@@ -1053,7 +1053,8 @@
                             <label>Temporada:</label>
                             <select id="plantilla-temporada" onchange="cargarPlantilla()"></select>
                         </div>
-                        <div id="plantilla-contador" class="plantilla-contador">0 / 30 jugadores</div>
+            <div id="plantilla-contador" class="plantilla-contador">0 / 30 jugadores</div>
+                        <button class="btn-primary" style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 8px 20px; font-size: 13px;" onclick="abrirModalDescargarPlantilla()">📄 Descargar Plantilla PDF</button>
                     </div>
                 </div>
                 
@@ -1395,6 +1396,17 @@
                     </div>
                 </div>
                 
+             <div class="form-row">
+                    <div class="form-group">
+                        <label>Nº Documento (DNI/NIE)</label>
+                        <input type="text" id="jugador-documento" placeholder="12345678A">
+                    </div>
+                    <div class="form-group">
+                        <label>Nº Licencia Federativa</label>
+                        <input type="text" id="jugador-licencia" placeholder="Nº licencia...">
+                    </div>
+                </div>
+                
                 <div class="form-group">
                     <label>Estado</label>
                     <select id="jugador-estado">
@@ -1410,7 +1422,81 @@
             </div>
         </div>
     </div>
-    
+    <!-- ==================== MODAL: DESCARGAR PLANTILLA PDF ==================== -->
+    <div id="modal-descargar-plantilla" class="modal-overlay" style="display: none;" onclick="cerrarModalDescargarPlantilla(event)">
+        <div class="modal-content" style="max-width: 500px;" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h3>📄 Descargar Plantilla en PDF</h3>
+                <button class="modal-close" onclick="cerrarModalDescargarPlantilla()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="color: #6b7280; margin-bottom: 15px;">Selecciona los campos que quieres incluir en el listado:</p>
+                
+                <div style="display: flex; gap: 8px; margin-bottom: 15px;">
+                    <button class="btn-secondary" style="font-size: 12px; padding: 5px 12px;" onclick="seleccionarTodosCamposPDF(true)">Todos</button>
+                    <button class="btn-secondary" style="font-size: 12px; padding: 5px 12px;" onclick="seleccionarTodosCamposPDF(false)">Ninguno</button>
+                </div>
+                
+                <div id="campos-pdf-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                    <label style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:#f8fafc;border-radius:8px;cursor:pointer;font-size:13px;">
+                        <input type="checkbox" class="campo-pdf-check" value="dorsal" checked> Dorsal
+                    </label>
+                    <label style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:#f8fafc;border-radius:8px;cursor:pointer;font-size:13px;">
+                        <input type="checkbox" class="campo-pdf-check" value="nombre" checked> Nombre
+                    </label>
+                    <label style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:#f8fafc;border-radius:8px;cursor:pointer;font-size:13px;">
+                        <input type="checkbox" class="campo-pdf-check" value="posicion" checked> Posición
+                    </label>
+                    <label style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:#f8fafc;border-radius:8px;cursor:pointer;font-size:13px;">
+                        <input type="checkbox" class="campo-pdf-check" value="nacimiento"> Fecha Nacimiento
+                    </label>
+                    <label style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:#f8fafc;border-radius:8px;cursor:pointer;font-size:13px;">
+                        <input type="checkbox" class="campo-pdf-check" value="edad"> Edad
+                    </label>
+                    <label style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:#f8fafc;border-radius:8px;cursor:pointer;font-size:13px;">
+                        <input type="checkbox" class="campo-pdf-check" value="pie"> Pie Dominante
+                    </label>
+                    <label style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:#f8fafc;border-radius:8px;cursor:pointer;font-size:13px;">
+                        <input type="checkbox" class="campo-pdf-check" value="altura"> Altura (cm)
+                    </label>
+                    <label style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:#f8fafc;border-radius:8px;cursor:pointer;font-size:13px;">
+                        <input type="checkbox" class="campo-pdf-check" value="peso"> Peso (kg)
+                    </label>
+                    <label style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:#f8fafc;border-radius:8px;cursor:pointer;font-size:13px;">
+                        <input type="checkbox" class="campo-pdf-check" value="telefono"> Teléfono
+                    </label>
+                    <label style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:#f8fafc;border-radius:8px;cursor:pointer;font-size:13px;">
+                        <input type="checkbox" class="campo-pdf-check" value="email"> Email
+                    </label>
+                    <label style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:#f8fafc;border-radius:8px;cursor:pointer;font-size:13px;">
+                        <input type="checkbox" class="campo-pdf-check" value="documento"> Nº Documento
+                    </label>
+                    <label style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:#f8fafc;border-radius:8px;cursor:pointer;font-size:13px;">
+                        <input type="checkbox" class="campo-pdf-check" value="licencia"> Nº Licencia Federativa
+                    </label>
+                    <label style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:#f8fafc;border-radius:8px;cursor:pointer;font-size:13px;">
+                        <input type="checkbox" class="campo-pdf-check" value="estado"> Estado
+                    </label>
+                </div>
+                
+                <div style="margin-top: 15px;">
+                    <label style="font-size: 13px; font-weight: 600; color: #374151; display: block; margin-bottom: 6px;">Orientación del PDF:</label>
+                    <div style="display: flex; gap: 10px;">
+                        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;">
+                            <input type="radio" name="pdf-orientacion" value="portrait" checked> Vertical
+                        </label>
+                        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;">
+                            <input type="radio" name="pdf-orientacion" value="landscape"> Horizontal
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="cerrarModalDescargarPlantilla()">Cancelar</button>
+                <button class="btn-primary" style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);" onclick="generarPDFPlantilla()">📄 Generar PDF</button>
+            </div>
+        </div>
+    </div>
     <!-- ==================== MODAL: SELECCIÓN SECCIÓN ==================== -->
     <div id="modal-seccion" class="modal-overlay" style="display: none;" onclick="cerrarModalSeccion(event)">
         <div class="modal-content" style="max-width: 400px;" onclick="event.stopPropagation()">
