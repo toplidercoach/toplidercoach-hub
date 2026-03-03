@@ -40,7 +40,7 @@ async function cargarCalendarioPartidos() {
     
     const partidosPorDia = {};
     (partidos || []).forEach(function(p) {
-        const dia = new Date(p.match_date).getDate();
+        const dia = new Date(p.match_date + 'T12:00:00').getDate();
         if (!partidosPorDia[dia]) partidosPorDia[dia] = [];
         partidosPorDia[dia].push(p);
     });
@@ -154,7 +154,8 @@ function limpiarFiltroPartidos() {
                     .eq('season_id', seasonId)
                     .order('match_date', { ascending: false });
                 
-                const hoy = new Date().toISOString().split('T')[0];
+                const ahora = new Date();
+const hoy = ahora.getFullYear() + '-' + String(ahora.getMonth() + 1).padStart(2, '0') + '-' + String(ahora.getDate()).padStart(2, '0');
                 // Filtros de fecha del calendario
 const desde = document.getElementById('filtro-partido-desde')?.value;
 const hasta = document.getElementById('filtro-partido-hasta')?.value;
@@ -181,7 +182,7 @@ if (hasta) {
                 }
                 
                 lista.innerHTML = data.map(p => {
-                    const fechaObj = new Date(p.match_date);
+                    const fechaObj = new Date(p.match_date + 'T12:00:00');
                     const diaSemana = ['DOM', 'LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB'][fechaObj.getDay()];
                     const diaNum = fechaObj.getDate();
                     const mesCorto = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC'][fechaObj.getMonth()];
@@ -274,7 +275,8 @@ if (hasta) {
             document.getElementById('partido-id').value = '';
             document.getElementById('partido-rival').value = '';
             document.getElementById('partido-competicion').value = '';
-            document.getElementById('partido-fecha').value = new Date().toISOString().split('T')[0];
+            const hoyFecha = new Date();
+document.getElementById('partido-fecha').value = hoyFecha.getFullYear() + '-' + String(hoyFecha.getMonth() + 1).padStart(2, '0') + '-' + String(hoyFecha.getDate()).padStart(2, '0');
             document.getElementById('partido-hora').value = '';
             document.getElementById('partido-localidad').value = 'home';
             document.getElementById('partido-estadio').value = '';
@@ -355,7 +357,7 @@ if (p.titulares && Array.isArray(p.titulares)) {
     
     const { data: club } = await supabaseClient.from('clubs').select('name, logo_url').eq('id', clubId).single();
     
-    const fecha = new Date(p.match_date).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    const fecha = new Date(p.match_date + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
     const hora = p.kick_off_time ? p.kick_off_time.slice(0, 5) : '';
     const esLocal = p.home_away === 'home';
     
@@ -1351,7 +1353,7 @@ async function abrirFichaJugador(playerId) {
     } else {
         tbody.innerHTML = stats.map(s => {
             const m = s.matches;
-            const fecha = new Date(m.match_date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
+            const fecha = new Date(m.match_date + 'T12:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
             const esLocal = m.home_away === 'home';
             const marcador = esLocal ? `${m.team_goals || 0}-${m.opponent_goals || 0}` : `${m.opponent_goals || 0}-${m.team_goals || 0}`;
             

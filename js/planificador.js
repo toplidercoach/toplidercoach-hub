@@ -393,7 +393,9 @@ registrarSubTab('planificador', 'calendario', cargarCalendarioUnificado);
         
        function limpiarSesion() {
             sesionEditandoId = null;
-            sesion = { nombre: '', fecha: new Date().toISOString().split('T')[0], calentamiento: [], principal: [], enfriamiento: [] };
+            const ahora = new Date();
+const fechaHoy = ahora.getFullYear() + '-' + String(ahora.getMonth() + 1).padStart(2, '0') + '-' + String(ahora.getDate()).padStart(2, '0');
+sesion = { nombre: '', fecha: fechaHoy, calentamiento: [], principal: [], enfriamiento: [] };
             document.getElementById('sesion-nombre').value = '';
             document.getElementById('sesion-fecha').value = sesion.fecha;
             document.getElementById('sesion-hora').value = '';
@@ -548,7 +550,7 @@ alert(sesionEditandoId ? 'Sesión actualizada correctamente' : 'Sesión guardada
                     const tTotal = tCal + tPri + tEnf;
                     const totalEj = cal.length + pri.length + enf.length;
                     
-                    const fechaObj = new Date(s.session_date);
+                    const fechaObj = new Date(s.session_date + 'T12:00:00');
                     const diaSemana = ['DOM', 'LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB'][fechaObj.getDay()];
                     const diaNum = fechaObj.getDate();
                     const mesCorto = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC'][fechaObj.getMonth()];
@@ -710,7 +712,7 @@ async function exportarSesionPDF(id, conTitulos = true) {
             const { data: s } = await supabaseClient.from('training_sessions').select('*').eq('id', id).single();
             const { data: club } = await supabaseClient.from('clubs').select('name, logo_url').eq('id', clubId).single();
             
-            const fecha = new Date(s.session_date).toLocaleDateString('es-ES');
+            const fecha = new Date(s.session_date + 'T12:00:00').toLocaleDateString('es-ES');
             const hora = s.session_time ? s.session_time.substring(0, 5) : '';
             
             // Funcion para limpiar texto
@@ -1032,14 +1034,14 @@ if (s.players && s.players.length > 0) {
             // Agrupar por día
             const sesionesPorDia = {};
             (sesiones || []).forEach(s => {
-                const dia = new Date(s.session_date).getDate();
+                const dia = new Date(s.session_date + 'T12:00:00').getDate();
                 if (!sesionesPorDia[dia]) sesionesPorDia[dia] = [];
                 sesionesPorDia[dia].push(s);
             });
             
             const partidosPorDia = {};
             (partidos || []).forEach(p => {
-                const dia = new Date(p.match_date).getDate();
+                const dia = new Date(p.match_date + 'T12:00:00').getDate();
                 if (!partidosPorDia[dia]) partidosPorDia[dia] = [];
                 partidosPorDia[dia].push(p);
             });
