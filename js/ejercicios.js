@@ -352,6 +352,10 @@ for (const l of trajs) {
             const hl = 8+sw;
             html += `<path d="M${l.x1} ${l.y1} Q${cx} ${cy} ${l.x2} ${l.y2}" stroke="${col}" stroke-width="${sw}" stroke-dasharray="${dash}" fill="none" opacity="0.85"/>
             <polygon points="${l.x2},${l.y2} ${l.x2-hl*Math.cos(ang-.4)},${l.y2-hl*Math.sin(ang-.4)} ${l.x2-hl*Math.cos(ang+.4)},${l.y2-hl*Math.sin(ang+.4)}" fill="${col}" opacity="0.85"/>`;
+            if (!ejP.isPlaying) {
+                html += `<line x1="${(l.x1+l.x2)/2}" y1="${(l.y1+l.y2)/2}" x2="${cx}" y2="${cy}" stroke="#facc15" stroke-width="1" stroke-dasharray="3 3" opacity="0.4"/>`;
+                html += `<circle cx="${cx}" cy="${cy}" r="9" fill="#facc15" stroke="white" stroke-width="2" data-traj-ctrl="${l.id}" style="cursor:grab;opacity:0.9"/>`;
+            }
         } else if (l.type === 'rect') {
             html += `<rect x="${l.x}" y="${l.y}" width="${l.w}" height="${l.h}" fill="none" stroke="${col}" stroke-width="${sw}" stroke-dasharray="${dash}" opacity="0.85"/>`;
         } else if (l.type === 'ellipse') {
@@ -399,6 +403,13 @@ function ejSvgPointerDown(e) {
     if (target.dataset.ctrl) {
         ejP.isDragging = true;
         ejP._ctrlId = target.dataset.ctrl;
+        return;
+    }
+
+    // Click en punto de control de trayectoria curva (animación)
+    if (target.dataset.trajCtrl) {
+        ejP.isDragging = true;
+        ejP._trajCtrlId = target.dataset.trajCtrl;
         return;
     }
 
@@ -481,17 +492,33 @@ return;
  // Herramientas de dibujo
     const drawTools = ['arrow','line','rect','ellipse','curved','pencil'];
     if (drawTools.includes(ejP.activeTool) && ejP.animMode) {
-        const SNAP = 35;
+        const SNAP_PLAYER = 30;
+        const SNAP_BALL = 22;
+        const SNAP_EQUIP = 26;
         let snapElem = null;
-        for (const p of ejP.players) {
-            const dx = pos.x - p.x, dy = pos.y - p.y;
-            if (Math.sqrt(dx*dx+dy*dy) < SNAP) { snapElem = p; break; }
+        let snapDist = 9999;
+
+        // Primero buscar balón (prioridad máxima, radio pequeño)
+        for (const eq of ejP.equipment) {
+            if (eq.eqType !== 'ball') continue;
+            const dx = pos.x - eq.x, dy = pos.y - eq.y;
+            const d = Math.sqrt(dx*dx+dy*dy);
+            if (d < SNAP_BALL && d < snapDist) { snapElem = eq; snapDist = d; }
         }
+        // Luego otro equipamiento
         if (!snapElem) {
             for (const eq of ejP.equipment) {
+                if (eq.eqType === 'ball') continue;
                 const dx = pos.x - eq.x, dy = pos.y - eq.y;
-                if (Math.sqrt(dx*dx+dy*dy) < SNAP) { snapElem = eq; break; }
+                const d = Math.sqrt(dx*dx+dy*dy);
+                if (d < SNAP_EQUIP && d < snapDist) { snapElem = eq; snapDist = d; }
             }
+        }
+        // Finalmente jugadores (solo si no hay balón/equipamiento más cerca)
+        for (const p of ejP.players) {
+            const dx = pos.x - p.x, dy = pos.y - p.y;
+            const d = Math.sqrt(dx*dx+dy*dy);
+            if (d < SNAP_PLAYER && d < snapDist) { snapElem = p; snapDist = d; }
         }
 if (snapElem) {
             const elemType = ejP.players.find(p => p.id === snapElem.id) ? 'player' : 'equipment';
@@ -534,10 +561,22 @@ if (snapElem) {
 function ejSvgPointerMove(e) {
     const pos = ejGetPos(e);
 
-    // Arrastrar punto de control de curva
+    // Arrastrar punto de control de curva (línea normal)
     if (ejP.isDragging && ejP._ctrlId) {
         const id = parseInt(ejP._ctrlId);
         ejP.lines = ejP.lines.map(l => l.id === id ? { ...l, cx: pos.x, cy: pos.y } : l);
+        ejRenderSVG();
+        return;
+    }
+
+    // Arrastrar punto de control de trayectoria curva (animación)
+    if (ejP.isDragging && ejP._trajCtrlId) {
+        const id = parseInt(ejP._trajCtrlId);
+        const frame = ejP.frames[ejP.currentFrame];
+        if (frame && frame.trajectories) {
+            const traj = frame.trajectories.find(t => t.id === id);
+            if (traj) { traj.cx = pos.x; traj.cy = pos.y; }
+        }
         ejRenderSVG();
         return;
     }
@@ -594,6 +633,7 @@ function ejSvgPointerUp(e) {
     }
     ejP.isDragging = false;
     ejP._ctrlId = null;
+    ejP._trajCtrlId = null;
 
     // Fin de dibujo
     if (ejP.isDrawing && ejP.drawStart) {
@@ -1801,16 +1841,25 @@ function ejFrameAnimate(now) {
         const pb = fB.players.find(p => p.id === pa.id);
         const player = ejP.players.find(p => p.id === pa.id);
         if (!pb || !player) continue;
-        const traj = (fA.trajectories || []).find(tr =>
+        const trajFree = (fA.trajectories || []).find(tr =>
             tr.isMovement && tr.linkedId === pa.id && tr.type === 'freehand' && tr.points && tr.points.length > 1
         );
-        if (traj) {
-            const pts = traj.points;
+        const trajCurved = (fA.trajectories || []).find(tr =>
+            tr.isMovement && tr.linkedId === pa.id && tr.type === 'curved'
+        );
+        if (trajFree) {
+            const pts = trajFree.points;
             const pos = ease * (pts.length - 1);
             const idx = Math.min(Math.floor(pos), pts.length - 2);
             const frac = pos - idx;
             player.x = pts[idx].x + (pts[idx + 1].x - pts[idx].x) * frac;
             player.y = pts[idx].y + (pts[idx + 1].y - pts[idx].y) * frac;
+        } else if (trajCurved) {
+            const t = ease;
+            const cx = trajCurved.cx ?? (trajCurved.x1 + trajCurved.x2) / 2;
+            const cy = trajCurved.cy ?? (trajCurved.y1 + trajCurved.y2) / 2 - 40;
+            player.x = (1-t)*(1-t)*trajCurved.x1 + 2*(1-t)*t*cx + t*t*trajCurved.x2;
+            player.y = (1-t)*(1-t)*trajCurved.y1 + 2*(1-t)*t*cy + t*t*trajCurved.y2;
         } else {
             player.x = pa.x + (pb.x - pa.x) * ease;
             player.y = pa.y + (pb.y - pa.y) * ease;
@@ -1821,16 +1870,25 @@ function ejFrameAnimate(now) {
         const eb = fB.equipment.find(e => e.id === ea.id);
         const eq = ejP.equipment.find(e => e.id === ea.id);
         if (!eb || !eq) continue;
-        const traj = (fA.trajectories || []).find(tr =>
+        const trajFreeEq = (fA.trajectories || []).find(tr =>
             tr.isMovement && tr.linkedId === ea.id && tr.type === 'freehand' && tr.points && tr.points.length > 1
         );
-        if (traj) {
-            const pts = traj.points;
+        const trajCurvedEq = (fA.trajectories || []).find(tr =>
+            tr.isMovement && tr.linkedId === ea.id && tr.type === 'curved'
+        );
+        if (trajFreeEq) {
+            const pts = trajFreeEq.points;
             const pos = ease * (pts.length - 1);
             const idx = Math.min(Math.floor(pos), pts.length - 2);
             const frac = pos - idx;
             eq.x = pts[idx].x + (pts[idx + 1].x - pts[idx].x) * frac;
             eq.y = pts[idx].y + (pts[idx + 1].y - pts[idx].y) * frac;
+        } else if (trajCurvedEq) {
+            const t = ease;
+            const cx = trajCurvedEq.cx ?? (trajCurvedEq.x1 + trajCurvedEq.x2) / 2;
+            const cy = trajCurvedEq.cy ?? (trajCurvedEq.y1 + trajCurvedEq.y2) / 2 - 40;
+            eq.x = (1-t)*(1-t)*trajCurvedEq.x1 + 2*(1-t)*t*cx + t*t*trajCurvedEq.x2;
+            eq.y = (1-t)*(1-t)*trajCurvedEq.y1 + 2*(1-t)*t*cy + t*t*trajCurvedEq.y2;
         } else {
             eq.x = ea.x + (eb.x - ea.x) * ease;
             eq.y = ea.y + (eb.y - ea.y) * ease;
