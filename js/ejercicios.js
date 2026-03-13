@@ -320,6 +320,19 @@ function ejRenderSVG() {
             ${p.showNumber && p.number ? `<text text-anchor="middle" dominant-baseline="central" fill="${textColor}" font-size="${fs}" font-weight="600" font-family="system-ui">${p.number}</text>` : ''}
         </g>`;
     }
+// Fantasmas del frame anterior
+if (ejP.animMode && ejP.currentFrame > 0) {
+    const prevF = ejP.frames[ejP.currentFrame - 1];
+    if (prevF) {
+        for (const fp of prevF.players) {
+            const cur = ejP.players.find(p => p.id === fp.id);
+            if (cur && (Math.abs(cur.x - fp.x) > 3 || Math.abs(cur.y - fp.y) > 3)) {
+                html += `<circle cx="${fp.x}" cy="${fp.y}" r="14" fill="none" stroke="#facc15" stroke-width="1.5" stroke-dasharray="3 3" opacity="0.25"/>`;
+            }
+        }
+    }
+}
+
 // Trayectorias del frame actual (modo animación)
 if (ejP.animMode && ejP.frames[ejP.currentFrame]) {
     const trajs = ejP.frames[ejP.currentFrame].trajectories || [];
@@ -623,18 +636,18 @@ function ejSvgPointerUp(e) {
                         ? ejP.players.find(p => p.id === snap.id)
                         : ejP.equipment.find(eq => eq.id === snap.id);
                     if (elem) {
-                        const fromX = elem.x, fromY = elem.y;
-                        elem.x = endX; elem.y = endY;
-                       newLine.isMovement = true;
-                        newLine.fromX = fromX;
-                        newLine.fromY = fromY;
+                        newLine.isMovement = true;
+                        newLine.fromX = elem.x;
+                        newLine.fromY = elem.y;
+                        newLine.toX = endX;
+                        newLine.toY = endY;
                         newLine.linkedId = snap.id;
                         newLine.color = '#facc15';
                         newLine.strokeWidth = 2;
                         newLine.dashed = true;
                         frame.trajectories.push(newLine);
-                        frame.undoStack.push({ type: 'move', elemType: snap.elemType, id: snap.id, fromX, fromY, toX: endX, toY: endY, trajId: newLine.id });
-                        ejFrameSaveCurrent();
+                        frame.undoStack = frame.undoStack || [];
+                        frame.undoStack.push({ type: 'traj', trajId: newLine.id });
                     }
                 } else {
                     newLine.isMovement = false;
@@ -1646,18 +1659,33 @@ function ejFrameRestore(frame) {
 // Guarda el estado actual en el frame actual
 function ejFrameSaveCurrent() {
     if (!ejP.animMode || ejP.frames.length === 0) return;
-    ejP.frames[ejP.currentFrame] = ejFrameSnapshot();
+    const existing = ejP.frames[ejP.currentFrame];
+    const snap = ejFrameSnapshot();
+    // Preservar trayectorias y undoStack al guardar posiciones
+    snap.trajectories = existing ? (existing.trajectories || []) : [];
+    snap.undoStack = existing ? (existing.undoStack || []) : [];
+    ejP.frames[ejP.currentFrame] = snap;
 }
 
 // Añade un nuevo frame (clona posiciones del frame actual)
 function ejFrameAdd() {
     if (!ejP.animMode) return;
-    // Guardar estado actual en su frame
     ejFrameSaveCurrent();
-    // Crear nuevo frame con las mismas posiciones
+    // Aplicar trayectorias: mover elementos a su destino
+    const cf = ejP.frames[ejP.currentFrame];
+    if (cf && cf.trajectories) {
+        for (const traj of cf.trajectories) {
+            if (!traj.isMovement || traj.toX === undefined) continue;
+            const pl = ejP.players.find(p => p.id === traj.linkedId);
+            if (pl) { pl.x = traj.toX; pl.y = traj.toY; }
+            const eq = ejP.equipment.find(e => e.id === traj.linkedId);
+            if (eq) { eq.x = traj.toX; eq.y = traj.toY; }
+        }
+    }
     const newFrame = ejFrameSnapshot();
     ejP.frames.push(newFrame);
     ejP.currentFrame = ejP.frames.length - 1;
+    ejRenderSVG();
     ejRenderTimeline();
 }
 
@@ -1676,24 +1704,9 @@ function ejFrameDeleteLast() {
 function ejFrameUndoTraj() {
     if (!ejP.animMode) return;
     const frame = ejP.frames[ejP.currentFrame];
-    if (!frame) return;
-    if (!frame.undoStack) frame.undoStack = [];
-
-    if (frame.undoStack.length === 0) return;
+    if (!frame || !frame.undoStack || frame.undoStack.length === 0) return;
     const action = frame.undoStack.pop();
-
-    if (action.type === 'move' || action.type === 'drag') {
-        const elem = action.elemType === 'player'
-            ? ejP.players.find(p => p.id === action.id)
-            : ejP.equipment.find(eq => eq.id === action.id);
-        if (elem) { elem.x = action.fromX; elem.y = action.fromY; }
-        if (action.trajId && frame.trajectories) {
-            frame.trajectories = frame.trajectories.filter(t => t.id !== action.trajId);
-        }
-        ejFrameSaveCurrent();
-    } else if (action.type === 'traj') {
-        if (frame.trajectories) frame.trajectories = frame.trajectories.filter(t => t.id !== action.trajId);
-    }
+    if (frame.trajectories) frame.trajectories = frame.trajectories.filter(t => t.id !== action.trajId);
     ejRenderSVG();
     ejRenderTimeline();
 }
@@ -1783,20 +1796,42 @@ function ejFrameAnimate(now) {
     // Ease in-out cuadrático
     const ease = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
 
-    // Interpolar jugadores
+    // Interpolar jugadores (siguiendo trayectoria freehand si existe)
     for (const pa of fA.players) {
         const pb = fB.players.find(p => p.id === pa.id);
         const player = ejP.players.find(p => p.id === pa.id);
-        if (pb && player) {
+        if (!pb || !player) continue;
+        const traj = (fA.trajectories || []).find(tr =>
+            tr.isMovement && tr.linkedId === pa.id && tr.type === 'freehand' && tr.points && tr.points.length > 1
+        );
+        if (traj) {
+            const pts = traj.points;
+            const pos = ease * (pts.length - 1);
+            const idx = Math.min(Math.floor(pos), pts.length - 2);
+            const frac = pos - idx;
+            player.x = pts[idx].x + (pts[idx + 1].x - pts[idx].x) * frac;
+            player.y = pts[idx].y + (pts[idx + 1].y - pts[idx].y) * frac;
+        } else {
             player.x = pa.x + (pb.x - pa.x) * ease;
             player.y = pa.y + (pb.y - pa.y) * ease;
         }
     }
-    // Interpolar equipamiento
- for (const ea of fA.equipment) {
+    // Interpolar equipamiento (siguiendo trayectoria freehand si existe)
+    for (const ea of fA.equipment) {
         const eb = fB.equipment.find(e => e.id === ea.id);
         const eq = ejP.equipment.find(e => e.id === ea.id);
-        if (eb && eq) {
+        if (!eb || !eq) continue;
+        const traj = (fA.trajectories || []).find(tr =>
+            tr.isMovement && tr.linkedId === ea.id && tr.type === 'freehand' && tr.points && tr.points.length > 1
+        );
+        if (traj) {
+            const pts = traj.points;
+            const pos = ease * (pts.length - 1);
+            const idx = Math.min(Math.floor(pos), pts.length - 2);
+            const frac = pos - idx;
+            eq.x = pts[idx].x + (pts[idx + 1].x - pts[idx].x) * frac;
+            eq.y = pts[idx].y + (pts[idx + 1].y - pts[idx].y) * frac;
+        } else {
             eq.x = ea.x + (eb.x - ea.x) * ease;
             eq.y = ea.y + (eb.y - ea.y) * ease;
         }
