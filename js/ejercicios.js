@@ -485,12 +485,18 @@ return;
                 if (Math.sqrt(dx*dx+dy*dy) < SNAP) { snapElem = eq; break; }
             }
         }
-        if (snapElem) {
-            ejP.selectedId = snapElem.id;
-            ejP.isDragging = true;
-            ejP._ctrlId = null;
-            ejP.dragOffset = { x: pos.x - snapElem.x, y: pos.y - snapElem.y };
-            ejRenderSVG();
+if (snapElem) {
+            const elemType = ejP.players.find(p => p.id === snapElem.id) ? 'player' : 'equipment';
+            ejP._animDrawSnap = { id: snapElem.id, elemType };
+            ejP.isDrawing = true;
+            ejP.drawStart = { x: snapElem.x, y: snapElem.y };
+            if (ejP.activeTool === 'pencil') {
+                ejP.tempShape = { type: 'freehand', points: [{ x: snapElem.x, y: snapElem.y }] };
+            } else if (ejP.activeTool === 'curved') {
+                ejP.tempShape = { type: 'curved', x1: snapElem.x, y1: snapElem.y, x2: snapElem.x, y2: snapElem.y };
+            } else {
+                ejP.tempShape = { type: 'line', x1: snapElem.x, y1: snapElem.y, x2: snapElem.x, y2: snapElem.y };
+            }
             return;
         }
     }
