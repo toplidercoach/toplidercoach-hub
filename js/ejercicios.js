@@ -323,6 +323,7 @@ function ejRenderSVG() {
             ${p.hasVest ? `<circle r="${r+4}" fill="none" stroke="${vc.fill}" stroke-width="4" stroke-dasharray="8 4"/>` : ''}
             <circle r="${r}" fill="${fillAttr}" stroke="${sel?'#22c55e':tc.stroke}" stroke-width="${sel?3:2}"/>
             ${p.showNumber && p.number ? `<text text-anchor="middle" dominant-baseline="central" fill="${textColor}" font-size="${fs}" font-weight="600" font-family="system-ui">${p.number}</text>` : ''}
+            ${p.showName && p.name ? `<text text-anchor="middle" y="${r+10}" fill="#ffffff" font-size="9" font-weight="600" font-family="system-ui" style="text-shadow:0 1px 2px rgba(0,0,0,.8)">${p.name.split(' ')[0]}</text>` : ''}
         </g>`;
     }
 // Fantasmas del frame anterior
@@ -453,19 +454,37 @@ function ejSvgPointerDown(e) {
     // Herramienta jugador
     if (ejP.activeTool === 'player' && isBackground) {
         ejSaveHistory();
-        const color = ejP._addingRival ? ejP.rivalColor : ejP.myColor;
-        const counts = ejP.playerCounts;
-        counts[color] = (counts[color] || 0) + 1;
         const scale = ejP.selectedSize === 'small' ? 0.6 : ejP.selectedSize === 'large' ? 1.4 : 1.0;
         const id = ejP.nextId++;
-        ejP.players.push({
-            id, x: pos.x, y: pos.y, color,
-            scale, number: ejP.showNumbers ? counts[color] : '',
-            showNumber: ejP.showNumbers,
-            hasVest: ejP.hasVest, vestColor: ejP.vestColor
-        });
+
+        if (ejP._plantillaMode && ejP._plantilla && ejP._plantillaSelIdx !== undefined) {
+            const p = ejP._plantilla[ejP._plantillaSelIdx];
+            const isGk = p.position && p.position.toLowerCase().includes('portero');
+            const color = isGk ? ejP.myGkColor : ejP.myColor;
+            ejP.players.push({
+                id, x: pos.x, y: pos.y, color,
+                scale, number: p.number, name: p.name,
+                showNumber: ejP._plantillaLabel !== 'name',
+                showName: ejP._plantillaLabel === 'name' || ejP._plantillaLabel === 'both',
+                hasVest: false, vestColor: ejP.vestColor
+            });
+            ejP._plantillaMode = false;
+            ejP._plantillaSelIdx = undefined;
+            ejP.activeTool = 'select';
+        } else {
+            const color = ejP._addingRival ? ejP.rivalColor : ejP.myColor;
+            const counts = ejP.playerCounts;
+            counts[color] = (counts[color] || 0) + 1;
+            ejP.players.push({
+                id, x: pos.x, y: pos.y, color,
+                scale, number: ejP.showNumbers ? counts[color] : '',
+                showNumber: ejP.showNumbers,
+                hasVest: ejP.hasVest, vestColor: ejP.vestColor
+            });
+        }
         ejP.selectedId = id;
         ejRenderSVG();
+        ejRenderToolbar();
         return;
     }
 
@@ -988,7 +1007,38 @@ function ejRenderToolbar() {
         </div>
         <div class="ej-opts-block">
             <label class="ej-opts-label">Opciones</label>
-            <button class="ej-btn-tool${t==='player'?' active':''}" onclick="ejSetTool('player');ejP._addingRival=false;ejRenderToolbar()">
+            <button onclick="ejCargarPlantilla()" style="width:100%;padding:7px;background:#1e3a5f;border:1px solid #2563eb;color:#93c5fd;border-radius:6px;cursor:pointer;font-size:12px;margin-bottom:6px">
+                👥 Cargar mi plantilla
+            </button>
+            ${ejP._plantilla && ejP._plantilla.length ? `
+            <div style="margin-bottom:8px">
+                <div style="font-size:10px;color:#64748b;margin-bottom:4px;text-transform:uppercase">Mi plantilla — clic para colocar</div>
+            <div style="display:flex;gap:4px;margin-bottom:6px">
+                ${['num','name','both'].map(opt => {
+                    const lbl = opt==='num'?'Nº':opt==='name'?'Nombre':'Nº+Nombre';
+                    const active = (ejP._plantillaLabel||'num') === opt;
+                    return `<button onclick="ejP._plantillaLabel='${opt}';ejRenderToolbar()" style="flex:1;padding:3px;font-size:9px;border-radius:4px;border:1px solid ${active?'#3b82f6':'#334155'};background:${active?'#1e3a5f':'transparent'};color:${active?'#93c5fd':'#64748b'};cursor:pointer">${lbl}</button>`;
+                }).join('')}
+            </div>
+                <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;max-height:200px;overflow-y:auto">
+                    ${ejP._plantilla.map((p, i) => {
+                        const isGk = p.position && p.position.toLowerCase().includes('portero');
+                        const col = isGk ? EJ_TEAM_COLORS[ejP.myGkColor] : EJ_TEAM_COLORS[ejP.myColor];
+                        const active = ejP._plantillaSelIdx === i;
+                        return `<div onclick="ejColocarJugadorPlantilla(${i})" title="${p.name}" style="
+                            display:flex;flex-direction:column;align-items:center;gap:2px;
+                            padding:4px 2px;border-radius:6px;cursor:pointer;
+                            background:${active?'#1e3a5f':'transparent'};
+                            border:1px solid ${active?'#3b82f6':'transparent'}">
+                            <div style="width:28px;height:28px;border-radius:50%;background:${col?.fill||'#3b82f6'};border:2px solid ${col?.stroke||'#2563eb'};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff">
+                                ${p.number}
+                            </div>
+                            <span style="font-size:8px;color:#9ca3af;text-align:center;line-height:1.1;max-width:36px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name.split(' ')[0]}</span>
+                        </div>`;
+                    }).join('')}
+                </div>
+            </div>` : ''}
+            <button class="ej-btn-tool${t==='player'&&!ejP._plantillaMode?' active':''}" onclick="ejSetTool('player');ejP._addingRival=false;ejP._plantillaMode=false;ejRenderToolbar()">
                 + Jugador (mi equipo)
             </button>
             <button class="ej-btn-tool${t==='player'&&ejP._addingRival?' active':''}" onclick="ejSetTool('player');ejP._addingRival=true;ejRenderToolbar()" style="border-color:#ef4444">
@@ -2047,7 +2097,57 @@ function ejRenderTimeline() {
         <span style="color:#64748b;font-size:11px;white-space:nowrap">Frame ${cur+1}/${total}</span>
     </div>`;
 }
+async function ejCargarPlantilla() {
+    try {
+        // Obtener temporada activa
+        // Buscar temporada activa del club actual
+        // Usar variables globales del sistema
+        const clubIdActual = window.clubId || clubId;
+        let seasonIdActual = window.seasonId || seasonId;
 
+        if (!seasonIdActual) {
+            const { data: seasons } = await supabaseClient
+                .from('seasons')
+                .select('id')
+                .eq('club_id', clubIdActual)
+                .eq('is_active', true)
+                .limit(1);
+            if (!seasons || !seasons.length) {
+                alert('No hay temporada activa. Configura una en Mi Club.');
+                return;
+            }
+            seasonIdActual = seasons[0].id;
+        }
+
+        // Cargar jugadores de la temporada
+        const { data, error } = await supabaseClient
+            .from('season_players')
+            .select('shirt_number, player_id, players(name, position)')
+            .eq('season_id', seasonIdActual)
+            .order('shirt_number', { ascending: true });
+
+        if (error) throw error;
+        ejP._plantilla = (data || []).map(sp => ({
+            playerId: sp.player_id,
+            number: sp.shirt_number,
+            name: sp.players?.name || '?',
+            position: sp.players?.position || ''
+        }));
+        ejRenderToolbar();
+    } catch(err) {
+        console.error('Error cargando plantilla:', err);
+        alert('Error: ' + err.message);
+    }
+}
+
+function ejColocarJugadorPlantilla(idx) {
+    const p = ejP._plantilla[idx];
+    if (!p) return;
+    ejP._plantillaSelIdx = idx;
+    ejP.activeTool = 'player';
+    ejP._plantillaMode = true;
+    ejRenderToolbar();
+}
 function ejInit() {
     const root = document.getElementById('ejercicios-root');
     if (!root) return;
