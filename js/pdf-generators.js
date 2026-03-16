@@ -113,7 +113,7 @@ async function exportarFichaJugadorPDF() {
     if (stats && stats.length > 0) {
         const tableData = stats.map(s => {
             const m = s.matches;
-            const fecha = new Date(m.match_date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
+            const fecha = new Date(m.match_date + 'T12:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
             const esLocal = m.home_away === 'home';
             const marcador = esLocal ? `${m.team_goals || 0}-${m.opponent_goals || 0}` : `${m.opponent_goals || 0}-${m.team_goals || 0}`;
             return [
@@ -204,12 +204,12 @@ async function generarPDFConvocatoria() {
     }
     jugadoresConvocados.sort((a, b) => (a.dorsal || 99) - (b.dorsal || 99));
     
-    const fechaFormateada = fecha ? new Date(fecha).toLocaleDateString('es-ES', { 
-        weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' 
-    }) : '';
-    const fechaCorta = fecha ? new Date(fecha).toLocaleDateString('es-ES', { 
-        day: '2-digit', month: 'short', year: 'numeric' 
-    }) : '';
+  const fechaFormateada = fecha ? new Date(fecha + 'T12:00:00').toLocaleDateString('es-ES', { 
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' 
+}) : '';
+  const fechaCorta = fecha ? new Date(fecha + 'T12:00:00').toLocaleDateString('es-ES', { 
+    day: '2-digit', month: 'short', year: 'numeric' 
+}) : '';
     
     const colorPrimario = [5, 150, 105];
     const colorSecundario = [16, 185, 129];
@@ -360,9 +360,9 @@ async function generarPDFConvocatoria() {
         if (fechaSalida || horaSalida) {
             doc.setFont('helvetica', 'bold');
             if (fechaSalida) {
-                const fechaSalidaFormateada = new Date(fechaSalida).toLocaleDateString('es-ES', { 
-                    weekday: 'short', day: 'numeric', month: 'short' 
-                });
+              const fechaSalidaFormateada = new Date(fechaSalida + 'T12:00:00').toLocaleDateString('es-ES', { 
+    weekday: 'short', day: 'numeric', month: 'short' 
+});
                 doc.text('Salida:', 15, yInfo);
                 doc.setFont('helvetica', 'normal');
                 doc.text(fechaSalidaFormateada + (horaSalida ? ' a las ' + horaSalida + 'h' : ''), 32, yInfo);
@@ -436,10 +436,9 @@ async function generarPDFAlineacion() {
     titulares.sort((a, b) => (a.dorsal || 99) - (b.dorsal || 99));
     suplentes.sort((a, b) => (a.dorsal || 99) - (b.dorsal || 99));
     
-    const fechaCorta = fecha ? new Date(fecha).toLocaleDateString('es-ES', { 
-        day: '2-digit', month: 'short', year: 'numeric' 
-    }) : '';
-    
+   const fechaCorta = fecha ? new Date(fecha + 'T12:00:00').toLocaleDateString('es-ES', { 
+    day: '2-digit', month: 'short', year: 'numeric' 
+}) : '';
     const colorPrimario = [37, 99, 235];
     const colorSecundario = [59, 130, 246];
     const colorSuplentes = [107, 114, 128];
@@ -650,7 +649,7 @@ async function dibujarJugadorCardCompacta(doc, jugador, x, y, ancho, alto, color
             const { data: p } = await supabaseClient.from('matches').select('*').eq('id', partidoId).single();
             const { data: stats } = await supabaseClient.from('match_player_stats').select('*, players(name, position)').eq('match_id', partidoId).order('minutes_played', { ascending: false });
             
-            const fecha = new Date(p.match_date).toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            const fecha = new Date(p.match_date + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
             
             // Header
             doc.setFillColor(5, 150, 105);
@@ -826,9 +825,9 @@ async function generarPDFHojaPartido() {
         .filter(sp => !titularesPartido.includes(String(sp.id)))
         .sort((a, b) => (a.shirt_number || 99) - (b.shirt_number || 99));
     
-    const fechaFormateada = fecha ? new Date(fecha).toLocaleDateString('es-ES', {
-        day: '2-digit', month: '2-digit', year: 'numeric'
-    }) : '';
+   const fechaFormateada = fecha ? new Date(fecha + 'T12:00:00').toLocaleDateString('es-ES', {
+    day: '2-digit', month: '2-digit', year: 'numeric'
+}) : '';
     
     // ===== HEADER =====
     doc.setFontSize(16);
