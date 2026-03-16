@@ -897,12 +897,12 @@ function ejCapturarParaFicha() {
     if (!svgEl) { alert('No hay pizarra para capturar'); return; }
     window.ejThumbnailPendiente = new XMLSerializer().serializeToString(svgEl);
     // Cambiar a la pestaña Ficha
-    const btnFicha = document.querySelector('[onclick*="\'ficha\'"]');
-    if (btnFicha) btnFicha.click();
-    // Mensaje visual en la ficha
+    ejShowTab('ficha', document.querySelector('[onclick*="\'ficha\'"]'));
+    // Actualizar miniatura y vídeo en la ficha
     setTimeout(() => {
+        ejActualizarFichaMedia();
         const msg = document.getElementById('ej-ficha-msg');
-        if (msg) msg.innerHTML = '<span style="color:#a855f7">🎨 Dibujo capturado — se guardará con el ejercicio</span>';
+        if (msg) msg.innerHTML = '<span style="color:#a855f7">📸 Miniatura capturada — rellena los datos y pulsa Guardar</span>';
         setTimeout(() => { if (msg) msg.innerHTML = ''; }, 4000);
     }, 300);
 }
@@ -1240,139 +1240,240 @@ function ejBuildFicha() {
     const root = document.getElementById('ej-ficha-container');
     if (!root) return;
     root.innerHTML = `
-    <div class="ej-ficha-form">
-        <h3 class="ej-ficha-title">📋 Ficha del Ejercicio</h3>
-        <div class="ej-form-grid">
-            <div class="ej-field">
-                <label>Nombre del ejercicio *</label>
-                <input type="text" id="ej-nombre" placeholder="Ej: Rondo 4x1">
+    <div class="ej-ficha-form" style="max-width:960px;margin:0 auto">
+
+        <!-- MEDIA: MINIATURA + VÍDEO -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;background:#0f172a;border:1px solid #1e3a5f;border-radius:10px;overflow:hidden;margin-bottom:16px">
+            <div style="padding:14px 16px;border-right:1px solid #1e3a5f">
+                <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">🎨 Miniatura</div>
+                <div id="ej-ficha-thumb" style="width:100%;aspect-ratio:8/5;border-radius:8px;background:#1e3a5f;display:flex;align-items:center;justify-content:center;overflow:hidden">
+                    <span style="color:#475569;font-size:11px">Dibuja en la pizarra y pulsa "Usar en ficha"</span>
+                </div>
+                <button onclick="ejCapturarMiniatura()" style="width:100%;margin-top:6px;padding:6px;background:#3b82f6;border:none;color:#fff;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600">📸 Capturar pizarra</button>
             </div>
-            <div class="ej-field">
-                <label>Categoría</label>
-                <select id="ej-categoria">
-                    <option value="">-- Seleccionar --</option>
-                    <option>Técnica individual</option>
-                    <option>Posesión</option>
-                    <option>Pressing</option>
-                    <option>Ataque posicional</option>
-                    <option>Defensa</option>
-                    <option>Transiciones</option>
-                    <option>Portería</option>
-                    <option>Físico</option>
-                    <option>Táctica</option>
-                </select>
+            <div style="padding:14px 16px">
+                <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">🎬 Vídeo animación</div>
+                <div id="ej-ficha-video" style="width:100%;aspect-ratio:8/5;border-radius:8px;background:#1e3a5f;display:flex;align-items:center;justify-content:center;overflow:hidden">
+                    <span style="color:#475569;font-size:11px">Exporta MP4 desde la pizarra</span>
+                </div>
+                <div id="ej-ficha-video-btns" style="margin-top:6px;display:flex;gap:6px"></div>
             </div>
-            <div class="ej-field">
-                <label>Categoría de edad</label>
-                <select id="ej-edad">
-                    <option value="">-- Todas --</option>
-                    <option>Prebenjamín</option><option>Benjamín</option><option>Alevín</option>
-                    <option>Infantil</option><option>Cadete</option><option>Juvenil</option>
-                    <option>Senior</option>
-                </select>
-            </div>
-            <div class="ej-field">
-                <label>Duración (min)</label>
-                <input type="number" id="ej-duracion" min="1" max="90" placeholder="15">
-            </div>
-            <div class="ej-field">
-                <label>Nº jugadores</label>
-                <input type="number" id="ej-jugadores" min="1" max="30" placeholder="14" oninput="ejCalcEII()">
-            </div>
-            <div class="ej-field">
-                <label>Dificultad</label>
-<select id="ej-dificultad">
-                    <option value="">Dificultad</option>
-                    <option value="1">1</option>
-                    <option value="2">2</option>
-                    <option value="3">3</option>
-                    <option value="4">4</option>
-                    <option value="5">5</option>
-                </select>
-            </div>
-            <div class="ej-field">
-                <label>Tema</label>
-       <select id="ej-tema">
-                    <option value="">-- Seleccionar --</option>
-                    <option>Calentamiento</option>
-                    <option>Cambios de orientación</option>
-                    <option>Centros laterales</option>
-                    <option>Contraataque</option>
-                    <option>Defensa en bloque bajo</option>
-                    <option>Defensa en inferioridad</option>
-                    <option>Duelos</option>
-                    <option>Finalización</option>
-                    <option>Físico-Técnico</option>
-                    <option>Juego de posición</option>
-                    <option>Juego interior</option>
-                    <option>Juegos Lúdicos</option>
-                    <option>Partidos</option>
-                    <option>Porteros</option>
-                    <option>Posesiones</option>
-                    <option>Presión</option>
-                    <option>Press perdida</option>
-                    <option>Progresión en el juego</option>
-                    <option>Rondos</option>
-                    <option>Ruedas de pases</option>
-                    <option>Salida de balón</option>
-                    <option>Tercer hombre</option>
-                    <option>Trabajo táctico</option>
-                    <option>Transiciones</option>
-                    <option>Técnica individual</option>
-                </select>
-            </div>
-            <div class="ej-field">
-                <label>Nº porteros</label>
-                <input type="number" id="ej-porteros" min="0" max="4" placeholder="0">
-            </div>
-            <div class="ej-field">
-                <label>Fase de juego</label>
-                <select id="ej-fase">
-                    <option value="">-- Todas --</option>
-                    <option>Organización ofensiva</option>
-                    <option>Organización defensiva</option>
-                    <option>Transición ataque</option>
-                    <option>Transición defensa</option>
-                    <option>Balón parado</option>
-                </select>
-            </div>
-            <div class="ej-field">
-                <label>Material</label>
-                <input type="text" id="ej-material" placeholder="Conos, picas, petos...">
-            </div>
-            <div class="ej-field ej-field-wide">
-                <label>Anchura × Largo del espacio</label>
-                <div style="display:flex;gap:8px;align-items:center">
-                    <input type="number" id="ej-ancho" placeholder="20" min="1" oninput="ejCalcEII()" style="width:80px"> m ×
-                    <input type="number" id="ej-largo" placeholder="25" min="1" oninput="ejCalcEII()" style="width:80px"> m
-                    <span id="ej-eii-display" style="color:#9ca3af;font-size:13px;margin-left:8px"></span>
+        </div>
+
+        <!-- DATOS PRINCIPALES -->
+        <div style="background:#0f172a;border:1px solid #1e3a5f;border-radius:10px;padding:16px;margin-bottom:16px">
+            <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:10px;margin-bottom:10px">
+                <div class="ej-field">
+                    <label>Nombre del ejercicio *</label>
+                    <input type="text" id="ej-nombre" placeholder="Ej: Rondo 4x1">
+                </div>
+                <div class="ej-field">
+                    <label>Duración (min)</label>
+                    <input type="number" id="ej-duracion" min="1" max="90" placeholder="15">
+                </div>
+                <div class="ej-field">
+                    <label>Nº jugadores</label>
+                    <input type="number" id="ej-jugadores" min="1" max="30" placeholder="14" oninput="ejCalcEII()">
+                </div>
+                <div class="ej-field">
+                    <label>Dificultad</label>
+                    <select id="ej-dificultad">
+                        <option value="">--</option>
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                        <option value="4">4</option>
+                        <option value="5">5</option>
+                    </select>
                 </div>
             </div>
-            <div class="ej-field ej-field-wide">
-                <label>Objetivos</label>
-                <textarea id="ej-objetivos" rows="2" placeholder="¿Qué trabaja este ejercicio?"></textarea>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:10px">
+                <div class="ej-field">
+                    <label>Categoría</label>
+                    <select id="ej-categoria">
+                        <option value="">-- Seleccionar --</option>
+                        <option>Técnica individual</option>
+                        <option>Posesión</option>
+                        <option>Pressing</option>
+                        <option>Ataque posicional</option>
+                        <option>Defensa</option>
+                        <option>Transiciones</option>
+                        <option>Portería</option>
+                        <option>Físico</option>
+                        <option>Táctica</option>
+                    </select>
+                </div>
+                <div class="ej-field">
+                    <label>Categoría de edad</label>
+                    <select id="ej-edad">
+                        <option value="">-- Todas --</option>
+                        <option>Prebenjamín</option><option>Benjamín</option><option>Alevín</option>
+                        <option>Infantil</option><option>Cadete</option><option>Juvenil</option>
+                        <option>Senior</option>
+                    </select>
+                </div>
+                <div class="ej-field">
+                    <label>Tema</label>
+                    <select id="ej-tema">
+                        <option value="">-- Seleccionar --</option>
+                        <option>Calentamiento</option>
+                        <option>Cambios de orientación</option>
+                        <option>Centros laterales</option>
+                        <option>Contraataque</option>
+                        <option>Defensa en bloque bajo</option>
+                        <option>Defensa en inferioridad</option>
+                        <option>Duelos</option>
+                        <option>Finalización</option>
+                        <option>Físico-Técnico</option>
+                        <option>Juego de posición</option>
+                        <option>Juego interior</option>
+                        <option>Juegos Lúdicos</option>
+                        <option>Partidos</option>
+                        <option>Porteros</option>
+                        <option>Posesiones</option>
+                        <option>Presión</option>
+                        <option>Press perdida</option>
+                        <option>Progresión en el juego</option>
+                        <option>Rondos</option>
+                        <option>Ruedas de pases</option>
+                        <option>Salida de balón</option>
+                        <option>Tercer hombre</option>
+                        <option>Trabajo táctico</option>
+                        <option>Transiciones</option>
+                        <option>Técnica individual</option>
+                    </select>
+                </div>
+                <div class="ej-field">
+                    <label>Fase de juego</label>
+                    <select id="ej-fase">
+                        <option value="">-- Todas --</option>
+                        <option>Organización ofensiva</option>
+                        <option>Organización defensiva</option>
+                        <option>Transición ataque</option>
+                        <option>Transición defensa</option>
+                        <option>Balón parado</option>
+                    </select>
+                </div>
             </div>
-            <div class="ej-field ej-field-wide">
-                <label>Descripción / Desarrollo</label>
-                <textarea id="ej-descripcion" rows="3" placeholder="Describe cómo se ejecuta el ejercicio..."></textarea>
-            </div>
-            <div class="ej-field ej-field-wide">
-                <label>Variantes</label>
-                <textarea id="ej-variantes" rows="2" placeholder="Versiones más fáciles o difíciles..."></textarea>
-            </div>
-            <div class="ej-field ej-field-wide">
-                <label>Notas del entrenador</label>
-                <textarea id="ej-notas" rows="2" placeholder="Observaciones, puntos clave..."></textarea>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px">
+                <div class="ej-field">
+                    <label>Nº porteros</label>
+                    <input type="number" id="ej-porteros" min="0" max="4" placeholder="0">
+                </div>
+                <div class="ej-field">
+                    <label>Espacio (ancho × largo)</label>
+                    <div style="display:flex;gap:4px;align-items:center">
+                        <input type="number" id="ej-ancho" placeholder="20" min="1" oninput="ejCalcEII()" style="width:60px">
+                        <span style="color:#64748b;font-size:12px">×</span>
+                        <input type="number" id="ej-largo" placeholder="25" min="1" oninput="ejCalcEII()" style="width:60px">
+                        <span style="color:#64748b;font-size:11px">m</span>
+                    </div>
+                </div>
+                <div class="ej-field">
+                    <label>EII</label>
+                    <span id="ej-eii-display" style="color:#9ca3af;font-size:13px;padding-top:6px;display:block"></span>
+                </div>
+                <div class="ej-field">
+                    <label>Material</label>
+                    <input type="text" id="ej-material" placeholder="Conos, picas, petos...">
+                </div>
             </div>
         </div>
-        <div class="ej-form-actions">
-            <button class="ej-btn-save" onclick="ejGuardarEjercicio()">💾 Guardar ejercicio</button>
-            <button class="ej-btn-cancel" onclick="ejLimpiarFicha()">✕ Limpiar</button>
+
+        <!-- TEXTOS -->
+        <div style="background:#0f172a;border:1px solid #1e3a5f;border-radius:10px;padding:16px;margin-bottom:16px">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+                <div class="ej-field">
+                    <label>Objetivos</label>
+                    <textarea id="ej-objetivos" rows="2" placeholder="¿Qué trabaja este ejercicio?"></textarea>
+                </div>
+                <div class="ej-field">
+                    <label>Descripción / Desarrollo</label>
+                    <textarea id="ej-descripcion" rows="2" placeholder="Describe cómo se ejecuta..."></textarea>
+                </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                <div class="ej-field">
+                    <label>Variantes</label>
+                    <textarea id="ej-variantes" rows="2" placeholder="Versiones más fáciles o difíciles..."></textarea>
+                </div>
+                <div class="ej-field">
+                    <label>Notas del entrenador</label>
+                    <textarea id="ej-notas" rows="2" placeholder="Observaciones, puntos clave..."></textarea>
+                </div>
+            </div>
         </div>
-        <div id="ej-ficha-msg"></div>
+
+        <!-- BOTONES -->
+        <div style="display:flex;gap:8px;justify-content:flex-end;align-items:center;flex-wrap:wrap">
+            <button class="ej-btn-save" onclick="ejGuardarEjercicio()" style="padding:9px 22px">💾 Guardar ejercicio</button>
+            <button class="ej-btn-cancel" onclick="ejLimpiarFicha()" style="padding:9px 16px">✕ Limpiar</button>
+            <button onclick="ejExportarPDF()" style="padding:9px 16px;background:#7c3aed;border:none;color:#fff;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600">📄 Exportar PDF</button>
+            <button onclick="ejEliminarEjercicio()" style="padding:9px 16px;background:#7f1d1d;border:1px solid #dc2626;color:#fca5a5;border-radius:8px;cursor:pointer;font-size:12px" id="ej-btn-eliminar" ${!ejEditandoId?'style="display:none"':''}>🗑 Eliminar</button>
+        </div>
+        <div id="ej-ficha-msg" style="margin-top:8px"></div>
     </div>`;
 }
+function ejCapturarMiniatura() {
+    const svgEl = document.getElementById('ej-svg');
+    if (!svgEl) { alert('Ve a la Pizarra y dibuja primero'); return; }
+    const thumbContainer = document.getElementById('ej-ficha-thumb');
+    if (!thumbContainer) return;
+    const clone = svgEl.cloneNode(true);
+    clone.setAttribute('width', '100%');
+    clone.setAttribute('height', '100%');
+    clone.removeAttribute('style');
+    clone.style.borderRadius = '8px';
+    thumbContainer.innerHTML = '';
+    thumbContainer.appendChild(clone);
+    window.ejThumbnailPendiente = new XMLSerializer().serializeToString(svgEl);
+    const msg = document.getElementById('ej-ficha-msg');
+    if (msg) msg.innerHTML = '<span style="color:#a855f7">📸 Miniatura capturada — se guardará con el ejercicio</span>';
+    setTimeout(() => { if (msg) msg.innerHTML = ''; }, 3000);
+}
 
+function ejActualizarFichaMedia() {
+    // Miniatura
+    const thumbContainer = document.getElementById('ej-ficha-thumb');
+    if (thumbContainer && window.ejThumbnailPendiente) {
+        thumbContainer.innerHTML = window.ejThumbnailPendiente;
+        const svg = thumbContainer.querySelector('svg');
+        if (svg) { svg.setAttribute('width','100%'); svg.setAttribute('height','100%'); svg.style.borderRadius='8px'; }
+    }
+    // Vídeo
+    const videoContainer = document.getElementById('ej-ficha-video');
+    const videoBtns = document.getElementById('ej-ficha-video-btns');
+    const url = ejP._lastVideoUrl;
+    if (videoContainer && url) {
+        videoContainer.innerHTML = '<video src="'+url+'" controls playsinline loop style="width:100%;height:100%;border-radius:8px;background:#000"></video>';
+        if (videoBtns) videoBtns.innerHTML = '<a href="https://toplidercoach.com/wp-content/uploads/ejercicios/download-video.php?url='+encodeURIComponent(url)+'" target="_blank" style="flex:1;padding:8px;background:#f97316;border:none;color:#fff;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;text-align:center;text-decoration:none">📥 Descargar MP4</a>';
+    }
+}
+
+function ejExportarPDF() {
+    const nombre = document.getElementById('ej-nombre')?.value?.trim();
+    if (!nombre) { alert('Pon un nombre al ejercicio primero'); return; }
+    alert('Función PDF próximamente — se implementará con jsPDF');
+}
+async function ejEliminarEjercicio() {
+    if (!ejEditandoId) { alert('No hay ejercicio cargado para eliminar'); return; }
+    if (!confirm('¿Eliminar este ejercicio? Esta acción no se puede deshacer.')) return;
+    try {
+        const { error } = await supabaseClient.from('custom_exercises').delete().eq('id', ejEditandoId);
+        if (error) throw error;
+        ejBancoCache = ejBancoCache.filter(x => x.id !== ejEditandoId);
+        ejEditandoId = null;
+        ejP._lastVideoUrl = null;
+        window.ejThumbnailPendiente = null;
+        ejLimpiarFicha();
+        ejBuildFicha();
+        ejShowTab('banco', document.querySelector('[onclick*="\'banco\'"]'));
+    } catch(err) {
+        alert('Error al eliminar: ' + err.message);
+    }
+}
 function ejCalcEII() {
     const a = parseFloat(document.getElementById('ej-ancho')?.value);
     const l = parseFloat(document.getElementById('ej-largo')?.value);
@@ -1613,26 +1714,55 @@ function ejBancoRender(list) {
             ${e.players_count ? `<span>👥 ${e.players_count}</span>` : ''}
         </div>
         ${e.thumbnail_url ? `
-        <div onclick="ejAbrirModal('${e.id}')" title="Ver ficha completa"
+           <div onclick="ejVerFicha('${e.id}')" title="Ver ficha"
             style="width:100%;aspect-ratio:8/5;overflow:hidden;border-radius:6px;margin:6px 0;background:#0f4c2a;cursor:pointer;position:relative">
             <img src="${e.thumbnail_url}" style="width:100%;height:100%;object-fit:cover;" loading="lazy"/>
-            <div style="position:absolute;bottom:4px;right:5px;font-size:9px;color:#fff;background:rgba(0,0,0,.6);padding:1px 6px;border-radius:4px">ver ficha</div>
         </div>` : e.thumbnail_svg ? `
-        <div onclick="ejAbrirModal('${e.id}')" title="Ver ficha completa"
+         <div onclick="ejVerFicha('${e.id}')" title="Ver ficha"
              style="width:100%;aspect-ratio:8/5;overflow:hidden;border-radius:6px;margin:6px 0;background:#0f4c2a;cursor:pointer;position:relative">
             ${e.thumbnail_svg}
-            <div style="position:absolute;inset:0"></div>
-            <div style="position:absolute;bottom:4px;right:5px;font-size:9px;color:#fff;background:rgba(0,0,0,.6);padding:1px 6px;border-radius:4px">ver ficha</div>
         </div>` : `
-        <div onclick="ejAbrirModal('${e.id}')" style="width:100%;aspect-ratio:8/5;border-radius:6px;margin:6px 0;background:#1e3a5f;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#6b7280;font-size:11px">
+         <div onclick="ejVerFicha('${e.id}')" style="width:100%;aspect-ratio:8/5;border-radius:6px;margin:6px 0;background:#1e3a5f;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#6b7280;font-size:11px">
             sin dibujo
         </div>`}
-        <div class="ej-card-actions">
-            <button class="ej-card-btn" onclick="ejBancoCargar('${e.id}')">📋 Cargar en pizarra</button>
+        <div class="ej-card-actions" style="display:flex;gap:4px">
+            <button class="ej-card-btn" onclick="ejVerFicha('${e.id}')" style="flex:1">📋 Ver ficha</button>
+            <button class="ej-card-btn" onclick="ejBancoCargar('${e.id}')" style="flex:1;background:#1e3a5f;border-color:#2563eb;color:#93c5fd">✏️ Editar dibujo</button>
         </div>
     </div>`).join('');
 }
-
+async function ejVerFicha(id) {
+    try {
+        const { data, error } = await supabaseClient
+            .from('custom_exercises').select('*').eq('id', id).single();
+        if (error) throw error;
+        ejEditandoId = data.id;
+        const set = (fid, val) => { const el = document.getElementById(fid); if (el && val) el.value = val; };
+        set('ej-nombre', data.name);
+        set('ej-categoria', data.category);
+        set('ej-edad', data.age_group);
+        set('ej-duracion', data.duration_min);
+        set('ej-jugadores', data.players_count);
+        set('ej-dificultad', data.difficulty);
+        set('ej-fase', data.game_phase);
+        set('ej-objetivos', data.objectives);
+        set('ej-descripcion', data.description);
+        set('ej-variantes', data.variants);
+        set('ej-notas', data.coach_notes);
+        set('ej-material', data.materials);
+        set('ej-tema', data.tema);
+        set('ej-porteros', data.num_goalkeepers);
+        set('ej-ancho', data.field_width);
+        set('ej-largo', data.field_length);
+        ejCalcEII();
+        if (data.thumbnail_svg) window.ejThumbnailPendiente = data.thumbnail_svg;
+        ejP._lastVideoUrl = data.animation_url || null;
+        ejShowTab('ficha', document.querySelector('[onclick*="\'ficha\'"]'));
+        setTimeout(() => ejActualizarFichaMedia(), 300);
+    } catch(err) {
+        alert('Error al cargar: ' + err.message);
+    }
+}
 async function ejBancoCargar(id) {
     try {
         const { data, error } = await supabaseClient
@@ -1679,6 +1809,7 @@ async function ejBancoCargar(id) {
         set('ej-largo', data.field_length);
         ejCalcEII();
         ejP._lastVideoUrl = data.animation_url || null;
+        setTimeout(() => ejActualizarFichaMedia(), 500);
 
         // Cambiar a pestaña pizarra
         ejShowTab('pizarra', document.querySelector('[onclick*="pizarra"]'));
