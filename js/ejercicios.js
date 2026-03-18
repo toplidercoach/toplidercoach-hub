@@ -429,9 +429,12 @@ function ejSvgPointerDown(e) {
     ejP.selectedId = id;
     ejP.isDragging = true;
     ejP._ctrlId = null;
-    ejP.expandedSection = 'actions';
-
     const type = el.dataset.type;
+    if (type === 'player') ejP.expandedSection = 'players';
+    else if (type === 'equipment') ejP.expandedSection = 'material';
+    else ejP.expandedSection = 'draw';
+
+    
     if (type === 'player') {
         const p = ejP.players.find(p => p.id === id);
         if (p) {
@@ -494,9 +497,9 @@ function ejSvgPointerDown(e) {
         ejSaveHistory();
         const id = ejP.nextId++;
         ejP.equipment.push({ id, x: pos.x, y: pos.y, eqType: ejP.selectedEquipmentType, scale: 0.5, rotation: 0 });
-        ejP.selectedId = null;
+ejP.selectedId = id;
         ejP.activeTool = 'select';
-ejP.expandedSection = 'actions';
+        ejP.expandedSection = 'material';
 ejRenderSVG();
 ejRenderToolbar();
 return;
@@ -1237,6 +1240,22 @@ function ejRenderToolbar() {
                 <span>${eq.name}</span>
             </button>`).join('')}
         </div>
+        ${selEquipment ? `
+        <div style="margin-top:8px;padding-top:8px;border-top:1px solid #334155">
+            <div style="font-size:11px;color:#9ca3af;margin-bottom:6px">Material seleccionado: <strong style="color:#fff">${EJ_EQUIPMENT_TYPES.find(e=>e.key===selEquipment.eqType)?.name||''}</strong></div>
+            <div style="display:flex;gap:4px;margin-bottom:6px">
+                <button onclick="ejChangeEquipmentSize('down')" style="flex:1;padding:5px;font-size:11px;background:#1e293b;border:1px solid #334155;color:#f97316;border-radius:6px;cursor:pointer">− Menor</button>
+                <button onclick="ejChangeEquipmentSize('up')" style="flex:1;padding:5px;font-size:11px;background:#1e293b;border:1px solid #334155;color:#22c55e;border-radius:6px;cursor:pointer">+ Mayor</button>
+            </div>
+            <div style="font-size:10px;color:#9ca3af;margin-bottom:4px">Rotación: ${selEquipment.rotation||0}°</div>
+            <div style="display:flex;gap:3px;margin-bottom:4px">
+                <button onclick="ejRotateEquipment(-45)" style="flex:1;padding:4px;font-size:10px;background:#1e293b;border:1px solid #334155;color:#9ca3af;border-radius:4px;cursor:pointer">−45°</button>
+                <button onclick="ejRotateEquipment(-10)" style="flex:1;padding:4px;font-size:10px;background:#1e293b;border:1px solid #334155;color:#9ca3af;border-radius:4px;cursor:pointer">−10°</button>
+                <button onclick="ejRotateEquipment(10)" style="flex:1;padding:4px;font-size:10px;background:#1e293b;border:1px solid #334155;color:#9ca3af;border-radius:4px;cursor:pointer">+10°</button>
+                <button onclick="ejRotateEquipment(45)" style="flex:1;padding:4px;font-size:10px;background:#1e293b;border:1px solid #334155;color:#9ca3af;border-radius:4px;cursor:pointer">+45°</button>
+            </div>
+            <input type="range" min="0" max="359" value="${selEquipment.rotation||0}" oninput="ejRotateEquipment(parseInt(this.value)-(${selEquipment.rotation||0}))" style="width:100%;accent-color:#a855f7"/>
+        </div>` : ''}
     </div>` : ''}
 
 
@@ -2306,6 +2325,22 @@ async function ejBancoCargar(id) {
         setTimeout(() => ejActualizarFichaMedia(), 500);
 
         // Cambiar a pestaña pizarra
+        // Ocultar overlay de selección de modo
+            var overlay = document.getElementById('ej-modo-overlay');
+            if (overlay) overlay.style.display = 'none';
+            // Mostrar toolbar
+            var tb = document.getElementById('ej-toolbar');
+            if (tb) tb.style.display = '';
+            // Activar modo correcto
+            if (data.board_data.animMode && !ejP.animMode) {
+                ejP.animMode = true;
+            } else if (!data.board_data.animMode && ejP.animMode) {
+                ejP.animMode = false;
+                ejP.frames = [];
+                ejP.currentFrame = 0;
+                var tlBar = document.getElementById('ej-timeline-bar');
+                if (tlBar) tlBar.style.display = 'none';
+            }
         ejShowTab('pizarra', document.querySelector('[onclick*="pizarra"]'));
         // Mostrar barra con nombre del ejercicio cargado
         const bar = document.getElementById('ej-pizarra-topbar');
