@@ -1,6 +1,6 @@
 // =============================================
-// MÓDULO EJERCICIOS ÔÇö TopLiderCoach HUB
-// v2.0 ÔÇö Pizarra táctica completa
+// MÓDULO EJERCICIOS — TopLiderCoach HUB
+// v2.0 — Pizarra táctica completa
 // =============================================
 
 // ---- COLORES DE EQUIPO ----
@@ -389,7 +389,7 @@ function ejGetPos(e) {
     const rect = svg.getBoundingClientRect();
     const clientX = e.touches ? e.touches[0].clientX : (e.clientX ?? e.x);
     const clientY = e.touches ? e.touches[0].clientY : (e.clientY ?? e.y);
-    // Escalar seg├║n tamaño real vs lógico
+    // Escalar según tamaño real vs lógico
     const scaleX = ejP.svgW / rect.width;
     const scaleY = ejP.svgH / rect.height;
     return {
@@ -530,7 +530,7 @@ return;
         let snapElem = null;
         let snapDist = 9999;
 
-        // Primero buscar balón (prioridad m├íxima, radio pequeño)
+        // Primero buscar balón (prioridad máxima, radio pequeño)
         for (const eq of ejP.equipment) {
             if (eq.eqType !== 'ball') continue;
             const dx = pos.x - eq.x, dy = pos.y - eq.y;
@@ -788,7 +788,7 @@ function ejElegirModo(modo) {
         // Activar modo animación directamente
         if (!ejP.animMode) ejToggleAnimMode();
     } else {
-        // Asegurar que animación est├í desactivada
+        // Asegurar que animación está desactivada
         if (ejP.animMode) {
             ejP.animMode = false;
             ejP.frames = [];
@@ -856,7 +856,7 @@ function ejGetFieldSVG(type, color) {
     for (var i = 0; i < 12; i++) {
         s += '<rect x="'+(20+i*63.3)+'" y="15" width="63" height="470" fill="'+(i%2===0?c2:c1)+'"/>';
     }
-    // Líneas blancas seg├║n tipo
+    // Líneas blancas según tipo
     var L = 'fill="none" stroke="#fff" stroke-width="2"';
     s += '<g '+L+' stroke-linecap="round" stroke-linejoin="round">';
     s += '<rect x="20" y="15" width="760" height="470" rx="1"/>';
@@ -923,14 +923,14 @@ function ejApplyFormation(key, isRival) {
     const scale = ejP.selectedSize === 'small' ? 0.6 : ejP.selectedSize === 'large' ? 1.4 : 1.0;
     const ts = Date.now();
     if (!isRival) {
-        // Reemplazar mi equipo ÔÇö mantener solo rivales
+        // Reemplazar mi equipo — mantener solo rivales
         ejP.players = ejP.players.filter(p => {
             const tc = EJ_TEAM_COLORS[p.color];
             return tc && ejP.rivalColor === p.color;
         });
         ejP.playerCounts[color] = 0;
     } else {
-        // Reemplazar rival ÔÇö mantener solo mi equipo
+        // Reemplazar rival — mantener solo mi equipo
         ejP.players = ejP.players.filter(p => {
             const tc = EJ_TEAM_COLORS[p.color];
             return tc && ejP.myColor === p.color;
@@ -1073,7 +1073,7 @@ function ejCapturarParaFicha() {
     setTimeout(() => {
         ejActualizarFichaMedia();
         const msg = document.getElementById('ej-ficha-msg');
-        if (msg) msg.innerHTML = '<span style="color:#a855f7">­ƒô© Miniatura capturada ÔÇö rellena los datos y pulsa Guardar</span>';
+        if (msg) msg.innerHTML = '<span style="color:#a855f7">📸 Miniatura capturada — rellena los datos y pulsa Guardar</span>';
         setTimeout(() => { if (msg) msg.innerHTML = ''; }, 4000);
     }, 300);
 }
@@ -1162,30 +1162,30 @@ ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin
     ${playersOpen ? `
     <div class="ej-section-body">
         <div class="ej-team-block">
-            <label class="ej-team-label blue">­ƒöÁ Mi equipo</label>
+            <label class="ej-team-label blue">🔵 Mi equipo</label>
             ${colorSwatches(ejP.myColor, true, true, 'ejSetMyColor')}
-            <label style="font-size:10px;color:#9ca3af;margin-top:4px;display:block">­ƒºñ Portero (n┬║1):</label>
+            <label style="font-size:10px;color:#9ca3af;margin-top:4px;display:block">🧤 Portero (nº1):</label>
             ${colorSwatches(ejP.myGkColor, true, false, 'ejSetMyGkColor')}
             <div class="ej-formations">${formationBtns('ejApplyFormation_my')}</div>
         </div>
         <div class="ej-team-block rival">
-            <label class="ej-team-label red">­ƒö┤ Equipo rival</label>
+            <label class="ej-team-label red">🔴 Equipo rival</label>
             ${colorSwatches(ejP.rivalColor, true, true, 'ejSetRivalColor')}
-            <label style="font-size:10px;color:#9ca3af;margin-top:4px;display:block">­ƒºñ Portero (n┬║1):</label>
+            <label style="font-size:10px;color:#9ca3af;margin-top:4px;display:block">🧤 Portero (nº1):</label>
             ${colorSwatches(ejP.rivalGkColor, true, false, 'ejSetRivalGkColor')}
             <div class="ej-formations rival">${formationBtns('ejApplyFormation_rival')}</div>
         </div>
         <div class="ej-opts-block">
             <label class="ej-opts-label">Opciones</label>
             <button onclick="ejCargarPlantilla()" style="width:100%;padding:7px;background:#1e3a5f;border:1px solid #2563eb;color:#93c5fd;border-radius:6px;cursor:pointer;font-size:12px;margin-bottom:6px">
-                ­ƒæÑ Cargar mi plantilla
+                👥 Cargar mi plantilla
             </button>
             ${ejP._plantilla && ejP._plantilla.length ? `
             <div style="margin-bottom:8px">
-                <div style="font-size:10px;color:#64748b;margin-bottom:4px;text-transform:uppercase">Mi plantilla ÔÇö clic para colocar</div>
+                <div style="font-size:10px;color:#64748b;margin-bottom:4px;text-transform:uppercase">Mi plantilla — clic para colocar</div>
             <div style="display:flex;gap:4px;margin-bottom:6px">
                 ${['num','name','both'].map(opt => {
-                    const lbl = opt==='num'?'N┬║':opt==='name'?'Nombre':'N┬║+Nombre';
+                    const lbl = opt==='num'?'Nº':opt==='name'?'Nombre':'Nº+Nombre';
                     const active = (ejP._plantillaLabel||'num') === opt;
                     return `<button onclick="ejP._plantillaLabel='${opt}';ejRenderToolbar()" style="flex:1;padding:3px;font-size:9px;border-radius:4px;border:1px solid ${active?'#3b82f6':'#334155'};background:${active?'#1e3a5f':'transparent'};color:${active?'#93c5fd':'#64748b'};cursor:pointer">${lbl}</button>`;
                 }).join('')}
@@ -1220,7 +1220,7 @@ ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin
                     `<button class="ej-sz${ejP.selectedSize===s?' active':''}" onclick="ejP.selectedSize='${s}';ejRenderToolbar()">${s==='small'?'S':s==='medium'?'M':'L'}</button>`
                 ).join('')}
             </div>
-            <label class="ej-check"><input type="checkbox" ${ejP.showNumbers?'checked':''} onchange="ejP.showNumbers=this.checked"> Mostrar n├║meros</label>
+            <label class="ej-check"><input type="checkbox" ${ejP.showNumbers?'checked':''} onchange="ejP.showNumbers=this.checked"> Mostrar números</label>
             <label class="ej-check"><input type="checkbox" ${ejP.hasVest?'checked':''} onchange="ejP.hasVest=this.checked"> Con peto</label>
             ${ejP.hasVest ? `<div class="ej-swatches">${
                 Object.entries(EJ_TEAM_COLORS).filter(([,v])=>!v.striped).map(([k,v])=>
@@ -1232,16 +1232,16 @@ ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin
         <div class="ej-selected-block">
             <div style="font-size:11px;color:#9ca3af;margin-bottom:4px">Jugador seleccionado</div>
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-                <label style="font-size:11px;color:#9ca3af">N┬║ camiseta:</label>
+                <label style="font-size:11px;color:#9ca3af">Nº camiseta:</label>
                 <input type="text" value="${selPlayer.number||''}" maxlength="3"
                     onchange="ejChangePlayerNumber(this.value)"
                     style="width:50px;padding:4px 6px;background:#0f172a;border:1px solid #334155;color:#fff;border-radius:6px;font-size:14px;font-weight:700;text-align:center"/>
                 <label style="font-size:11px;color:#9ca3af;margin-left:4px">
-                    <input type="checkbox" ${selPlayer.showNumber?'checked':''} onchange="ejTogglePlayerNumber(this.checked)"> Ver n┬║
+                    <input type="checkbox" ${selPlayer.showNumber?'checked':''} onchange="ejTogglePlayerNumber(this.checked)"> Ver nº
                 </label>
             </div>
             <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
-                <label style="font-size:11px;color:#9ca3af">Color n┬║:</label>
+                <label style="font-size:11px;color:#9ca3af">Color nº:</label>
                 <button onclick="ejChangeNumberColor('#ffffff')" style="width:22px;height:22px;border-radius:50%;background:#ffffff;border:2px solid ${(selPlayer.numberColor||'auto')==='#ffffff'?'#22c55e':'#334155'};cursor:pointer"></button>
                 <button onclick="ejChangeNumberColor('#1e293b')" style="width:22px;height:22px;border-radius:50%;background:#1e293b;border:2px solid ${(selPlayer.numberColor||'auto')==='#1e293b'?'#22c55e':'#334155'};cursor:pointer"></button>
                 <button onclick="ejChangeNumberColor('auto')" style="padding:2px 8px;font-size:10px;background:${(selPlayer.numberColor||'auto')==='auto'?'#1e3a5f':'#0f172a'};border:1px solid ${(selPlayer.numberColor||'auto')==='auto'?'#22c55e':'#334155'};color:#9ca3af;border-radius:4px;cursor:pointer">Auto</button>
@@ -1272,7 +1272,7 @@ ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin
         </div>
         <div class="ej-draw-tools">
             ${[
-                {k:'pencil',  ico:'Ô£Å´©Å', lbl:'L├ípiz'},
+                {k:'pencil',  ico:'✏️', lbl:'Lápiz'},
                 {k:'arrow',   ico:'Ô×í´©Å', lbl:'Flecha'},
                 {k:'curved',  ico:'Ôåù´©Å', lbl:'Curva'},
                 {k:'line',    ico:'Ô×û', lbl:'Línea'},
@@ -1311,15 +1311,15 @@ ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin
         <div style="margin-top:8px;padding-top:8px;border-top:1px solid #334155">
             <div style="font-size:11px;color:#9ca3af;margin-bottom:6px">Material seleccionado: <strong style="color:#fff">${EJ_EQUIPMENT_TYPES.find(e=>e.key===selEquipment.eqType)?.name||''}</strong></div>
             <div style="display:flex;gap:4px;margin-bottom:6px">
-                <button onclick="ejChangeEquipmentSize('down')" style="flex:1;padding:5px;font-size:11px;background:#1e293b;border:1px solid #334155;color:#f97316;border-radius:6px;cursor:pointer">ÔêÆ Menor</button>
+                <button onclick="ejChangeEquipmentSize('down')" style="flex:1;padding:5px;font-size:11px;background:#1e293b;border:1px solid #334155;color:#f97316;border-radius:6px;cursor:pointer">− Menor</button>
                 <button onclick="ejChangeEquipmentSize('up')" style="flex:1;padding:5px;font-size:11px;background:#1e293b;border:1px solid #334155;color:#22c55e;border-radius:6px;cursor:pointer">+ Mayor</button>
             </div>
-            <div style="font-size:10px;color:#9ca3af;margin-bottom:4px">Rotación: ${selEquipment.rotation||0}┬░</div>
+            <div style="font-size:10px;color:#9ca3af;margin-bottom:4px">Rotación: ${selEquipment.rotation||0}°</div>
             <div style="display:flex;gap:3px;margin-bottom:4px">
-                <button onclick="ejRotateEquipment(-45)" style="flex:1;padding:4px;font-size:10px;background:#1e293b;border:1px solid #334155;color:#9ca3af;border-radius:4px;cursor:pointer">ÔêÆ45┬░</button>
-                <button onclick="ejRotateEquipment(-10)" style="flex:1;padding:4px;font-size:10px;background:#1e293b;border:1px solid #334155;color:#9ca3af;border-radius:4px;cursor:pointer">ÔêÆ10┬░</button>
-                <button onclick="ejRotateEquipment(10)" style="flex:1;padding:4px;font-size:10px;background:#1e293b;border:1px solid #334155;color:#9ca3af;border-radius:4px;cursor:pointer">+10┬░</button>
-                <button onclick="ejRotateEquipment(45)" style="flex:1;padding:4px;font-size:10px;background:#1e293b;border:1px solid #334155;color:#9ca3af;border-radius:4px;cursor:pointer">+45┬░</button>
+                <button onclick="ejRotateEquipment(-45)" style="flex:1;padding:4px;font-size:10px;background:#1e293b;border:1px solid #334155;color:#9ca3af;border-radius:4px;cursor:pointer">−45°</button>
+                <button onclick="ejRotateEquipment(-10)" style="flex:1;padding:4px;font-size:10px;background:#1e293b;border:1px solid #334155;color:#9ca3af;border-radius:4px;cursor:pointer">−10°</button>
+                <button onclick="ejRotateEquipment(10)" style="flex:1;padding:4px;font-size:10px;background:#1e293b;border:1px solid #334155;color:#9ca3af;border-radius:4px;cursor:pointer">+10°</button>
+                <button onclick="ejRotateEquipment(45)" style="flex:1;padding:4px;font-size:10px;background:#1e293b;border:1px solid #334155;color:#9ca3af;border-radius:4px;cursor:pointer">+45°</button>
             </div>
             <input type="range" min="0" max="359" value="${selEquipment.rotation||0}" oninput="ejRotateEquipment(parseInt(this.value)-(${selEquipment.rotation||0}))" style="width:100%;accent-color:#a855f7"/>
         </div>` : ''}
@@ -1329,7 +1329,7 @@ ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin
     <!-- BOTONES PRINCIPALES -->
     <div style="margin-top:10px;display:flex;flex-direction:column;gap:6px">
         ${ejP.animMode && ejEditandoId ? '' : '<button class="ej-act-btn purple full" onclick="ejCapturarParaFicha()" style="width:100%;padding:10px;background:#7c3aed;border:none;color:#fff;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600">💾 Guardar ejercicio</button>'}
-        <button class="ej-act-btn green full" onclick="ejExportPNG()" style="width:100%;padding:8px;background:#0f172a;border:1px solid #334155;color:#94a3b8;border-radius:8px;cursor:pointer;font-size:12px">­📥 Exportar PNG</button>
+        <button class="ej-act-btn green full" onclick="ejExportPNG()" style="width:100%;padding:8px;background:#0f172a;border:1px solid #334155;color:#94a3b8;border-radius:8px;cursor:pointer;font-size:12px">📥 Exportar PNG</button>
         <button class="ej-act-btn red full" onclick="ejDelete()" ${!sel?'disabled':''} style="width:100%;padding:8px;background:#7f1d1d;border:1px solid #dc2626;color:#fca5a5;border-radius:8px;cursor:pointer;font-size:12px">🗑 Eliminar seleccionado</button>
     </div>
     `;
@@ -1359,7 +1359,7 @@ root.innerHTML = `
         <div style="display:flex;flex-direction:column;gap:6px;min-width:0">
         <div id="ej-pizarra-topbar" style="display:flex;align-items:center;justify-content:space-between;background:#1e3a5f;border:1px solid #2563eb;border-radius:8px;padding:8px 14px;margin-bottom:8px;gap:10px">
             <div style="display:flex;align-items:center;gap:8px;min-width:0">
-                <span style="font-size:14px">­ƒôï</span>
+                <span style="font-size:14px">📋</span>
                 <span id="ej-pizarra-nombre-label" style="color:#93c5fd;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Pizarra libre</span>
             </div>
             <button onclick="ejNuevaPizarra()" style="background:#0f172a;border:1px solid #475569;color:#94a3b8;padding:5px 14px;border-radius:6px;cursor:pointer;font-size:12px;white-space:nowrap;flex-shrink:0">✕ Nueva pizarra</button>
@@ -1368,7 +1368,7 @@ root.innerHTML = `
         </div>
         <div id="ej-canvas-area" style="position:relative">
         <div id="ej-modo-overlay" style="position:absolute;inset:0;background:rgba(15,23,42,0.85);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:10;border-radius:8px;gap:20px">
-                <div style="color:#e2e8f0;font-size:18px;font-weight:700;text-align:center">┬┐Qué tipo de ejercicio quieres crear?</div>
+                <div style="color:#e2e8f0;font-size:18px;font-weight:700;text-align:center">¿Qué tipo de ejercicio quieres crear?</div>
                 <div style="display:flex;gap:16px">
                     <button onclick="ejElegirModo('estatico')" style="padding:16px 32px;background:#3b82f6;border:none;color:white;border-radius:10px;cursor:pointer;font-size:15px;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:6px">
                         <span style="font-size:28px">🖼️</span>
@@ -1430,14 +1430,14 @@ function ejBuildFicha() {
         <!-- MEDIA: MINIATURA + VÉDEO -->
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;background:#0f172a;border:1px solid #1e3a5f;border-radius:10px;overflow:hidden;margin-bottom:16px">
             <div style="padding:14px 16px;border-right:1px solid #1e3a5f">
-                <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">­ƒÄ¿ Miniatura</div>
+                <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">❓ Miniatura</div>
                 <div id="ej-ficha-thumb" style="width:100%;aspect-ratio:8/5;border-radius:8px;background:#1e3a5f;display:flex;align-items:center;justify-content:center;overflow:hidden">
                     <span style="color:#475569;font-size:11px">Dibuja en la pizarra y pulsa "Usar en ficha"</span>
                 </div>
                 
             </div>
             <div style="padding:14px 16px">
-                <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">­ƒÄ¼ Vídeo animación</div>
+                <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">🎬 Vídeo animación</div>
                 <div id="ej-ficha-video" style="width:100%;aspect-ratio:8/5;border-radius:8px;background:#1e3a5f;display:flex;align-items:center;justify-content:center;overflow:hidden">
                     <span style="color:#475569;font-size:11px">Exporta MP4 desde la pizarra</span>
                 </div>
@@ -1451,14 +1451,14 @@ function ejBuildFicha() {
                 <div class="ej-field">
                     <label>Nombre del ejercicio *</label>
                     <input type="text" id="ej-nombre" placeholder="Ej: Rondo 4x1">
-                    <div id="ej-nombre-lock-msg" style="display:none;font-size:10px;color:#64748b;margin-top:2px">­ƒöÆ El nombre no se puede cambiar</div>
+                    <div id="ej-nombre-lock-msg" style="display:none;font-size:10px;color:#64748b;margin-top:2px">🔒 El nombre no se puede cambiar</div>
                 </div>
                 <div class="ej-field">
                     <label>Duración (min)</label>
                     <input type="number" id="ej-duracion" min="1" max="90" placeholder="15">
                 </div>
                 <div class="ej-field">
-                    <label>N┬║ jugadores</label>
+                    <label>Nº jugadores</label>
                     <input type="number" id="ej-jugadores" min="1" max="30" placeholder="14" oninput="ejCalcEII()">
                 </div>
                 <div class="ej-field">
@@ -1514,7 +1514,7 @@ function ejBuildFicha() {
                         <option>Físico-Técnico</option>
                         <option>Juego de posición</option>
                         <option>Juego interior</option>
-                        <option>Juegos L├║dicos</option>
+                        <option>Juegos Lúdicos</option>
                         <option>Partidos</option>
                         <option>Porteros</option>
                         <option>Posesiones</option>
@@ -1545,14 +1545,14 @@ function ejBuildFicha() {
 
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px">
                 <div class="ej-field">
-                    <label>N┬║ porteros</label>
+                    <label>Nº porteros</label>
                     <input type="number" id="ej-porteros" min="0" max="4" placeholder="0">
                 </div>
                 <div class="ej-field">
-                    <label>Espacio (ancho ├ù largo)</label>
+                    <label>Espacio (ancho × largo)</label>
                     <div style="display:flex;gap:4px;align-items:center">
                         <input type="number" id="ej-ancho" placeholder="20" min="1" oninput="ejCalcEII()" style="width:60px">
-                        <span style="color:#64748b;font-size:12px">├ù</span>
+                        <span style="color:#64748b;font-size:12px">×</span>
                         <input type="number" id="ej-largo" placeholder="25" min="1" oninput="ejCalcEII()" style="width:60px">
                         <span style="color:#64748b;font-size:11px">m</span>
                     </div>
@@ -1573,7 +1573,7 @@ function ejBuildFicha() {
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
                 <div class="ej-field">
                     <label>Objetivos</label>
-                    <textarea id="ej-objetivos" rows="2" placeholder="┬┐Qué trabaja este ejercicio?"></textarea>
+                    <textarea id="ej-objetivos" rows="2" placeholder="¿Qué trabaja este ejercicio?"></textarea>
                 </div>
                 <div class="ej-field">
                     <label>Descripción / Desarrollo</label>
@@ -1594,11 +1594,11 @@ function ejBuildFicha() {
 
         <!-- BOTONES -->
         <div style="display:flex;gap:8px;justify-content:flex-end;align-items:center;flex-wrap:wrap">
-        <button onclick="ejEditarDibujo()" style="padding:9px 16px;background:#3b82f6;border:none;color:#fff;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600" id="ej-btn-editar-dibujo">Ô£Å´©Å Editar dibujo</button>
-            <button class="ej-btn-save" onclick="ejGuardarEjercicio()" style="padding:9px 22px">­ƒÆ¥ Guardar ejercicio</button>
-            <button class="ej-btn-cancel" onclick="ejLimpiarFicha()" style="padding:9px 16px">Ô£ò Limpiar</button>
-            <button onclick="ejExportarPDF()" style="padding:9px 16px;background:#7c3aed;border:none;color:#fff;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600">­ƒôä Exportar PDF</button>
-            <button onclick="ejEliminarEjercicio()" style="padding:9px 16px;background:#7f1d1d;border:1px solid #dc2626;color:#fca5a5;border-radius:8px;cursor:pointer;font-size:12px" id="ej-btn-eliminar">­ƒùæ Eliminar</button>
+        <button onclick="ejEditarDibujo()" style="padding:9px 16px;background:#3b82f6;border:none;color:#fff;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600" id="ej-btn-editar-dibujo">✏️ Editar dibujo</button>
+            <button class="ej-btn-save" onclick="ejGuardarEjercicio()" style="padding:9px 22px">💾 Guardar ejercicio</button>
+            <button class="ej-btn-cancel" onclick="ejLimpiarFicha()" style="padding:9px 16px">✕ Limpiar</button>
+            <button onclick="ejExportarPDF()" style="padding:9px 16px;background:#7c3aed;border:none;color:#fff;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600">📄 Exportar PDF</button>
+            <button onclick="ejEliminarEjercicio()" style="padding:9px 16px;background:#7f1d1d;border:1px solid #dc2626;color:#fca5a5;border-radius:8px;cursor:pointer;font-size:12px" id="ej-btn-eliminar">🗑 Eliminar</button>
         </div>
         <div id="ej-ficha-msg" style="margin-top:8px"></div>
     </div>`;
@@ -1618,7 +1618,7 @@ function ejCapturarMiniatura() {
     window.ejThumbnailPendiente = new XMLSerializer().serializeToString(svgEl);
     ejPrepararThumbParaPDF();
     const msg = document.getElementById('ej-ficha-msg');
-    if (msg) msg.innerHTML = '<span style="color:#a855f7">­ƒô© Miniatura capturada ÔÇö se guardar├í con el ejercicio</span>';
+    if (msg) msg.innerHTML = '<span style="color:#a855f7">📸 Miniatura capturada — se guardará con el ejercicio</span>';
     setTimeout(() => { if (msg) msg.innerHTML = ''; }, 3000);
 }
 
@@ -1639,7 +1639,7 @@ function ejActualizarFichaMedia() {
     const url = ejP._lastVideoUrl;
     if (videoContainer && url) {
         videoContainer.innerHTML = '<video src="'+url+'" controls playsinline loop style="width:100%;height:100%;border-radius:8px;background:#000"></video>';
-        if (videoBtns) videoBtns.innerHTML = '<a href="https://toplidercoach.com/wp-content/uploads/ejercicios/download-video.php?url='+encodeURIComponent(url)+'" target="_blank" style="flex:1;padding:8px;background:#f97316;border:none;color:#fff;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;text-align:center;text-decoration:none">­ƒôÑ Descargar MP4</a>';
+        if (videoBtns) videoBtns.innerHTML = '<a href="https://toplidercoach.com/wp-content/uploads/ejercicios/download-video.php?url='+encodeURIComponent(url)+'" target="_blank" style="flex:1;padding:8px;background:#f97316;border:none;color:#fff;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;text-align:center;text-decoration:none">📥 Descargar MP4</a>';
     }
 }
 
@@ -1682,7 +1682,7 @@ function ejGenerarPDF(nombre) {
     };
 
     // ======================================================
-    // HEADER ÔÇö banda de color con marca
+    // HEADER — banda de color con marca
     // ======================================================
     doc.setFillColor(...brand);
     doc.rect(0, 0, W, 28, 'F');
@@ -1821,10 +1821,10 @@ function ejGenerarPDF(nombre) {
     // SECCIONES DE TEXTO
     // ======================================================
     var sections = [
-        { t: 'Objetivos', v: getValue('ej-objetivos') || 'ÔÇö' },
-        { t: 'Descripcion / Desarrollo', v: getValue('ej-descripcion') || 'ÔÇö' },
-        { t: 'Variantes', v: getValue('ej-variantes') || 'ÔÇö' },
-        { t: 'Notas del entrenador', v: getValue('ej-notas') || 'ÔÇö' }
+        { t: 'Objetivos', v: getValue('ej-objetivos') || '—' },
+        { t: 'Descripcion / Desarrollo', v: getValue('ej-descripcion') || '—' },
+        { t: 'Variantes', v: getValue('ej-variantes') || '—' },
+        { t: 'Notas del entrenador', v: getValue('ej-notas') || '—' }
     ];
 
     var colW2 = (contentW - 6) / 2;
@@ -1987,7 +1987,7 @@ function ejCalcEII() {
     if (!el) return;
     if (a && l && j) {
         const eii = ((a * l) / j).toFixed(1);
-        el.textContent = `EII: ${eii} m┬▓/jug`;
+        el.textContent = `EII: ${eii} m²/jug`;
     } else {
         el.textContent = '';
     }
@@ -2198,7 +2198,7 @@ function ejBuildBanco() {
         <h3 class="ej-ficha-title" style="margin-bottom:12px">🗂 Banco de ejercicios</h3>
         <div style="background:#0f172a;border:1px solid #1e3a5f;border-radius:10px;padding:12px 14px;margin-bottom:14px">
             <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
-                <input type="text" id="ej-search" placeholder="­ƒöì Buscar por nombre..." oninput="ejBancoSearch()" style="flex:1">
+                <input type="text" id="ej-search" placeholder="🔍 Buscar por nombre..." oninput="ejBancoSearch()" style="flex:1">
                 <span id="ej-banco-count" style="font-size:11px;background:#1e3a5f;color:#93c5fd;padding:3px 10px;border-radius:6px;white-space:nowrap"></span>
             </div>
             <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
@@ -2207,7 +2207,7 @@ function ejBuildBanco() {
                     <option>Calentamiento</option><option>Cambios de orientación</option><option>Centros laterales</option>
                     <option>Contraataque</option><option>Defensa en bloque bajo</option><option>Defensa en inferioridad</option>
                     <option>Duelos</option><option>Finalización</option><option>Físico-Técnico</option>
-                    <option>Juego de posición</option><option>Juego interior</option><option>Juegos L├║dicos</option>
+                    <option>Juego de posición</option><option>Juego interior</option><option>Juegos Lúdicos</option>
                     <option>Partidos</option><option>Porteros</option><option>Posesiones</option>
                     <option>Presión</option><option>Press perdida</option><option>Progresión en el juego</option>
                     <option>Rondos</option><option>Ruedas de pases</option><option>Salida de balón</option>
@@ -2238,7 +2238,7 @@ function ejBuildBanco() {
                 <input type="number" id="ej-filter-jug" placeholder="Jugadores" min="1" max="30" oninput="ejBancoSearch()" style="width:75px;padding:4px 8px;font-size:11px;background:#1e293b;border:1px solid #334155;color:#cbd5e1;border-radius:6px">
                 <input type="number" id="ej-filter-port" placeholder="Porteros" min="0" max="4" oninput="ejBancoSearch()" style="width:70px;padding:4px 8px;font-size:11px;background:#1e293b;border:1px solid #334155;color:#cbd5e1;border-radius:6px">
                 <input type="number" id="ej-filter-dur" placeholder="Min." min="1" oninput="ejBancoSearch()" style="width:55px;padding:4px 8px;font-size:11px;background:#1e293b;border:1px solid #334155;color:#cbd5e1;border-radius:6px">
-                <button onclick="ejLimpiarFiltros()" style="padding:4px 10px;font-size:11px;background:#334155;border:none;color:#94a3b8;border-radius:6px;cursor:pointer;white-space:nowrap">Ô£ò Limpiar</button>
+                <button onclick="ejLimpiarFiltros()" style="padding:4px 10px;font-size:11px;background:#334155;border:none;color:#94a3b8;border-radius:6px;cursor:pointer;white-space:nowrap">✕ Limpiar</button>
             </div>
         </div>
         
@@ -2356,7 +2356,7 @@ function ejBancoRender(list) {
             + '<div style="display:flex;gap:4px">'
             + '<button onclick="ejVerFicha(\'' + e.id + '\')" style="flex:1;padding:5px;font-size:11px;background:#1e293b;border:1px solid #334155;color:#93c5fd;border-radius:6px;cursor:pointer">Ver ficha</button>'
             + '<button onclick="ejBancoCargar(\'' + e.id + '\')" style="flex:1;padding:5px;font-size:11px;background:#1e293b;border:1px solid #334155;color:#cbd5e1;border-radius:6px;cursor:pointer">Editar</button>'
-            + '<button onclick="ejEliminarDesdeBanco(\'' + e.id + '\')" style="padding:5px 6px;font-size:11px;background:#1e293b;border:1px solid #7f1d1d;color:#fca5a5;border-radius:6px;cursor:pointer" title="Eliminar">­ƒùæ</button>'
+            + '<button onclick="ejEliminarDesdeBanco(\'' + e.id + '\')" style="padding:5px 6px;font-size:11px;background:#1e293b;border:1px solid #7f1d1d;color:#fca5a5;border-radius:6px;cursor:pointer" title="Eliminar">🗑</button>'
             + '</div>'
             + '</div>';
     }
@@ -2502,13 +2502,13 @@ function ejAbrirModal(id) {
         : '';
 
     const metaTags = [
-        e.category    && `<span style="background:#1e3a5f;padding:3px 10px;border-radius:6px">­ƒôü ${e.category}</span>`,
-        e.age_group   && `<span style="background:#1e3a5f;padding:3px 10px;border-radius:6px">­ƒÄé ${e.age_group}</span>`,
-        e.duration_min && `<span style="background:#1e3a5f;padding:3px 10px;border-radius:6px">ÔÅ▒ ${e.duration_min} min</span>`,
-        e.players_count && `<span style="background:#1e3a5f;padding:3px 10px;border-radius:6px">­ƒæÑ ${e.players_count} jug.</span>`,
+        e.category    && `<span style="background:#1e3a5f;padding:3px 10px;border-radius:6px">📁 ${e.category}</span>`,
+        e.age_group   && `<span style="background:#1e3a5f;padding:3px 10px;border-radius:6px">🎂 ${e.age_group}</span>`,
+        e.duration_min && `<span style="background:#1e3a5f;padding:3px 10px;border-radius:6px">⏱ ${e.duration_min} min</span>`,
+        e.players_count && `<span style="background:#1e3a5f;padding:3px 10px;border-radius:6px">👥 ${e.players_count} jug.</span>`,
         e.game_phase  && `<span style="background:#1e3a5f;padding:3px 10px;border-radius:6px">ÔÜ¢ ${e.game_phase}</span>`,
-        e.eii         && `<span style="background:#1e3a5f;padding:3px 10px;border-radius:6px">­ƒôÉ EII: ${e.eii} m┬▓/jug</span>`,
-        e.materials   && `<span style="background:#1e3a5f;padding:3px 10px;border-radius:6px">­ƒº░ ${e.materials}</span>`
+        e.eii         && `<span style="background:#1e3a5f;padding:3px 10px;border-radius:6px">📐 EII: ${e.eii} m²/jug</span>`,
+        e.materials   && `<span style="background:#1e3a5f;padding:3px 10px;border-radius:6px">🧰 ${e.materials}</span>`
     ].filter(Boolean).join('');
 
     function infoBlock(label, icon, value) {
@@ -2528,7 +2528,7 @@ function ejAbrirModal(id) {
                 <h2 style="color:#f8fafc;margin:0 0 8px;font-size:20px;font-weight:700">${e.name}${difBadge}</h2>
                 <div style="display:flex;gap:6px;flex-wrap:wrap;font-size:12px;color:#94a3b8">${metaTags || '<span style="color:#475569">Sin categoría</span>'}</div>
             </div>
-            <button id="ej-modal-close" style="background:#334155;border:none;color:#94a3b8;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:16px;flex-shrink:0;display:flex;align-items:center;justify-content:center">Ô£ò</button>
+            <button id="ej-modal-close" style="background:#334155;border:none;color:#94a3b8;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:16px;flex-shrink:0;display:flex;align-items:center;justify-content:center">✕</button>
         </div>
 
         <!-- Body -->
@@ -2536,16 +2536,16 @@ function ejAbrirModal(id) {
 
             <!-- Columna izquierda: dibujo -->
             <div style="padding:20px 12px 20px 24px;border-right:1px solid #334155">
-                <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">­ƒÄ¿ Pizarra táctica</div>
+                <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">❓ Pizarra táctica</div>
                 <div id="ej-modal-svg-container" style="width:100%;aspect-ratio:8/5;overflow:hidden;border-radius:10px;background:#0f4c2a;margin-bottom:14px;box-shadow:inset 0 2px 8px rgba(0,0,0,.4)">
                     <div style="color:#475569;font-size:12px;display:flex;align-items:center;justify-content:center;height:100%">Sin dibujo guardado</div>
                 </div>
                 <button id="ej-modal-cargar-btn" style="width:100%;padding:10px;background:#3b82f6;border:none;color:#fff;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px">
-                    ­ƒôï Cargar en pizarra
+                    📋 Cargar en pizarra
                 </button>
             ${e.animation_url ? `
                 <div style="margin-top:10px">
-                    <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">­ƒÄ¼ Animación del ejercicio</div>
+                    <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">🎬 Animación del ejercicio</div>
                     <video src="${e.animation_url}" controls playsinline loop style="width:100%;border-radius:8px;background:#000"></video>
 <a href="https://toplidercoach.com/wp-content/uploads/ejercicios/download-video.php?url=${encodeURIComponent(e.animation_url)}" target="_blank" style="display:block;width:100%;margin-top:8px;padding:10px;background:#f97316;border:none;color:#fff;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;text-align:center;text-decoration:none">
                     </a>
@@ -2553,11 +2553,11 @@ function ejAbrirModal(id) {
 
             <!-- Columna derecha: info -->
             <div style="padding:20px 24px 20px 12px;display:flex;flex-direction:column;gap:8px">
-                <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px">­ƒôä Detalles del ejercicio</div>
-                ${infoBlock('Objetivos', '­ƒÄ»', e.objectives)}
-                ${infoBlock('Descripción', '­ƒôØ', e.description)}
-                ${infoBlock('Variantes', '­ƒöÇ', e.variants)}
-                ${infoBlock('Notas del entrenador', '­ƒÆ¼', e.coach_notes)}
+                <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px">📄 Detalles del ejercicio</div>
+                ${infoBlock('Objetivos', '🎯', e.objectives)}
+                ${infoBlock('Descripción', '📝', e.description)}
+                ${infoBlock('Variantes', '🔀', e.variants)}
+                ${infoBlock('Notas del entrenador', '💬', e.coach_notes)}
                 ${!e.objectives && !e.description && !e.variants && !e.coach_notes
                     ? '<div style="color:#475569;font-size:13px;padding:20px 0">Sin información adicional.</div>'
                     : ''}
@@ -2566,7 +2566,7 @@ function ejAbrirModal(id) {
 
         <!-- Footer -->
         <div style="padding:14px 24px;border-top:1px solid #334155;display:flex;justify-content:flex-end;gap:8px">
-            <button id="ej-modal-eliminar-btn" style="padding:8px 16px;background:#7f1d1d;border:1px solid #dc2626;color:#fca5a5;border-radius:8px;cursor:pointer;font-size:12px">­ƒùæ Eliminar</button>
+            <button id="ej-modal-eliminar-btn" style="padding:8px 16px;background:#7f1d1d;border:1px solid #dc2626;color:#fca5a5;border-radius:8px;cursor:pointer;font-size:12px">🗑 Eliminar</button>
             <button id="ej-modal-cerrar-btn" style="padding:8px 16px;background:#334155;border:none;color:#cbd5e1;border-radius:8px;cursor:pointer;font-size:12px">Cerrar</button>
         </div>
     </div>`;
@@ -2920,7 +2920,7 @@ function ejRenderTimeline() {
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <div style="display:flex;align-items:center;gap:4px">
             ${ejP.isPlaying
-                ? '<button onclick="ejFrameStop()" style="background:#ef4444;border:none;color:#fff;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">ÔÅ╣ Stop</button>'
+                ? '<button onclick="ejFrameStop()" style="background:#ef4444;border:none;color:#fff;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">⏹ Stop</button>'
                 : '<button onclick="ejFramePlay()" style="background:#22c55e;border:none;color:#fff;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600" ' + (total<2?'disabled':'') + '>ÔûÂ Play</button>'
             }
             <button onclick="ejFramePrev()" style="background:#1e3a5f;border:1px solid #2563eb;color:#93c5fd;padding:5px 8px;border-radius:6px;cursor:pointer;font-size:12px" ${cur<=0?'disabled':''}>ÔùÇ</button>
@@ -2931,8 +2931,8 @@ function ejRenderTimeline() {
         </div>
         <div style="display:flex;align-items:center;gap:4px">
 <button onclick="ejFrameAdd()" style="background:#7c3aed;border:none;color:#fff;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600">+ Frame</button>
-            <button onclick="ejFrameDeleteLast()" style="background:#7f1d1d;border:1px solid #dc2626;color:#fca5a5;padding:5px 8px;border-radius:6px;cursor:pointer;font-size:11px" ${total<=1?'disabled':''}>­ƒùæ Frame</button>
-            <button onclick="ejFrameUndoTraj()" style="background:#1e3a5f;border:1px solid #2563eb;color:#93c5fd;padding:5px 8px;border-radius:6px;cursor:pointer;font-size:11px" title="Deshacer ├║ltima trayectoria del frame">Ôå® Trayo</button>
+            <button onclick="ejFrameDeleteLast()" style="background:#7f1d1d;border:1px solid #dc2626;color:#fca5a5;padding:5px 8px;border-radius:6px;cursor:pointer;font-size:11px" ${total<=1?'disabled':''}>🗑 Frame</button>
+            <button onclick="ejFrameUndoTraj()" style="background:#1e3a5f;border:1px solid #2563eb;color:#93c5fd;padding:5px 8px;border-radius:6px;cursor:pointer;font-size:11px" title="Deshacer última trayectoria del frame">Ôå® Trayo</button>
         </div>
         <div style="display:flex;align-items:center;gap:4px">
             <span style="color:#64748b;font-size:10px">Vel:</span>
@@ -2941,9 +2941,9 @@ function ejRenderTimeline() {
             <button onclick="ejFrameSetSpeed(400)" style="background:${ejP.playSpeed<800?'#1e3a5f':'#0f172a'};border:1px solid #334155;color:#9ca3af;padding:3px 6px;border-radius:4px;cursor:pointer;font-size:10px">2x</button>
         </div>
         <span style="color:#64748b;font-size:11px;white-space:nowrap">Frame ${cur+1}/${total}</span>
-        ${ejEditandoId ? `<button onclick="ejGuardarYExportar()" style="background:#22c55e;border:none;color:#fff;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600">${ejP._exportingVideo ? 'ÔÅ│ Generando...' : '­ƒÆ¥ Guardar cambios'}</button>` : `<button onclick="ejExportarAnimacionMP4()" style="background:#f97316;border:none;color:#fff;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600">${ejP._exportingVideo ? 'ÔÅ│ Generando...' : '­ƒÄ¼ MP4'}</button>`}
+        ${ejEditandoId ? `<button onclick="ejGuardarYExportar()" style="background:#22c55e;border:none;color:#fff;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600">${ejP._exportingVideo ? '⏳ Generando...' : '💾 Guardar cambios'}</button>` : `<button onclick="ejExportarAnimacionMP4()" style="background:#f97316;border:none;color:#fff;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600">${ejP._exportingVideo ? '⏳ Generando...' : '🎬 MP4'}</button>`}
     </div>
-    <div id="ej-anim-msg" style="font-size:11px;color:#9ca3af;margin-top:4px;text-align:center">${ejP._exportingVideo ? 'ÔÅ│ Generando vídeo... (no toques nada)' : ejP._lastVideoUrl ? '<span style="color:#22c55e">Ô£à Vídeo MP4 guardado</span> ÔÇö <a href="'+ejP._lastVideoUrl+'" target="_blank" style="color:#93c5fd;text-decoration:underline">Ver vídeo ÔûÂ</a> ┬À <a href="https://toplidercoach.com/wp-content/uploads/ejercicios/download-video.php?url='+encodeURIComponent(ejP._lastVideoUrl)+'" target="_blank" style="color:#f97316;text-decoration:underline">­ƒôÑ Descargar</a>' : ''}</div>`;
+    <div id="ej-anim-msg" style="font-size:11px;color:#9ca3af;margin-top:4px;text-align:center">${ejP._exportingVideo ? '⏳ Generando vídeo... (no toques nada)' : ejP._lastVideoUrl ? '<span style="color:#22c55e">Ô£à Vídeo MP4 guardado</span> — <a href="'+ejP._lastVideoUrl+'" target="_blank" style="color:#93c5fd;text-decoration:underline">Ver vídeo ÔûÂ</a> · <a href="https://toplidercoach.com/wp-content/uploads/ejercicios/download-video.php?url='+encodeURIComponent(ejP._lastVideoUrl)+'" target="_blank" style="color:#f97316;text-decoration:underline">📥 Descargar</a>' : ''}</div>`;
 }
 async function ejCargarPlantilla() {
     try {
@@ -3020,7 +3020,7 @@ function ejColocarJugadorPlantilla(idx) {
     
     // 2. Guardar board_data + miniatura en Supabase
     var msgEl = document.getElementById('ej-anim-msg');
-    if (msgEl) msgEl.innerHTML = '<span style="color:#3b82f6">­ƒÆ¥ Guardando ejercicio...</span>';
+    if (msgEl) msgEl.innerHTML = '<span style="color:#3b82f6">💾 Guardando ejercicio...</span>';
     
     try {
         ejFrameSaveCurrent();
@@ -3071,7 +3071,7 @@ async function ejExportarAnimacionMP4() {
     const msg = document.getElementById('ej-anim-msg');
     ejP._exportingVideo = true; ejRenderTimeline();
     var progDiv = document.getElementById('ej-anim-msg');
-    if (progDiv) progDiv.innerHTML = '<span style="color:#f97316;font-weight:600">ÔÅ│ Generando vídeo MP4... no toques nada, puede tardar hasta 1 minuto</span>';
+    if (progDiv) progDiv.innerHTML = '<span style="color:#f97316;font-weight:600">⏳ Generando vídeo MP4... no toques nada, puede tardar hasta 1 minuto</span>';
 
     const svg = document.getElementById('ej-svg');
     const W = ejP.svgW;
@@ -3262,7 +3262,7 @@ async function ejExportarAnimacionMP4() {
     const blob = new Blob(chunks, { type: 'video/webm' }); console.log('Blob creado, tamaño:', blob.size, 'bytes');
    console.log('Iniciando conversión a base64...');
     var progDiv2 = document.getElementById('ej-anim-msg');
-    if (progDiv2) progDiv2.innerHTML = '<span style="color:#3b82f6;font-weight:600">­ƒôñ Subiendo al servidor y convirtiendo a MP4...</span>';
+    if (progDiv2) progDiv2.innerHTML = '<span style="color:#3b82f6;font-weight:600">📤 Subiendo al servidor y convirtiendo a MP4...</span>';
     try {
         const base64 = await new Promise((resolve, reject) => {
             const rd = new FileReader();
@@ -3281,7 +3281,7 @@ async function ejExportarAnimacionMP4() {
             await supabaseClient.from('custom_exercises').update({ animation_url: data.url }).eq('id', ejEditandoId);
             const idx = ejBancoCache.findIndex(x => x.id === ejEditandoId);
             if (idx >= 0) ejBancoCache[idx].animation_url = data.url;
-            ejP._exportingVideo = false; ejP._lastVideoUrl = data.url; ejRenderTimeline(); const msgFinal = document.getElementById('ej-anim-msg'); if (msgFinal) msgFinal.innerHTML = 'Ô£à Vídeo MP4 guardado ÔÇö <a href="' + data.url + '" target="_blank" style="color:#93c5fd;text-decoration:underline">Ver vídeo ÔûÂ</a>';
+            ejP._exportingVideo = false; ejP._lastVideoUrl = data.url; ejRenderTimeline(); const msgFinal = document.getElementById('ej-anim-msg'); if (msgFinal) msgFinal.innerHTML = 'Ô£à Vídeo MP4 guardado — <a href="' + data.url + '" target="_blank" style="color:#93c5fd;text-decoration:underline">Ver vídeo ÔûÂ</a>';
             ejP._videoDesactualizado = false;
         } else {
             ejP._exportingVideo = false; ejRenderTimeline(); const msgErr = document.getElementById('ej-anim-msg'); if (msgErr) msgErr.textContent = 'ÔØî Error: ' + (data.error || 'desconocido');
