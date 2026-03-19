@@ -34,13 +34,13 @@ const EJ_FORMATIONS = {
               {x:.38,y:.25},{x:.38,y:.50},{x:.38,y:.75},{x:.55,y:.35},{x:.55,y:.65}]
 };
 
-// ---- COLORES DE LÉNEA ----
+// ---- COLORES DE LÍNEA ----
 const EJ_LINE_COLORS = [
     {c:'#ffffff',n:'Blanco'},{c:'#ef4444',n:'Rojo'},{c:'#3b82f6',n:'Azul'},{c:'#22c55e',n:'Verde'},
     {c:'#eab308',n:'Amarillo'},{c:'#f97316',n:'Naranja'},{c:'#a855f7',n:'Morado'},{c:'#000000',n:'Negro'}
 ];
 
-// ---- IMÜGENES DE EQUIPAMIENTO (del proyecto FBT) ----
+// ---- IMÁGENES DE EQUIPAMIENTO (del proyecto FBT) ----
 
 
 // ---- TIPOS DE EQUIPAMIENTO ----
@@ -58,7 +58,7 @@ const EJ_EQUIPMENT_TYPES = [
     { key: 'manikin',    name: 'Maniquí',        w: 34, h: 48 }
 ];
 
-// ---- IMÜGENES DEL CAMPO ----
+// ---- IMÁGENES DEL CAMPO ----
 const EJ_FIELD_IMAGES = {
     full:  'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA4MDAgNTAwIj48cmVjdCB3aWR0aD0iODAwIiBoZWlnaHQ9IjUwMCIgZmlsbD0iIzFhNmIzMCIvPjxjbGlwUGF0aCBpZD0iZmMiPjxyZWN0IHg9IjIwIiB5PSIxNSIgd2lkdGg9Ijc2MCIgaGVpZ2h0PSI0NzAiIHJ4PSIxIi8+PC9jbGlwUGF0aD48ZyBjbGlwLXBhdGg9InVybCgjZmMpIj48cmVjdCB4PSIyMCIgeT0iMTUiIHdpZHRoPSI2MyIgaGVpZ2h0PSI0NzAiIGZpbGw9IiMyMDczMzIiLz48cmVjdCB4PSI4MyIgeT0iMTUiIHdpZHRoPSI2NCIgaGVpZ2h0PSI0NzAiIGZpbGw9IiMxYTZiMzAiLz48cmVjdCB4PSIxNDciIHk9IjE1IiB3aWR0aD0iNjMiIGhlaWdodD0iNDcwIiBmaWxsPSIjMjA3MzMyIi8+PHJlY3QgeD0iMjEwIiB5PSIxNSIgd2lkdGg9IjY0IiBoZWlnaHQ9IjQ3MCIgZmlsbD0iIzFhNmIzMCIvPjxyZWN0IHg9IjI3NCIgeT0iMTUiIHdpZHRoPSI2MyIgaGVpZ2h0PSI0NzAiIGZpbGw9IiMyMDczMzIiLz48cmVjdCB4PSIzMzciIHk9IjE1IiB3aWR0aD0iNjMiIGhlaWdodD0iNDcwIiBmaWxsPSIjMWE2YjMwIi8+PHJlY3QgeD0iNDAwIiB5PSIxNSIgd2lkdGg9IjY0IiBoZWlnaHQ9IjQ3MCIgZmlsbD0iIzIwNzMzMiIvPjxyZWN0IHg9IjQ2NCIgeT0iMTUiIHdpZHRoPSI2MyIgaGVpZ2h0PSI0NzAiIGZpbGw9IiMxYTZiMzAiLz48cmVjdCB4PSI1MjciIHk9IjE1IiB3aWR0aD0iNjMiIGhlaWdodD0iNDcwIiBmaWxsPSIjMjA3MzMyIi8+PHJlY3QgeD0iNTkwIiB5PSIxNSIgd2lkdGg9IjY0IiBoZWlnaHQ9IjQ3MCIgZmlsbD0iIzFhNmIzMCIvPjxyZWN0IHg9IjY1NCIgeT0iMTUiIHdpZHRoPSI2MyIgaGVpZ2h0PSI0NzAiIGZpbGw9IiMyMDczMzIiLz48cmVjdCB4PSI3MTciIHk9IjE1IiB3aWR0aD0iNjMiIGhlaWdodD0iNDcwIiBmaWxsPSIjMWE2YjMwIi8+PC9nPjxnIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxyZWN0IHg9IjIwIiB5PSIxNSIgd2lkdGg9Ijc2MCIgaGVpZ2h0PSI0NzAiIHJ4PSIxIi8+PGxpbmUgeDE9IjQwMCIgeTE9IjE1IiB4Mj0iNDAwIiB5Mj0iNDg1Ii8+PGNpcmNsZSBjeD0iNDAwIiBjeT0iMjUwIiByPSI2NSIvPjxyZWN0IHg9IjIwIiB5PSIxMzMiIHdpZHRoPSIxMDgiIGhlaWdodD0iMjM0Ii8+PHJlY3QgeD0iNjcyIiB5PSIxMzMiIHdpZHRoPSIxMDgiIGhlaWdodD0iMjM0Ii8+PHJlY3QgeD0iMjAiIHk9IjE5NSIgd2lkdGg9IjQwIiBoZWlnaHQ9IjExMCIvPjxyZWN0IHg9Ijc0MCIgeT0iMTk1IiB3aWR0aD0iNDAiIGhlaWdodD0iMTEwIi8+PHJlY3QgeD0iMTAiIHk9IjIyMCIgd2lkdGg9IjEwIiBoZWlnaHQ9IjYwIi8+PHJlY3QgeD0iNzgwIiB5PSIyMjAiIHdpZHRoPSIxMCIgaGVpZ2h0PSI2MCIvPjxwYXRoIGQ9Ik0xMjggMTk5IEE2NSA2NSAwIDAgMSAxMjggMzAxIi8+PHBhdGggZD0iTTY3MiAxOTkgQTY1IDY1IDAgMCAwIDY3MiAzMDEiLz48cGF0aCBkPSJNMjAgMjIgQTcgNyAwIDAgMSAyNyAxNSIvPjxwYXRoIGQ9Ik03NzMgMTUgQTcgNyAwIDAgMSA3ODAgMjIiLz48cGF0aCBkPSJNNzgwIDQ3OCBBNyA3IDAgMCAxIDc3MyA0ODUiLz48cGF0aCBkPSJNMjcgNDg1IEE3IDcgMCAwIDEgMjAgNDc4Ii8+PC9nPjxjaXJjbGUgY3g9IjQwMCIgY3k9IjI1MCIgcj0iMy41IiBmaWxsPSIjZmZmIi8+PGNpcmNsZSBjeD0iMTAwIiBjeT0iMjUwIiByPSIzLjUiIGZpbGw9IiNmZmYiLz48Y2lyY2xlIGN4PSI3MDAiIGN5PSIyNTAiIHI9IjMuNSIgZmlsbD0iI2ZmZiIvPjwvc3ZnPgo=',
    half:  'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA4MDAgNTAwIj4KPHJlY3Qgd2lkdGg9IjgwMCIgaGVpZ2h0PSI1MDAiIGZpbGw9IiMxYTZiMzAiLz4KPGNsaXBQYXRoIGlkPSJmaCI+PHJlY3QgeD0iMjAiIHk9IjE1IiB3aWR0aD0iNzYwIiBoZWlnaHQ9IjQ3MCIgcng9IjEiLz48L2NsaXBQYXRoPgo8ZyBjbGlwLXBhdGg9InVybCgjZmgpIj4KPHJlY3QgeD0iMjAiIHk9IjE1IiB3aWR0aD0iNjMiIGhlaWdodD0iNDcwIiBmaWxsPSIjMjA3MzMyIi8+CjxyZWN0IHg9IjgzIiB5PSIxNSIgd2lkdGg9IjY0IiBoZWlnaHQ9IjQ3MCIgZmlsbD0iIzFhNmIzMCIvPgo8cmVjdCB4PSIxNDciIHk9IjE1IiB3aWR0aD0iNjMiIGhlaWdodD0iNDcwIiBmaWxsPSIjMjA3MzMyIi8+CjxyZWN0IHg9IjIxMCIgeT0iMTUiIHdpZHRoPSI2NCIgaGVpZ2h0PSI0NzAiIGZpbGw9IiMxYTZiMzAiLz4KPHJlY3QgeD0iMjc0IiB5PSIxNSIgd2lkdGg9IjYzIiBoZWlnaHQ9IjQ3MCIgZmlsbD0iIzIwNzMzMiIvPgo8cmVjdCB4PSIzMzciIHk9IjE1IiB3aWR0aD0iNjMiIGhlaWdodD0iNDcwIiBmaWxsPSIjMWE2YjMwIi8+CjxyZWN0IHg9IjQwMCIgeT0iMTUiIHdpZHRoPSI2NCIgaGVpZ2h0PSI0NzAiIGZpbGw9IiMyMDczMzIiLz4KPHJlY3QgeD0iNDY0IiB5PSIxNSIgd2lkdGg9IjYzIiBoZWlnaHQ9IjQ3MCIgZmlsbD0iIzFhNmIzMCIvPgo8cmVjdCB4PSI1MjciIHk9IjE1IiB3aWR0aD0iNjMiIGhlaWdodD0iNDcwIiBmaWxsPSIjMjA3MzMyIi8+CjxyZWN0IHg9IjU5MCIgeT0iMTUiIHdpZHRoPSI2NCIgaGVpZ2h0PSI0NzAiIGZpbGw9IiMxYTZiMzAiLz4KPHJlY3QgeD0iNjU0IiB5PSIxNSIgd2lkdGg9IjYzIiBoZWlnaHQ9IjQ3MCIgZmlsbD0iIzIwNzMzMiIvPgo8cmVjdCB4PSI3MTciIHk9IjE1IiB3aWR0aD0iNjMiIGhlaWdodD0iNDcwIiBmaWxsPSIjMWE2YjMwIi8+CjwvZz4KPGcgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+CjwhLS0gRmllbGQgYm91bmRhcnkgLS0+CjxyZWN0IHg9IjIwIiB5PSIxNSIgd2lkdGg9Ijc2MCIgaGVpZ2h0PSI0NzAiIHJ4PSIxIi8+CjwhLS0gR29hbCAoNy4zMm0gd2lkZSwgYWJvdmUgZmllbGQgbGluZSkgLS0+CjxyZWN0IHg9IjM1OSIgeT0iMiIgd2lkdGg9IjgyIiBoZWlnaHQ9IjEzIi8+CjwhLS0gUGVuYWx0eSBhcmVhICg0MC4zMm0gd2lkZSB4IDE2LjVtIGRlZXApIC0tPgo8cmVjdCB4PSIxNzUiIHk9IjE1IiB3aWR0aD0iNDUwIiBoZWlnaHQ9IjE0OCIvPgo8IS0tIEdvYWwgYXJlYSAoMTguMzJtIHdpZGUgeCA1LjVtIGRlZXApIC0tPgo8cmVjdCB4PSIyOTgiIHk9IjE1IiB3aWR0aD0iMjA0IiBoZWlnaHQ9IjUwIi8+CjwhLS0gUGVuYWx0eSBhcmMgKG9ubHkgcGFydCBvdXRzaWRlIHBlbmFsdHkgYXJlYSwgZWxsaXB0aWNhbCkgLS0+CjxwYXRoIGQ9Ik0zMTkgMTYzIEExMDIgODIgMCAwIDAgNDgxIDE2MyIvPgo8IS0tIENlbnRlciBzZW1pY2lyY2xlIGF0IGJvdHRvbSBsaW5lIC0tPgo8cGF0aCBkPSJNMjk4IDQ4NSBBMTAyIDgyIDAgMCAxIDUwMiA0ODUiLz4KPCEtLSBDb3JuZXIgYXJjcyB0b3AgLS0+CjxwYXRoIGQ9Ik0yMCAyMiBBNyA3IDAgMCAxIDI3IDE1Ii8+CjxwYXRoIGQ9Ik03NzMgMTUgQTcgNyAwIDAgMSA3ODAgMjIiLz4KPC9nPgo8IS0tIFBlbmFsdHkgc3BvdCAtLT4KPGNpcmNsZSBjeD0iNDAwIiBjeT0iMTEzIiByPSIzLjUiIGZpbGw9IiNmZmYiLz4KPCEtLSBDZW50ZXIgc3BvdCBhdCBib3R0b20gLS0+CjxjaXJjbGUgY3g9IjQwMCIgY3k9IjQ4NSIgcj0iMy41IiBmaWxsPSIjZmZmIi8+Cjwvc3ZnPgo=',
@@ -805,7 +805,7 @@ function ejElegirModo(modo) {
     ejRenderToolbar();
 }
 function ejNuevaPizarra() {
-    ejConfirm('¿Limpiar la pizarra y empezar desde cero?', () => {
+    if (!confirm('¿Limpiar la pizarra y empezar desde cero?')) return;
     ejSaveHistory();
     ejP.players = []; ejP.lines = []; ejP.shapes = []; ejP.texts = []; ejP.equipment = [];
     ejP.selectedId = null; ejP.playerCounts = {};
@@ -830,16 +830,14 @@ function ejNuevaPizarra() {
     var overlay = document.getElementById('ej-modo-overlay');
     if (overlay) overlay.style.display = 'flex';
     ejRenderToolbar();
-    });
 }
 function ejClearAll() {
-    ejConfirm('¿Borrar toda la pizarra?', () => {
+    if (!confirm('¿Borrar toda la pizarra?')) return;
     ejSaveHistory();
     ejP.players = []; ejP.lines = []; ejP.shapes = []; ejP.texts = []; ejP.equipment = [];
     ejP.selectedId = null; ejP.playerCounts = {};
     ejRenderSVG();
     ejRenderToolbar();
-    });
 }
 
 function ejSetTool(tool) {
@@ -1158,7 +1156,7 @@ ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin
     </div>` : ''}
 
     <!-- SECCIÓN JUGADORES -->
-    ${sectionHeader('players','ÔÜ¢','Jugadores')}
+    ${sectionHeader('players','⚽','Jugadores')}
     ${playersOpen ? `
     <div class="ej-section-body">
         <div class="ej-team-block">
@@ -1257,7 +1255,7 @@ ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin
          ${drawOpen ? `
     <div class="ej-section-body">
         <div class="ej-field-btns">
-            ${['full','half','halfDown','blank'].map(f=>`<button class="ej-btn-sm${ejP.fieldType===f?' active':''}" onclick="ejSetField('${f}')">${f==='full'?'Completo':f==='half'?'Medio Ôåæ':f==='halfDown'?'Medio Ôåô':'Libre'}</button>`).join('')}
+            ${['full','half','halfDown','blank'].map(f=>`<button class="ej-btn-sm${ejP.fieldType===f?' active':''}" onclick="ejSetField('${f}')">${f==='full'?'Completo':f==='half'?'Medio ↑':f==='halfDown'?'Medio ↓':'Libre'}</button>`).join('')}
         </div>
         <div style="display:flex;gap:4px;margin-top:6px">
             ${['#1a6b30','#1a8540','#2d8a4e','#0f4c2a','#1e3a5f','#0a1628','#2c2c2c'].map(c =>
@@ -1273,11 +1271,11 @@ ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin
         <div class="ej-draw-tools">
             ${[
                 {k:'pencil',  ico:'✏️', lbl:'Lápiz'},
-                {k:'arrow',   ico:'Ô×í´©Å', lbl:'Flecha'},
-                {k:'curved',  ico:'Ôåù´©Å', lbl:'Curva'},
-                {k:'line',    ico:'Ô×û', lbl:'Línea'},
-                {k:'rect',    ico:'Ô¼£', lbl:'Rect.'},
-                {k:'ellipse', ico:'Ô¡ò', lbl:'Círculo'},
+                {k:'arrow',   ico:'➡️', lbl:'Flecha'},
+                {k:'curved',  ico:'↗️', lbl:'Curva'},
+                {k:'line',    ico:'➖', lbl:'Línea'},
+                {k:'rect',    ico:'⬜', lbl:'Rect.'},
+                {k:'ellipse', ico:'⭕', lbl:'Círculo'},
                 {k:'text',    ico:'T',  lbl:'Texto'}
             ].map(item=>`<button class="ej-btn-tool${t===item.k?' active':''}" onclick="ejSetTool('${item.k}')">${item.ico} ${item.lbl}</button>`).join('')}
         </div>
@@ -1290,8 +1288,8 @@ ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin
             ${EJ_LINE_COLORS.map(c=>`<div class="ej-lcolor${ejP.lineColor===c.c?' active':''}" style="background:${c.c}" title="${c.n}" onclick="ejP.lineColor='${c.c}';ejRenderToolbar()"></div>`).join('')}
         </div>
         <div class="ej-actions-row" style="margin-top:8px;padding-top:8px;border-top:1px solid #334155">
-            <button class="ej-act-btn undo" onclick="ejUndo()" title="Deshacer (Ctrl+Z)">Ôå® Deshacer</button>
-            <button class="ej-act-btn redo" onclick="ejRedo()" title="Rehacer (Ctrl+Y)">Ôå¬ Rehacer</button>
+            <button class="ej-act-btn undo" onclick="ejUndo()" title="Deshacer (Ctrl+Z)">↩ Deshacer</button>
+            <button class="ej-act-btn redo" onclick="ejRedo()" title="Rehacer (Ctrl+Y)">↪ Rehacer</button>
         </div>
     </div>` : ''}
     <!-- SECCIÓN MATERIAL -->
@@ -1328,7 +1326,7 @@ ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin
 
     <!-- BOTONES PRINCIPALES -->
     <div style="margin-top:10px;display:flex;flex-direction:column;gap:6px">
-        ${ejP.animMode && ejEditandoId ? '' : '<button class="ej-act-btn purple full" onclick="ejCapturarParaFicha()" style="width:100%;padding:10px;background:#7c3aed;border:none;color:#fff;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600">💾 Guardar ejercicio</button>'}
+        ${ejP.animMode && ejEditandoId ? '' : '<button class="ej-act-btn purple full" onclick="ejCapturarParaFicha()" style="width:100%;padding:10px;background:#7c3aed;border:none;color:#fff;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600">📋 Guardar ejercicio</button>'}
         <button class="ej-act-btn green full" onclick="ejExportPNG()" style="width:100%;padding:8px;background:#0f172a;border:1px solid #334155;color:#94a3b8;border-radius:8px;cursor:pointer;font-size:12px">📥 Exportar PNG</button>
         <button class="ej-act-btn red full" onclick="ejDelete()" ${!sel?'disabled':''} style="width:100%;padding:8px;background:#7f1d1d;border:1px solid #dc2626;color:#fca5a5;border-radius:8px;cursor:pointer;font-size:12px">🗑 Eliminar seleccionado</button>
     </div>
@@ -1427,10 +1425,10 @@ function ejBuildFicha() {
     root.innerHTML = `
     <div class="ej-ficha-form" style="max-width:960px;margin:0 auto">
 
-        <!-- MEDIA: MINIATURA + VÉDEO -->
+        <!-- MEDIA: MINIATURA + VÍDEO -->
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;background:#0f172a;border:1px solid #1e3a5f;border-radius:10px;overflow:hidden;margin-bottom:16px">
             <div style="padding:14px 16px;border-right:1px solid #1e3a5f">
-                <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">❓ Miniatura</div>
+                <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">🎨 Miniatura</div>
                 <div id="ej-ficha-thumb" style="width:100%;aspect-ratio:8/5;border-radius:8px;background:#1e3a5f;display:flex;align-items:center;justify-content:center;overflow:hidden">
                     <span style="color:#475569;font-size:11px">Dibuja en la pizarra y pulsa "Usar en ficha"</span>
                 </div>
@@ -1949,7 +1947,7 @@ function ejPrepararThumbParaPDF() {
 }
 async function ejEliminarDesdeBanco(id) {
     const e = ejBancoCache.find(x => x.id === id);
-    ejConfirm('¿Eliminar "' + (e ? e.name : '') + '"? No se puede deshacer.', async () => {
+    if (!confirm('¿Eliminar "' + (e ? e.name : '') + '"? No se puede deshacer.')) return;
     try {
         const { error } = await supabaseClient.from('custom_exercises').delete().eq('id', id);
         if (error) throw error;
@@ -1958,11 +1956,10 @@ async function ejEliminarDesdeBanco(id) {
     } catch(err) {
         ejToast('Error: ' + err.message, 'error');
     }
-    });
 }
 async function ejEliminarEjercicio() {
     if (!ejEditandoId) { ejToast('No hay ejercicio cargado para eliminar', 'warning'); return; }
-    ejConfirm('¿Eliminar este ejercicio? Esta acción no se puede deshacer.', async () => {
+    if (!confirm('¿Eliminar este ejercicio? Esta acción no se puede deshacer.')) return;
     try {
         const { error } = await supabaseClient.from('custom_exercises').delete().eq('id', ejEditandoId);
         if (error) throw error;
@@ -1975,9 +1972,7 @@ async function ejEliminarEjercicio() {
         ejShowTab('banco', document.querySelector('[onclick*="\'banco\'"]'));
     } catch(err) {
         ejToast('Error al eliminar: ' + err.message, 'error');
-        ejToast('Error al eliminar: ' + err.message, 'error');
     }
-    });
 }
 function ejCalcEII() {
     const a = parseFloat(document.getElementById('ej-ancho')?.value);
@@ -2160,11 +2155,11 @@ let thumbnailSvg = window.ejThumbnailPendiente || null;
             if (idx >= 0) ejBancoCache[idx] = { ...ejBancoCache[idx], ...res[0] };
             else ejBancoCache.unshift(res[0]);
         }
-        var videoAviso = ejP.animMode ? '<br><span style="color:#f97316">ÔÜá´©Å Si has hecho cambios en la animación, pulsa MP4 en la pizarra para actualizar el vídeo.</span>' : '';
+        var videoAviso = ejP.animMode ? '<br><span style="color:#f97316">⚠️ Si has hecho cambios en la animación, pulsa MP4 en la pizarra para actualizar el vídeo.</span>' : '';
         setTimeout(() => { if (msg) msg.innerHTML = ''; }, 6000);
     } catch(err){
         console.error(err);
-        if (msg) msg.innerHTML = `<span style="color:#ef4444">ÔØî Error: ${err.message}</span>`;
+        if (msg) msg.innerHTML = `<span style="color:#ef4444">❌ Error: ${err.message}</span>`;
     }
 }
 
@@ -2203,7 +2198,7 @@ function ejBuildBanco() {
             </div>
             <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
                 <select id="ej-filter-tema" onchange="ejBancoSearch()" style="padding:4px 8px;font-size:11px;background:#1e293b;border:1px solid #334155;color:#cbd5e1;border-radius:6px;cursor:pointer">
-                    <option value="">Tema Ôû¥</option>
+                    <option value="">Tema ▾</option>
                     <option>Calentamiento</option><option>Cambios de orientación</option><option>Centros laterales</option>
                     <option>Contraataque</option><option>Defensa en bloque bajo</option><option>Defensa en inferioridad</option>
                     <option>Duelos</option><option>Finalización</option><option>Físico-Técnico</option>
@@ -2215,23 +2210,23 @@ function ejBuildBanco() {
                     <option>Técnica individual</option>
                 </select>
                 <select id="ej-filter-cat" onchange="ejBancoSearch()" style="padding:4px 8px;font-size:11px;background:#1e293b;border:1px solid #334155;color:#cbd5e1;border-radius:6px;cursor:pointer">
-                    <option value="">Categoría Ôû¥</option>
+                    <option value="">Categoría ▾</option>
                     <option>Técnica individual</option><option>Posesión</option><option>Pressing</option>
                     <option>Ataque posicional</option><option>Defensa</option><option>Transiciones</option>
                     <option>Portería</option><option>Físico</option><option>Táctica</option>
                 </select>
                 <select id="ej-filter-edad" onchange="ejBancoSearch()" style="padding:4px 8px;font-size:11px;background:#1e293b;border:1px solid #334155;color:#cbd5e1;border-radius:6px;cursor:pointer">
-                    <option value="">Edad Ôû¥</option>
+                    <option value="">Edad ▾</option>
                     <option>Prebenjamín</option><option>Benjamín</option><option>Alevín</option>
                     <option>Infantil</option><option>Cadete</option><option>Juvenil</option><option>Senior</option>
                 </select>
                 <select id="ej-filter-dif" onchange="ejBancoSearch()" style="padding:4px 8px;font-size:11px;background:#1e293b;border:1px solid #334155;color:#cbd5e1;border-radius:6px;cursor:pointer">
-                    <option value="">Dificultad Ôû¥</option>
+                    <option value="">Dificultad ▾</option>
                     <option value="1">1</option><option value="2">2</option><option value="3">3</option>
                     <option value="4">4</option><option value="5">5</option>
                 </select>
                 <select id="ej-filter-fase" onchange="ejBancoSearch()" style="padding:4px 8px;font-size:11px;background:#1e293b;border:1px solid #334155;color:#cbd5e1;border-radius:6px;cursor:pointer">
-                    <option value="">Fase Ôû¥</option>
+                    <option value="">Fase ▾</option>
                     <option>Organización ofensiva</option><option>Organización defensiva</option>
                     <option>Transición ataque</option><option>Transición defensa</option><option>Balón parado</option>
                 </select>
@@ -2506,7 +2501,7 @@ function ejAbrirModal(id) {
         e.age_group   && `<span style="background:#1e3a5f;padding:3px 10px;border-radius:6px">🎂 ${e.age_group}</span>`,
         e.duration_min && `<span style="background:#1e3a5f;padding:3px 10px;border-radius:6px">⏱ ${e.duration_min} min</span>`,
         e.players_count && `<span style="background:#1e3a5f;padding:3px 10px;border-radius:6px">👥 ${e.players_count} jug.</span>`,
-        e.game_phase  && `<span style="background:#1e3a5f;padding:3px 10px;border-radius:6px">ÔÜ¢ ${e.game_phase}</span>`,
+        e.game_phase  && `<span style="background:#1e3a5f;padding:3px 10px;border-radius:6px">⚽ ${e.game_phase}</span>`,
         e.eii         && `<span style="background:#1e3a5f;padding:3px 10px;border-radius:6px">📐 EII: ${e.eii} m²/jug</span>`,
         e.materials   && `<span style="background:#1e3a5f;padding:3px 10px;border-radius:6px">🧰 ${e.materials}</span>`
     ].filter(Boolean).join('');
@@ -2536,7 +2531,7 @@ function ejAbrirModal(id) {
 
             <!-- Columna izquierda: dibujo -->
             <div style="padding:20px 12px 20px 24px;border-right:1px solid #334155">
-                <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">❓ Pizarra táctica</div>
+                <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">🎨 Pizarra táctica</div>
                 <div id="ej-modal-svg-container" style="width:100%;aspect-ratio:8/5;overflow:hidden;border-radius:10px;background:#0f4c2a;margin-bottom:14px;box-shadow:inset 0 2px 8px rgba(0,0,0,.4)">
                     <div style="color:#475569;font-size:12px;display:flex;align-items:center;justify-content:center;height:100%">Sin dibujo guardado</div>
                 </div>
@@ -2590,7 +2585,7 @@ function ejAbrirModal(id) {
     });
 
     document.getElementById('ej-modal-eliminar-btn').addEventListener('click', async () => {
-        ejConfirm('¿Eliminar este ejercicio? Esta acción no se puede deshacer.', async () => {
+        if (!confirm('¿Eliminar este ejercicio? Esta acción no se puede deshacer.')) return;
         try {
             const { error } = await supabaseClient.from('custom_exercises').delete().eq('id', e.id);
             if (error) throw error;
@@ -2600,7 +2595,6 @@ function ejAbrirModal(id) {
         } catch(err) {
             ejToast('Error al eliminar: ' + err.message, 'error');
         }
-        });
     });
 }
 // =============================================
@@ -2686,15 +2680,14 @@ function ejFrameAdd() {
 // Elimina el último frame
 function ejFrameDeleteLast() {
     if (!ejP.animMode || ejP.frames.length <= 1) return;
-    ejConfirm('¿Eliminar el último frame?', () => {
-        ejP.frames.pop();
-        if (ejP.currentFrame >= ejP.frames.length) {
-            ejP.currentFrame = ejP.frames.length - 1;
-        }
-        ejFrameRestore(ejP.frames[ejP.currentFrame]);
-        ejRenderSVG();
-        ejRenderTimeline();
-    });
+    if (!confirm('¿Eliminar el último frame?')) return;
+    ejP.frames.pop();
+    if (ejP.currentFrame >= ejP.frames.length) {
+        ejP.currentFrame = ejP.frames.length - 1;
+    }
+    ejFrameRestore(ejP.frames[ejP.currentFrame]);
+    ejRenderSVG();
+    ejRenderTimeline();
 }
 function ejFrameUndoTraj() {
     if (!ejP.animMode) return;
@@ -2921,10 +2914,10 @@ function ejRenderTimeline() {
         <div style="display:flex;align-items:center;gap:4px">
             ${ejP.isPlaying
                 ? '<button onclick="ejFrameStop()" style="background:#ef4444;border:none;color:#fff;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">⏹ Stop</button>'
-                : '<button onclick="ejFramePlay()" style="background:#22c55e;border:none;color:#fff;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600" ' + (total<2?'disabled':'') + '>ÔûÂ Play</button>'
+                : '<button onclick="ejFramePlay()" style="background:#22c55e;border:none;color:#fff;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600" ' + (total<2?'disabled':'') + '>▶ Play</button>'
             }
-            <button onclick="ejFramePrev()" style="background:#1e3a5f;border:1px solid #2563eb;color:#93c5fd;padding:5px 8px;border-radius:6px;cursor:pointer;font-size:12px" ${cur<=0?'disabled':''}>ÔùÇ</button>
-            <button onclick="ejFrameNext()" style="background:#1e3a5f;border:1px solid #2563eb;color:#93c5fd;padding:5px 8px;border-radius:6px;cursor:pointer;font-size:12px" ${cur>=total-1?'disabled':''}>ÔûÂ</button>
+            <button onclick="ejFramePrev()" style="background:#1e3a5f;border:1px solid #2563eb;color:#93c5fd;padding:5px 8px;border-radius:6px;cursor:pointer;font-size:12px" ${cur<=0?'disabled':''}>◀</button>
+            <button onclick="ejFrameNext()" style="background:#1e3a5f;border:1px solid #2563eb;color:#93c5fd;padding:5px 8px;border-radius:6px;cursor:pointer;font-size:12px" ${cur>=total-1?'disabled':''}>▶</button>
         </div>
         <div style="display:flex;align-items:center;gap:6px;flex:1;overflow-x:auto;padding:4px 0">
             ${dots}
@@ -2932,7 +2925,7 @@ function ejRenderTimeline() {
         <div style="display:flex;align-items:center;gap:4px">
 <button onclick="ejFrameAdd()" style="background:#7c3aed;border:none;color:#fff;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600">+ Frame</button>
             <button onclick="ejFrameDeleteLast()" style="background:#7f1d1d;border:1px solid #dc2626;color:#fca5a5;padding:5px 8px;border-radius:6px;cursor:pointer;font-size:11px" ${total<=1?'disabled':''}>🗑 Frame</button>
-            <button onclick="ejFrameUndoTraj()" style="background:#1e3a5f;border:1px solid #2563eb;color:#93c5fd;padding:5px 8px;border-radius:6px;cursor:pointer;font-size:11px" title="Deshacer última trayectoria del frame">Ôå® Trayo</button>
+            <button onclick="ejFrameUndoTraj()" style="background:#1e3a5f;border:1px solid #2563eb;color:#93c5fd;padding:5px 8px;border-radius:6px;cursor:pointer;font-size:11px" title="Deshacer última trayectoria del frame">↩ Trayo</button>
         </div>
         <div style="display:flex;align-items:center;gap:4px">
             <span style="color:#64748b;font-size:10px">Vel:</span>
@@ -2943,7 +2936,7 @@ function ejRenderTimeline() {
         <span style="color:#64748b;font-size:11px;white-space:nowrap">Frame ${cur+1}/${total}</span>
         ${ejEditandoId ? `<button onclick="ejGuardarYExportar()" style="background:#22c55e;border:none;color:#fff;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600">${ejP._exportingVideo ? '⏳ Generando...' : '💾 Guardar cambios'}</button>` : `<button onclick="ejExportarAnimacionMP4()" style="background:#f97316;border:none;color:#fff;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600">${ejP._exportingVideo ? '⏳ Generando...' : '🎬 MP4'}</button>`}
     </div>
-    <div id="ej-anim-msg" style="font-size:11px;color:#9ca3af;margin-top:4px;text-align:center">${ejP._exportingVideo ? '⏳ Generando vídeo... (no toques nada)' : ejP._lastVideoUrl ? '<span style="color:#22c55e">Ô£à Vídeo MP4 guardado</span> — <a href="'+ejP._lastVideoUrl+'" target="_blank" style="color:#93c5fd;text-decoration:underline">Ver vídeo ÔûÂ</a> · <a href="https://toplidercoach.com/wp-content/uploads/ejercicios/download-video.php?url='+encodeURIComponent(ejP._lastVideoUrl)+'" target="_blank" style="color:#f97316;text-decoration:underline">📥 Descargar</a>' : ''}</div>`;
+    <div id="ej-anim-msg" style="font-size:11px;color:#9ca3af;margin-top:4px;text-align:center">${ejP._exportingVideo ? '⏳ Generando vídeo... (no toques nada)' : ejP._lastVideoUrl ? '<span style="color:#22c55e">✅ Vídeo MP4 guardado</span> — <a href="'+ejP._lastVideoUrl+'" target="_blank" style="color:#93c5fd;text-decoration:underline">Ver vídeo ▶</a> · <a href="https://toplidercoach.com/wp-content/uploads/ejercicios/download-video.php?url='+encodeURIComponent(ejP._lastVideoUrl)+'" target="_blank" style="color:#f97316;text-decoration:underline">📥 Descargar</a>' : ''}</div>`;
 }
 async function ejCargarPlantilla() {
     try {
@@ -3044,7 +3037,7 @@ function ejColocarJugadorPlantilla(idx) {
             if (idx >= 0) ejBancoCache[idx] = { ...ejBancoCache[idx], ...res.data[0] };
         }
         
-        if (msgEl) msgEl.innerHTML = '<span style="color:#22c55e">Ô£à Ejercicio guardado. Generando vídeo...</span>';
+        if (msgEl) msgEl.innerHTML = '<span style="color:#22c55e">✅ Ejercicio guardado. Generando vídeo...</span>';
         
         // 3. Exportar MP4
         await ejExportarAnimacionMP4();
@@ -3055,16 +3048,16 @@ function ejColocarJugadorPlantilla(idx) {
         setTimeout(function() { ejActualizarFichaMedia(); }, 500);
         
     } catch(err) {
-        if (msgEl) msgEl.innerHTML = '<span style="color:#ef4444">ÔØî Error: ' + err.message + '</span>';
+        if (msgEl) msgEl.innerHTML = '<span style="color:#ef4444">❌ Error: ' + err.message + '</span>';
     }
 }
 async function ejExportarAnimacionMP4() {
     if (!ejP.animMode || ejP.frames.length < 2) {
-        ejToast('Activa el modo animación y crea al menos 2 frames.', 'warning');
+        ejToast('Activa el modo animación y crea al menos 2 frames.');
         return;
     }
     if (!ejEditandoId) {
-        ejToast('Guarda el ejercicio primero desde la Ficha antes de exportar vídeo.', 'warning');
+        ejToast('Guarda el ejercicio primero desde la Ficha antes de exportar vídeo.');
         return;
     }
 
@@ -3281,14 +3274,14 @@ async function ejExportarAnimacionMP4() {
             await supabaseClient.from('custom_exercises').update({ animation_url: data.url }).eq('id', ejEditandoId);
             const idx = ejBancoCache.findIndex(x => x.id === ejEditandoId);
             if (idx >= 0) ejBancoCache[idx].animation_url = data.url;
-            ejP._exportingVideo = false; ejP._lastVideoUrl = data.url; ejRenderTimeline(); const msgFinal = document.getElementById('ej-anim-msg'); if (msgFinal) msgFinal.innerHTML = 'Ô£à Vídeo MP4 guardado — <a href="' + data.url + '" target="_blank" style="color:#93c5fd;text-decoration:underline">Ver vídeo ÔûÂ</a>';
+            ejP._exportingVideo = false; ejP._lastVideoUrl = data.url; ejRenderTimeline(); const msgFinal = document.getElementById('ej-anim-msg'); if (msgFinal) msgFinal.innerHTML = '✅ Vídeo MP4 guardado — <a href="' + data.url + '" target="_blank" style="color:#93c5fd;text-decoration:underline">Ver vídeo ▶</a>';
             ejP._videoDesactualizado = false;
         } else {
-            ejP._exportingVideo = false; ejRenderTimeline(); const msgErr = document.getElementById('ej-anim-msg'); if (msgErr) msgErr.textContent = 'ÔØî Error: ' + (data.error || 'desconocido');
+            ejP._exportingVideo = false; ejRenderTimeline(); const msgErr = document.getElementById('ej-anim-msg'); if (msgErr) msgErr.textContent = '❌ Error: ' + (data.error || 'desconocido');
         }
     } catch(e) {
         console.error('Error exportando:', e);
-        ejP._exportingVideo = false; ejRenderTimeline(); const msgCatch = document.getElementById('ej-anim-msg'); if (msgCatch) msgCatch.textContent = 'ÔØî Error: ' + e.message;
+        ejP._exportingVideo = false; ejRenderTimeline(); const msgCatch = document.getElementById('ej-anim-msg'); if (msgCatch) msgCatch.textContent = '❌ Error: ' + e.message;
     }
 }
 function ejConfirm(msg, onAceptar) {
@@ -3301,12 +3294,7 @@ function ejConfirm(msg, onAceptar) {
 }
 
 function ejToast(msg, tipo = 'info') {
-    const cfg = {
-        info:    { bg: '#1e3a5f', icon: 'ℹ️' },
-        success: { bg: '#166534', icon: '✅' },
-        error:   { bg: '#7f1d1d', icon: '❌' },
-        warning: { bg: '#78350f', icon: '⚠️' }
-    }[tipo] || { bg: '#1e3a5f', icon: 'ℹ️' };
+    const cfg = { info: { bg: '#1e3a5f', icon: 'i' }, success: { bg: '#166534', icon: 'OK' }, error: { bg: '#7f1d1d', icon: 'Error' }, warning: { bg: '#78350f', icon: 'Aviso' } }[tipo] || { bg: '#1e3a5f', icon: 'i' };
     const t = document.createElement('div');
     t.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:' + cfg.bg + ';color:#fff;padding:12px 22px;border-radius:8px;font-size:14px;z-index:99999;max-width:380px;text-align:center;box-shadow:0 4px 16px rgba(0,0,0,0.5);transition:opacity 0.4s;pointer-events:none;';
     t.textContent = cfg.icon + ' ' + msg;
