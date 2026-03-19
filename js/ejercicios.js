@@ -320,7 +320,7 @@ function ejRenderSVG() {
         const scale = p.scale ?? 1.0;
         const r = 14 * scale;
         const fs = 11 * scale;
-        const textColor = p.numberColor && p.numberColor !== 'auto' ? p.numberColor : (['yellow','white','atletico','juventus'].includes(p.color) ? '#1e293b' : '#ffffff');
+        const textColor = ['yellow','white','atletico','juventus'].includes(p.color) ? '#1e293b' : '#ffffff';
         const fillAttr = tc.striped ? `url(#stp-${p.id})` : tc.fill;
 
         html += `<g data-id="${p.id}" data-type="player" transform="translate(${p.x},${p.y})" style="cursor:move">
@@ -386,16 +386,12 @@ for (const l of trajs) {
 // =============================================
 function ejGetPos(e) {
     const svg = document.getElementById('ej-svg');
-    const rect = svg.getBoundingClientRect();
-    const clientX = e.touches ? e.touches[0].clientX : (e.clientX ?? e.x);
-    const clientY = e.touches ? e.touches[0].clientY : (e.clientY ?? e.y);
-    // Escalar según tamaño real vs lógico
-    const scaleX = ejP.svgW / rect.width;
-    const scaleY = ejP.svgH / rect.height;
-    return {
-        x: (clientX - rect.left) * scaleX,
-        y: (clientY - rect.top)  * scaleY
-    };
+    const pt = svg.createSVGPoint();
+    pt.x = e.touches ? e.touches[0].clientX : (e.clientX ?? e.x);
+    pt.y = e.touches ? e.touches[0].clientY : (e.clientY ?? e.y);
+    // Transformar coordenadas de pantalla a coordenadas del viewBox del SVG
+    const svgP = pt.matrixTransform(svg.getScreenCTM().inverse());
+    return { x: svgP.x, y: svgP.y };
 }
 
 // =============================================
@@ -805,7 +801,7 @@ function ejElegirModo(modo) {
     ejRenderToolbar();
 }
 function ejNuevaPizarra() {
-    ejConfirm('¿Limpiar la pizarra y empezar desde cero?', () => {
+    if (!confirm('¿Limpiar la pizarra y empezar desde cero?')) return;
     ejSaveHistory();
     ejP.players = []; ejP.lines = []; ejP.shapes = []; ejP.texts = []; ejP.equipment = [];
     ejP.selectedId = null; ejP.playerCounts = {};
@@ -830,16 +826,14 @@ function ejNuevaPizarra() {
     var overlay = document.getElementById('ej-modo-overlay');
     if (overlay) overlay.style.display = 'flex';
     ejRenderToolbar();
-    });
 }
 function ejClearAll() {
-    ejConfirm('¿Borrar toda la pizarra?', () => {
+    if (!confirm('¿Borrar toda la pizarra?')) return;
     ejSaveHistory();
     ejP.players = []; ejP.lines = []; ejP.shapes = []; ejP.texts = []; ejP.equipment = [];
     ejP.selectedId = null; ejP.playerCounts = {};
     ejRenderSVG();
     ejRenderToolbar();
-    });
 }
 
 function ejSetTool(tool) {
@@ -923,17 +917,10 @@ function ejApplyFormation(key, isRival) {
     const scale = ejP.selectedSize === 'small' ? 0.6 : ejP.selectedSize === 'large' ? 1.4 : 1.0;
     const ts = Date.now();
     if (!isRival) {
-        // Reemplazar mi equipo — mantener solo rivales
+        // Reemplazar mi equipo
         ejP.players = ejP.players.filter(p => {
             const tc = EJ_TEAM_COLORS[p.color];
-            return tc && ejP.rivalColor === p.color;
-        });
-        ejP.playerCounts[color] = 0;
-    } else {
-        // Reemplazar rival — mantener solo mi equipo
-        ejP.players = ejP.players.filter(p => {
-            const tc = EJ_TEAM_COLORS[p.color];
-            return tc && ejP.myColor === p.color;
+            return tc && ejP.rivalColor === p.color; // mantener solo rivales
         });
         ejP.playerCounts[color] = 0;
     }
@@ -1020,15 +1007,7 @@ function ejRotateEquipment(deg) {
     ejRenderSVG();
     ejRenderToolbar();
 }
-function ejChangeNumberColor(color) {
-    if (!ejP.selectedId) return;
-    ejP.players = ejP.players.map(p =>
-        p.id === ejP.selectedId ? { ...p, numberColor: color } : p
-    );
-    ejSaveHistory();
-    ejRenderSVG();
-    ejRenderToolbar();
-}
+
 function ejChangeLineColor(color) {
     if (!ejP.selectedId) return;
     ejP.lines  = ejP.lines.map(l  => l.id === ejP.selectedId  ? {...l, color} : l);
@@ -1038,7 +1017,7 @@ function ejChangeLineColor(color) {
 }
 function ejCapturarParaFicha() {
     const svgEl = document.getElementById('ej-svg');
-    if (!svgEl) { ejToast('No hay pizarra para capturar', 'warning'); return; }
+    if (!svgEl) { alert('No hay pizarra para capturar'); return; }
     
     // Limpiar datos del ejercicio anterior si es pizarra libre
     const lbl = document.getElementById('ej-pizarra-nombre-label');
@@ -1239,12 +1218,6 @@ ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin
                 <label style="font-size:11px;color:#9ca3af;margin-left:4px">
                     <input type="checkbox" ${selPlayer.showNumber?'checked':''} onchange="ejTogglePlayerNumber(this.checked)"> Ver nº
                 </label>
-            </div>
-            <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
-                <label style="font-size:11px;color:#9ca3af">Color nº:</label>
-                <button onclick="ejChangeNumberColor('#ffffff')" style="width:22px;height:22px;border-radius:50%;background:#ffffff;border:2px solid ${(selPlayer.numberColor||'auto')==='#ffffff'?'#22c55e':'#334155'};cursor:pointer"></button>
-                <button onclick="ejChangeNumberColor('#1e293b')" style="width:22px;height:22px;border-radius:50%;background:#1e293b;border:2px solid ${(selPlayer.numberColor||'auto')==='#1e293b'?'#22c55e':'#334155'};cursor:pointer"></button>
-                <button onclick="ejChangeNumberColor('auto')" style="padding:2px 8px;font-size:10px;background:${(selPlayer.numberColor||'auto')==='auto'?'#1e3a5f':'#0f172a'};border:1px solid ${(selPlayer.numberColor||'auto')==='auto'?'#22c55e':'#334155'};color:#9ca3af;border-radius:4px;cursor:pointer">Auto</button>
             </div>
             <label style="font-size:11px;color:#9ca3af">Cambiar color:</label>
             ${colorSwatches(selPlayer.color, true, true, 'ejChangePlayerColor')}
@@ -1605,7 +1578,7 @@ function ejBuildFicha() {
 }
 function ejCapturarMiniatura() {
     const svgEl = document.getElementById('ej-svg');
-    if (!svgEl) { ejToast('Ve a la Pizarra y dibuja primero', 'warning'); return; }
+    if (!svgEl) { alert('Ve a la Pizarra y dibuja primero'); return; }
     const thumbContainer = document.getElementById('ej-ficha-thumb');
     if (!thumbContainer) return;
     const clone = svgEl.cloneNode(true);
@@ -1645,7 +1618,7 @@ function ejActualizarFichaMedia() {
 
 function ejExportarPDF() {
     const nombre = document.getElementById('ej-nombre')?.value?.trim();
-    if (!nombre) { ejToast('Pon un nombre al ejercicio primero', 'warning'); return; }
+    if (!nombre) { alert('Pon un nombre al ejercicio primero'); return; }
 
     const svgSource = window.ejThumbnailPendiente;
     if (svgSource && !window._ejPdfThumbData) {
@@ -1949,20 +1922,19 @@ function ejPrepararThumbParaPDF() {
 }
 async function ejEliminarDesdeBanco(id) {
     const e = ejBancoCache.find(x => x.id === id);
-    ejConfirm('¿Eliminar "' + (e ? e.name : '') + '"? No se puede deshacer.', async () => {
+    if (!confirm('¿Eliminar "' + (e ? e.name : '') + '"? No se puede deshacer.')) return;
     try {
         const { error } = await supabaseClient.from('custom_exercises').delete().eq('id', id);
         if (error) throw error;
         ejBancoCache = ejBancoCache.filter(x => x.id !== id);
         ejBancoSearch();
     } catch(err) {
-        ejToast('Error: ' + err.message, 'error');
+        alert('Error: ' + err.message);
     }
-    });
 }
 async function ejEliminarEjercicio() {
-    if (!ejEditandoId) { ejToast('No hay ejercicio cargado para eliminar', 'warning'); return; }
-    ejConfirm('¿Eliminar este ejercicio? Esta acción no se puede deshacer.', async () => {
+    if (!ejEditandoId) { alert('No hay ejercicio cargado para eliminar'); return; }
+    if (!confirm('¿Eliminar este ejercicio? Esta acción no se puede deshacer.')) return;
     try {
         const { error } = await supabaseClient.from('custom_exercises').delete().eq('id', ejEditandoId);
         if (error) throw error;
@@ -1974,9 +1946,8 @@ async function ejEliminarEjercicio() {
         ejBuildFicha();
         ejShowTab('banco', document.querySelector('[onclick*="\'banco\'"]'));
     } catch(err) {
-        ejToast('Error al eliminar: ' + err.message, 'error');
+        alert('Error al eliminar: ' + err.message);
     }
-});
 }
 function ejCalcEII() {
     const a = parseFloat(document.getElementById('ej-ancho')?.value);
@@ -2013,7 +1984,7 @@ async function ejSubirThumbnail(ejercicioId) {
 }
 async function ejEditarDibujo() {
     if (!ejEditandoId) {
-        ejToast('Primero guarda el ejercicio para poder editar el dibujo.', 'warning');
+        alert('Primero guarda el ejercicio para poder editar el dibujo.');
         return;
     }
     try {
@@ -2072,12 +2043,12 @@ async function ejEditarDibujo() {
         ejRenderToolbar();
         ejShowTab('pizarra', document.querySelector('[onclick*="pizarra"]'));
     } catch(err) {
-        ejToast('Error al cargar dibujo: ' + err.message, 'error');
+        alert('Error al cargar dibujo: ' + err.message);
     }
 }
 async function ejGuardarEjercicio() {
     const nombre = document.getElementById('ej-nombre')?.value?.trim();
-    if (!nombre) { ejToast('El nombre del ejercicio es obligatorio', 'warning'); return; }
+    if (!nombre) { alert('El nombre del ejercicio es obligatorio'); return; }
 
     const msg = document.getElementById('ej-ficha-msg');
     if (msg) msg.innerHTML = '<span style="color:#9ca3af">Guardando...</span>';
@@ -2160,6 +2131,7 @@ let thumbnailSvg = window.ejThumbnailPendiente || null;
             else ejBancoCache.unshift(res[0]);
         }
         var videoAviso = ejP.animMode ? '<br><span style="color:#f97316">⚠️ Si has hecho cambios en la animación, pulsa MP4 en la pizarra para actualizar el vídeo.</span>' : '';
+        if (msg) msg.innerHTML = '<span style="color:#22c55e">✅ Ejercicio guardado correctamente</span>' + videoAviso;
         setTimeout(() => { if (msg) msg.innerHTML = ''; }, 6000);
     } catch(err){
         console.error(err);
@@ -2413,7 +2385,7 @@ async function ejVerFicha(id) {
         ejShowTab('ficha', document.querySelector('[onclick*="\'ficha\'"]'));
         setTimeout(() => { ejActualizarFichaMedia(); ejPrepararThumbParaPDF(); }, 300);
     } catch(err) {
-        ejToast('Error al cargar: ' + err.message, 'error');
+        alert('Error al cargar: ' + err.message);
     }
 }
 async function ejBancoCargar(id) {
@@ -2475,7 +2447,7 @@ async function ejBancoCargar(id) {
         const lbl = document.getElementById('ej-pizarra-nombre-label');
         if (bar && lbl) { lbl.textContent = data.name; bar.style.display = 'flex'; }
     } catch(err) {
-        ejToast('Error al cargar: ' + err.message, 'error');
+        alert('Error al cargar: ' + err.message);
     }
 }
 
@@ -2549,6 +2521,7 @@ function ejAbrirModal(id) {
 <a href="https://toplidercoach.com/wp-content/uploads/ejercicios/download-video.php?url=${encodeURIComponent(e.animation_url)}" target="_blank" style="display:block;width:100%;margin-top:8px;padding:10px;background:#f97316;border:none;color:#fff;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;text-align:center;text-decoration:none">
                     </a>
                 </div>` : ''}
+            </div>
 
             <!-- Columna derecha: info -->
             <div style="padding:20px 24px 20px 12px;display:flex;flex-direction:column;gap:8px">
@@ -2588,21 +2561,19 @@ function ejAbrirModal(id) {
         overlay.remove();
     });
 
-   document.getElementById('ej-modal-eliminar-btn').addEventListener('click', () => {
-        ejConfirm('¿Eliminar este ejercicio? Esta acción no se puede deshacer.', async () => {
-            try {
-                const { error } = await supabaseClient.from('custom_exercises').delete().eq('id', e.id);
-                if (error) throw error;
-                overlay.remove();
-                ejBancoCache = ejBancoCache.filter(x => x.id !== e.id);
-                ejBancoRender(ejBancoCache);
-            } catch(err) {
-                ejToast('Error al eliminar: ' + err.message, 'error');
-            }
-        });
+    document.getElementById('ej-modal-eliminar-btn').addEventListener('click', async () => {
+        if (!confirm('¿Eliminar este ejercicio? Esta acción no se puede deshacer.')) return;
+        try {
+            const { error } = await supabaseClient.from('custom_exercises').delete().eq('id', e.id);
+            if (error) throw error;
+            overlay.remove();
+            ejBancoCache = ejBancoCache.filter(x => x.id !== e.id);
+            ejBancoRender(ejBancoCache);
+        } catch(err) {
+            alert('Error al eliminar: ' + err.message);
+        }
     });
 }
-
 // =============================================
 // SISTEMA DE ANIMACIÓN POR FRAMES
 // =============================================
@@ -2686,7 +2657,7 @@ function ejFrameAdd() {
 // Elimina el último frame
 function ejFrameDeleteLast() {
     if (!ejP.animMode || ejP.frames.length <= 1) return;
-    ejConfirm('¿Eliminar el último frame?', () => {
+    if (!confirm('¿Eliminar el último frame?')) return;
     ejP.frames.pop();
     if (ejP.currentFrame >= ejP.frames.length) {
         ejP.currentFrame = ejP.frames.length - 1;
@@ -2694,7 +2665,6 @@ function ejFrameDeleteLast() {
     ejFrameRestore(ejP.frames[ejP.currentFrame]);
     ejRenderSVG();
     ejRenderTimeline();
-    });
 }
 function ejFrameUndoTraj() {
     if (!ejP.animMode) return;
@@ -2740,6 +2710,7 @@ function ejFramePlay(fromFrame) {
     ejP.isPlaying = true;
     ejP._animFrame = ejP.currentFrame;
     ejP._animProgress = 0;
+    ejP._globalProgress = ejP.currentFrame; // progreso global continuo
     ejP._animLastTime = performance.now();
     ejP._animId = requestAnimationFrame(ejFrameAnimate);
     ejRenderTimeline();
@@ -2747,6 +2718,7 @@ function ejFramePlay(fromFrame) {
 
 function ejFrameStop() {
     ejP.isPlaying = false;
+    ejP._globalProgress = 0;
     if (ejP._animId) {
         cancelAnimationFrame(ejP._animId);
         ejP._animId = null;
@@ -2758,6 +2730,9 @@ function ejFrameStop() {
     }
     ejRenderTimeline();
 }
+
+// Catmull-Rom spline: suaviza curvas entre 4 puntos (p0,p1,p2,p3)
+// Mezcla 70% lineal + 30% spline para estabilidad
 function ejCatmullRom(p0, p1, p2, p3, t) {
     var spline = 0.5 * (
         (2 * p1) +
@@ -2768,117 +2743,120 @@ function ejCatmullRom(p0, p1, p2, p3, t) {
     var linear = p1 + (p2 - p1) * t;
     return linear * 0.7 + spline * 0.3;
 }
+
+// Helper: interpola un elemento usando trayectoria o Catmull-Rom entre frames
+function ejInterpolateElem(id, fA, fB, ease, frameIdx, elemType) {
+    var aList = elemType === 'player' ? fA.players : fA.equipment;
+    var bList = elemType === 'player' ? fB.players : fB.equipment;
+    var liveList = elemType === 'player' ? ejP.players : ejP.equipment;
+    var pa = aList.find(function(p) { return p.id === id; });
+    var pb = bList.find(function(p) { return p.id === id; });
+    var elem = liveList.find(function(p) { return p.id === id; });
+    if (!pa || !pb || !elem) return;
+
+    // Buscar trayectoria freehand
+    var trajFree = (fA.trajectories || []).find(function(tr) {
+        return tr.isMovement && tr.linkedId === id && tr.type === 'freehand' && tr.points && tr.points.length > 1;
+    });
+    if (trajFree) {
+        var pts = trajFree.points;
+        var pos = ease * (pts.length - 1);
+        var idx = Math.min(Math.floor(pos), pts.length - 2);
+        var frac = pos - idx;
+        elem.x = pts[idx].x + (pts[idx + 1].x - pts[idx].x) * frac;
+        elem.y = pts[idx].y + (pts[idx + 1].y - pts[idx].y) * frac;
+        return;
+    }
+
+    // Buscar trayectoria curva
+    var trajCurved = (fA.trajectories || []).find(function(tr) {
+        return tr.isMovement && tr.linkedId === id && tr.type === 'curved';
+    });
+    if (trajCurved) {
+        var cx = trajCurved.cx ?? (trajCurved.x1 + trajCurved.x2) / 2;
+        var cy = trajCurved.cy ?? (trajCurved.y1 + trajCurved.y2) / 2 - 40;
+        elem.x = (1-ease)*(1-ease)*trajCurved.x1 + 2*(1-ease)*ease*cx + ease*ease*trajCurved.x2;
+        elem.y = (1-ease)*(1-ease)*trajCurved.y1 + 2*(1-ease)*ease*cy + ease*ease*trajCurved.y2;
+        return;
+    }
+
+    // Sin trayectoria: Catmull-Rom con frames vecinos para suavidad
+    if (Math.abs(pa.x - pb.x) < 2 && Math.abs(pa.y - pb.y) < 2) {
+        elem.x = pa.x; elem.y = pa.y;
+        return;
+    }
+    var prevFrame = ejP.frames[frameIdx - 1];
+    var nextFrame = ejP.frames[frameIdx + 2];
+    var pPrev = prevFrame ? (elemType === 'player' ? prevFrame.players : prevFrame.equipment).find(function(p) { return p.id === id; }) : null;
+    var pNext = nextFrame ? (elemType === 'player' ? nextFrame.players : nextFrame.equipment).find(function(p) { return p.id === id; }) : null;
+    var x0 = pPrev ? pPrev.x : pa.x;
+    var y0 = pPrev ? pPrev.y : pa.y;
+    var x3 = pNext ? pNext.x : pb.x;
+    var y3 = pNext ? pNext.y : pb.y;
+    elem.x = ejCatmullRom(x0, pa.x, pb.x, x3, ease);
+    elem.y = ejCatmullRom(y0, pa.y, pb.y, y3, ease);
+}
+
 // Loop de animación con interpolación suave
+// Easing GLOBAL: solo frena al inicio y al final de toda la secuencia.
+// Entre frames intermedios el movimiento fluye continuo sin paradas.
 function ejFrameAnimate(now) {
     if (!ejP.isPlaying) return;
     const dt = now - ejP._animLastTime;
     ejP._animLastTime = now;
-    ejP._animProgress += dt / (ejP.playSpeed * 1.5);
 
-    if (ejP._animProgress >= 1) {
-        // Pasar al siguiente frame
-        ejP._animProgress = 0;
-        ejP._animFrame++;
-        ejP.currentFrame = ejP._animFrame;
+    // Progreso global continuo (0 → totalFrames-1)
+    var totalSegs = ejP.frames.length - 1;
+    if (totalSegs < 1) { ejFrameStop(); return; }
+    var segDuration = ejP.playSpeed * 1.2;
+    ejP._globalProgress = (ejP._globalProgress || 0) + dt / segDuration;
 
-        if (ejP._animFrame >= ejP.frames.length - 1) {
-            // Llegamos al final
-            ejP.currentFrame = ejP.frames.length - 1;
-            ejFrameRestore(ejP.frames[ejP.currentFrame]);
-            ejRenderSVG();
-            ejFrameStop();
-            return;
-        }
+    if (ejP._globalProgress >= totalSegs) {
+        // Fin de la secuencia
+        ejP.currentFrame = ejP.frames.length - 1;
+        ejFrameRestore(ejP.frames[ejP.currentFrame]);
+        ejRenderSVG();
+        ejP._globalProgress = 0;
+        ejFrameStop();
+        return;
     }
 
-    // Interpolar entre frame actual y siguiente
-    const fA = ejP.frames[ejP._animFrame];
-    const fB = ejP.frames[ejP._animFrame + 1];
+    // Aplicar easing global: suavizar solo el 15% inicial y el 15% final
+    var rawT = ejP._globalProgress / totalSegs; // 0→1 global
+    var easeZone = 0.15;
+    var easedT;
+    if (rawT < easeZone) {
+        // Ease-in: acelera suavemente desde parado
+        var local = rawT / easeZone;
+        easedT = easeZone * (local * local * (3 - 2 * local));
+    } else if (rawT > 1 - easeZone) {
+        // Ease-out: frena suavemente al final
+        var local = (rawT - (1 - easeZone)) / easeZone;
+        easedT = (1 - easeZone) + easeZone * (local * local * (3 - 2 * local));
+    } else {
+        // Medio: velocidad constante, fluido
+        easedT = rawT;
+    }
+
+    // Convertir progreso global eased a segmento + fracción
+    var globalPos = easedT * totalSegs;
+    var seg = Math.min(Math.floor(globalPos), totalSegs - 1);
+    var frac = globalPos - seg;
+
+    ejP.currentFrame = seg;
+    ejP._animFrame = seg;
+
+    var fA = ejP.frames[seg];
+    var fB = ejP.frames[seg + 1];
     if (!fA || !fB) { ejFrameStop(); return; }
 
-    const t = ejP._animProgress;
-    // Ease in-out cuadrático
-    const ease = t;
-
-    // Interpolar jugadores (siguiendo trayectoria freehand si existe)
-    for (const pa of fA.players) {
-        const pb = fB.players.find(p => p.id === pa.id);
-        const player = ejP.players.find(p => p.id === pa.id);
-        if (!pb || !player) continue;
-        const trajFree = (fA.trajectories || []).find(tr =>
-            tr.isMovement && tr.linkedId === pa.id && tr.type === 'freehand' && tr.points && tr.points.length > 1
-        );
-        const trajCurved = (fA.trajectories || []).find(tr =>
-            tr.isMovement && tr.linkedId === pa.id && tr.type === 'curved'
-        );
-        if (trajFree) {
-            const pts = trajFree.points;
-            const pos = ease * (pts.length - 1);
-            const idx = Math.min(Math.floor(pos), pts.length - 2);
-            const frac = pos - idx;
-            player.x = pts[idx].x + (pts[idx + 1].x - pts[idx].x) * frac;
-            player.y = pts[idx].y + (pts[idx + 1].y - pts[idx].y) * frac;
-        } else if (trajCurved) {
-            const t = ease;
-            const cx = trajCurved.cx ?? (trajCurved.x1 + trajCurved.x2) / 2;
-            const cy = trajCurved.cy ?? (trajCurved.y1 + trajCurved.y2) / 2 - 40;
-            player.x = (1-t)*(1-t)*trajCurved.x1 + 2*(1-t)*t*cx + t*t*trajCurved.x2;
-            player.y = (1-t)*(1-t)*trajCurved.y1 + 2*(1-t)*t*cy + t*t*trajCurved.y2;
-        } else {
-            if (Math.abs(pa.x - pb.x) < 2 && Math.abs(pa.y - pb.y) < 2) {
-                player.x = pa.x; player.y = pa.y;
-            } else {
-                var fi = ejP._animFrame;
-                var pPrev = ejP.frames[fi-1] ? ejP.frames[fi-1].players.find(p=>p.id===pa.id) : null;
-                var pNext2 = ejP.frames[fi+2] ? ejP.frames[fi+2].players.find(p=>p.id===pa.id) : null;
-                var x0 = pPrev ? pPrev.x : pa.x;
-                var y0 = pPrev ? pPrev.y : pa.y;
-                var x3 = pNext2 ? pNext2.x : pb.x;
-                var y3 = pNext2 ? pNext2.y : pb.y;
-                player.x = ejCatmullRom(x0, pa.x, pb.x, x3, ease);
-                player.y = ejCatmullRom(y0, pa.y, pb.y, y3, ease);
-            }
-        }
+    // Interpolar jugadores
+    for (var i = 0; i < fA.players.length; i++) {
+        ejInterpolateElem(fA.players[i].id, fA, fB, frac, seg, 'player');
     }
-    // Interpolar equipamiento (siguiendo trayectoria freehand si existe)
-    for (const ea of fA.equipment) {
-        const eb = fB.equipment.find(e => e.id === ea.id);
-        const eq = ejP.equipment.find(e => e.id === ea.id);
-        if (!eb || !eq) continue;
-        const trajFreeEq = (fA.trajectories || []).find(tr =>
-            tr.isMovement && tr.linkedId === ea.id && tr.type === 'freehand' && tr.points && tr.points.length > 1
-        );
-        const trajCurvedEq = (fA.trajectories || []).find(tr =>
-            tr.isMovement && tr.linkedId === ea.id && tr.type === 'curved'
-        );
-        if (trajFreeEq) {
-            const pts = trajFreeEq.points;
-            const pos = ease * (pts.length - 1);
-            const idx = Math.min(Math.floor(pos), pts.length - 2);
-            const frac = pos - idx;
-            eq.x = pts[idx].x + (pts[idx + 1].x - pts[idx].x) * frac;
-            eq.y = pts[idx].y + (pts[idx + 1].y - pts[idx].y) * frac;
-        } else if (trajCurvedEq) {
-            const t = ease;
-            const cx = trajCurvedEq.cx ?? (trajCurvedEq.x1 + trajCurvedEq.x2) / 2;
-            const cy = trajCurvedEq.cy ?? (trajCurvedEq.y1 + trajCurvedEq.y2) / 2 - 40;
-            eq.x = (1-t)*(1-t)*trajCurvedEq.x1 + 2*(1-t)*t*cx + t*t*trajCurvedEq.x2;
-            eq.y = (1-t)*(1-t)*trajCurvedEq.y1 + 2*(1-t)*t*cy + t*t*trajCurvedEq.y2;
-        } else {
-            if (Math.abs(ea.x - eb.x) < 2 && Math.abs(ea.y - eb.y) < 2) {
-                eq.x = ea.x; eq.y = ea.y;
-            } else {
-                var fi = ejP._animFrame;
-                var ePrev = ejP.frames[fi-1] ? ejP.frames[fi-1].equipment.find(e=>e.id===ea.id) : null;
-                var eNext2 = ejP.frames[fi+2] ? ejP.frames[fi+2].equipment.find(e=>e.id===ea.id) : null;
-                var x0 = ePrev ? ePrev.x : ea.x;
-                var y0 = ePrev ? ePrev.y : ea.y;
-                var x3 = eNext2 ? eNext2.x : eb.x;
-                var y3 = eNext2 ? eNext2.y : eb.y;
-                eq.x = ejCatmullRom(x0, ea.x, eb.x, x3, ease);
-                eq.y = ejCatmullRom(y0, ea.y, eb.y, y3, ease);
-            }
-        }
+    // Interpolar equipamiento
+    for (var i = 0; i < fA.equipment.length; i++) {
+        ejInterpolateElem(fA.equipment[i].id, fA, fB, frac, seg, 'equipment');
     }
 
     ejRenderSVG();
@@ -2961,7 +2939,7 @@ async function ejCargarPlantilla() {
                 .eq('is_active', true)
                 .limit(1);
             if (!seasons || !seasons.length) {
-                ejToast('No hay temporada activa. Configura una en Mi Club.', 'warning');
+                alert('No hay temporada activa. Configura una en Mi Club.');
                 return;
             }
             seasonIdActual = seasons[0].id;
@@ -2984,7 +2962,7 @@ async function ejCargarPlantilla() {
         ejRenderToolbar();
     } catch(err) {
         console.error('Error cargando plantilla:', err);
-        ejToast('Error: ' + err.message, 'error');
+        alert('Error: ' + err.message);
     }
 }
 
@@ -2997,7 +2975,7 @@ function ejColocarJugadorPlantilla(idx) {
     ejRenderToolbar();
 }async function ejGuardarYExportar() {
     if (!ejEditandoId) {
-        ejToast('Guarda el ejercicio primero desde la Ficha.', 'warning');
+        alert('Guarda el ejercicio primero desde la Ficha.');
         return;
     }
     if (ejP._exportingVideo) return;
@@ -3060,11 +3038,11 @@ function ejColocarJugadorPlantilla(idx) {
 }
 async function ejExportarAnimacionMP4() {
     if (!ejP.animMode || ejP.frames.length < 2) {
-        ejToast('Activa el modo animación y crea al menos 2 frames.');
+        alert('Activa el modo animación y crea al menos 2 frames.');
         return;
     }
     if (!ejEditandoId) {
-        ejToast('Guarda el ejercicio primero desde la Ficha antes de exportar vídeo.');
+        alert('Guarda el ejercicio primero desde la Ficha antes de exportar vídeo.');
         return;
     }
 
@@ -3091,14 +3069,13 @@ async function ejExportarAnimacionMP4() {
     }
     const recorder = new MediaRecorder(stream, {
         mimeType,
-        videoBitsPerSecond: 8000000
+        videoBitsPerSecond: 5000000
     });
     const chunks = [];
     recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
 
     // Guardar estado actual
     ejP._exporting = true;
-    ejP.selectedId = null;
     const savedFrame = ejP.currentFrame;
     const savedPlaying = ejP.isPlaying;
     if (savedPlaying) ejFrameStop();
@@ -3126,119 +3103,54 @@ async function ejExportarAnimacionMP4() {
 
     const FPS = 30;
     const frameDuration = ejP.playSpeed;
-    const framesPerTransition = Math.max(30, Math.round((frameDuration * 2 / 1000) * FPS));
-    const holdFrames = 12;
-    const holdMid = 0;
+    const framesPerTransition = Math.max(24, Math.round((frameDuration * 1.5 / 1000) * FPS));
+    const holdFrames = 10;
+    var totalSegs = ejP.frames.length - 1;
+    var totalVideoFrames = totalSegs * framesPerTransition;
+    var easeZone = 0.15;
 
-    for (let i = 0; i < ejP.frames.length; i++) {
-        // Mostrar keyframe
-        ejFrameRestore(ejP.frames[i]);
-        ejP.currentFrame = i;
+    // Pausa inicial para ver posición de partida
+    ejFrameRestore(ejP.frames[0]);
+    ejP.currentFrame = 0;
+    ejRenderSVG();
+    for (let h = 0; h < holdFrames; h++) {
+        await renderSVGToCanvas();
+        await new Promise(r => setTimeout(r, 1000 / FPS));
+    }
+
+    // Loop global continuo con easing solo al inicio y final
+    for (let vf = 0; vf <= totalVideoFrames; vf++) {
+        var rawT = vf / totalVideoFrames; // 0→1 global
+        var easedT;
+        if (rawT < easeZone) {
+            var local = rawT / easeZone;
+            easedT = easeZone * (local * local * (3 - 2 * local));
+        } else if (rawT > 1 - easeZone) {
+            var local = (rawT - (1 - easeZone)) / easeZone;
+            easedT = (1 - easeZone) + easeZone * (local * local * (3 - 2 * local));
+        } else {
+            easedT = rawT;
+        }
+
+        var globalPos = easedT * totalSegs;
+        var seg = Math.min(Math.floor(globalPos), totalSegs - 1);
+        var frac = globalPos - seg;
+
+        var fA = ejP.frames[seg];
+        var fB = ejP.frames[seg + 1];
+        if (!fA || !fB) break;
+
+        for (var pi = 0; pi < fA.players.length; pi++) {
+            ejInterpolateElem(fA.players[pi].id, fA, fB, frac, seg, 'player');
+        }
+        for (var ei = 0; ei < fA.equipment.length; ei++) {
+            ejInterpolateElem(fA.equipment[ei].id, fA, fB, frac, seg, 'equipment');
+        }
+
+        ejP.currentFrame = seg;
         ejRenderSVG();
-
-        // Pausa solo en primer frame
-        var pauseFrames = (i === 0) ? holdFrames : holdMid;
-        for (let h = 0; h < pauseFrames; h++) {
-            await renderSVGToCanvas();
-            await new Promise(r => setTimeout(r, 1000 / FPS));
-        }
-
-        // Interpolar hacia el siguiente frame
-        if (i < ejP.frames.length - 1) {
-            const fA = ejP.frames[i];
-            const fB = ejP.frames[i + 1];
-
-            for (let f = 0; f <= framesPerTransition; f++) {
-                const t = f / framesPerTransition;
-                const ease = t;
-
-                // Interpolar jugadores
-                for (const pa of fA.players) {
-                    const pb = fB.players.find(p => p.id === pa.id);
-                    const player = ejP.players.find(p => p.id === pa.id);
-                    if (!pb || !player) continue;
-
-                    const trajFree = (fA.trajectories || []).find(tr =>
-                        tr.isMovement && tr.linkedId === pa.id && tr.type === 'freehand' && tr.points && tr.points.length > 1
-                    );
-                    const trajCurved = (fA.trajectories || []).find(tr =>
-                        tr.isMovement && tr.linkedId === pa.id && tr.type === 'curved'
-                    );
-
-                    if (trajFree) {
-                        const pts = trajFree.points;
-                        const pos = ease * (pts.length - 1);
-                        const idx = Math.min(Math.floor(pos), pts.length - 2);
-                        const frac = pos - idx;
-                        player.x = pts[idx].x + (pts[idx + 1].x - pts[idx].x) * frac;
-                        player.y = pts[idx].y + (pts[idx + 1].y - pts[idx].y) * frac;
-                    } else if (trajCurved) {
-                        const cx = trajCurved.cx ?? (trajCurved.x1 + trajCurved.x2) / 2;
-                        const cy = trajCurved.cy ?? (trajCurved.y1 + trajCurved.y2) / 2 - 40;
-                        player.x = (1-ease)*(1-ease)*trajCurved.x1 + 2*(1-ease)*ease*cx + ease*ease*trajCurved.x2;
-                        player.y = (1-ease)*(1-ease)*trajCurved.y1 + 2*(1-ease)*ease*cy + ease*ease*trajCurved.y2;
-                    } else {
-                        if (Math.abs(pa.x - pb.x) < 2 && Math.abs(pa.y - pb.y) < 2) {
-                            player.x = pa.x; player.y = pa.y;
-                        } else {
-                            var pPrev = ejP.frames[i-1] ? ejP.frames[i-1].players.find(p=>p.id===pa.id) : null;
-                            var pNext2 = ejP.frames[i+2] ? ejP.frames[i+2].players.find(p=>p.id===pa.id) : null;
-                            var x0 = pPrev ? pPrev.x : pa.x;
-                            var y0 = pPrev ? pPrev.y : pa.y;
-                            var x3 = pNext2 ? pNext2.x : pb.x;
-                            var y3 = pNext2 ? pNext2.y : pb.y;
-                            player.x = ejCatmullRom(x0, pa.x, pb.x, x3, ease);
-                            player.y = ejCatmullRom(y0, pa.y, pb.y, y3, ease);
-                        }
-                    }
-                }
-
-                // Interpolar equipamiento
-                for (const ea of fA.equipment) {
-                    const eb = fB.equipment.find(e => e.id === ea.id);
-                    const eq = ejP.equipment.find(e => e.id === ea.id);
-                    if (!eb || !eq) continue;
-
-                    const trajFreeEq = (fA.trajectories || []).find(tr =>
-                        tr.isMovement && tr.linkedId === ea.id && tr.type === 'freehand' && tr.points && tr.points.length > 1
-                    );
-                    const trajCurvedEq = (fA.trajectories || []).find(tr =>
-                        tr.isMovement && tr.linkedId === ea.id && tr.type === 'curved'
-                    );
-
-                    if (trajFreeEq) {
-                        const pts = trajFreeEq.points;
-                        const pos = ease * (pts.length - 1);
-                        const idx = Math.min(Math.floor(pos), pts.length - 2);
-                        const frac = pos - idx;
-                        eq.x = pts[idx].x + (pts[idx + 1].x - pts[idx].x) * frac;
-                        eq.y = pts[idx].y + (pts[idx + 1].y - pts[idx].y) * frac;
-                    } else if (trajCurvedEq) {
-                        const cx = trajCurvedEq.cx ?? (trajCurvedEq.x1 + trajCurvedEq.x2) / 2;
-                        const cy = trajCurvedEq.cy ?? (trajCurvedEq.y1 + trajCurvedEq.y2) / 2 - 40;
-                        eq.x = (1-ease)*(1-ease)*trajCurvedEq.x1 + 2*(1-ease)*ease*cx + ease*ease*trajCurvedEq.x2;
-                        eq.y = (1-ease)*(1-ease)*trajCurvedEq.y1 + 2*(1-ease)*ease*cy + ease*ease*trajCurvedEq.y2;
-                    } else {
-                        if (Math.abs(ea.x - eb.x) < 2 && Math.abs(ea.y - eb.y) < 2) {
-                            eq.x = ea.x; eq.y = ea.y;
-                        } else {
-                            var ePrev = ejP.frames[i-1] ? ejP.frames[i-1].equipment.find(e=>e.id===ea.id) : null;
-                            var eNext2 = ejP.frames[i+2] ? ejP.frames[i+2].equipment.find(e=>e.id===ea.id) : null;
-                            var x0 = ePrev ? ePrev.x : ea.x;
-                            var y0 = ePrev ? ePrev.y : ea.y;
-                            var x3 = eNext2 ? eNext2.x : eb.x;
-                            var y3 = eNext2 ? eNext2.y : eb.y;
-                            eq.x = ejCatmullRom(x0, ea.x, eb.x, x3, ease);
-                            eq.y = ejCatmullRom(y0, ea.y, eb.y, y3, ease);
-                        }
-                    }
-                }
-
-                ejRenderSVG();
-                await renderSVGToCanvas();
-                await new Promise(r => setTimeout(r, 1000 / FPS));
-            }
-        }
+        await renderSVGToCanvas();
+        await new Promise(r => setTimeout(r, 1000 / FPS));
     }
 
     // Frame final
@@ -3291,24 +3203,6 @@ async function ejExportarAnimacionMP4() {
         ejP._exportingVideo = false; ejRenderTimeline(); const msgCatch = document.getElementById('ej-anim-msg'); if (msgCatch) msgCatch.textContent = '❌ Error: ' + e.message;
     }
 }
-function ejConfirm(msg, onAceptar) {
-    const overlay = document.createElement('div');
-    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:99998;display:flex;align-items:center;justify-content:center;';
-    overlay.innerHTML = '<div style="background:#1e293b;border:1px solid #334155;border-radius:12px;padding:28px 32px;max-width:360px;width:90%;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.6)"><p style="color:#f1f5f9;font-size:15px;margin:0 0 24px">' + msg + '</p><div style="display:flex;gap:12px;justify-content:center"><button id="ejc-cancel" style="padding:9px 22px;border-radius:7px;border:1px solid #475569;background:transparent;color:#94a3b8;cursor:pointer;font-size:14px">Cancelar</button><button id="ejc-ok" style="padding:9px 22px;border-radius:7px;border:none;background:#ef4444;color:#fff;cursor:pointer;font-size:14px;font-weight:600">Aceptar</button></div></div>';
-    document.body.appendChild(overlay);
-    overlay.querySelector('#ejc-cancel').onclick = () => overlay.remove();
-    overlay.querySelector('#ejc-ok').onclick = () => { overlay.remove(); onAceptar(); };
-}
-
-function ejToast(msg, tipo = 'info') {
-    const cfg = { info: { bg: '#1e3a5f', icon: 'i' }, success: { bg: '#166534', icon: 'OK' }, error: { bg: '#7f1d1d', icon: 'Error' }, warning: { bg: '#78350f', icon: 'Aviso' } }[tipo] || { bg: '#1e3a5f', icon: 'i' };
-    const t = document.createElement('div');
-    t.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:' + cfg.bg + ';color:#fff;padding:12px 22px;border-radius:8px;font-size:14px;z-index:99999;max-width:380px;text-align:center;box-shadow:0 4px 16px rgba(0,0,0,0.5);transition:opacity 0.4s;pointer-events:none;';
-    t.textContent = cfg.icon + ' ' + msg;
-    document.body.appendChild(t);
-    setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 400); }, 3500);
-}
-
 function ejInit() {
     const root = document.getElementById('ejercicios-root');
     if (!root) return;
