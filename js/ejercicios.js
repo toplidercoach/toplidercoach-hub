@@ -2588,19 +2588,20 @@ function ejAbrirModal(id)
         overlay.remove();
     });
 
-    document.getElementById('ej-modal-eliminar-btn').addEventListener('click', async () => {
+   document.getElementById('ej-modal-eliminar-btn').addEventListener('click', () => {
         ejConfirm('¿Eliminar este ejercicio? Esta acción no se puede deshacer.', async () => {
-        try {
-            const { error } = await supabaseClient.from('custom_exercises').delete().eq('id', e.id);
-            if (error) throw error;
-            overlay.remove();
-            ejBancoCache = ejBancoCache.filter(x => x.id !== e.id);
-            ejBancoRender(ejBancoCache);
-        } catch(err) {
-            ejToast('Error al eliminar: ' + err.message, 'error');
-        }
+            try {
+                const { error } = await supabaseClient.from('custom_exercises').delete().eq('id', e.id);
+                if (error) throw error;
+                overlay.remove();
+                ejBancoCache = ejBancoCache.filter(x => x.id !== e.id);
+                ejBancoRender(ejBancoCache);
+            } catch(err) {
+                ejToast('Error al eliminar: ' + err.message, 'error');
+            }
+        });
     });
-}
+
 // =============================================
 // SISTEMA DE ANIMACIÓN POR FRAMES
 // =============================================
