@@ -245,7 +245,8 @@ function ejRenderSVG() {
             const prev = l.points[l.points.length-2];
             const ang = Math.atan2(last.y-prev.y, last.x-prev.x);
             const hl = 8+sw;
-            html += `<g data-id="${l.id}" data-type="line" style="cursor:pointer">
+            html += `<g data-id="${l.id}" data-type="line" style="cursor:${ejP.activeTool==='select'?'move':'pointer'}">
+                <path d="${d}" stroke="transparent" stroke-width="16" fill="none"/>
                 <path d="${d}" stroke="${l.color}" stroke-width="${sel?sw+1:sw}"
                     stroke-dasharray="${dash}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
                 <polygon points="${last.x},${last.y} ${last.x-hl*Math.cos(ang-.4)},${last.y-hl*Math.sin(ang-.4)} ${last.x-hl*Math.cos(ang+.4)},${last.y-hl*Math.sin(ang+.4)}" fill="${l.color}"/>
@@ -255,27 +256,27 @@ function ejRenderSVG() {
             const cy = l.cy ?? (l.y1+l.y2)/2 - 50;
             const ang = Math.atan2(l.y2-cy, l.x2-cx);
             const hl = 8+sw;
-            html += `<g data-id="${l.id}" data-type="line" style="cursor:pointer">
+            html += `<g data-id="${l.id}" data-type="line" style="cursor:${ejP.activeTool==='select'?'move':'pointer'}">
+                <path d="M${l.x1} ${l.y1} Q${cx} ${cy} ${l.x2} ${l.y2}" stroke="transparent" stroke-width="16" fill="none"/>
                 <path d="M${l.x1} ${l.y1} Q${cx} ${cy} ${l.x2} ${l.y2}"
                     stroke="${l.color}" stroke-width="${sel?sw+1:sw}"
                     stroke-dasharray="${dash}" fill="none" stroke-linecap="round"/>
                 <polygon points="${l.x2},${l.y2} ${l.x2-hl*Math.cos(ang-.4)},${l.y2-hl*Math.sin(ang-.4)} ${l.x2-hl*Math.cos(ang+.4)},${l.y2-hl*Math.sin(ang+.4)}" fill="${l.color}"/>
                 ${sel ? `<circle cx="${cx}" cy="${cy}" r="7" fill="#22c55e" stroke="white" stroke-width="2" data-ctrl="${l.id}" style="cursor:grab"/>` : ''}
+                ${sel ? `<circle cx="${l.x1}" cy="${l.y1}" r="5" fill="#22c55e" data-ep="${l.id}-1"/><circle cx="${l.x2}" cy="${l.y2}" r="5" fill="#22c55e" data-ep="${l.id}-2"/>` : ''}
             </g>`;
         } else {
             // line / arrow
             const dx = l.x2-l.x1, dy = l.y2-l.y1;
             const ang = Math.atan2(dy,dx);
             const hl = 8+sw;
-            html += `<g data-id="${l.id}" data-type="line" style="cursor:pointer">
+            html += `<g data-id="${l.id}" data-type="line" style="cursor:${ejP.activeTool==='select'?'move':'pointer'}">
+                <line x1="${l.x1}" y1="${l.y1}" x2="${l.x2}" y2="${l.y2}" stroke="transparent" stroke-width="16"/>
                 <line x1="${l.x1}" y1="${l.y1}" x2="${l.x2}" y2="${l.y2}"
                     stroke="${l.color}" stroke-width="${sel?sw+1:sw}" stroke-dasharray="${dash}"/>
                 ${l.hasArrow ? `<polygon points="${l.x2},${l.y2} ${l.x2-hl*Math.cos(ang-.4)},${l.y2-hl*Math.sin(ang-.4)} ${l.x2-hl*Math.cos(ang+.4)},${l.y2-hl*Math.sin(ang+.4)}" fill="${l.color}"/>` : ''}
+                ${sel ? `<circle cx="${l.x1}" cy="${l.y1}" r="5" fill="#22c55e" data-ep="${l.id}-1"/><circle cx="${l.x2}" cy="${l.y2}" r="5" fill="#22c55e" data-ep="${l.id}-2"/>` : ''}
             </g>`;
-        }
-        if (sel && l.type !== 'freehand') {
-            html += `<circle cx="${l.x1}" cy="${l.y1}" r="5" fill="#22c55e" data-ep="${l.id}-1"/>`;
-            html += `<circle cx="${l.x2}" cy="${l.y2}" r="5" fill="#22c55e" data-ep="${l.id}-2"/>`;
         }
     }
 
@@ -448,7 +449,20 @@ function ejSvgPointerDown(e) {
         }
     } else {
         ejP._dragOriginal = null;
-        // ... resto del offset para text/shape/line igual que antes
+        // Calcular offset para text/shape/line
+        const tx = ejP.texts.find(t => t.id === id);
+        if (tx) {
+            ejP.dragOffset = { x: pos.x - tx.x, y: pos.y - tx.y };
+        }
+        const sh = ejP.shapes.find(s => s.id === id);
+        if (sh) {
+            if (sh.x !== undefined) ejP.dragOffset = { x: pos.x - sh.x, y: pos.y - sh.y };
+            else if (sh.cx !== undefined) ejP.dragOffset = { x: pos.x - sh.cx, y: pos.y - sh.cy };
+        }
+        const ln = ejP.lines.find(l => l.id === id);
+        if (ln) {
+            ejP.dragOffset = { x: pos.x - (ln.x1 ?? 0), y: pos.y - (ln.y1 ?? 0) };
+        }
     }
     ejRenderSVG();
     return;
@@ -506,14 +520,15 @@ return;
 
     // Herramienta texto
     if (ejP.activeTool === 'text' && isBackground) {
-        const text = prompt('Introduce el texto:', 'Texto');
-        if (text) {
-            ejSaveHistory();
-            const id = ejP.nextId++;
-            ejP.texts.push({ id, x: pos.x, y: pos.y, text, color: '#ffffff', size: 16 });
-            ejP.selectedId = id;
-            ejRenderSVG();
-        }
+        ejPrompt('Introduce el texto:', 'Texto', function(text) {
+            if (text) {
+                ejSaveHistory();
+                const id = ejP.nextId++;
+                ejP.texts.push({ id, x: pos.x, y: pos.y, text, color: '#ffffff', size: 16 });
+                ejP.selectedId = id;
+                ejRenderSVG();
+            }
+        });
         return;
     }
 
@@ -625,7 +640,17 @@ function ejSvgPointerMove(e) {
                 const tx = ejP.texts.find(t => t.id === id);
                 if (tx) { tx.x = pos.x - ejP.dragOffset.x; tx.y = pos.y - ejP.dragOffset.y; }
                 const sh = ejP.shapes.find(s => s.id === id);
-                if (sh && sh.x !== undefined) { sh.x = pos.x - ejP.dragOffset.x; sh.y = pos.y - ejP.dragOffset.y; }
+                if (sh) {
+                    if (sh.x !== undefined) { sh.x = pos.x - ejP.dragOffset.x; sh.y = pos.y - ejP.dragOffset.y; }
+                    else if (sh.cx !== undefined) { sh.cx = pos.x - ejP.dragOffset.x; sh.cy = pos.y - ejP.dragOffset.y; }
+                }
+                const ln = ejP.lines.find(l => l.id === id);
+                if (ln && ln.x1 !== undefined) {
+                    const dx = (pos.x - ejP.dragOffset.x) - ln.x1;
+                    const dy = (pos.y - ejP.dragOffset.y) - ln.y1;
+                    ln.x1 += dx; ln.y1 += dy; ln.x2 += dx; ln.y2 += dy;
+                    if (ln.cx !== undefined) { ln.cx += dx; ln.cy += dy; }
+                }
             }
         }
         ejRenderSVG();
@@ -801,11 +826,10 @@ function ejElegirModo(modo) {
     ejRenderToolbar();
 }
 function ejNuevaPizarra() {
-    if (!confirm('¿Limpiar la pizarra y empezar desde cero?')) return;
+    ejConfirm('¿Limpiar la pizarra y empezar desde cero?', () => {
     ejSaveHistory();
     ejP.players = []; ejP.lines = []; ejP.shapes = []; ejP.texts = []; ejP.equipment = [];
     ejP.selectedId = null; ejP.playerCounts = {};
-    // Resetear animación
     ejFrameStop();
     ejP.animMode = false;
     ejP.frames = [];
@@ -816,24 +840,24 @@ function ejNuevaPizarra() {
     window._ejPdfThumbData = null;
     window.ejThumbnailPendiente = null;
     ejEditandoId = null;
-    // Limpiar toolbar para que no queden restos
     var tb = document.getElementById('ej-toolbar');
     if (tb) tb.style.display = 'none';
     const lbl = document.getElementById('ej-pizarra-nombre-label');
     if (lbl) lbl.textContent = 'Pizarra libre';
     ejRenderSVG();
-    // Mostrar overlay de selección de modo
     var overlay = document.getElementById('ej-modo-overlay');
     if (overlay) overlay.style.display = 'flex';
     ejRenderToolbar();
+    });
 }
 function ejClearAll() {
-    if (!confirm('¿Borrar toda la pizarra?')) return;
+    ejConfirm('¿Borrar toda la pizarra?', () => {
     ejSaveHistory();
     ejP.players = []; ejP.lines = []; ejP.shapes = []; ejP.texts = []; ejP.equipment = [];
     ejP.selectedId = null; ejP.playerCounts = {};
     ejRenderSVG();
     ejRenderToolbar();
+    });
 }
 
 function ejSetTool(tool) {
@@ -1017,7 +1041,7 @@ function ejChangeLineColor(color) {
 }
 function ejCapturarParaFicha() {
     const svgEl = document.getElementById('ej-svg');
-    if (!svgEl) { alert('No hay pizarra para capturar'); return; }
+    if (!svgEl) { ejToast('No hay pizarra para capturar', 'warning'); return; }
     
     // Limpiar datos del ejercicio anterior si es pizarra libre
     const lbl = document.getElementById('ej-pizarra-nombre-label');
@@ -1578,7 +1602,7 @@ function ejBuildFicha() {
 }
 function ejCapturarMiniatura() {
     const svgEl = document.getElementById('ej-svg');
-    if (!svgEl) { alert('Ve a la Pizarra y dibuja primero'); return; }
+    if (!svgEl) { ejToast('Ve a la Pizarra y dibuja primero', 'warning'); return; }
     const thumbContainer = document.getElementById('ej-ficha-thumb');
     if (!thumbContainer) return;
     const clone = svgEl.cloneNode(true);
@@ -1618,7 +1642,7 @@ function ejActualizarFichaMedia() {
 
 function ejExportarPDF() {
     const nombre = document.getElementById('ej-nombre')?.value?.trim();
-    if (!nombre) { alert('Pon un nombre al ejercicio primero'); return; }
+    if (!nombre) { ejToast('Pon un nombre al ejercicio primero', 'warning'); return; }
 
     const svgSource = window.ejThumbnailPendiente;
     if (svgSource && !window._ejPdfThumbData) {
@@ -1922,19 +1946,20 @@ function ejPrepararThumbParaPDF() {
 }
 async function ejEliminarDesdeBanco(id) {
     const e = ejBancoCache.find(x => x.id === id);
-    if (!confirm('¿Eliminar "' + (e ? e.name : '') + '"? No se puede deshacer.')) return;
+    ejConfirm('¿Eliminar "' + (e ? e.name : '') + '"? No se puede deshacer.', async () => {
     try {
         const { error } = await supabaseClient.from('custom_exercises').delete().eq('id', id);
         if (error) throw error;
         ejBancoCache = ejBancoCache.filter(x => x.id !== id);
         ejBancoSearch();
     } catch(err) {
-        alert('Error: ' + err.message);
+        ejToast('Error: ' + err.message, 'error');
     }
+    });
 }
 async function ejEliminarEjercicio() {
-    if (!ejEditandoId) { alert('No hay ejercicio cargado para eliminar'); return; }
-    if (!confirm('¿Eliminar este ejercicio? Esta acción no se puede deshacer.')) return;
+    if (!ejEditandoId) { ejToast('No hay ejercicio cargado para eliminar', 'warning'); return; }
+    ejConfirm('¿Eliminar este ejercicio? Esta acción no se puede deshacer.', async () => {
     try {
         const { error } = await supabaseClient.from('custom_exercises').delete().eq('id', ejEditandoId);
         if (error) throw error;
@@ -1946,8 +1971,9 @@ async function ejEliminarEjercicio() {
         ejBuildFicha();
         ejShowTab('banco', document.querySelector('[onclick*="\'banco\'"]'));
     } catch(err) {
-        alert('Error al eliminar: ' + err.message);
+        ejToast('Error al eliminar: ' + err.message, 'error');
     }
+    });
 }
 function ejCalcEII() {
     const a = parseFloat(document.getElementById('ej-ancho')?.value);
@@ -1984,7 +2010,7 @@ async function ejSubirThumbnail(ejercicioId) {
 }
 async function ejEditarDibujo() {
     if (!ejEditandoId) {
-        alert('Primero guarda el ejercicio para poder editar el dibujo.');
+        ejToast('Primero guarda el ejercicio para poder editar el dibujo.', 'warning');
         return;
     }
     try {
@@ -2043,12 +2069,12 @@ async function ejEditarDibujo() {
         ejRenderToolbar();
         ejShowTab('pizarra', document.querySelector('[onclick*="pizarra"]'));
     } catch(err) {
-        alert('Error al cargar dibujo: ' + err.message);
+        ejToast('Error al cargar dibujo: ' + err.message, 'error');
     }
 }
 async function ejGuardarEjercicio() {
     const nombre = document.getElementById('ej-nombre')?.value?.trim();
-    if (!nombre) { alert('El nombre del ejercicio es obligatorio'); return; }
+    if (!nombre) { ejToast('El nombre del ejercicio es obligatorio', 'warning'); return; }
 
     const msg = document.getElementById('ej-ficha-msg');
     if (msg) msg.innerHTML = '<span style="color:#9ca3af">Guardando...</span>';
@@ -2385,7 +2411,7 @@ async function ejVerFicha(id) {
         ejShowTab('ficha', document.querySelector('[onclick*="\'ficha\'"]'));
         setTimeout(() => { ejActualizarFichaMedia(); ejPrepararThumbParaPDF(); }, 300);
     } catch(err) {
-        alert('Error al cargar: ' + err.message);
+        ejToast('Error al cargar: ' + err.message, 'error');
     }
 }
 async function ejBancoCargar(id) {
@@ -2447,7 +2473,7 @@ async function ejBancoCargar(id) {
         const lbl = document.getElementById('ej-pizarra-nombre-label');
         if (bar && lbl) { lbl.textContent = data.name; bar.style.display = 'flex'; }
     } catch(err) {
-        alert('Error al cargar: ' + err.message);
+        ejToast('Error al cargar: ' + err.message, 'error');
     }
 }
 
@@ -2561,17 +2587,18 @@ function ejAbrirModal(id) {
         overlay.remove();
     });
 
-    document.getElementById('ej-modal-eliminar-btn').addEventListener('click', async () => {
-        if (!confirm('¿Eliminar este ejercicio? Esta acción no se puede deshacer.')) return;
-        try {
-            const { error } = await supabaseClient.from('custom_exercises').delete().eq('id', e.id);
-            if (error) throw error;
-            overlay.remove();
-            ejBancoCache = ejBancoCache.filter(x => x.id !== e.id);
-            ejBancoRender(ejBancoCache);
-        } catch(err) {
-            alert('Error al eliminar: ' + err.message);
-        }
+    document.getElementById('ej-modal-eliminar-btn').addEventListener('click', () => {
+        ejConfirm('¿Eliminar este ejercicio? Esta acción no se puede deshacer.', async () => {
+            try {
+                const { error } = await supabaseClient.from('custom_exercises').delete().eq('id', e.id);
+                if (error) throw error;
+                overlay.remove();
+                ejBancoCache = ejBancoCache.filter(x => x.id !== e.id);
+                ejBancoRender(ejBancoCache);
+            } catch(err) {
+                ejToast('Error al eliminar: ' + err.message, 'error');
+            }
+        });
     });
 }
 // =============================================
@@ -2657,7 +2684,7 @@ function ejFrameAdd() {
 // Elimina el último frame
 function ejFrameDeleteLast() {
     if (!ejP.animMode || ejP.frames.length <= 1) return;
-    if (!confirm('¿Eliminar el último frame?')) return;
+    ejConfirm('¿Eliminar el último frame?', () => {
     ejP.frames.pop();
     if (ejP.currentFrame >= ejP.frames.length) {
         ejP.currentFrame = ejP.frames.length - 1;
@@ -2665,6 +2692,7 @@ function ejFrameDeleteLast() {
     ejFrameRestore(ejP.frames[ejP.currentFrame]);
     ejRenderSVG();
     ejRenderTimeline();
+    });
 }
 function ejFrameUndoTraj() {
     if (!ejP.animMode) return;
@@ -2939,7 +2967,7 @@ async function ejCargarPlantilla() {
                 .eq('is_active', true)
                 .limit(1);
             if (!seasons || !seasons.length) {
-                alert('No hay temporada activa. Configura una en Mi Club.');
+                ejToast('No hay temporada activa. Configura una en Mi Club.', 'warning');
                 return;
             }
             seasonIdActual = seasons[0].id;
@@ -2962,7 +2990,7 @@ async function ejCargarPlantilla() {
         ejRenderToolbar();
     } catch(err) {
         console.error('Error cargando plantilla:', err);
-        alert('Error: ' + err.message);
+        ejToast('Error: ' + err.message, 'error');
     }
 }
 
@@ -2975,7 +3003,7 @@ function ejColocarJugadorPlantilla(idx) {
     ejRenderToolbar();
 }async function ejGuardarYExportar() {
     if (!ejEditandoId) {
-        alert('Guarda el ejercicio primero desde la Ficha.');
+        ejToast('Guarda el ejercicio primero desde la Ficha.', 'warning');
         return;
     }
     if (ejP._exportingVideo) return;
@@ -3038,11 +3066,11 @@ function ejColocarJugadorPlantilla(idx) {
 }
 async function ejExportarAnimacionMP4() {
     if (!ejP.animMode || ejP.frames.length < 2) {
-        alert('Activa el modo animación y crea al menos 2 frames.');
+        ejToast('Activa el modo animación y crea al menos 2 frames.', 'warning');
         return;
     }
     if (!ejEditandoId) {
-        alert('Guarda el ejercicio primero desde la Ficha antes de exportar vídeo.');
+        ejToast('Guarda el ejercicio primero desde la Ficha antes de exportar vídeo.', 'warning');
         return;
     }
 
@@ -3203,6 +3231,37 @@ async function ejExportarAnimacionMP4() {
         ejP._exportingVideo = false; ejRenderTimeline(); const msgCatch = document.getElementById('ej-anim-msg'); if (msgCatch) msgCatch.textContent = '❌ Error: ' + e.message;
     }
 }
+function ejConfirm(msg, onAceptar) {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:99998;display:flex;align-items:center;justify-content:center;';
+    overlay.innerHTML = '<div style="background:#1e293b;border:1px solid #334155;border-radius:12px;padding:28px 32px;max-width:360px;width:90%;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.6)"><p style="color:#f1f5f9;font-size:15px;margin:0 0 24px">' + msg + '</p><div style="display:flex;gap:12px;justify-content:center"><button id="ejc-cancel" style="padding:9px 22px;border-radius:7px;border:1px solid #475569;background:transparent;color:#94a3b8;cursor:pointer;font-size:14px">Cancelar</button><button id="ejc-ok" style="padding:9px 22px;border-radius:7px;border:none;background:#ef4444;color:#fff;cursor:pointer;font-size:14px;font-weight:600">Aceptar</button></div></div>';
+    document.body.appendChild(overlay);
+    overlay.querySelector('#ejc-cancel').onclick = () => overlay.remove();
+    overlay.querySelector('#ejc-ok').onclick = () => { overlay.remove(); onAceptar(); };
+}
+
+function ejPrompt(msg, valorInicial, onAceptar) {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:99998;display:flex;align-items:center;justify-content:center;';
+    overlay.innerHTML = '<div style="background:#1e293b;border:1px solid #334155;border-radius:12px;padding:28px 32px;max-width:360px;width:90%;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.6)"><p style="color:#f1f5f9;font-size:15px;margin:0 0 16px">' + msg + '</p><input id="ejp-input" type="text" value="' + (valorInicial||'') + '" style="width:100%;padding:8px 12px;background:#0f172a;border:1px solid #475569;color:#fff;border-radius:6px;font-size:14px;margin-bottom:20px;box-sizing:border-box"/><div style="display:flex;gap:12px;justify-content:center"><button id="ejp-cancel" style="padding:9px 22px;border-radius:7px;border:1px solid #475569;background:transparent;color:#94a3b8;cursor:pointer;font-size:14px">Cancelar</button><button id="ejp-ok" style="padding:9px 22px;border-radius:7px;border:none;background:#3b82f6;color:#fff;cursor:pointer;font-size:14px;font-weight:600">Aceptar</button></div></div>';
+    document.body.appendChild(overlay);
+    var input = overlay.querySelector('#ejp-input');
+    input.focus(); input.select();
+    overlay.querySelector('#ejp-cancel').onclick = function() { overlay.remove(); };
+    overlay.querySelector('#ejp-ok').onclick = function() { var v = input.value.trim(); overlay.remove(); if (v) onAceptar(v); };
+    input.addEventListener('keydown', function(e) { if (e.key === 'Enter') { var v = input.value.trim(); overlay.remove(); if (v) onAceptar(v); } });
+}
+
+function ejToast(msg, tipo) {
+    tipo = tipo || 'info';
+    var cfg = { info: { bg: '#1e3a5f', icon: 'ℹ️' }, success: { bg: '#166534', icon: '✅' }, error: { bg: '#7f1d1d', icon: '❌' }, warning: { bg: '#78350f', icon: '⚠️' } }[tipo] || { bg: '#1e3a5f', icon: 'ℹ️' };
+    var t = document.createElement('div');
+    t.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:' + cfg.bg + ';color:#fff;padding:12px 22px;border-radius:8px;font-size:14px;z-index:99999;max-width:380px;text-align:center;box-shadow:0 4px 16px rgba(0,0,0,0.5);transition:opacity 0.4s;pointer-events:none;';
+    t.textContent = cfg.icon + ' ' + msg;
+    document.body.appendChild(t);
+    setTimeout(function() { t.style.opacity = '0'; setTimeout(function() { t.remove(); }, 400); }, 3500);
+}
+
 function ejInit() {
     const root = document.getElementById('ejercicios-root');
     if (!root) return;
