@@ -1900,7 +1900,7 @@ function ejComprimirThumbSVG(svgStr) {
         .replace(/<image[^>]*data-bg="1"[^>]*href="data:image\/webp;base64,[^"]*"[^>]*\/>/g, campo)
         .replace(/<image[^>]*href="data:image\/svg\+xml;base64,[^"]*"[^>]*data-bg="1"[^>]*\/>/g, campo)
         .replace(/<image[^>]*data-bg="1"[^>]*href="data:image\/svg\+xml;base64,[^"]*"[^>]*\/>/g, campo)
-        .substring(0, 50000);
+        .substring(0, 100000);
 }
 function ejPrepararThumbParaPDF() {
     const svgSource = window.ejThumbnailPendiente || (() => {
@@ -2730,13 +2730,20 @@ function ejFrameStop() {
     }
     ejRenderTimeline();
 }
-
+function ejCatmullRom(p0, p1, p2, p3, t) {
+    return 0.5 * (
+        (2 * p1) +
+        (-p0 + p2) * t +
+        (2*p0 - 5*p1 + 4*p2 - p3) * t*t +
+        (-p0 + 3*p1 - 3*p2 + p3) * t*t*t
+    );
+}
 // Loop de animación con interpolación suave
 function ejFrameAnimate(now) {
     if (!ejP.isPlaying) return;
     const dt = now - ejP._animLastTime;
     ejP._animLastTime = now;
-    ejP._animProgress += dt / (ejP.playSpeed * 0.7);
+    ejP._animProgress += dt / (ejP.playSpeed * 1.5);
 
     if (ejP._animProgress >= 1) {
         // Pasar al siguiente frame
@@ -2761,7 +2768,7 @@ function ejFrameAnimate(now) {
 
     const t = ejP._animProgress;
     // Ease in-out cuadrático
-    const ease = t * t * t * (t * (t * 6 - 15) + 10);
+    const ease = t;
 
     // Interpolar jugadores (siguiendo trayectoria freehand si existe)
     for (const pa of fA.players) {
@@ -2788,8 +2795,19 @@ function ejFrameAnimate(now) {
             player.x = (1-t)*(1-t)*trajCurved.x1 + 2*(1-t)*t*cx + t*t*trajCurved.x2;
             player.y = (1-t)*(1-t)*trajCurved.y1 + 2*(1-t)*t*cy + t*t*trajCurved.y2;
         } else {
-            player.x = pa.x + (pb.x - pa.x) * ease;
-            player.y = pa.y + (pb.y - pa.y) * ease;
+            if (Math.abs(pa.x - pb.x) < 2 && Math.abs(pa.y - pb.y) < 2) {
+                player.x = pa.x; player.y = pa.y;
+            } else {
+                var fi = ejP._animFrame;
+                var pPrev = ejP.frames[fi-1] ? ejP.frames[fi-1].players.find(p=>p.id===pa.id) : null;
+                var pNext2 = ejP.frames[fi+2] ? ejP.frames[fi+2].players.find(p=>p.id===pa.id) : null;
+                var x0 = pPrev ? pPrev.x : pa.x;
+                var y0 = pPrev ? pPrev.y : pa.y;
+                var x3 = pNext2 ? pNext2.x : pb.x;
+                var y3 = pNext2 ? pNext2.y : pb.y;
+                player.x = ejCatmullRom(x0, pa.x, pb.x, x3, ease);
+                player.y = ejCatmullRom(y0, pa.y, pb.y, y3, ease);
+            }
         }
     }
     // Interpolar equipamiento (siguiendo trayectoria freehand si existe)
@@ -2817,8 +2835,19 @@ function ejFrameAnimate(now) {
             eq.x = (1-t)*(1-t)*trajCurvedEq.x1 + 2*(1-t)*t*cx + t*t*trajCurvedEq.x2;
             eq.y = (1-t)*(1-t)*trajCurvedEq.y1 + 2*(1-t)*t*cy + t*t*trajCurvedEq.y2;
         } else {
-            eq.x = ea.x + (eb.x - ea.x) * ease;
-            eq.y = ea.y + (eb.y - ea.y) * ease;
+            if (Math.abs(ea.x - eb.x) < 2 && Math.abs(ea.y - eb.y) < 2) {
+                eq.x = ea.x; eq.y = ea.y;
+            } else {
+                var fi = ejP._animFrame;
+                var ePrev = ejP.frames[fi-1] ? ejP.frames[fi-1].equipment.find(e=>e.id===ea.id) : null;
+                var eNext2 = ejP.frames[fi+2] ? ejP.frames[fi+2].equipment.find(e=>e.id===ea.id) : null;
+                var x0 = ePrev ? ePrev.x : ea.x;
+                var y0 = ePrev ? ePrev.y : ea.y;
+                var x3 = eNext2 ? eNext2.x : eb.x;
+                var y3 = eNext2 ? eNext2.y : eb.y;
+                eq.x = ejCatmullRom(x0, ea.x, eb.x, x3, ease);
+                eq.y = ejCatmullRom(y0, ea.y, eb.y, y3, ease);
+            }
         }
     }
 
@@ -3032,13 +3061,14 @@ async function ejExportarAnimacionMP4() {
     }
     const recorder = new MediaRecorder(stream, {
         mimeType,
-        videoBitsPerSecond: 5000000
+        videoBitsPerSecond: 8000000
     });
     const chunks = [];
     recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
 
     // Guardar estado actual
     ejP._exporting = true;
+    ejP.selectedId = null;
     const savedFrame = ejP.currentFrame;
     const savedPlaying = ejP.isPlaying;
     if (savedPlaying) ejFrameStop();
@@ -3066,8 +3096,8 @@ async function ejExportarAnimacionMP4() {
 
     const FPS = 30;
     const frameDuration = ejP.playSpeed;
-    const framesPerTransition = Math.max(8, Math.round((frameDuration / 1000) * FPS * 0.5));
-    const holdFrames = 0;
+    const framesPerTransition = Math.max(30, Math.round((frameDuration * 2 / 1000) * FPS));
+    const holdFrames = 12;
     const holdMid = 0;
 
     for (let i = 0; i < ejP.frames.length; i++) {
@@ -3090,7 +3120,7 @@ async function ejExportarAnimacionMP4() {
 
             for (let f = 0; f <= framesPerTransition; f++) {
                 const t = f / framesPerTransition;
-                const ease = t * t * t * (t * (t * 6 - 15) + 10);
+                const ease = t;
 
                 // Interpolar jugadores
                 for (const pa of fA.players) {
@@ -3118,8 +3148,18 @@ async function ejExportarAnimacionMP4() {
                         player.x = (1-ease)*(1-ease)*trajCurved.x1 + 2*(1-ease)*ease*cx + ease*ease*trajCurved.x2;
                         player.y = (1-ease)*(1-ease)*trajCurved.y1 + 2*(1-ease)*ease*cy + ease*ease*trajCurved.y2;
                     } else {
-                        player.x = pa.x + (pb.x - pa.x) * ease;
-                        player.y = pa.y + (pb.y - pa.y) * ease;
+                        if (Math.abs(pa.x - pb.x) < 2 && Math.abs(pa.y - pb.y) < 2) {
+                            player.x = pa.x; player.y = pa.y;
+                        } else {
+                            var pPrev = ejP.frames[i-1] ? ejP.frames[i-1].players.find(p=>p.id===pa.id) : null;
+                            var pNext2 = ejP.frames[i+2] ? ejP.frames[i+2].players.find(p=>p.id===pa.id) : null;
+                            var x0 = pPrev ? pPrev.x : pa.x;
+                            var y0 = pPrev ? pPrev.y : pa.y;
+                            var x3 = pNext2 ? pNext2.x : pb.x;
+                            var y3 = pNext2 ? pNext2.y : pb.y;
+                            player.x = ejCatmullRom(x0, pa.x, pb.x, x3, ease);
+                            player.y = ejCatmullRom(y0, pa.y, pb.y, y3, ease);
+                        }
                     }
                 }
 
@@ -3149,8 +3189,18 @@ async function ejExportarAnimacionMP4() {
                         eq.x = (1-ease)*(1-ease)*trajCurvedEq.x1 + 2*(1-ease)*ease*cx + ease*ease*trajCurvedEq.x2;
                         eq.y = (1-ease)*(1-ease)*trajCurvedEq.y1 + 2*(1-ease)*ease*cy + ease*ease*trajCurvedEq.y2;
                     } else {
-                        eq.x = ea.x + (eb.x - ea.x) * ease;
-                        eq.y = ea.y + (eb.y - ea.y) * ease;
+                        if (Math.abs(ea.x - eb.x) < 2 && Math.abs(ea.y - eb.y) < 2) {
+                            eq.x = ea.x; eq.y = ea.y;
+                        } else {
+                            var ePrev = ejP.frames[i-1] ? ejP.frames[i-1].equipment.find(e=>e.id===ea.id) : null;
+                            var eNext2 = ejP.frames[i+2] ? ejP.frames[i+2].equipment.find(e=>e.id===ea.id) : null;
+                            var x0 = ePrev ? ePrev.x : ea.x;
+                            var y0 = ePrev ? ePrev.y : ea.y;
+                            var x3 = eNext2 ? eNext2.x : eb.x;
+                            var y3 = eNext2 ? eNext2.y : eb.y;
+                            eq.x = ejCatmullRom(x0, ea.x, eb.x, x3, ease);
+                            eq.y = ejCatmullRom(y0, ea.y, eb.y, y3, ease);
+                        }
                     }
                 }
 
