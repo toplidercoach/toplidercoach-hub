@@ -320,7 +320,7 @@ function ejRenderSVG() {
         const scale = p.scale ?? 1.0;
         const r = 14 * scale;
         const fs = 11 * scale;
-        const textColor = ['yellow','white','atletico','juventus'].includes(p.color) ? '#1e293b' : '#ffffff';
+        const textColor = p.numberColor && p.numberColor !== 'auto' ? p.numberColor : (['yellow','white','atletico','juventus'].includes(p.color) ? '#1e293b' : '#ffffff');
         const fillAttr = tc.striped ? `url(#stp-${p.id})` : tc.fill;
 
         html += `<g data-id="${p.id}" data-type="player" transform="translate(${p.x},${p.y})" style="cursor:move">
@@ -921,10 +921,17 @@ function ejApplyFormation(key, isRival) {
     const scale = ejP.selectedSize === 'small' ? 0.6 : ejP.selectedSize === 'large' ? 1.4 : 1.0;
     const ts = Date.now();
     if (!isRival) {
-        // Reemplazar mi equipo
+        // Reemplazar mi equipo — mantener solo rivales
         ejP.players = ejP.players.filter(p => {
             const tc = EJ_TEAM_COLORS[p.color];
-            return tc && ejP.rivalColor === p.color; // mantener solo rivales
+            return tc && ejP.rivalColor === p.color;
+        });
+        ejP.playerCounts[color] = 0;
+    } else {
+        // Reemplazar rival — mantener solo mi equipo
+        ejP.players = ejP.players.filter(p => {
+            const tc = EJ_TEAM_COLORS[p.color];
+            return tc && ejP.myColor === p.color;
         });
         ejP.playerCounts[color] = 0;
     }
@@ -1011,7 +1018,15 @@ function ejRotateEquipment(deg) {
     ejRenderSVG();
     ejRenderToolbar();
 }
-
+function ejChangeNumberColor(color) {
+    if (!ejP.selectedId) return;
+    ejP.players = ejP.players.map(p =>
+        p.id === ejP.selectedId ? { ...p, numberColor: color } : p
+    );
+    ejSaveHistory();
+    ejRenderSVG();
+    ejRenderToolbar();
+}
 function ejChangeLineColor(color) {
     if (!ejP.selectedId) return;
     ejP.lines  = ejP.lines.map(l  => l.id === ejP.selectedId  ? {...l, color} : l);
@@ -1222,6 +1237,12 @@ ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin
                 <label style="font-size:11px;color:#9ca3af;margin-left:4px">
                     <input type="checkbox" ${selPlayer.showNumber?'checked':''} onchange="ejTogglePlayerNumber(this.checked)"> Ver nº
                 </label>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+                <label style="font-size:11px;color:#9ca3af">Color nº:</label>
+                <button onclick="ejChangeNumberColor('#ffffff')" style="width:22px;height:22px;border-radius:50%;background:#ffffff;border:2px solid ${(selPlayer.numberColor||'auto')==='#ffffff'?'#22c55e':'#334155'};cursor:pointer"></button>
+                <button onclick="ejChangeNumberColor('#1e293b')" style="width:22px;height:22px;border-radius:50%;background:#1e293b;border:2px solid ${(selPlayer.numberColor||'auto')==='#1e293b'?'#22c55e':'#334155'};cursor:pointer"></button>
+                <button onclick="ejChangeNumberColor('auto')" style="padding:2px 8px;font-size:10px;background:${(selPlayer.numberColor||'auto')==='auto'?'#1e3a5f':'#0f172a'};border:1px solid ${(selPlayer.numberColor||'auto')==='auto'?'#22c55e':'#334155'};color:#9ca3af;border-radius:4px;cursor:pointer">Auto</button>
             </div>
             <label style="font-size:11px;color:#9ca3af">Cambiar color:</label>
             ${colorSwatches(selPlayer.color, true, true, 'ejChangePlayerColor')}
@@ -2731,12 +2752,14 @@ function ejFrameStop() {
     ejRenderTimeline();
 }
 function ejCatmullRom(p0, p1, p2, p3, t) {
-    return 0.5 * (
+    var spline = 0.5 * (
         (2 * p1) +
         (-p0 + p2) * t +
         (2*p0 - 5*p1 + 4*p2 - p3) * t*t +
         (-p0 + 3*p1 - 3*p2 + p3) * t*t*t
     );
+    var linear = p1 + (p2 - p1) * t;
+    return linear * 0.7 + spline * 0.3;
 }
 // Loop de animación con interpolación suave
 function ejFrameAnimate(now) {
