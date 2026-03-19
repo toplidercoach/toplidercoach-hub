@@ -21,6 +21,7 @@
     <link rel="stylesheet" href="css/staff.css">
     <link rel="stylesheet" href="css/miclub.css">
     <link rel="stylesheet" href="css/asistencia.css">
+    <link rel="stylesheet" href="css/ejercicios.css">
 </head>
 <body>
     <!-- ==================== LOGIN ==================== -->
@@ -64,6 +65,9 @@
     </button>
     <button class="main-tab planificador" onclick="cambiarModulo('planificador', this)">
         Planificador
+    </button>
+<button class="main-tab pizarra" onclick="cambiarModulo('pizarra', this)">
+        🎯 Pizarra
     </button>
     <button class="main-tab matchstats" onclick="cambiarModulo('matchstats', this)">
         MatchStats
@@ -331,8 +335,12 @@
                 <div class="planificador-layout">
                   <!-- Panel Biblioteca -->
                     <div class="panel">
-                        <div class="panel-header">
+<div class="panel-header">
                             <h3>Biblioteca de Ejercicios</h3>
+                            <div style="display:flex;gap:6px;margin-top:8px">
+                                <button class="bib-tab active" id="bib-tab-tlc" onclick="cambiarFuenteBiblioteca('tlc',this)" style="flex:1;padding:6px 10px;font-size:12px;font-weight:600;border-radius:6px;border:2px solid #7c3aed;background:#7c3aed;color:white;cursor:pointer">TopLiderCoach</button>
+                                <button class="bib-tab" id="bib-tab-mis" onclick="cambiarFuenteBiblioteca('mis',this)" style="flex:1;padding:6px 10px;font-size:12px;font-weight:600;border-radius:6px;border:2px solid #7c3aed;background:transparent;color:#7c3aed;cursor:pointer">Mis Ejercicios</button>
+                            </div>
                         </div>
                         <div class="panel-content">
                             <!-- Toggle Filtros -->
@@ -535,7 +543,10 @@
                 </div>
             </div>
         </div>
-        
+        <!-- ==================== MODULO: PIZARRA ==================== -->
+        <div id="modulo-pizarra" class="vista-modulo">
+            <div id="ejercicios-root" style="padding:0;"></div>
+        </div>
         <!-- ==================== MODULO: MATCHSTATS ==================== -->
         <div id="modulo-matchstats" class="vista-modulo">
           <div class="sub-tabs matchstats-subtabs">
@@ -1656,5 +1667,7 @@
     <script src="js/miclub.js"></script>
     <script src="js/asistencia.js"></script>
     <script src="js/dashboard.js"></script>
+    <script src="js/ej-images.js"></script>
+    <script src="js/ejercicios.js"></script>
 </body>
 </html>

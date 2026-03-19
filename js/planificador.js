@@ -476,31 +476,25 @@ sesion = { nombre: '', fecha: fechaHoy, calentamiento: [], principal: [], enfria
                     sesionId = sesionCreada?.id;
                 }
 
-// Guardar asistencia de jugadores seleccionados
-const jugadoresParaAsistencia = obtenerJugadoresParaGuardar();
-if (jugadoresParaAsistencia.length > 0 && sesionId) {
-    // Si es edición, eliminar asistencia anterior
-    if (sesionEditandoId) {
+// Solo crear asistencia automática al crear sesión NUEVA (no al editar)
+if (!sesionEditandoId) {
+    const jugadoresParaAsistencia = obtenerJugadoresParaGuardar();
+    if (jugadoresParaAsistencia.length > 0 && sesionId) {
+        const registrosAsistencia = jugadoresParaAsistencia.map(j => ({
+            sesion_id: sesionId,
+            jugador_id: j.player_id,
+            asistio: true,
+            motivo_ausencia: null,
+            peso: null,
+            wellness: null,
+            estado_muscular: null,
+            notas: null
+        }));
+        
         await supabaseClient
             .from('asistencia_sesiones')
-            .delete()
-            .eq('sesion_id', sesionId);
+            .insert(registrosAsistencia);
     }
-    
-    const registrosAsistencia = jugadoresParaAsistencia.map(j => ({
-        sesion_id: sesionId,
-        jugador_id: j.player_id,
-        asistio: true,
-        motivo_ausencia: null,
-        peso: null,
-        wellness: null,
-        estado_muscular: null,
-        notas: null
-    }));
-    
-    await supabaseClient
-        .from('asistencia_sesiones')
-        .insert(registrosAsistencia);
 }
 
 alert(sesionEditandoId ? 'Sesión actualizada correctamente' : 'Sesión guardada correctamente');
@@ -1158,3 +1152,199 @@ if (s.players && s.players.length > 0) {
             if (calendarioMes > 11) { calendarioMes = 0; calendarioAnio++; }
             cargarCalendarioUnificado();
         }
+        // ========== BIBLIOTECA: FUENTE DE EJERCICIOS ==========
+let bibliotecaFuente = 'tlc';
+
+function cambiarFuenteBiblioteca(fuente, btn) {
+    bibliotecaFuente = fuente;
+    // Actualizar tabs visuales
+    document.querySelectorAll('.bib-tab').forEach(b => {
+        b.style.background = 'transparent';
+        b.style.color = '#7c3aed';
+        b.classList.remove('active');
+    });
+    btn.style.background = '#7c3aed';
+    btn.style.color = 'white';
+    btn.classList.add('active');
+    
+    // Mostrar/ocultar filtros (solo para TLC)
+    const filtrosToggle = document.getElementById('filtros-toggle');
+    const filtrosBiblioteca = document.getElementById('filtros-biblioteca');
+    if (filtrosToggle) filtrosToggle.style.display = fuente === 'tlc' ? '' : 'none';
+    if (filtrosBiblioteca) filtrosBiblioteca.style.display = fuente === 'tlc' ? '' : 'none';
+    
+    if (fuente === 'tlc') {
+        cargarEjercicios(1);
+    } else {
+        cargarMisEjerciciosBiblioteca();
+    }
+}
+
+async function cargarMisEjerciciosBiblioteca() {
+    const lista = document.getElementById('lista-ejercicios');
+    const pag = document.getElementById('paginacion-ejercicios');
+    lista.innerHTML = '<div class="loading">Cargando mis ejercicios...</div>';
+    if (pag) pag.innerHTML = '';
+    
+    try {
+        const { data, error } = await supabaseClient
+            .from('custom_exercises')
+            .select('id, name, category, tema, difficulty, duration_min, players_count, thumbnail_svg')
+            .order('created_at', { ascending: false })
+            .limit(50);
+        
+        if (error) throw error;
+        
+        if (!data || data.length === 0) {
+            lista.innerHTML = '<p style="text-align:center;color:#9ca3af;padding:20px;">No tienes ejercicios propios.<br>Crea uno desde la Pizarra.</p>';
+            return;
+        }
+        
+        lista.innerHTML = data.map(ej => {
+            var thumbSrc = '';
+            
+            if (ej.thumbnail_svg) {
+                try {
+                    var blob = new Blob([ej.thumbnail_svg], {type: 'image/svg+xml'});
+                    thumbSrc = URL.createObjectURL(blob);
+                } catch(e) {
+                    thumbSrc = '';
+                }
+            }
+            
+            var tags = [];
+            if (ej.tema) tags.push('<span class="tag">' + ej.tema + '</span>');
+            if (ej.difficulty) tags.push('<span class="tag dificultad">Dif: ' + ej.difficulty + '</span>');
+            if (ej.category) tags.push('<span class="tag">' + ej.category + '</span>');
+            
+            var ejercicioData = JSON.stringify({
+                id: ej.id,
+                titulo: ej.name,
+                imagen: thumbSrc,
+                duracion: ej.duration_min || 15,
+                fuente: 'custom'
+            }).replace(/'/g, "&#39;");
+            
+            return '<div class="ejercicio-card" onclick="seleccionarMiEjercicio(\'' + ej.id + '\')">' +
+                '<img src="' + (thumbSrc || 'https://via.placeholder.com/80x60?text=Sin+img') + '" alt="" style="border-radius:6px">' +
+                '<div class="info">' +
+                    '<div class="titulo">' + ej.name + '</div>' +
+                    '<div class="tags">' + tags.join('') + '</div>' +
+                '</div>' +
+                '<button class="btn-agregar" data-ejercicio=\'' + ejercicioData + '\' onclick="event.stopPropagation(); agregarMiEjercicioDesdeBoton(this)">+ Añadir</button>' +
+            '</div>';
+        }).join('');
+        
+    } catch(err) {
+        lista.innerHTML = '<p style="color:red;">Error: ' + err.message + '</p>';
+    }
+}
+
+function seleccionarMiEjercicio(id) {
+    const detalle = document.getElementById('detalle-ejercicio');
+    detalle.innerHTML = '<div class="loading">Cargando...</div>';
+    
+    supabaseClient.from('custom_exercises').select('*').eq('id', id).single()
+        .then(function(res) {
+            if (res.error) throw res.error;
+            var ej = res.data;
+          ejercicioSeleccionado = {
+                id: ej.id,
+                titulo: ej.name,
+                duracion: ej.duration_min || 15,
+                imagen: '',
+                objetivo: (ej.objectives ? ej.objectives + '\n\n' : '') + (ej.description || ''),
+                entrenador: '',
+                equipo: '',
+                fuente: 'custom'
+            };
+            // Convertir SVG a PNG para que funcione en el PDF
+            if (ej.thumbnail_svg) {
+                ejSvgToPng(ej.thumbnail_svg).then(function(pngData) {
+                    ejercicioSeleccionado.imagen = pngData;
+                });
+            }
+            
+           // Generar miniatura
+            var thumbHTML = '';
+            if (ej.thumbnail_svg) {
+                try {
+                    var blob = new Blob([ej.thumbnail_svg], {type: 'image/svg+xml'});
+                    var blobUrl = URL.createObjectURL(blob);
+                    thumbHTML = '<img src="' + blobUrl + '" alt="' + ej.name + '" style="width:100%;border-radius:8px;margin-bottom:10px">';
+                } catch(e) {}
+            }
+            
+            detalle.className = 'detalle-ejercicio active';
+            detalle.innerHTML = thumbHTML +
+                '<h3>' + ej.name + '</h3>' +
+                '<div class="meta" style="font-size:13px;color:#666;line-height:1.8;margin-bottom:10px;">' +
+                    (ej.category ? '<strong>Categoría:</strong> ' + ej.category + '<br>' : '') +
+                    (ej.tema ? '<strong>Tema:</strong> ' + ej.tema + '<br>' : '') +
+                    (ej.game_phase ? '<strong>Fase:</strong> ' + ej.game_phase + '<br>' : '') +
+                    (ej.difficulty ? '<strong>Dificultad:</strong> ' + ej.difficulty + '<br>' : '') +
+                    '<strong>Duración:</strong> ' + (ej.duration_min || 15) + ' min' +
+                    (ej.players_count ? '<br><strong>Jugadores:</strong> ' + ej.players_count : '') +
+                    (ej.materials ? '<br><strong>Material:</strong> ' + ej.materials : '') +
+                    (ej.eii ? '<br><strong>EII:</strong> ' + ej.eii + ' m²/jug' : '') +
+                '</div>' +
+                (ej.objectives ? '<div class="detalle-seccion"><h4>Objetivos</h4><p>' + ej.objectives + '</p></div>' : '') +
+                (ej.description ? '<div class="detalle-seccion"><h4>Descripción</h4><p>' + ej.description + '</p></div>' : '') +
+                (ej.variants ? '<div class="detalle-seccion"><h4>Variantes</h4><p>' + ej.variants + '</p></div>' : '') +
+                (ej.coach_notes ? '<div class="detalle-seccion"><h4>Notas del entrenador</h4><p>' + ej.coach_notes + '</p></div>' : '') +
+                '<button class="btn-primary purple" style="width:100%;margin-top:10px;" onclick="abrirModalSeccion()">Añadir a Sesión</button>';
+        })
+        .catch(function(err) {
+            detalle.innerHTML = '<p style="color:red;">Error: ' + err.message + '</p>';
+        });
+}
+
+async function agregarMiEjercicioDesdeBoton(btn) {
+    var data = JSON.parse(btn.dataset.ejercicio);
+    var imagen = '';
+    var objetivo = '';
+    
+    // Cargar datos completos del ejercicio
+    if (data.fuente === 'custom') {
+        try {
+            var res = await supabaseClient.from('custom_exercises').select('thumbnail_svg, objectives, description').eq('id', data.id).single();
+            if (res.data) {
+                if (res.data.thumbnail_svg) {
+                    imagen = await ejSvgToPng(res.data.thumbnail_svg);
+                }
+                objetivo = (res.data.objectives ? res.data.objectives + '\n\n' : '') + (res.data.description || '');
+            }
+        } catch(e) { console.warn('No se pudo cargar datos:', e); }
+    }
+    
+    ejercicioSeleccionado = {
+        id: data.id,
+        titulo: data.titulo,
+        duracion: data.duracion || 15,
+        imagen: imagen,
+        objetivo: objetivo,
+        entrenador: '',
+        equipo: '',
+        fuente: data.fuente || 'custom'
+    };
+    abrirModalSeccion();
+}
+// Convertir SVG a PNG data URL para PDFs
+function ejSvgToPng(svgString) {
+    return new Promise(function(resolve) {
+        var canvas = document.createElement('canvas');
+        canvas.width = 800;
+        canvas.height = 500;
+        var ctx = canvas.getContext('2d');
+        var img = new Image();
+        var blob = new Blob([svgString], {type: 'image/svg+xml'});
+        var url = URL.createObjectURL(blob);
+        img.onload = function() {
+            ctx.drawImage(img, 0, 0, 800, 500);
+            resolve(canvas.toDataURL('image/png'));
+            URL.revokeObjectURL(url);
+        };
+        img.onerror = function() { resolve(''); URL.revokeObjectURL(url); };
+        img.src = url;
+    });
+}
