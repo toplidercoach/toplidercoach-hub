@@ -75,8 +75,12 @@
     <button class="main-tab staff" onclick="cambiarModulo('staff', this)">
         Tu Cuerpo Técnico
     </button>
-    <button class="main-tab config" onclick="cambiarModulo('config', this)">
+<button class="main-tab config" onclick="cambiarModulo('config', this)">
         Mi Club
+    </button>
+    <button class="main-tab tacticlip" onclick="abrirPromoTactiClip()" style="display:flex;align-items:center;gap:6px;">
+        <img src="https://toplidercoach.com/wp-content/uploads/2026/03/tacticlip-logo.png" alt="TactiClip" style="width:18px;height:18px;object-fit:contain;border-radius:3px;">
+        TactiClip
     </button>
 </div>
       <!-- ==================== MODULO: DASHBOARD ==================== -->
@@ -1655,6 +1659,70 @@
         </div>
     </div>
 </div>
+
+    <!-- ==================== MODAL: PROMO TACTICLIP ==================== -->
+<div id="modal-tacticlip" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.75);align-items:center;justify-content:center;">
+  <div style="background:#0f172a;border:1px solid #1e3a5f;border-radius:16px;max-width:480px;width:90%;overflow:hidden;box-shadow:0 25px 60px rgba(0,0,0,0.7);">
+    
+    <!-- Header -->
+    <div style="background:linear-gradient(135deg,#1e3a5f,#0f2744);padding:26px 28px 18px;text-align:center;position:relative;">
+      <button onclick="cerrarPromoTactiClip()" style="position:absolute;top:12px;right:16px;background:none;border:none;color:#94a3b8;font-size:22px;cursor:pointer;line-height:1;">✕</button>
+      <img src="https://toplidercoach.com/wp-content/uploads/2026/03/tacticlip-logo.png" alt="TactiClip" style="width:56px;height:56px;object-fit:contain;border-radius:10px;margin-bottom:10px;">
+      <h2 style="color:#fff;margin:0 0 5px;font-size:22px;font-weight:700;">TactiClip</h2>
+      <p style="color:#94a3b8;margin:0;font-size:13px;">Análisis de vídeo táctico para entrenadores</p>
+    </div>
+
+    <!-- Badge descuento -->
+    <div style="background:#15803d;text-align:center;padding:9px;font-size:12px;font-weight:700;color:#fff;letter-spacing:0.5px;">
+      🎁 OFERTA EXCLUSIVA PARA SUSCRIPTORES DE TOPLIDERCOACH
+    </div>
+
+    <!-- Cuerpo -->
+    <div style="padding:24px;">
+      <p style="color:#e2e8f0;font-size:14px;line-height:1.65;margin:0 0 18px;">
+        Recorta, etiqueta y analiza los momentos clave de tus partidos. Importa vídeos, dibuja jugadas encima y compártelas con tus jugadores en segundos.
+      </p>
+
+      <!-- Features -->
+      <div style="display:flex;flex-direction:column;gap:9px;margin-bottom:22px;">
+        <div style="display:flex;align-items:center;gap:10px;color:#cbd5e1;font-size:13px;"><span style="color:#22c55e;font-size:15px;flex-shrink:0;">✓</span> Recorte y etiquetado de jugadas</div>
+        <div style="display:flex;align-items:center;gap:10px;color:#cbd5e1;font-size:13px;"><span style="color:#22c55e;font-size:15px;flex-shrink:0;">✓</span> Diagramas tácticos dibujados sobre vídeo</div>
+        <div style="display:flex;align-items:center;gap:10px;color:#cbd5e1;font-size:13px;"><span style="color:#22c55e;font-size:15px;flex-shrink:0;">✓</span> Exportación y compartir con jugadores</div>
+      </div>
+
+      <!-- Código descuento -->
+      <div style="background:#0a1929;border:1px solid #1e3a5f;border-radius:12px;padding:16px;text-align:center;margin-bottom:22px;">
+        <div style="color:#94a3b8;font-size:12px;margin-bottom:6px;">Como suscriptor de TopLiderCoach tienes un</div>
+        <div style="color:#22c55e;font-size:26px;font-weight:800;margin-bottom:6px;">-20% de descuento</div>
+        <div style="color:#94a3b8;font-size:12px;">Usa el código al registrarte:</div>
+        <div style="display:inline-block;background:#1e3a5f;border:1px solid #22c55e;border-radius:8px;padding:6px 20px;margin-top:6px;color:#22c55e;font-size:18px;font-weight:800;letter-spacing:3px;">TOPLIDER20</div>
+      </div>
+
+      <!-- Botones -->
+      <div style="display:flex;gap:10px;">
+        <button onclick="cerrarPromoTactiClip()" style="flex:1;padding:11px;background:#1e293b;border:1px solid #334155;border-radius:8px;color:#94a3b8;font-size:13px;cursor:pointer;">
+          Ahora no
+        </button>
+        <a href="https://tacticlipfutbol.com/" target="_blank" onclick="cerrarPromoTactiClip()" style="flex:2;padding:11px;background:linear-gradient(135deg,#16a34a,#15803d);border-radius:8px;color:#fff;font-size:14px;font-weight:700;cursor:pointer;text-decoration:none;text-align:center;display:flex;align-items:center;justify-content:center;gap:6px;">
+          🎬 Ver TactiClip
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function abrirPromoTactiClip() {
+  const m = document.getElementById('modal-tacticlip');
+  m.style.display = 'flex';
+}
+function cerrarPromoTactiClip() {
+  document.getElementById('modal-tacticlip').style.display = 'none';
+}
+document.getElementById('modal-tacticlip').addEventListener('click', function(e) {
+  if (e.target === this) cerrarPromoTactiClip();
+});
+</script>
 
     <!-- JS Modular (ORDEN IMPORTA: core siempre primero) -->
     <script src="js/core.js"></script>
