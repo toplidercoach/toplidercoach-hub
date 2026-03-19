@@ -805,7 +805,7 @@ function ejElegirModo(modo) {
     ejRenderToolbar();
 }
 function ejNuevaPizarra() {
-    if (!confirm('¿Limpiar la pizarra y empezar desde cero?')) return;
+    ejConfirm('¿Limpiar la pizarra y empezar desde cero?', () => {
     ejSaveHistory();
     ejP.players = []; ejP.lines = []; ejP.shapes = []; ejP.texts = []; ejP.equipment = [];
     ejP.selectedId = null; ejP.playerCounts = {};
@@ -833,12 +833,13 @@ function ejNuevaPizarra() {
     });
 }
 function ejClearAll() {
-    if (!confirm('¿Borrar toda la pizarra?')) return;
+    ejConfirm('¿Borrar toda la pizarra?', () => {
     ejSaveHistory();
     ejP.players = []; ejP.lines = []; ejP.shapes = []; ejP.texts = []; ejP.equipment = [];
     ejP.selectedId = null; ejP.playerCounts = {};
     ejRenderSVG();
     ejRenderToolbar();
+    });
 }
 
 function ejSetTool(tool) {
@@ -1948,7 +1949,7 @@ function ejPrepararThumbParaPDF() {
 }
 async function ejEliminarDesdeBanco(id) {
     const e = ejBancoCache.find(x => x.id === id);
-    if (!confirm('¿Eliminar "' + (e ? e.name : '') + '"? No se puede deshacer.')) return;
+    ejConfirm('¿Eliminar "' + (e ? e.name : '') + '"? No se puede deshacer.', async () => {
     try {
         const { error } = await supabaseClient.from('custom_exercises').delete().eq('id', id);
         if (error) throw error;
@@ -1961,7 +1962,7 @@ async function ejEliminarDesdeBanco(id) {
 }
 async function ejEliminarEjercicio() {
     if (!ejEditandoId) { ejToast('No hay ejercicio cargado para eliminar', 'warning'); return; }
-    if (!confirm('¿Eliminar este ejercicio? Esta acción no se puede deshacer.')) return;
+    ejConfirm('¿Eliminar este ejercicio? Esta acción no se puede deshacer.', async () => {
     try {
         const { error } = await supabaseClient.from('custom_exercises').delete().eq('id', ejEditandoId);
         if (error) throw error;
@@ -1975,8 +1976,8 @@ async function ejEliminarEjercicio() {
     } catch(err) {
         ejToast('Error al eliminar: ' + err.message, 'error');
     }
-    });
 }
+});
 function ejCalcEII() {
     const a = parseFloat(document.getElementById('ej-ancho')?.value);
     const l = parseFloat(document.getElementById('ej-largo')?.value);
@@ -2588,17 +2589,16 @@ function ejAbrirModal(id) {
     });
 
     document.getElementById('ej-modal-eliminar-btn').addEventListener('click', async () => {
-        if (!confirm('¿Eliminar este ejercicio? Esta acción no se puede deshacer.')) return;
+        ejConfirm('¿Eliminar este ejercicio? Esta acción no se puede deshacer.', async () => {
         try {
             const { error } = await supabaseClient.from('custom_exercises').delete().eq('id', e.id);
             if (error) throw error;
             overlay.remove();
             ejBancoCache = ejBancoCache.filter(x => x.id !== e.id);
             ejBancoRender(ejBancoCache);
-            } catch(err) {
-                ejToast('Error al eliminar: ' + err.message, 'error');
-            }
-        });
+        } catch(err) {
+            ejToast('Error al eliminar: ' + err.message, 'error');
+        }
     });
 }
 // =============================================
@@ -2684,7 +2684,7 @@ function ejFrameAdd() {
 // Elimina el último frame
 function ejFrameDeleteLast() {
     if (!ejP.animMode || ejP.frames.length <= 1) return;
-    if (!confirm('¿Eliminar el último frame?')) return;
+    ejConfirm('¿Eliminar el último frame?', () => {
     ejP.frames.pop();
     if (ejP.currentFrame >= ejP.frames.length) {
         ejP.currentFrame = ejP.frames.length - 1;
