@@ -1,6 +1,6 @@
 // =============================================
-// M├ôDULO EJERCICIOS ÔÇö TopLiderCoach HUB
-// v2.0 ÔÇö Pizarra t├íctica completa
+// MÓDULO EJERCICIOS ÔÇö TopLiderCoach HUB
+// v2.0 ÔÇö Pizarra táctica completa
 // =============================================
 
 // ---- COLORES DE EQUIPO ----
@@ -13,7 +13,7 @@ const EJ_TEAM_COLORS = {
     green:     { fill: '#22c55e', stroke: '#16a34a', name: 'Verde' },
     orange:    { fill: '#f97316', stroke: '#ea580c', name: 'Naranja' },
     purple:    { fill: '#a855f7', stroke: '#9333ea', name: 'Morado' },
-    atletico:  { fill: '#ef4444', fill2: '#ffffff', stroke: '#dc2626', name: 'Atl├®tico', striped: true },
+    atletico:  { fill: '#ef4444', fill2: '#ffffff', stroke: '#dc2626', name: 'Atlético', striped: true },
     barcelona: { fill: '#a855f7', fill2: '#dc2626', stroke: '#7c3aed', name: 'Barcelona', striped: true },
     milan:     { fill: '#ef4444', fill2: '#1e293b', stroke: '#dc2626', name: 'Milan',    striped: true },
     juventus:  { fill: '#ffffff', fill2: '#1e293b', stroke: '#cbd5e1', name: 'Juventus', striped: true },
@@ -34,31 +34,31 @@ const EJ_FORMATIONS = {
               {x:.38,y:.25},{x:.38,y:.50},{x:.38,y:.75},{x:.55,y:.35},{x:.55,y:.65}]
 };
 
-// ---- COLORES DE L├ìNEA ----
+// ---- COLORES DE LÉNEA ----
 const EJ_LINE_COLORS = [
     {c:'#ffffff',n:'Blanco'},{c:'#ef4444',n:'Rojo'},{c:'#3b82f6',n:'Azul'},{c:'#22c55e',n:'Verde'},
     {c:'#eab308',n:'Amarillo'},{c:'#f97316',n:'Naranja'},{c:'#a855f7',n:'Morado'},{c:'#000000',n:'Negro'}
 ];
 
-// ---- IM├üGENES DE EQUIPAMIENTO (del proyecto FBT) ----
+// ---- IMÜGENES DE EQUIPAMIENTO (del proyecto FBT) ----
 
 
 // ---- TIPOS DE EQUIPAMIENTO ----
 const EJ_EQUIPMENT_TYPES = [
-    { key: 'ball',       name: 'Bal├│n',         w: 40, h: 43 },
+    { key: 'ball',       name: 'Balón',         w: 40, h: 43 },
     { key: 'cone',       name: 'Cono',           w: 36, h: 40 },
     { key: 'marker',     name: 'Marcador',       w: 36, h: 36 },
     { key: 'stickRed',   name: 'Pica Roja',      w: 28, h: 50 },
     { key: 'stickYellow',name: 'Pica Amarilla',  w: 28, h: 50 },
     { key: 'wall',       name: 'Barrera',        w: 40, h: 42 },
-    { key: 'smallGoal',  name: 'Mini Porter├¡a',  w: 50, h: 42 },
-    { key: 'goalSmall',  name: 'Porter├¡a S',     w: 55, h: 46 },
-    { key: 'goalMedium', name: 'Porter├¡a M',     w: 60, h: 50 },
-    { key: 'goalLarge',  name: 'Porter├¡a L',     w: 65, h: 55 },
-    { key: 'manikin',    name: 'Maniqu├¡',        w: 34, h: 48 }
+    { key: 'smallGoal',  name: 'Mini Portería',  w: 50, h: 42 },
+    { key: 'goalSmall',  name: 'Portería S',     w: 55, h: 46 },
+    { key: 'goalMedium', name: 'Portería M',     w: 60, h: 50 },
+    { key: 'goalLarge',  name: 'Portería L',     w: 65, h: 55 },
+    { key: 'manikin',    name: 'Maniquí',        w: 34, h: 48 }
 ];
 
-// ---- IM├üGENES DEL CAMPO ----
+// ---- IMÜGENES DEL CAMPO ----
 const EJ_FIELD_IMAGES = {
     full:  'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA4MDAgNTAwIj48cmVjdCB3aWR0aD0iODAwIiBoZWlnaHQ9IjUwMCIgZmlsbD0iIzFhNmIzMCIvPjxjbGlwUGF0aCBpZD0iZmMiPjxyZWN0IHg9IjIwIiB5PSIxNSIgd2lkdGg9Ijc2MCIgaGVpZ2h0PSI0NzAiIHJ4PSIxIi8+PC9jbGlwUGF0aD48ZyBjbGlwLXBhdGg9InVybCgjZmMpIj48cmVjdCB4PSIyMCIgeT0iMTUiIHdpZHRoPSI2MyIgaGVpZ2h0PSI0NzAiIGZpbGw9IiMyMDczMzIiLz48cmVjdCB4PSI4MyIgeT0iMTUiIHdpZHRoPSI2NCIgaGVpZ2h0PSI0NzAiIGZpbGw9IiMxYTZiMzAiLz48cmVjdCB4PSIxNDciIHk9IjE1IiB3aWR0aD0iNjMiIGhlaWdodD0iNDcwIiBmaWxsPSIjMjA3MzMyIi8+PHJlY3QgeD0iMjEwIiB5PSIxNSIgd2lkdGg9IjY0IiBoZWlnaHQ9IjQ3MCIgZmlsbD0iIzFhNmIzMCIvPjxyZWN0IHg9IjI3NCIgeT0iMTUiIHdpZHRoPSI2MyIgaGVpZ2h0PSI0NzAiIGZpbGw9IiMyMDczMzIiLz48cmVjdCB4PSIzMzciIHk9IjE1IiB3aWR0aD0iNjMiIGhlaWdodD0iNDcwIiBmaWxsPSIjMWE2YjMwIi8+PHJlY3QgeD0iNDAwIiB5PSIxNSIgd2lkdGg9IjY0IiBoZWlnaHQ9IjQ3MCIgZmlsbD0iIzIwNzMzMiIvPjxyZWN0IHg9IjQ2NCIgeT0iMTUiIHdpZHRoPSI2MyIgaGVpZ2h0PSI0NzAiIGZpbGw9IiMxYTZiMzAiLz48cmVjdCB4PSI1MjciIHk9IjE1IiB3aWR0aD0iNjMiIGhlaWdodD0iNDcwIiBmaWxsPSIjMjA3MzMyIi8+PHJlY3QgeD0iNTkwIiB5PSIxNSIgd2lkdGg9IjY0IiBoZWlnaHQ9IjQ3MCIgZmlsbD0iIzFhNmIzMCIvPjxyZWN0IHg9IjY1NCIgeT0iMTUiIHdpZHRoPSI2MyIgaGVpZ2h0PSI0NzAiIGZpbGw9IiMyMDczMzIiLz48cmVjdCB4PSI3MTciIHk9IjE1IiB3aWR0aD0iNjMiIGhlaWdodD0iNDcwIiBmaWxsPSIjMWE2YjMwIi8+PC9nPjxnIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxyZWN0IHg9IjIwIiB5PSIxNSIgd2lkdGg9Ijc2MCIgaGVpZ2h0PSI0NzAiIHJ4PSIxIi8+PGxpbmUgeDE9IjQwMCIgeTE9IjE1IiB4Mj0iNDAwIiB5Mj0iNDg1Ii8+PGNpcmNsZSBjeD0iNDAwIiBjeT0iMjUwIiByPSI2NSIvPjxyZWN0IHg9IjIwIiB5PSIxMzMiIHdpZHRoPSIxMDgiIGhlaWdodD0iMjM0Ii8+PHJlY3QgeD0iNjcyIiB5PSIxMzMiIHdpZHRoPSIxMDgiIGhlaWdodD0iMjM0Ii8+PHJlY3QgeD0iMjAiIHk9IjE5NSIgd2lkdGg9IjQwIiBoZWlnaHQ9IjExMCIvPjxyZWN0IHg9Ijc0MCIgeT0iMTk1IiB3aWR0aD0iNDAiIGhlaWdodD0iMTEwIi8+PHJlY3QgeD0iMTAiIHk9IjIyMCIgd2lkdGg9IjEwIiBoZWlnaHQ9IjYwIi8+PHJlY3QgeD0iNzgwIiB5PSIyMjAiIHdpZHRoPSIxMCIgaGVpZ2h0PSI2MCIvPjxwYXRoIGQ9Ik0xMjggMTk5IEE2NSA2NSAwIDAgMSAxMjggMzAxIi8+PHBhdGggZD0iTTY3MiAxOTkgQTY1IDY1IDAgMCAwIDY3MiAzMDEiLz48cGF0aCBkPSJNMjAgMjIgQTcgNyAwIDAgMSAyNyAxNSIvPjxwYXRoIGQ9Ik03NzMgMTUgQTcgNyAwIDAgMSA3ODAgMjIiLz48cGF0aCBkPSJNNzgwIDQ3OCBBNyA3IDAgMCAxIDc3MyA0ODUiLz48cGF0aCBkPSJNMjcgNDg1IEE3IDcgMCAwIDEgMjAgNDc4Ii8+PC9nPjxjaXJjbGUgY3g9IjQwMCIgY3k9IjI1MCIgcj0iMy41IiBmaWxsPSIjZmZmIi8+PGNpcmNsZSBjeD0iMTAwIiBjeT0iMjUwIiByPSIzLjUiIGZpbGw9IiNmZmYiLz48Y2lyY2xlIGN4PSI3MDAiIGN5PSIyNTAiIHI9IjMuNSIgZmlsbD0iI2ZmZiIvPjwvc3ZnPgo=',
    half:  'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA4MDAgNTAwIj4KPHJlY3Qgd2lkdGg9IjgwMCIgaGVpZ2h0PSI1MDAiIGZpbGw9IiMxYTZiMzAiLz4KPGNsaXBQYXRoIGlkPSJmaCI+PHJlY3QgeD0iMjAiIHk9IjE1IiB3aWR0aD0iNzYwIiBoZWlnaHQ9IjQ3MCIgcng9IjEiLz48L2NsaXBQYXRoPgo8ZyBjbGlwLXBhdGg9InVybCgjZmgpIj4KPHJlY3QgeD0iMjAiIHk9IjE1IiB3aWR0aD0iNjMiIGhlaWdodD0iNDcwIiBmaWxsPSIjMjA3MzMyIi8+CjxyZWN0IHg9IjgzIiB5PSIxNSIgd2lkdGg9IjY0IiBoZWlnaHQ9IjQ3MCIgZmlsbD0iIzFhNmIzMCIvPgo8cmVjdCB4PSIxNDciIHk9IjE1IiB3aWR0aD0iNjMiIGhlaWdodD0iNDcwIiBmaWxsPSIjMjA3MzMyIi8+CjxyZWN0IHg9IjIxMCIgeT0iMTUiIHdpZHRoPSI2NCIgaGVpZ2h0PSI0NzAiIGZpbGw9IiMxYTZiMzAiLz4KPHJlY3QgeD0iMjc0IiB5PSIxNSIgd2lkdGg9IjYzIiBoZWlnaHQ9IjQ3MCIgZmlsbD0iIzIwNzMzMiIvPgo8cmVjdCB4PSIzMzciIHk9IjE1IiB3aWR0aD0iNjMiIGhlaWdodD0iNDcwIiBmaWxsPSIjMWE2YjMwIi8+CjxyZWN0IHg9IjQwMCIgeT0iMTUiIHdpZHRoPSI2NCIgaGVpZ2h0PSI0NzAiIGZpbGw9IiMyMDczMzIiLz4KPHJlY3QgeD0iNDY0IiB5PSIxNSIgd2lkdGg9IjYzIiBoZWlnaHQ9IjQ3MCIgZmlsbD0iIzFhNmIzMCIvPgo8cmVjdCB4PSI1MjciIHk9IjE1IiB3aWR0aD0iNjMiIGhlaWdodD0iNDcwIiBmaWxsPSIjMjA3MzMyIi8+CjxyZWN0IHg9IjU5MCIgeT0iMTUiIHdpZHRoPSI2NCIgaGVpZ2h0PSI0NzAiIGZpbGw9IiMxYTZiMzAiLz4KPHJlY3QgeD0iNjU0IiB5PSIxNSIgd2lkdGg9IjYzIiBoZWlnaHQ9IjQ3MCIgZmlsbD0iIzIwNzMzMiIvPgo8cmVjdCB4PSI3MTciIHk9IjE1IiB3aWR0aD0iNjMiIGhlaWdodD0iNDcwIiBmaWxsPSIjMWE2YjMwIi8+CjwvZz4KPGcgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+CjwhLS0gRmllbGQgYm91bmRhcnkgLS0+CjxyZWN0IHg9IjIwIiB5PSIxNSIgd2lkdGg9Ijc2MCIgaGVpZ2h0PSI0NzAiIHJ4PSIxIi8+CjwhLS0gR29hbCAoNy4zMm0gd2lkZSwgYWJvdmUgZmllbGQgbGluZSkgLS0+CjxyZWN0IHg9IjM1OSIgeT0iMiIgd2lkdGg9IjgyIiBoZWlnaHQ9IjEzIi8+CjwhLS0gUGVuYWx0eSBhcmVhICg0MC4zMm0gd2lkZSB4IDE2LjVtIGRlZXApIC0tPgo8cmVjdCB4PSIxNzUiIHk9IjE1IiB3aWR0aD0iNDUwIiBoZWlnaHQ9IjE0OCIvPgo8IS0tIEdvYWwgYXJlYSAoMTguMzJtIHdpZGUgeCA1LjVtIGRlZXApIC0tPgo8cmVjdCB4PSIyOTgiIHk9IjE1IiB3aWR0aD0iMjA0IiBoZWlnaHQ9IjUwIi8+CjwhLS0gUGVuYWx0eSBhcmMgKG9ubHkgcGFydCBvdXRzaWRlIHBlbmFsdHkgYXJlYSwgZWxsaXB0aWNhbCkgLS0+CjxwYXRoIGQ9Ik0zMTkgMTYzIEExMDIgODIgMCAwIDAgNDgxIDE2MyIvPgo8IS0tIENlbnRlciBzZW1pY2lyY2xlIGF0IGJvdHRvbSBsaW5lIC0tPgo8cGF0aCBkPSJNMjk4IDQ4NSBBMTAyIDgyIDAgMCAxIDUwMiA0ODUiLz4KPCEtLSBDb3JuZXIgYXJjcyB0b3AgLS0+CjxwYXRoIGQ9Ik0yMCAyMiBBNyA3IDAgMCAxIDI3IDE1Ii8+CjxwYXRoIGQ9Ik03NzMgMTUgQTcgNyAwIDAgMSA3ODAgMjIiLz4KPC9nPgo8IS0tIFBlbmFsdHkgc3BvdCAtLT4KPGNpcmNsZSBjeD0iNDAwIiBjeT0iMTEzIiByPSIzLjUiIGZpbGw9IiNmZmYiLz4KPCEtLSBDZW50ZXIgc3BvdCBhdCBib3R0b20gLS0+CjxjaXJjbGUgY3g9IjQwMCIgY3k9IjQ4NSIgcj0iMy41IiBmaWxsPSIjZmZmIi8+Cjwvc3ZnPgo=',
@@ -108,7 +108,7 @@ const ejP = {
     expandedSection: 'players',
 nextId: 1,
 
-    // ---- ANIMACI├ôN ----
+    // ---- ANIMACIÓN ----
     animMode: false,
     frames: [],
     currentFrame: 0,
@@ -232,7 +232,7 @@ function ejRenderSVG() {
         </g>`;
     }
 
-    // L├¡neas y flechas
+    // Líneas y flechas
     for (const l of ejP.lines) {
         if (ejP.animMode && l.fromFrame !== undefined && (ejP.currentFrame < l.fromFrame || (l.toFrame !== undefined && ejP.currentFrame >= l.toFrame))) continue;
         const sel = l.id === ejP.selectedId;
@@ -279,7 +279,7 @@ function ejRenderSVG() {
         }
     }
 
-    // L├¡nea temporal mientras dibuja
+    // Línea temporal mientras dibuja
     if (ejP.tempShape) {
         const t = ejP.tempShape;
         const sw = ejP.lineWidth;
@@ -330,7 +330,7 @@ function ejRenderSVG() {
             ${p.showName && p.name ? `<text text-anchor="middle" y="${r+10}" fill="#ffffff" font-size="9" font-weight="600" font-family="system-ui" style="text-shadow:0 1px 2px rgba(0,0,0,.8)">${p.name.split(' ')[0]}</text>` : ''}
         </g>`;
     }
-// Fantasmas del frame anterior - no mostrar durante exportaci├│n
+// Fantasmas del frame anterior - no mostrar durante exportación
 if (ejP.animMode && !ejP._exporting && ejP.currentFrame > 0) {
     const prevF = ejP.frames[ejP.currentFrame - 1];
     if (prevF) {
@@ -343,7 +343,7 @@ if (ejP.animMode && !ejP._exporting && ejP.currentFrame > 0) {
     }
 }
 
-// Trayectorias del frame actual (modo animaci├│n) - no mostrar durante exportaci├│n
+// Trayectorias del frame actual (modo animación) - no mostrar durante exportación
 if (ejP.animMode && !ejP._exporting && ejP.frames[ejP.currentFrame]) {
     const trajs = ejP.frames[ejP.currentFrame].trajectories || [];
 for (const l of trajs) {
@@ -382,14 +382,14 @@ for (const l of trajs) {
 }
 
 // =============================================
-// POSICI├ôN DEL PUNTERO (mouse + touch)
+// POSICIÓN DEL PUNTERO (mouse + touch)
 // =============================================
 function ejGetPos(e) {
     const svg = document.getElementById('ej-svg');
     const rect = svg.getBoundingClientRect();
     const clientX = e.touches ? e.touches[0].clientX : (e.clientX ?? e.x);
     const clientY = e.touches ? e.touches[0].clientY : (e.clientY ?? e.y);
-    // Escalar seg├║n tama├▒o real vs l├│gico
+    // Escalar seg├║n tamaño real vs lógico
     const scaleX = ejP.svgW / rect.width;
     const scaleY = ejP.svgH / rect.height;
     return {
@@ -416,7 +416,7 @@ function ejSvgPointerDown(e) {
         return;
     }
 
-    // Click en punto de control de trayectoria curva (animaci├│n)
+    // Click en punto de control de trayectoria curva (animación)
     if (target.dataset.trajCtrl) {
         ejP.isDragging = true;
         ejP._trajCtrlId = target.dataset.trajCtrl;
@@ -530,7 +530,7 @@ return;
         let snapElem = null;
         let snapDist = 9999;
 
-        // Primero buscar bal├│n (prioridad m├íxima, radio peque├▒o)
+        // Primero buscar balón (prioridad m├íxima, radio pequeño)
         for (const eq of ejP.equipment) {
             if (eq.eqType !== 'ball') continue;
             const dx = pos.x - eq.x, dy = pos.y - eq.y;
@@ -546,7 +546,7 @@ return;
                 if (d < SNAP_EQUIP && d < snapDist) { snapElem = eq; snapDist = d; }
             }
         }
-        // Finalmente jugadores (solo si no hay bal├│n/equipamiento m├ís cerca)
+        // Finalmente jugadores (solo si no hay balón/equipamiento más cerca)
         for (const p of ejP.players) {
             const dx = pos.x - p.x, dy = pos.y - p.y;
             const d = Math.sqrt(dx*dx+dy*dy);
@@ -593,7 +593,7 @@ if (snapElem) {
 function ejSvgPointerMove(e) {
     const pos = ejGetPos(e);
 
-    // Arrastrar punto de control de curva (l├¡nea normal)
+    // Arrastrar punto de control de curva (línea normal)
     if (ejP.isDragging && ejP._ctrlId) {
         const id = parseInt(ejP._ctrlId);
         ejP.lines = ejP.lines.map(l => l.id === id ? { ...l, cx: pos.x, cy: pos.y } : l);
@@ -601,7 +601,7 @@ function ejSvgPointerMove(e) {
         return;
     }
 
-    // Arrastrar punto de control de trayectoria curva (animaci├│n)
+    // Arrastrar punto de control de trayectoria curva (animación)
     if (ejP.isDragging && ejP._trajCtrlId) {
         const id = parseInt(ejP._trajCtrlId);
         const frame = ejP.frames[ejP.currentFrame];
@@ -749,7 +749,7 @@ function ejDelete() {
     ejSaveHistory();
     const id = ejP.selectedId;
     
-    // En modo animaci├│n, las formas/l├¡neas con fromFrame no se borran, se les pone toFrame
+    // En modo animación, las formas/líneas con fromFrame no se borran, se les pone toFrame
     if (ejP.animMode) {
         var shape = ejP.shapes.find(s => s.id === id && s.fromFrame !== undefined);
         var line = ejP.lines.find(l => l.id === id && l.fromFrame !== undefined);
@@ -769,7 +769,7 @@ function ejDelete() {
         }
     }
     
-    // Borrado normal (sin fromFrame o modo est├ítico)
+    // Borrado normal (sin fromFrame o modo estático)
     ejP.players = ejP.players.filter(p => p.id !== id);
     ejP.lines   = ejP.lines.filter(l => l.id !== id);
     ejP.shapes  = ejP.shapes.filter(s => s.id !== id);
@@ -785,10 +785,10 @@ function ejElegirModo(modo) {
     if (overlay) overlay.style.display = 'none';
     
     if (modo === 'animado') {
-        // Activar modo animaci├│n directamente
+        // Activar modo animación directamente
         if (!ejP.animMode) ejToggleAnimMode();
     } else {
-        // Asegurar que animaci├│n est├í desactivada
+        // Asegurar que animación est├í desactivada
         if (ejP.animMode) {
             ejP.animMode = false;
             ejP.frames = [];
@@ -797,7 +797,7 @@ function ejElegirModo(modo) {
             if (bar) bar.style.display = 'none';
         }
     }
-    // Abrir secci├│n jugadores por defecto
+    // Abrir sección jugadores por defecto
     // Mostrar toolbar
     var tb = document.getElementById('ej-toolbar');
     if (tb) tb.style.display = '';
@@ -809,7 +809,7 @@ function ejNuevaPizarra() {
     ejSaveHistory();
     ejP.players = []; ejP.lines = []; ejP.shapes = []; ejP.texts = []; ejP.equipment = [];
     ejP.selectedId = null; ejP.playerCounts = {};
-    // Resetear animaci├│n
+    // Resetear animación
     ejFrameStop();
     ejP.animMode = false;
     ejP.frames = [];
@@ -826,7 +826,7 @@ function ejNuevaPizarra() {
     const lbl = document.getElementById('ej-pizarra-nombre-label');
     if (lbl) lbl.textContent = 'Pizarra libre';
     ejRenderSVG();
-    // Mostrar overlay de selecci├│n de modo
+    // Mostrar overlay de selección de modo
     var overlay = document.getElementById('ej-modo-overlay');
     if (overlay) overlay.style.display = 'flex';
     ejRenderToolbar();
@@ -856,7 +856,7 @@ function ejGetFieldSVG(type, color) {
     for (var i = 0; i < 12; i++) {
         s += '<rect x="'+(20+i*63.3)+'" y="15" width="63" height="470" fill="'+(i%2===0?c2:c1)+'"/>';
     }
-    // L├¡neas blancas seg├║n tipo
+    // Líneas blancas seg├║n tipo
     var L = 'fill="none" stroke="#fff" stroke-width="2"';
     s += '<g '+L+' stroke-linecap="round" stroke-linejoin="round">';
     s += '<rect x="20" y="15" width="760" height="470" rx="1"/>';
@@ -1066,10 +1066,10 @@ function ejCapturarParaFicha() {
     
     ejPrepararThumbParaPDF();
     
-    // Cambiar a la pesta├▒a Ficha
+    // Cambiar a la pestaña Ficha
     ejShowTab('ficha', document.querySelector('[onclick*="\'ficha\'"]'));
     
-    // Actualizar miniatura y v├¡deo en la ficha
+    // Actualizar miniatura y vídeo en la ficha
     setTimeout(() => {
         ejActualizarFichaMedia();
         const msg = document.getElementById('ej-ficha-msg');
@@ -1082,7 +1082,7 @@ function ejExportPNG() {
     ejRenderSVG();
     setTimeout(() => {
         const svg = document.getElementById('ej-svg');
-        // Clonar el SVG y ponerle dimensiones expl├¡citas
+        // Clonar el SVG y ponerle dimensiones explícitas
         const clone = svg.cloneNode(true);
         clone.setAttribute('width', ejP.svgW);
         clone.setAttribute('height', ejP.svgH);
@@ -1152,12 +1152,12 @@ function ejRenderToolbar() {
     const actionsOpen = ejP.expandedSection === 'actions';
 
     tb.innerHTML = `
-  <!-- BOT├ôN MODO ANIMACI├ôN (solo visible en modo animado) -->
+  <!-- BOTÓN MODO ANIMACIÓN (solo visible en modo animado) -->
 ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin-bottom:6px;width:100%;padding:8px;border-radius:6px;text-align:center;color:#fff;font-size:12px;font-weight:600">
-        ­ƒÄ¼ Modo Animaci├│n ON
+        🎬 Modo Animación ON
     </div>` : ''}
 
-    <!-- SECCI├ôN JUGADORES -->
+    <!-- SECCIÓN JUGADORES -->
     ${sectionHeader('players','ÔÜ¢','Jugadores')}
     ${playersOpen ? `
     <div class="ej-section-body">
@@ -1215,7 +1215,7 @@ ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin
                 + Jugador (rival)
             </button>
             <div class="ej-size-row">
-                <span>Tama├▒o nuevo:</span>
+                <span>Tamaño nuevo:</span>
                 ${['small','medium','large'].map(s=>
                     `<button class="ej-sz${ejP.selectedSize===s?' active':''}" onclick="ejP.selectedSize='${s}';ejRenderToolbar()">${s==='small'?'S':s==='medium'?'M':'L'}</button>`
                 ).join('')}
@@ -1251,8 +1251,8 @@ ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin
         </div>` : ''}
     </div>` : ''}
 
-    <!-- SECCI├ôN DIBUJO -->
-    ${sectionHeader('draw','Ô£Å´©Å','Dibujo y Campos')}
+    <!-- SECCIÓN DIBUJO -->
+    ${sectionHeader('draw','✏️','Dibujo y Campos')}
    
          ${drawOpen ? `
     <div class="ej-section-body">
@@ -1275,9 +1275,9 @@ ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin
                 {k:'pencil',  ico:'Ô£Å´©Å', lbl:'L├ípiz'},
                 {k:'arrow',   ico:'Ô×í´©Å', lbl:'Flecha'},
                 {k:'curved',  ico:'Ôåù´©Å', lbl:'Curva'},
-                {k:'line',    ico:'Ô×û', lbl:'L├¡nea'},
+                {k:'line',    ico:'Ô×û', lbl:'Línea'},
                 {k:'rect',    ico:'Ô¼£', lbl:'Rect.'},
-                {k:'ellipse', ico:'Ô¡ò', lbl:'C├¡rculo'},
+                {k:'ellipse', ico:'Ô¡ò', lbl:'Círculo'},
                 {k:'text',    ico:'T',  lbl:'Texto'}
             ].map(item=>`<button class="ej-btn-tool${t===item.k?' active':''}" onclick="ejSetTool('${item.k}')">${item.ico} ${item.lbl}</button>`).join('')}
         </div>
@@ -1285,7 +1285,7 @@ ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin
             <span>Grosor: <input type="range" min="1" max="10" value="${ejP.lineWidth}" oninput="ejP.lineWidth=+this.value" style="width:80px;vertical-align:middle;accent-color:#22c55e"></span>
             <label><input type="checkbox" ${ejP.lineDashed?'checked':''} onchange="ejP.lineDashed=this.checked;ejRenderToolbar()"> Discontinua</label>
         </div>
-        <label style="font-size:11px;color:#9ca3af">Color de l├¡nea:</label>
+        <label style="font-size:11px;color:#9ca3af">Color de línea:</label>
         <div class="ej-line-colors">
             ${EJ_LINE_COLORS.map(c=>`<div class="ej-lcolor${ejP.lineColor===c.c?' active':''}" style="background:${c.c}" title="${c.n}" onclick="ejP.lineColor='${c.c}';ejRenderToolbar()"></div>`).join('')}
         </div>
@@ -1294,8 +1294,8 @@ ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin
             <button class="ej-act-btn redo" onclick="ejRedo()" title="Rehacer (Ctrl+Y)">Ôå¬ Rehacer</button>
         </div>
     </div>` : ''}
-    <!-- SECCI├ôN MATERIAL -->
-    ${sectionHeader('material','­ƒÅà','Material')}
+    <!-- SECCIÓN MATERIAL -->
+    ${sectionHeader('material','🏅','Material')}
     ${ejP.expandedSection === 'material' ? `
     <div class="ej-section-body">
         <div class="ej-equipment-grid">
@@ -1314,7 +1314,7 @@ ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin
                 <button onclick="ejChangeEquipmentSize('down')" style="flex:1;padding:5px;font-size:11px;background:#1e293b;border:1px solid #334155;color:#f97316;border-radius:6px;cursor:pointer">ÔêÆ Menor</button>
                 <button onclick="ejChangeEquipmentSize('up')" style="flex:1;padding:5px;font-size:11px;background:#1e293b;border:1px solid #334155;color:#22c55e;border-radius:6px;cursor:pointer">+ Mayor</button>
             </div>
-            <div style="font-size:10px;color:#9ca3af;margin-bottom:4px">Rotaci├│n: ${selEquipment.rotation||0}┬░</div>
+            <div style="font-size:10px;color:#9ca3af;margin-bottom:4px">Rotación: ${selEquipment.rotation||0}┬░</div>
             <div style="display:flex;gap:3px;margin-bottom:4px">
                 <button onclick="ejRotateEquipment(-45)" style="flex:1;padding:4px;font-size:10px;background:#1e293b;border:1px solid #334155;color:#9ca3af;border-radius:4px;cursor:pointer">ÔêÆ45┬░</button>
                 <button onclick="ejRotateEquipment(-10)" style="flex:1;padding:4px;font-size:10px;background:#1e293b;border:1px solid #334155;color:#9ca3af;border-radius:4px;cursor:pointer">ÔêÆ10┬░</button>
@@ -1328,9 +1328,9 @@ ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin
 
     <!-- BOTONES PRINCIPALES -->
     <div style="margin-top:10px;display:flex;flex-direction:column;gap:6px">
-        ${ejP.animMode && ejEditandoId ? '' : '<button class="ej-act-btn purple full" onclick="ejCapturarParaFicha()" style="width:100%;padding:10px;background:#7c3aed;border:none;color:#fff;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600">­ƒôï Guardar ejercicio</button>'}
-        <button class="ej-act-btn green full" onclick="ejExportPNG()" style="width:100%;padding:8px;background:#0f172a;border:1px solid #334155;color:#94a3b8;border-radius:8px;cursor:pointer;font-size:12px">­ƒôÑ Exportar PNG</button>
-        <button class="ej-act-btn red full" onclick="ejDelete()" ${!sel?'disabled':''} style="width:100%;padding:8px;background:#7f1d1d;border:1px solid #dc2626;color:#fca5a5;border-radius:8px;cursor:pointer;font-size:12px">­ƒùæ Eliminar seleccionado</button>
+        ${ejP.animMode && ejEditandoId ? '' : '<button class="ej-act-btn purple full" onclick="ejCapturarParaFicha()" style="width:100%;padding:10px;background:#7c3aed;border:none;color:#fff;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600">💾 Guardar ejercicio</button>'}
+        <button class="ej-act-btn green full" onclick="ejExportPNG()" style="width:100%;padding:8px;background:#0f172a;border:1px solid #334155;color:#94a3b8;border-radius:8px;cursor:pointer;font-size:12px">­📥 Exportar PNG</button>
+        <button class="ej-act-btn red full" onclick="ejDelete()" ${!sel?'disabled':''} style="width:100%;padding:8px;background:#7f1d1d;border:1px solid #dc2626;color:#fca5a5;border-radius:8px;cursor:pointer;font-size:12px">🗑 Eliminar seleccionado</button>
     </div>
     `;
 }
@@ -1362,20 +1362,20 @@ root.innerHTML = `
                 <span style="font-size:14px">­ƒôï</span>
                 <span id="ej-pizarra-nombre-label" style="color:#93c5fd;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Pizarra libre</span>
             </div>
-            <button onclick="ejNuevaPizarra()" style="background:#0f172a;border:1px solid #475569;color:#94a3b8;padding:5px 14px;border-radius:6px;cursor:pointer;font-size:12px;white-space:nowrap;flex-shrink:0">Ô£ò Nueva pizarra</button>
+            <button onclick="ejNuevaPizarra()" style="background:#0f172a;border:1px solid #475569;color:#94a3b8;padding:5px 14px;border-radius:6px;cursor:pointer;font-size:12px;white-space:nowrap;flex-shrink:0">✕ Nueva pizarra</button>
 </div>
         <div id="ej-toolbar"></div>
         </div>
         <div id="ej-canvas-area" style="position:relative">
         <div id="ej-modo-overlay" style="position:absolute;inset:0;background:rgba(15,23,42,0.85);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:10;border-radius:8px;gap:20px">
-                <div style="color:#e2e8f0;font-size:18px;font-weight:700;text-align:center">┬┐Qu├® tipo de ejercicio quieres crear?</div>
+                <div style="color:#e2e8f0;font-size:18px;font-weight:700;text-align:center">┬┐Qué tipo de ejercicio quieres crear?</div>
                 <div style="display:flex;gap:16px">
                     <button onclick="ejElegirModo('estatico')" style="padding:16px 32px;background:#3b82f6;border:none;color:white;border-radius:10px;cursor:pointer;font-size:15px;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:6px">
-                        <span style="font-size:28px">­ƒû╝´©Å</span>
-                        Ejercicio est├ítico
+                        <span style="font-size:28px">🖼️</span>
+                        Ejercicio estático
                     </button>
                     <button onclick="ejElegirModo('animado')" style="padding:16px 32px;background:#7c3aed;border:none;color:white;border-radius:10px;cursor:pointer;font-size:15px;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:6px">
-                        <span style="font-size:28px">­ƒÄ¼</span>
+                        <span style="font-size:28px">🎬</span>
                         Ejercicio animado
                     </button>
                 </div>
@@ -1419,7 +1419,7 @@ root.innerHTML = `
 }
 
 // =============================================
-// SECCI├ôN FICHA DEL EJERCICIO
+// SECCIÓN FICHA DEL EJERCICIO
 // =============================================
 function ejBuildFicha() {
     const root = document.getElementById('ej-ficha-container');
@@ -1427,7 +1427,7 @@ function ejBuildFicha() {
     root.innerHTML = `
     <div class="ej-ficha-form" style="max-width:960px;margin:0 auto">
 
-        <!-- MEDIA: MINIATURA + V├ìDEO -->
+        <!-- MEDIA: MINIATURA + VÉDEO -->
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;background:#0f172a;border:1px solid #1e3a5f;border-radius:10px;overflow:hidden;margin-bottom:16px">
             <div style="padding:14px 16px;border-right:1px solid #1e3a5f">
                 <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">­ƒÄ¿ Miniatura</div>
@@ -1437,7 +1437,7 @@ function ejBuildFicha() {
                 
             </div>
             <div style="padding:14px 16px">
-                <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">­ƒÄ¼ V├¡deo animaci├│n</div>
+                <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">­ƒÄ¼ Vídeo animación</div>
                 <div id="ej-ficha-video" style="width:100%;aspect-ratio:8/5;border-radius:8px;background:#1e3a5f;display:flex;align-items:center;justify-content:center;overflow:hidden">
                     <span style="color:#475569;font-size:11px">Exporta MP4 desde la pizarra</span>
                 </div>
@@ -1454,7 +1454,7 @@ function ejBuildFicha() {
                     <div id="ej-nombre-lock-msg" style="display:none;font-size:10px;color:#64748b;margin-top:2px">­ƒöÆ El nombre no se puede cambiar</div>
                 </div>
                 <div class="ej-field">
-                    <label>Duraci├│n (min)</label>
+                    <label>Duración (min)</label>
                     <input type="number" id="ej-duracion" min="1" max="90" placeholder="15">
                 </div>
                 <div class="ej-field">
@@ -1476,25 +1476,25 @@ function ejBuildFicha() {
 
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:10px">
                 <div class="ej-field">
-                    <label>Categor├¡a</label>
+                    <label>Categoría</label>
                     <select id="ej-categoria">
                         <option value="">-- Seleccionar --</option>
-                        <option>T├®cnica individual</option>
-                        <option>Posesi├│n</option>
+                        <option>Técnica individual</option>
+                        <option>Posesión</option>
                         <option>Pressing</option>
                         <option>Ataque posicional</option>
                         <option>Defensa</option>
                         <option>Transiciones</option>
-                        <option>Porter├¡a</option>
-                        <option>F├¡sico</option>
-                        <option>T├íctica</option>
+                        <option>Portería</option>
+                        <option>Físico</option>
+                        <option>Táctica</option>
                     </select>
                 </div>
                 <div class="ej-field">
-                    <label>Categor├¡a de edad</label>
+                    <label>Categoría de edad</label>
                     <select id="ej-edad">
                         <option value="">-- Todas --</option>
-                        <option>Prebenjam├¡n</option><option>Benjam├¡n</option><option>Alev├¡n</option>
+                        <option>Prebenjamín</option><option>Benjamín</option><option>Alevín</option>
                         <option>Infantil</option><option>Cadete</option><option>Juvenil</option>
                         <option>Senior</option>
                     </select>
@@ -1504,41 +1504,41 @@ function ejBuildFicha() {
                     <select id="ej-tema">
                         <option value="">-- Seleccionar --</option>
                         <option>Calentamiento</option>
-                        <option>Cambios de orientaci├│n</option>
+                        <option>Cambios de orientación</option>
                         <option>Centros laterales</option>
                         <option>Contraataque</option>
                         <option>Defensa en bloque bajo</option>
                         <option>Defensa en inferioridad</option>
                         <option>Duelos</option>
-                        <option>Finalizaci├│n</option>
-                        <option>F├¡sico-T├®cnico</option>
-                        <option>Juego de posici├│n</option>
+                        <option>Finalización</option>
+                        <option>Físico-Técnico</option>
+                        <option>Juego de posición</option>
                         <option>Juego interior</option>
                         <option>Juegos L├║dicos</option>
                         <option>Partidos</option>
                         <option>Porteros</option>
                         <option>Posesiones</option>
-                        <option>Presi├│n</option>
+                        <option>Presión</option>
                         <option>Press perdida</option>
-                        <option>Progresi├│n en el juego</option>
+                        <option>Progresión en el juego</option>
                         <option>Rondos</option>
                         <option>Ruedas de pases</option>
-                        <option>Salida de bal├│n</option>
+                        <option>Salida de balón</option>
                         <option>Tercer hombre</option>
-                        <option>Trabajo t├íctico</option>
+                        <option>Trabajo táctico</option>
                         <option>Transiciones</option>
-                        <option>T├®cnica individual</option>
+                        <option>Técnica individual</option>
                     </select>
                 </div>
                 <div class="ej-field">
                     <label>Fase de juego</label>
                     <select id="ej-fase">
                         <option value="">-- Todas --</option>
-                        <option>Organizaci├│n ofensiva</option>
-                        <option>Organizaci├│n defensiva</option>
-                        <option>Transici├│n ataque</option>
-                        <option>Transici├│n defensa</option>
-                        <option>Bal├│n parado</option>
+                        <option>Organización ofensiva</option>
+                        <option>Organización defensiva</option>
+                        <option>Transición ataque</option>
+                        <option>Transición defensa</option>
+                        <option>Balón parado</option>
                     </select>
                 </div>
             </div>
@@ -1573,17 +1573,17 @@ function ejBuildFicha() {
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
                 <div class="ej-field">
                     <label>Objetivos</label>
-                    <textarea id="ej-objetivos" rows="2" placeholder="┬┐Qu├® trabaja este ejercicio?"></textarea>
+                    <textarea id="ej-objetivos" rows="2" placeholder="┬┐Qué trabaja este ejercicio?"></textarea>
                 </div>
                 <div class="ej-field">
-                    <label>Descripci├│n / Desarrollo</label>
-                    <textarea id="ej-descripcion" rows="2" placeholder="Describe c├│mo se ejecuta..."></textarea>
+                    <label>Descripción / Desarrollo</label>
+                    <textarea id="ej-descripcion" rows="2" placeholder="Describe cómo se ejecuta..."></textarea>
                 </div>
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
                 <div class="ej-field">
                     <label>Variantes</label>
-                    <textarea id="ej-variantes" rows="2" placeholder="Versiones m├ís f├íciles o dif├¡ciles..."></textarea>
+                    <textarea id="ej-variantes" rows="2" placeholder="Versiones más fáciles o difíciles..."></textarea>
                 </div>
                 <div class="ej-field">
                     <label>Notas del entrenador</label>
@@ -1633,7 +1633,7 @@ function ejActualizarFichaMedia() {
             if (svg) { svg.setAttribute('width','100%'); svg.setAttribute('height','100%'); svg.style.borderRadius='8px'; svg.style.display='block'; }
         }
     }
-    // V├¡deo
+    // Vídeo
     const videoContainer = document.getElementById('ej-ficha-video');
     const videoBtns = document.getElementById('ej-ficha-video-btns');
     const url = ejP._lastVideoUrl;
@@ -1858,7 +1858,7 @@ function ejGenerarPDF(nombre) {
     for (let i = 1; i <= pageCount; i++) {
         doc.setPage(i);
 
-        // L├¡nea fina
+        // Línea fina
         doc.setDrawColor(...borderC);
         doc.setLineWidth(0.2);
         doc.line(mL, H - 12, W - mR, H - 12);
@@ -2154,13 +2154,13 @@ let thumbnailSvg = window.ejThumbnailPendiente || null;
                 }
             }
         }
-        // Actualizar cach├® local para que el Banco refleje los cambios al instante
+        // Actualizar caché local para que el Banco refleje los cambios al instante
         if (res && res[0]) {
             const idx = ejBancoCache.findIndex(x => x.id === res[0].id);
             if (idx >= 0) ejBancoCache[idx] = { ...ejBancoCache[idx], ...res[0] };
             else ejBancoCache.unshift(res[0]);
         }
-        var videoAviso = ejP.animMode ? '<br><span style="color:#f97316">ÔÜá´©Å Si has hecho cambios en la animaci├│n, pulsa MP4 en la pizarra para actualizar el v├¡deo.</span>' : '';
+        var videoAviso = ejP.animMode ? '<br><span style="color:#f97316">ÔÜá´©Å Si has hecho cambios en la animación, pulsa MP4 en la pizarra para actualizar el vídeo.</span>' : '';
         setTimeout(() => { if (msg) msg.innerHTML = ''; }, 6000);
     } catch(err){
         console.error(err);
@@ -2188,14 +2188,14 @@ function ejLimpiarFicha() {
 }
 
 // =============================================
-// SECCI├ôN BANCO DE EJERCICIOS
+// SECCIÓN BANCO DE EJERCICIOS
 // =============================================
 function ejBuildBanco() {
     const root = document.getElementById('ej-banco-container');
     if (!root) return;
     root.innerHTML = `
     <div class="ej-banco-wrap">
-        <h3 class="ej-ficha-title" style="margin-bottom:12px">­ƒùé Banco de ejercicios</h3>
+        <h3 class="ej-ficha-title" style="margin-bottom:12px">🗂 Banco de ejercicios</h3>
         <div style="background:#0f172a;border:1px solid #1e3a5f;border-radius:10px;padding:12px 14px;margin-bottom:14px">
             <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
                 <input type="text" id="ej-search" placeholder="­ƒöì Buscar por nombre..." oninput="ejBancoSearch()" style="flex:1">
@@ -2204,25 +2204,25 @@ function ejBuildBanco() {
             <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
                 <select id="ej-filter-tema" onchange="ejBancoSearch()" style="padding:4px 8px;font-size:11px;background:#1e293b;border:1px solid #334155;color:#cbd5e1;border-radius:6px;cursor:pointer">
                     <option value="">Tema Ôû¥</option>
-                    <option>Calentamiento</option><option>Cambios de orientaci├│n</option><option>Centros laterales</option>
+                    <option>Calentamiento</option><option>Cambios de orientación</option><option>Centros laterales</option>
                     <option>Contraataque</option><option>Defensa en bloque bajo</option><option>Defensa en inferioridad</option>
-                    <option>Duelos</option><option>Finalizaci├│n</option><option>F├¡sico-T├®cnico</option>
-                    <option>Juego de posici├│n</option><option>Juego interior</option><option>Juegos L├║dicos</option>
+                    <option>Duelos</option><option>Finalización</option><option>Físico-Técnico</option>
+                    <option>Juego de posición</option><option>Juego interior</option><option>Juegos L├║dicos</option>
                     <option>Partidos</option><option>Porteros</option><option>Posesiones</option>
-                    <option>Presi├│n</option><option>Press perdida</option><option>Progresi├│n en el juego</option>
-                    <option>Rondos</option><option>Ruedas de pases</option><option>Salida de bal├│n</option>
-                    <option>Tercer hombre</option><option>Trabajo t├íctico</option><option>Transiciones</option>
-                    <option>T├®cnica individual</option>
+                    <option>Presión</option><option>Press perdida</option><option>Progresión en el juego</option>
+                    <option>Rondos</option><option>Ruedas de pases</option><option>Salida de balón</option>
+                    <option>Tercer hombre</option><option>Trabajo táctico</option><option>Transiciones</option>
+                    <option>Técnica individual</option>
                 </select>
                 <select id="ej-filter-cat" onchange="ejBancoSearch()" style="padding:4px 8px;font-size:11px;background:#1e293b;border:1px solid #334155;color:#cbd5e1;border-radius:6px;cursor:pointer">
-                    <option value="">Categor├¡a Ôû¥</option>
-                    <option>T├®cnica individual</option><option>Posesi├│n</option><option>Pressing</option>
+                    <option value="">Categoría Ôû¥</option>
+                    <option>Técnica individual</option><option>Posesión</option><option>Pressing</option>
                     <option>Ataque posicional</option><option>Defensa</option><option>Transiciones</option>
-                    <option>Porter├¡a</option><option>F├¡sico</option><option>T├íctica</option>
+                    <option>Portería</option><option>Físico</option><option>Táctica</option>
                 </select>
                 <select id="ej-filter-edad" onchange="ejBancoSearch()" style="padding:4px 8px;font-size:11px;background:#1e293b;border:1px solid #334155;color:#cbd5e1;border-radius:6px;cursor:pointer">
                     <option value="">Edad Ôû¥</option>
-                    <option>Prebenjam├¡n</option><option>Benjam├¡n</option><option>Alev├¡n</option>
+                    <option>Prebenjamín</option><option>Benjamín</option><option>Alevín</option>
                     <option>Infantil</option><option>Cadete</option><option>Juvenil</option><option>Senior</option>
                 </select>
                 <select id="ej-filter-dif" onchange="ejBancoSearch()" style="padding:4px 8px;font-size:11px;background:#1e293b;border:1px solid #334155;color:#cbd5e1;border-radius:6px;cursor:pointer">
@@ -2232,8 +2232,8 @@ function ejBuildBanco() {
                 </select>
                 <select id="ej-filter-fase" onchange="ejBancoSearch()" style="padding:4px 8px;font-size:11px;background:#1e293b;border:1px solid #334155;color:#cbd5e1;border-radius:6px;cursor:pointer">
                     <option value="">Fase Ôû¥</option>
-                    <option>Organizaci├│n ofensiva</option><option>Organizaci├│n defensiva</option>
-                    <option>Transici├│n ataque</option><option>Transici├│n defensa</option><option>Bal├│n parado</option>
+                    <option>Organización ofensiva</option><option>Organización defensiva</option>
+                    <option>Transición ataque</option><option>Transición defensa</option><option>Balón parado</option>
                 </select>
                 <input type="number" id="ej-filter-jug" placeholder="Jugadores" min="1" max="30" oninput="ejBancoSearch()" style="width:75px;padding:4px 8px;font-size:11px;background:#1e293b;border:1px solid #334155;color:#cbd5e1;border-radius:6px">
                 <input type="number" id="ej-filter-port" placeholder="Porteros" min="0" max="4" oninput="ejBancoSearch()" style="width:70px;padding:4px 8px;font-size:11px;background:#1e293b;border:1px solid #334155;color:#cbd5e1;border-radius:6px">
@@ -2363,7 +2363,7 @@ function ejBancoRender(list) {
 
     grid.innerHTML = html;
 
-    // Convertir SVGs a Blob URLs (fiable con cualquier tama├▒o)
+    // Convertir SVGs a Blob URLs (fiable con cualquier tamaño)
     setTimeout(function() {
         var imgs = grid.querySelectorAll('img[data-svg-idx]');
         for (var i = 0; i < imgs.length; i++) {
@@ -2433,7 +2433,7 @@ async function ejBancoCargar(id) {
             ejP.selectedId = null;
             ejEditandoId = data.id;
             ejP._lastVideoUrl = data.animation_url || null;
-            // Restaurar animaci├│n si existe
+            // Restaurar animación si existe
             if (data.board_data.animFrames && data.board_data.animFrames.length > 0) {
                 ejP.frames = data.board_data.animFrames;
                 ejP.currentFrame = 0;
@@ -2526,7 +2526,7 @@ function ejAbrirModal(id) {
         <div style="padding:20px 24px 16px;border-bottom:1px solid #334155;display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
             <div>
                 <h2 style="color:#f8fafc;margin:0 0 8px;font-size:20px;font-weight:700">${e.name}${difBadge}</h2>
-                <div style="display:flex;gap:6px;flex-wrap:wrap;font-size:12px;color:#94a3b8">${metaTags || '<span style="color:#475569">Sin categor├¡a</span>'}</div>
+                <div style="display:flex;gap:6px;flex-wrap:wrap;font-size:12px;color:#94a3b8">${metaTags || '<span style="color:#475569">Sin categoría</span>'}</div>
             </div>
             <button id="ej-modal-close" style="background:#334155;border:none;color:#94a3b8;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:16px;flex-shrink:0;display:flex;align-items:center;justify-content:center">Ô£ò</button>
         </div>
@@ -2536,7 +2536,7 @@ function ejAbrirModal(id) {
 
             <!-- Columna izquierda: dibujo -->
             <div style="padding:20px 12px 20px 24px;border-right:1px solid #334155">
-                <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">­ƒÄ¿ Pizarra t├íctica</div>
+                <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">­ƒÄ¿ Pizarra táctica</div>
                 <div id="ej-modal-svg-container" style="width:100%;aspect-ratio:8/5;overflow:hidden;border-radius:10px;background:#0f4c2a;margin-bottom:14px;box-shadow:inset 0 2px 8px rgba(0,0,0,.4)">
                     <div style="color:#475569;font-size:12px;display:flex;align-items:center;justify-content:center;height:100%">Sin dibujo guardado</div>
                 </div>
@@ -2545,7 +2545,7 @@ function ejAbrirModal(id) {
                 </button>
             ${e.animation_url ? `
                 <div style="margin-top:10px">
-                    <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">­ƒÄ¼ Animaci├│n del ejercicio</div>
+                    <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">­ƒÄ¼ Animación del ejercicio</div>
                     <video src="${e.animation_url}" controls playsinline loop style="width:100%;border-radius:8px;background:#000"></video>
 <a href="https://toplidercoach.com/wp-content/uploads/ejercicios/download-video.php?url=${encodeURIComponent(e.animation_url)}" target="_blank" style="display:block;width:100%;margin-top:8px;padding:10px;background:#f97316;border:none;color:#fff;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;text-align:center;text-decoration:none">
                     </a>
@@ -2555,11 +2555,11 @@ function ejAbrirModal(id) {
             <div style="padding:20px 24px 20px 12px;display:flex;flex-direction:column;gap:8px">
                 <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px">­ƒôä Detalles del ejercicio</div>
                 ${infoBlock('Objetivos', '­ƒÄ»', e.objectives)}
-                ${infoBlock('Descripci├│n', '­ƒôØ', e.description)}
+                ${infoBlock('Descripción', '­ƒôØ', e.description)}
                 ${infoBlock('Variantes', '­ƒöÇ', e.variants)}
                 ${infoBlock('Notas del entrenador', '­ƒÆ¼', e.coach_notes)}
                 ${!e.objectives && !e.description && !e.variants && !e.coach_notes
-                    ? '<div style="color:#475569;font-size:13px;padding:20px 0">Sin informaci├│n adicional.</div>'
+                    ? '<div style="color:#475569;font-size:13px;padding:20px 0">Sin información adicional.</div>'
                     : ''}
             </div>
         </div>
@@ -2604,7 +2604,7 @@ function ejAbrirModal(id) {
     });
 }
 // =============================================
-// SISTEMA DE ANIMACI├ôN POR FRAMES
+// SISTEMA DE ANIMACIÓN POR FRAMES
 // =============================================
 
 function ejToggleAnimMode() {
@@ -2616,7 +2616,7 @@ function ejToggleAnimMode() {
         ejP.currentFrame = 0;
         ejP.isPlaying = false;
     } else {
-        // Al desactivar: parar reproducci├│n
+        // Al desactivar: parar reproducción
         ejFrameStop();
         ejP.frames = [];
         ejP.currentFrame = 0;
@@ -2660,7 +2660,7 @@ function ejFrameSaveCurrent() {
     ejP.frames[ejP.currentFrame] = snap;
 }
 
-// A├▒ade un nuevo frame (clona posiciones del frame actual)
+// Añade un nuevo frame (clona posiciones del frame actual)
 function ejFrameAdd() {
     if (!ejP.animMode) return;
     if (ejP.animMode) ejP._videoDesactualizado = true;
@@ -2683,7 +2683,7 @@ function ejFrameAdd() {
     ejRenderTimeline();
 }
 
-// Elimina el ├║ltimo frame
+// Elimina el último frame
 function ejFrameDeleteLast() {
     if (!ejP.animMode || ejP.frames.length <= 1) return;
     ejConfirm('¿Eliminar el último frame?', () => {
@@ -2705,7 +2705,7 @@ function ejFrameUndoTraj() {
     ejRenderSVG();
     ejRenderTimeline();
 }
-// Navega a un frame espec├¡fico
+// Navega a un frame específico
 function ejFrameGo(idx) {
     if (!ejP.animMode || idx < 0 || idx >= ejP.frames.length) return;
     if (ejP.isPlaying) ejFrameStop();
@@ -2725,7 +2725,7 @@ function ejFrameNext() {
     if (ejP.currentFrame < ejP.frames.length - 1) ejFrameGo(ejP.currentFrame + 1);
 }
 
-// Reproducci├│n
+// Reproducción
 function ejFramePlay(fromFrame) {
     if (!ejP.animMode || ejP.frames.length < 2) return;
     ejFrameSaveCurrent();
@@ -2768,7 +2768,7 @@ function ejCatmullRom(p0, p1, p2, p3, t) {
     var linear = p1 + (p2 - p1) * t;
     return linear * 0.7 + spline * 0.3;
 }
-// Loop de animaci├│n con interpolaci├│n suave
+// Loop de animación con interpolación suave
 function ejFrameAnimate(now) {
     if (!ejP.isPlaying) return;
     const dt = now - ejP._animLastTime;
@@ -2797,7 +2797,7 @@ function ejFrameAnimate(now) {
     if (!fA || !fB) { ejFrameStop(); return; }
 
     const t = ejP._animProgress;
-    // Ease in-out cuadr├ítico
+    // Ease in-out cuadrático
     const ease = t;
 
     // Interpolar jugadores (siguiendo trayectoria freehand si existe)
@@ -2943,7 +2943,7 @@ function ejRenderTimeline() {
         <span style="color:#64748b;font-size:11px;white-space:nowrap">Frame ${cur+1}/${total}</span>
         ${ejEditandoId ? `<button onclick="ejGuardarYExportar()" style="background:#22c55e;border:none;color:#fff;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600">${ejP._exportingVideo ? 'ÔÅ│ Generando...' : '­ƒÆ¥ Guardar cambios'}</button>` : `<button onclick="ejExportarAnimacionMP4()" style="background:#f97316;border:none;color:#fff;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600">${ejP._exportingVideo ? 'ÔÅ│ Generando...' : '­ƒÄ¼ MP4'}</button>`}
     </div>
-    <div id="ej-anim-msg" style="font-size:11px;color:#9ca3af;margin-top:4px;text-align:center">${ejP._exportingVideo ? 'ÔÅ│ Generando v├¡deo... (no toques nada)' : ejP._lastVideoUrl ? '<span style="color:#22c55e">Ô£à V├¡deo MP4 guardado</span> ÔÇö <a href="'+ejP._lastVideoUrl+'" target="_blank" style="color:#93c5fd;text-decoration:underline">Ver v├¡deo ÔûÂ</a> ┬À <a href="https://toplidercoach.com/wp-content/uploads/ejercicios/download-video.php?url='+encodeURIComponent(ejP._lastVideoUrl)+'" target="_blank" style="color:#f97316;text-decoration:underline">­ƒôÑ Descargar</a>' : ''}</div>`;
+    <div id="ej-anim-msg" style="font-size:11px;color:#9ca3af;margin-top:4px;text-align:center">${ejP._exportingVideo ? 'ÔÅ│ Generando vídeo... (no toques nada)' : ejP._lastVideoUrl ? '<span style="color:#22c55e">Ô£à Vídeo MP4 guardado</span> ÔÇö <a href="'+ejP._lastVideoUrl+'" target="_blank" style="color:#93c5fd;text-decoration:underline">Ver vídeo ÔûÂ</a> ┬À <a href="https://toplidercoach.com/wp-content/uploads/ejercicios/download-video.php?url='+encodeURIComponent(ejP._lastVideoUrl)+'" target="_blank" style="color:#f97316;text-decoration:underline">­ƒôÑ Descargar</a>' : ''}</div>`;
 }
 async function ejCargarPlantilla() {
     try {
@@ -3038,18 +3038,18 @@ function ejColocarJugadorPlantilla(idx) {
         var res = await supabaseClient.from('custom_exercises').update(updateData).eq('id', ejEditandoId).select();
         if (res.error) throw res.error;
         
-        // Actualizar cach├®
+        // Actualizar caché
         if (res.data && res.data[0]) {
             var idx = ejBancoCache.findIndex(x => x.id === ejEditandoId);
             if (idx >= 0) ejBancoCache[idx] = { ...ejBancoCache[idx], ...res.data[0] };
         }
         
-        if (msgEl) msgEl.innerHTML = '<span style="color:#22c55e">Ô£à Ejercicio guardado. Generando v├¡deo...</span>';
+        if (msgEl) msgEl.innerHTML = '<span style="color:#22c55e">Ô£à Ejercicio guardado. Generando vídeo...</span>';
         
         // 3. Exportar MP4
         await ejExportarAnimacionMP4();
         
-        // 4. Actualizar ficha con nuevo v├¡deo
+        // 4. Actualizar ficha con nuevo vídeo
         window.ejThumbnailPendiente = thumbnailSvg;
         ejPrepararThumbParaPDF();
         setTimeout(function() { ejActualizarFichaMedia(); }, 500);
@@ -3071,7 +3071,7 @@ async function ejExportarAnimacionMP4() {
     const msg = document.getElementById('ej-anim-msg');
     ejP._exportingVideo = true; ejRenderTimeline();
     var progDiv = document.getElementById('ej-anim-msg');
-    if (progDiv) progDiv.innerHTML = '<span style="color:#f97316;font-weight:600">ÔÅ│ Generando v├¡deo MP4... no toques nada, puede tardar hasta 1 minuto</span>';
+    if (progDiv) progDiv.innerHTML = '<span style="color:#f97316;font-weight:600">ÔÅ│ Generando vídeo MP4... no toques nada, puede tardar hasta 1 minuto</span>';
 
     const svg = document.getElementById('ej-svg');
     const W = ejP.svgW;
@@ -3083,7 +3083,7 @@ async function ejExportarAnimacionMP4() {
     canvas.height = H * 2;
     const ctx = canvas.getContext('2d');
 
-    // Configurar grabaci├│n
+    // Configurar grabación
     const stream = canvas.captureStream(30);
     let mimeType = 'video/webm;codecs=vp9';
     if (!MediaRecorder.isTypeSupported(mimeType)) {
@@ -3121,7 +3121,7 @@ async function ejExportarAnimacionMP4() {
         });
     }
 
-    // Iniciar grabaci├│n
+    // Iniciar grabación
     recorder.start();
 
     const FPS = 30;
@@ -3245,7 +3245,7 @@ async function ejExportarAnimacionMP4() {
     await renderSVGToCanvas();
     await new Promise(r => setTimeout(r, 200));
 
-    console.log('Animaci├│n renderizada, parando grabaci├│n...'); // Parar grabaci├│n y esperar a que termine
+    console.log('Animación renderizada, parando grabación...'); // Parar grabación y esperar a que termine
     recorder.onerror = (e) => { console.error('Recorder error:', e); }; const recordingDone = new Promise(resolve => { recorder.onstop = () => { console.log('Recorder parado OK'); resolve(); }; });
     recorder.stop();
     await recordingDone;
@@ -3259,18 +3259,18 @@ async function ejExportarAnimacionMP4() {
 
     console.log('Video generado, chunks:', chunks.length); if (msg) msg.textContent = 'Subiendo al servidor y convirtiendo a MP4...';
 
-    const blob = new Blob(chunks, { type: 'video/webm' }); console.log('Blob creado, tama├▒o:', blob.size, 'bytes');
-   console.log('Iniciando conversi├│n a base64...');
+    const blob = new Blob(chunks, { type: 'video/webm' }); console.log('Blob creado, tamaño:', blob.size, 'bytes');
+   console.log('Iniciando conversión a base64...');
     var progDiv2 = document.getElementById('ej-anim-msg');
     if (progDiv2) progDiv2.innerHTML = '<span style="color:#3b82f6;font-weight:600">­ƒôñ Subiendo al servidor y convirtiendo a MP4...</span>';
     try {
         const base64 = await new Promise((resolve, reject) => {
             const rd = new FileReader();
             rd.onload = () => { console.log('Base64 OK'); resolve(rd.result.split(',')[1]); };
-            rd.onerror = () => reject(new Error('FileReader fall├│'));
+            rd.onerror = () => reject(new Error('FileReader falló'));
             rd.readAsDataURL(blob);
         });
-        console.log('Enviando al servidor, tama├▒o:', base64.length);
+        console.log('Enviando al servidor, tamaño:', base64.length);
         const res = await fetch('https://toplidercoach.com/wp-content/uploads/ejercicios/upload-video.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer toplider_thumb_2026' },
@@ -3281,7 +3281,7 @@ async function ejExportarAnimacionMP4() {
             await supabaseClient.from('custom_exercises').update({ animation_url: data.url }).eq('id', ejEditandoId);
             const idx = ejBancoCache.findIndex(x => x.id === ejEditandoId);
             if (idx >= 0) ejBancoCache[idx].animation_url = data.url;
-            ejP._exportingVideo = false; ejP._lastVideoUrl = data.url; ejRenderTimeline(); const msgFinal = document.getElementById('ej-anim-msg'); if (msgFinal) msgFinal.innerHTML = 'Ô£à V├¡deo MP4 guardado ÔÇö <a href="' + data.url + '" target="_blank" style="color:#93c5fd;text-decoration:underline">Ver v├¡deo ÔûÂ</a>';
+            ejP._exportingVideo = false; ejP._lastVideoUrl = data.url; ejRenderTimeline(); const msgFinal = document.getElementById('ej-anim-msg'); if (msgFinal) msgFinal.innerHTML = 'Ô£à Vídeo MP4 guardado ÔÇö <a href="' + data.url + '" target="_blank" style="color:#93c5fd;text-decoration:underline">Ver vídeo ÔûÂ</a>';
             ejP._videoDesactualizado = false;
         } else {
             ejP._exportingVideo = false; ejRenderTimeline(); const msgErr = document.getElementById('ej-anim-msg'); if (msgErr) msgErr.textContent = 'ÔØî Error: ' + (data.error || 'desconocido');
@@ -3324,11 +3324,11 @@ function ejInit() {
 
     root.innerHTML = `
     <div class="ej-module">
-        <!-- Sub-navegaci├│n interna -->
+        <!-- Sub-navegación interna -->
         <div class="ej-nav">
-            <button class="ej-nav-btn active" onclick="ejShowTab('pizarra',this)">­ƒÄ» Pizarra</button>
-            <button class="ej-nav-btn" onclick="ejShowTab('ficha',this)">­ƒôï Ficha</button>
-            <button class="ej-nav-btn" onclick="ejShowTab('banco',this)">­ƒùé Banco</button>
+            <button class="ej-nav-btn active" onclick="ejShowTab('pizarra',this)">🎯 Pizarra</button>
+            <button class="ej-nav-btn" onclick="ejShowTab('ficha',this)">📋 Ficha</button>
+            <button class="ej-nav-btn" onclick="ejShowTab('banco',this)">🗂 Banco</button>
         </div>
         <div id="ej-tab-pizarra" class="ej-tab active">
             <div id="ej-pizarra-container"></div>
@@ -3355,6 +3355,6 @@ function ejShowTab(tab, btn) {
 }
 
 // =============================================
-// REGISTRO DEL M├ôDULO
+// REGISTRO DEL MÓDULO
 // =============================================
 registrarModulo('pizarra', ejInit);
