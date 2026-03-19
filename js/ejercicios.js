@@ -498,6 +498,7 @@ function ejSvgPointerDown(e) {
                 showNumber: ejP.showNumbers,
                 hasVest: ejP.hasVest, vestColor: ejP.vestColor
             });
+            ejP.activeTool = 'select';
         }
         ejP.selectedId = id;
         ejRenderSVG();
@@ -3096,14 +3097,14 @@ async function ejExportarAnimacionMP4() {
     const ctx = canvas.getContext('2d');
 
     // Configurar grabación
-    const stream = canvas.captureStream(30);
+    const stream = canvas.captureStream(60);
     let mimeType = 'video/webm;codecs=vp9';
     if (!MediaRecorder.isTypeSupported(mimeType)) {
         mimeType = 'video/webm';
     }
     const recorder = new MediaRecorder(stream, {
         mimeType,
-        videoBitsPerSecond: 5000000
+        videoBitsPerSecond: 10000000
     });
     const chunks = [];
     recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
@@ -3135,10 +3136,10 @@ async function ejExportarAnimacionMP4() {
     // Iniciar grabación
     recorder.start();
 
-    const FPS = 30;
+    const FPS = 60;
     const frameDuration = ejP.playSpeed;
-    const framesPerTransition = Math.max(24, Math.round((frameDuration * 1.5 / 1000) * FPS));
-    const holdFrames = 10;
+    const framesPerTransition = Math.max(40, Math.round((frameDuration * 1.5 / 1000) * FPS));
+    const holdFrames = 15;
     var totalSegs = ejP.frames.length - 1;
     var totalVideoFrames = totalSegs * framesPerTransition;
     var easeZone = 0.15;
