@@ -2482,7 +2482,7 @@ async function ejBancoCargar(id) {
 // =============================================
 // MODAL FICHA EJERCICIO
 // =============================================
-function ejAbrirModal(id) 
+function ejAbrirModal(id) {
     const e = ejBancoCache.find(x => x.id === id);
     if (!e) return;
 
@@ -2601,6 +2601,7 @@ function ejAbrirModal(id)
             }
         });
     });
+}
 
 // =============================================
 // SISTEMA DE ANIMACIÓN POR FRAMES
