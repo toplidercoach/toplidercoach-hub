@@ -517,7 +517,7 @@ showToast(sesionEditandoId ? 'Sesión actualizada correctamente' : 'Sesión guar
                 let query = supabaseClient
                     .from('training_sessions')
                     .select('*')
-                    .eq('coach_id', usuario.id);
+                    .eq('club_id', clubId);
                 
                 if (fechaDesde) query = query.gte('session_date', fechaDesde);
                 if (fechaHasta) query = query.lte('session_date', fechaHasta);
@@ -1005,7 +1005,7 @@ if (s.players && s.players.length > 0) {
             const { data: sesiones, error: errorSesiones } = await supabaseClient
                 .from('training_sessions')
                 .select('id, name, session_date, session_time')
-                .eq('coach_id', usuario.id)
+                .eq('club_id', clubId)
                 .gte('session_date', inicioMes)
                 .lte('session_date', finMes)
                 .order('session_date');
@@ -1016,7 +1016,7 @@ if (s.players && s.players.length > 0) {
             let queryPartidos = supabaseClient
                 .from('matches')
                 .select('*')
-                .eq('coach_id', usuario.id)
+                .eq('club_id', clubId)
                 .gte('match_date', inicioMes)
                 .lte('match_date', finMes)
                 .order('match_date');
@@ -1190,7 +1190,7 @@ async function cargarMisEjerciciosBiblioteca() {
         const { data, error } = await supabaseClient
             .from('custom_exercises')
             .select('id, name, category, tema, difficulty, duration_min, players_count, thumbnail_svg')
-            .eq('coach_id', usuario.id)
+            .eq('coach_id', String(usuario.id))
             .order('created_at', { ascending: false })
             .limit(50);
         
