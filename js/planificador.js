@@ -84,8 +84,8 @@ registrarSubTab('planificador', 'calendario', cargarCalendarioUnificado);
                 lista.innerHTML = '<p style="color:red;">Error al cargar</p>';
             }
         }
-        let jugadoresPlantilla = [];
-        let jugadoresSeleccionados = [];
+        var jugadoresPlantilla = [];
+        var jugadoresSeleccionados = [];
         
         async function cargarJugadoresSesion() {
             const grid = document.getElementById('jugadores-sesion-grid');

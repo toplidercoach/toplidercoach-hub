@@ -241,6 +241,7 @@
                 <button class="sub-tab" onclick="cambiarSubTab('planificador', 'mis-sesiones', this)">Mis Sesiones</button>
                 <button class="sub-tab" onclick="cambiarSubTab('planificador', 'calendario', this)">Calendario</button>
                 <button class="sub-tab" onclick="cambiarSubTab('planificador', 'asistencia', this)">📊 Asistencia</button>
+                <button class="sub-tab" onclick="cambiarSubTab('planificador', 'periodizacion', this)">📅 Periodización</button>
             </div>
             
             <!-- Sub: Crear Sesión -->
@@ -272,7 +273,7 @@
                             
                             <div class="campo-grupo">
                                 <label>Fecha</label>
-                                <input type="date" id="sesion-fecha">
+                                <input type="date" id="sesion-fecha" onchange="if(typeof pdzAutoRellenar==='function')pdzAutoRellenar()">
                             </div>
                             
                             <div class="campo-grupo">
@@ -520,6 +521,12 @@
         </div>
     </div>
 </div>
+            <!-- Sub: Periodización -->
+            <div id="planificador-periodizacion" class="vista-contenido">
+                <div id="periodizacion-root">
+                    <div class="loading">Cargando periodización...</div>
+                </div>
+            </div>
             <!-- Sub: Calendario Unificado -->
             <div id="planificador-calendario" class="vista-contenido">
                 <div class="calendario-container">
@@ -1735,6 +1742,7 @@ document.getElementById('modal-tacticlip').addEventListener('click', function(e)
     <script src="js/miclub.js"></script>
     <script src="js/asistencia.js"></script>
     <script src="js/dashboard.js"></script>
+    <script src="js/periodizacion.js"></script>
     <script src="js/ej-images.js"></script>
     <script src="js/ejercicios.js"></script>
 </body>
