@@ -48,6 +48,7 @@ function pdzRenderMain() {
     '<div style="max-width:1200px;margin:0 auto;padding:10px 0">' +
         '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">' +
             '<h2 style="margin:0;font-size:20px;color:#e2e8f0">📅 Periodización</h2>' +
+                '<button onclick="pdzMostrarAyuda()" style="padding:5px 12px;background:#1e293b;border:1px solid #475569;color:#94a3b8;border-radius:6px;cursor:pointer;font-size:12px">❓ Guía rápida</button>' +
             '<div style="display:flex;gap:8px">' +
                 '<button onclick="pdzMostrarFormulario(\'macro\')" style="padding:8px 16px;background:#ef4444;border:none;color:#fff;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600">+ Macrociclo</button>' +
                 '<button onclick="pdzMostrarFormulario(\'meso\')" style="padding:8px 16px;background:#f97316;border:none;color:#fff;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600">+ Mesociclo</button>' +
@@ -886,4 +887,82 @@ async function pdzExportarPDF(id) {
 // =============================================
 // REGISTRO DEL MÓDULO
 // =============================================
+// =============================================
+// GUIA RAPIDA (MODAL)
+// =============================================
+function pdzMostrarAyuda() {
+    var prev = document.getElementById('pdz-ayuda-overlay');
+    if (prev) prev.remove();
+
+    var overlay = document.createElement('div');
+    overlay.id = 'pdz-ayuda-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(2px)';
+    overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+
+    overlay.innerHTML = '' +
+    '<div style="background:#0f172a;border:1px solid #1e3a5f;border-radius:16px;max-width:640px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 25px 60px rgba(0,0,0,.7)">' +
+        '<div style="padding:20px 24px 0;display:flex;justify-content:space-between;align-items:center">' +
+            '<h2 style="margin:0;color:#e2e8f0;font-size:18px">📅 Guia rapida de Periodizacion</h2>' +
+            '<button onclick="document.getElementById(\'pdz-ayuda-overlay\').remove()" style="background:none;border:none;color:#9ca3af;font-size:22px;cursor:pointer">✕</button>' +
+        '</div>' +
+        '<div style="padding:20px 24px">' +
+
+            '<div style="background:#1e293b;border-radius:10px;padding:14px;margin-bottom:14px">' +
+                '<div style="font-size:14px;font-weight:700;color:#e2e8f0;margin-bottom:8px">¿Que es la periodizacion?</div>' +
+                '<div style="font-size:13px;color:#94a3b8;line-height:1.6">Organiza tu temporada en bloques de entrenamiento con objetivos claros. Las sesiones se vinculan automaticamente por fecha.</div>' +
+            '</div>' +
+
+            '<div style="background:#1e293b;border-radius:10px;padding:14px;margin-bottom:14px">' +
+                '<div style="font-size:14px;font-weight:700;color:#e2e8f0;margin-bottom:8px">3 niveles de organizacion</div>' +
+                '<div style="display:flex;flex-direction:column;gap:6px">' +
+                    '<div style="display:flex;align-items:center;gap:8px"><span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:#ef4444;flex-shrink:0"></span><span style="color:#e2e8f0;font-size:13px"><strong>Macrociclo</strong></span><span style="color:#64748b;font-size:12px">— Fases grandes (2-6 meses): Pretemporada, Competicion, Transicion</span></div>' +
+                    '<div style="display:flex;align-items:center;gap:8px"><span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:#f97316;flex-shrink:0"></span><span style="color:#e2e8f0;font-size:13px"><strong>Mesociclo</strong></span><span style="color:#64748b;font-size:12px">— Bloques con foco (2-6 semanas): Acumulacion, Fuerza, Tapering...</span></div>' +
+                    '<div style="display:flex;align-items:center;gap:8px"><span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:#22c55e;flex-shrink:0"></span><span style="color:#e2e8f0;font-size:13px"><strong>Microciclo</strong></span><span style="color:#64748b;font-size:12px">— La semana entre partidos (morfociclo)</span></div>' +
+                '</div>' +
+            '</div>' +
+
+            '<div style="background:#1e293b;border-radius:10px;padding:14px;margin-bottom:14px">' +
+                '<div style="font-size:14px;font-weight:700;color:#e2e8f0;margin-bottom:8px">Como empezar</div>' +
+                '<div style="display:flex;flex-direction:column;gap:4px;font-size:13px;color:#94a3b8">' +
+                    '<div><span style="color:#f59e0b;font-weight:600">1.</span> Crea un <strong style="color:#ef4444">Macrociclo</strong> (ej: Pretemporada, jul-ago)</div>' +
+                    '<div><span style="color:#f59e0b;font-weight:600">2.</span> Crea <strong style="color:#f97316">Mesociclos</strong> dentro (ej: Acumulacion, Transformacion)</div>' +
+                    '<div><span style="color:#f59e0b;font-weight:600">3.</span> Crea <strong style="color:#22c55e">Microciclos</strong> dentro de cada meso</div>' +
+                    '<div><span style="color:#f59e0b;font-weight:600">4.</span> Tus sesiones se asignan solas por fecha</div>' +
+                '</div>' +
+            '</div>' +
+
+            '<div style="background:#1e293b;border-radius:10px;padding:14px;margin-bottom:14px">' +
+                '<div style="font-size:14px;font-weight:700;color:#e2e8f0;margin-bottom:8px">Metricas automaticas</div>' +
+                '<div style="font-size:13px;color:#94a3b8;line-height:1.6">Al hacer clic en una barra del timeline veras: sesiones, minutos totales, RPE medio, asistencia y el <strong style="color:#e2e8f0">ACWR</strong> (ratio de carga aguda/cronica).</div>' +
+            '</div>' +
+
+            '<div style="background:#1e293b;border-radius:10px;padding:14px;margin-bottom:14px">' +
+                '<div style="font-size:14px;font-weight:700;color:#e2e8f0;margin-bottom:8px">ACWR — Semaforo de carga</div>' +
+                '<div style="display:flex;flex-direction:column;gap:4px;font-size:12px">' +
+                    '<div style="display:flex;align-items:center;gap:8px"><span style="color:#3b82f6;font-weight:700;min-width:55px">< 0.8</span><span style="color:#94a3b8">Carga baja — posible desentrenamiento</span></div>' +
+                    '<div style="display:flex;align-items:center;gap:8px"><span style="color:#22c55e;font-weight:700;min-width:55px">0.8 - 1.3</span><span style="color:#94a3b8">Zona optima — bajo riesgo de lesion ✅</span></div>' +
+                    '<div style="display:flex;align-items:center;gap:8px"><span style="color:#f59e0b;font-weight:700;min-width:55px">1.3 - 1.5</span><span style="color:#94a3b8">Precaucion — monitorizar fatiga ⚠️</span></div>' +
+                    '<div style="display:flex;align-items:center;gap:8px"><span style="color:#ef4444;font-weight:700;min-width:55px">> 1.5</span><span style="color:#94a3b8">Zona de riesgo — carga excesiva 🔴</span></div>' +
+                '</div>' +
+                '<div style="font-size:11px;color:#64748b;margin-top:8px;padding-top:8px;border-top:1px solid #334155">Necesitas al menos 4 sesiones con RPE para que se active.</div>' +
+            '</div>' +
+
+            '<div style="background:#1e293b;border-radius:10px;padding:14px;margin-bottom:14px">' +
+                '<div style="font-size:14px;font-weight:700;color:#e2e8f0;margin-bottom:8px">Funciones extra</div>' +
+                '<div style="display:flex;flex-direction:column;gap:4px;font-size:13px;color:#94a3b8">' +
+                    '<div><strong style="color:#93c5fd">Comparar</strong> — Compara dos periodos del mismo tipo lado a lado</div>' +
+                    '<div><strong style="color:#c4b5fd">PDF</strong> — Genera un informe descargable del periodo</div>' +
+                    '<div><strong style="color:#e2e8f0">Auto-rellenar</strong> — Al crear sesion, el Microciclo y MD se ponen solos</div>' +
+                '</div>' +
+            '</div>' +
+
+            '<div style="background:#0f2744;border:1px solid #1e3a5f;border-radius:10px;padding:12px;text-align:center">' +
+                '<div style="font-size:12px;color:#64748b">Registra siempre el <strong style="color:#fbbf24">RPE (1-10)</strong> en cada sesion para sacar el maximo partido a las metricas.</div>' +
+            '</div>' +
+
+        '</div>' +
+    '</div>';
+
+    document.body.appendChild(overlay);
+}
 registrarSubTab('planificador', 'periodizacion', initPeriodizacion);

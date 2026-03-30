@@ -406,6 +406,7 @@ sesion = { nombre: '', fecha: fechaHoy, calentamiento: [], principal: [], enfria
             document.getElementById('sesion-objetivo').value = '';
             document.getElementById('sesion-material').value = '';
             document.getElementById('sesion-notas').value = '';
+            document.getElementById('sesion-rpe').value = '';
             renderizarSesion();
             jugadoresSeleccionados = [];
             renderizarJugadoresSesion();
@@ -446,7 +447,8 @@ sesion = { nombre: '', fecha: fechaHoy, calentamiento: [], principal: [], enfria
                     team_category: equipo || null,
                     objective: objetivo || null,
                     materials: material || null,
-                    notes: notas || null,
+                   notes: notas || null,
+                    rpe: document.getElementById('sesion-rpe').value ? parseFloat(document.getElementById('sesion-rpe').value) : null,
                     warm_up: sesion.calentamiento,
                     main_part: sesion.principal,
                     cool_down: sesion.enfriamiento,
@@ -657,7 +659,8 @@ showToast(sesionEditandoId ? 'Sesión actualizada correctamente' : 'Sesión guar
                 document.getElementById('sesion-equipo').value = data.team_category || '';
                 document.getElementById('sesion-objetivo').value = data.objective || '';
                 document.getElementById('sesion-material').value = data.materials || '';
-                document.getElementById('sesion-notas').value = data.notes || '';
+              document.getElementById('sesion-notas').value = data.notes || '';
+                document.getElementById('sesion-rpe').value = data.rpe || '';
                 
                 // Cargar jugadores seleccionados
                 if (data.players && Array.isArray(data.players)) {

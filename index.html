@@ -276,9 +276,14 @@
                                 <input type="date" id="sesion-fecha" onchange="if(typeof pdzAutoRellenar==='function')pdzAutoRellenar()">
                             </div>
                             
-                            <div class="campo-grupo">
+                                <div class="campo-grupo">
                                 <label>Hora de Inicio</label>
                                 <input type="time" id="sesion-hora">
+                            </div>
+                            
+                            <div class="campo-grupo">
+                                <label>RPE (1-10)</label>
+                                <input type="number" id="sesion-rpe" min="1" max="10" step="0.5" placeholder="Ej: 7">
                             </div>
                             
                             <div class="campo-grupo">
@@ -564,6 +569,7 @@
     <button class="sub-tab active" onclick="cambiarSubTab('matchstats', 'partidos', this)">Partidos</button>
     <button class="sub-tab" onclick="cambiarSubTab('matchstats', 'estadisticas', this)">Estadísticas</button>
     <button class="sub-tab" onclick="cambiarSubTab('matchstats', 'analisis', this)">📊 Análisis</button>
+    <button class="sub-tab" onclick="cambiarSubTab('matchstats', 'planpartido', this)">📋 Plan de Partido</button>
 </div>
             
             <!-- Sub: Partidos -->
@@ -915,6 +921,12 @@
         </div>
     </div>
 </div>
+</div>
+<!-- Sub: Plan de Partido -->
+<div id="matchstats-planpartido" class="vista-contenido">
+    <div id="planpartido-root">
+        <div class="loading">Cargando plan de partido...</div>
+    </div>
 </div>
 <!-- ==================== MODULO: TU CUERPO TÉCNICO ==================== -->
 <div id="modulo-staff" class="vista-modulo">
@@ -1744,6 +1756,7 @@ document.getElementById('modal-tacticlip').addEventListener('click', function(e)
     <script src="js/dashboard.js"></script>
     <script src="js/periodizacion.js"></script>
     <script src="js/ej-images.js"></script>
+    <script src="js/planpartido.js"></script>
     <script src="js/ejercicios.js"></script>
 </body>
 </html>
