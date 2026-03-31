@@ -70,7 +70,7 @@ async function ppAsignarSlot(slotId,pi){var wm=pp.planActual.weekly_map||{};if(!
 function initPlanPartido(){var r=document.getElementById('planpartido-root');if(!r)return;ppRenderMain();ppCargarPartidosPendientes();ppCargarPlantilla()}
 function ppRenderMain(){var r=document.getElementById('planpartido-root');if(!r)return;r.innerHTML='<div style="max-width:1200px;margin:0 auto;padding:10px 0"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px"><h2 style="margin:0;font-size:20px;color:#e2e8f0">📋 Plan de Partido</h2><div id="pp-status-badge"></div></div><div style="background:#0f172a;border:1px solid #1e3a5f;border-radius:12px;padding:16px;margin-bottom:16px"><label style="font-size:13px;color:#9ca3af;display:block;margin-bottom:6px">Selecciona el proximo partido:</label><select id="pp-partido-select" onchange="ppSeleccionarPartido()" style="width:100%;padding:10px 14px;background:#1e293b;border:1px solid #334155;border-radius:8px;color:#e2e8f0;font-size:14px"><option value="">-- Elige partido --</option></select></div><div id="pp-contenido" style="display:none"></div></div>'}
 async function ppCargarPartidosPendientes(){if(!clubId||!seasonId)return;var s=document.getElementById('pp-partido-select');if(!s)return;try{var{data:p,error}=await supabaseClient.from('matches').select('*').eq('club_id',clubId).eq('season_id',seasonId).is('result',null).order('match_date',{ascending:true});if(error)throw error;if(!p||!p.length){s.innerHTML='<option value="">-- Sin partidos --</option>';return}var h='<option value="">-- Elige partido --</option>';p.forEach(function(m){var f=new Date(m.match_date+'T12:00:00');h+='<option value="'+m.id+'">'+['Dom','Lun','Mar','Mie','Jue','Vie','Sab'][f.getDay()]+' '+f.getDate()+'/'+(f.getMonth()+1)+(m.kick_off_time?' '+m.kick_off_time.slice(0,5):'')+' — '+(m.home_away==='home'?'vs ':'@ ')+m.opponent+(m.competition?' · '+m.competition:'')+'</option>'});s.innerHTML=h}catch(e){showToast('Error: '+e.message)}}
-async function ppSeleccionarPartido(){var s=document.getElementById('pp-partido-select'),mid=s.value,c=document.getElementById('pp-contenido');if(!mid){c.style.display='none';pp.planActual=null;pp.partidoActual=null;ppRenderStatusBadge();return}c.style.display='block';c.innerHTML='<div style="text-align:center;padding:40px;color:#64748b">Cargando...</div>';try{var{data:par}=await supabaseClient.from('matches').select('*').eq('id',mid).single();pp.partidoActual=par;var{data:riv}=await supabaseClient.from('opponents').select('*').eq('club_id',clubId).eq('name',par.opponent).single();pp.rivalActual=riv||null;var{data:plan,error:e2}=await supabaseClient.from('match_plans').select('*').eq('match_id',mid).single();if(e2&&e2.code==='PGRST116'){var{data:np}=await supabaseClient.from('match_plans').insert({club_id:clubId,season_id:seasonId,match_id:mid,status:'draft'}).select().single();plan=np;showToast('Plan creado')}else if(e2)throw e2;pp.planActual=plan;ppRenderContenido()}catch(e){c.innerHTML='<div style="text-align:center;padding:40px;color:#ef4444">'+e.message+'</div>'}}
+async function ppSeleccionarPartido(){var s=document.getElementById('pp-partido-select'),mid=s.value,c=document.getElementById('pp-contenido');if(!mid){c.style.display='none';pp.planActual=null;pp.partidoActual=null;ppRenderStatusBadge();return}c.style.display='block';c.innerHTML='<div style="text-align:center;padding:40px;color:#64748b">Cargando...</div>';try{var{data:par}=await supabaseClient.from('matches').select('*').eq('id',mid).single();pp.partidoActual=par;var{data:riv}=await supabaseClient.from('opponents').select('*').eq('club_id',clubId).eq('name',par.opponent).single();pp.rivalActual=riv||{name:par.opponent};if(!pp.rivalActual.logo_url&&par.opponent_logo)pp.rivalActual.logo_url=par.opponent_logo;var{data:plan,error:e2}=await supabaseClient.from('match_plans').select('*').eq('match_id',mid).single();if(e2&&e2.code==='PGRST116'){var{data:np}=await supabaseClient.from('match_plans').insert({club_id:clubId,season_id:seasonId,match_id:mid,status:'draft'}).select().single();plan=np;showToast('Plan creado')}else if(e2)throw e2;pp.planActual=plan;ppRenderContenido()}catch(e){c.innerHTML='<div style="text-align:center;padding:40px;color:#ef4444">'+e.message+'</div>'}}
 
 // === CABECERA + STATUS ===
 function ppRenderCabecera(){var p=pp.partidoActual;if(!p)return '';var f=new Date(p.match_date+'T12:00:00');var fl=f.toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long',year:'numeric'});var eL=p.home_away==='home';var h=p.kick_off_time?p.kick_off_time.slice(0,5):'';var co=p.competition||'';var eR=(pp.rivalActual&&pp.rivalActual.logo_url)?'<img src="'+pp.rivalActual.logo_url+'" style="width:48px;height:48px;object-fit:contain;border-radius:8px">':'<div style="width:48px;height:48px;background:#1e293b;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:24px">🛡️</div>';var eP=(clubData&&clubData.logo_url)?'<img src="'+clubData.logo_url+'" style="width:48px;height:48px;object-fit:contain;border-radius:8px">':'<div style="width:48px;height:48px;background:#1e293b;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:24px">🏠</div>';return '<div style="background:linear-gradient(135deg,#0f172a,#1e293b);border:1px solid #1e3a5f;border-radius:12px;padding:20px;margin-bottom:16px"><div style="display:flex;align-items:center;justify-content:center;gap:20px;flex-wrap:wrap"><div style="text-align:center">'+(eL?eP:eR)+'<div style="font-size:14px;font-weight:700;color:#e2e8f0;margin-top:6px">'+(eL?((clubData&&clubData.name)||'Mi Equipo'):p.opponent)+'</div></div><div style="text-align:center;padding:0 10px"><div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:1px">'+co+'</div><div style="font-size:24px;font-weight:700;color:#f59e0b;margin:4px 0">VS</div><div style="font-size:13px;color:#94a3b8">'+fl+'</div>'+(h?'<div style="font-size:13px;color:#94a3b8">'+h+'h</div>':'')+'</div><div style="text-align:center">'+(eL?eR:eP)+'<div style="font-size:14px;font-weight:700;color:#e2e8f0;margin-top:6px">'+(eL?p.opponent:((clubData&&clubData.name)||'Mi Equipo'))+'</div></div></div></div>'}
@@ -356,6 +356,7 @@ function ppAbrirFormObjetivo(idx) {
     a.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 function ppCerrarFormObjetivo(){var a=document.getElementById('pp-obj-form-area');if(a)a.style.display='none';pp.objEditIdx=-1;_ppObjEjercicios=[]}
+function ppObjVerEjercicio(i){var ej=_ppObjEjercicios[i];if(!ej)return;if(ej.url){window.open(ej.url,'_blank')}else if(ej.fuente==='tlc'){window.open('https://toplidercoach.com/wp-json/toplider/v1/ejercicio/'+String(ej.id).replace('tlc_',''),'_blank')}else{showToast('Sin URL disponible')}}
 function ppObjQuitarEjercicio(i) {
     _ppObjEjercicios.splice(i, 1);
     ppAbrirFormObjetivo(pp.objEditIdx); // re-render preserving form data
@@ -366,7 +367,7 @@ async function ppObjBuscarEjercicio() {
     var ov = document.createElement('div'); ov.id = 'pp-ej-overlay';
     ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
     ov.onclick = function(e) { if (e.target === ov) ov.remove(); };
-    ov.innerHTML = '<div style="background:#0f172a;border:1px solid #1e3a5f;border-radius:12px;max-width:700px;width:100%;max-height:80vh;display:flex;flex-direction:column"><div style="padding:16px 20px;border-bottom:1px solid #1e3a5f;display:flex;justify-content:space-between;align-items:center"><h3 style="margin:0;color:#e2e8f0;font-size:16px">Vincular ejercicio</h3><button onclick="document.getElementById(\'pp-ej-overlay\').remove()" style="background:none;border:none;color:#9ca3af;font-size:20px;cursor:pointer">✕</button></div><div style="padding:12px 20px;border-bottom:1px solid #1e3a5f"><div style="display:flex;gap:6px;margin-bottom:10px"><button onclick="ppObjCambiarFuente(\'tlc\')" id="ppobj-tab-tlc" style="flex:1;padding:8px;font-size:12px;font-weight:600;border-radius:6px;border:2px solid #7c3aed;background:#7c3aed;color:#fff;cursor:pointer">TopLiderCoach</button><button onclick="ppObjCambiarFuente(\'mis\')" id="ppobj-tab-mis" style="flex:1;padding:8px;font-size:12px;font-weight:600;border-radius:6px;border:2px solid #7c3aed;background:transparent;color:#7c3aed;cursor:pointer">Mis Ejercicios</button></div><input type="text" id="pp-ej-search" oninput="ppObjFiltrarActual()" placeholder="Buscar..." style="width:100%;padding:8px 12px;background:#1e293b;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-size:13px"></div><div id="pp-ej-results" style="flex:1;overflow-y:auto;padding:12px 20px"><div style="text-align:center;padding:20px;color:#64748b">Cargando...</div></div></div>';
+    ov.innerHTML = '<div style="background:#0f172a;border:1px solid #1e3a5f;border-radius:12px;max-width:700px;width:100%;max-height:80vh;display:flex;flex-direction:column"><div style="padding:16px 20px;border-bottom:1px solid #1e3a5f;display:flex;justify-content:space-between;align-items:center"><h3 style="margin:0;color:#e2e8f0;font-size:16px">Vincular ejercicio</h3><button onclick="document.getElementById(\'pp-ej-overlay\').remove()" style="background:none;border:none;color:#9ca3af;font-size:20px;cursor:pointer">✕</button></div><div style="padding:12px 20px;border-bottom:1px solid #1e3a5f"><div style="display:flex;gap:6px;margin-bottom:10px"><button onclick="ppObjCambiarFuente(\'tlc\')" id="ppobj-tab-tlc" style="flex:1;padding:8px;font-size:12px;font-weight:600;border-radius:6px;border:2px solid #7c3aed;background:#7c3aed;color:#fff;cursor:pointer">TopLiderCoach</button><button onclick="ppObjCambiarFuente(\'mis\')" id="ppobj-tab-mis" style="flex:1;padding:8px;font-size:12px;font-weight:600;border-radius:6px;border:2px solid #7c3aed;background:transparent;color:#7c3aed;cursor:pointer">Mis Ejercicios</button></div><input type="text" id="pp-ej-search" oninput="clearTimeout(window._ppSearchTimer);window._ppSearchTimer=setTimeout(ppObjFiltrarActual,400)" placeholder="Buscar..." style="width:100%;padding:8px 12px;background:#1e293b;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-size:13px"></div><div id="pp-ej-results" style="flex:1;overflow-y:auto;padding:12px 20px"><div style="text-align:center;padding:20px;color:#64748b">Cargando...</div></div></div>';
     document.body.appendChild(ov);
     _ppObjBibFuente = 'tlc';
     ppObjCargarTLC(1);
@@ -377,19 +378,20 @@ function ppObjCambiarFuente(fuente) {
     if (fuente === 'tlc') { btlc.style.background = '#7c3aed'; btlc.style.color = '#fff'; bmis.style.background = 'transparent'; bmis.style.color = '#7c3aed'; ppObjCargarTLC(1); }
     else { bmis.style.background = '#7c3aed'; bmis.style.color = '#fff'; btlc.style.background = 'transparent'; btlc.style.color = '#7c3aed'; ppObjCargarMis(); }
 }
-async function ppObjCargarTLC(pagina) {
+async function ppObjCargarTLC(pagina, append) {
     var r = document.getElementById('pp-ej-results'); if (!r) return;
-    r.innerHTML = '<div style="text-align:center;padding:20px;color:#64748b">Cargando biblioteca...</div>';
+    if (!append) r.innerHTML = '<div style="text-align:center;padding:20px;color:#64748b">Cargando biblioteca...</div>';
+    else { var lb = r.querySelector('[data-loadmore]'); if (lb) lb.remove(); }
     try {
         var s = (document.getElementById('pp-ej-search')?.value || '').trim();
-        var url = 'https://toplidercoach.com/wp-json/toplider/v1/ejercicios?page=' + pagina + '&per_page=20';
-        if (s) url += '&search=' + encodeURIComponent(s) + '&tema=' + encodeURIComponent(s);
+        var url = 'https://toplidercoach.com/wp-json/toplider/v1/ejercicios?page=' + pagina + '&per_page=40';
+        // filtrado client-side
         var res = await fetch(url);
         var data = await res.json();
-        if (!data.ejercicios || !data.ejercicios.length) { r.innerHTML = '<div style="text-align:center;padding:20px;color:#64748b">Sin resultados</div>'; return; }
+        var ejercicios=data.ejercicios||[];if(s){var sl=s.toLowerCase();ejercicios=ejercicios.filter(function(e){return((e.titulo||'')+(e.entrenador||'')+(e.tema||'')).toLowerCase().indexOf(sl)>=0})}if(!ejercicios.length){r.innerHTML='<div style="text-align:center;padding:20px;color:#64748b">Sin resultados — carga mas ejercicios</div>';return}
         var yaIds = _ppObjEjercicios.map(function(e) { return 'tlc_' + e.id; });
         var h = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px">';
-        data.ejercicios.forEach(function(ej) {
+        ejercicios.forEach(function(ej) {
             var yaVinc = yaIds.indexOf('tlc_' + ej.id) >= 0;
             h += '<div onclick="' + (yaVinc ? '' : 'ppObjVincularTLC(' + ej.id + ')') + '" style="background:#1e293b;border:1px solid #334155;border-radius:8px;padding:8px;cursor:' + (yaVinc ? 'not-allowed' : 'pointer') + ';opacity:' + (yaVinc ? '0.4' : '1') + '">' +
                 '<div style="width:100%;aspect-ratio:8/5;border-radius:6px;overflow:hidden;background:#0f4c2a"><img src="' + (ej.imagen || 'https://via.placeholder.com/200x125?text=Sin+img') + '" style="width:100%;height:100%;object-fit:cover"></div>' +
@@ -398,15 +400,11 @@ async function ppObjCargarTLC(pagina) {
                 '</div>';
         });
         h += '</div>';
-        if (data.total_pages && data.total_pages > 1) {
-            h += '<div style="display:flex;justify-content:center;gap:6px;margin-top:12px">';
-            for (var p = 1; p <= Math.min(data.total_pages, 5); p++) {
-                h += '<button onclick="ppObjCargarTLC(' + p + ')" style="padding:4px 10px;background:' + (p === pagina ? '#3b82f6' : '#1e293b') + ';border:1px solid #334155;color:#e2e8f0;border-radius:4px;cursor:pointer;font-size:11px">' + p + '</button>';
-            }
-            h += '</div>';
+        if (data.pagination && data.pagination.total_pages > pagina) {
+            h += '<div style="text-align:center;margin-top:12px;padding-bottom:8px"><button onclick="ppObjCargarTLC(' + (pagina + 1) + ',true)" style="padding:8px 24px;background:#3b82f6;border:none;color:#fff;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600">Cargar mas (' + pagina + '/' + data.total_pages + ')</button></div>';
         }
-        r.innerHTML = h;
-    } catch (e) { r.innerHTML = '<div style="color:#ef4444;text-align:center;padding:20px">Error: ' + e.message + '</div>'; }
+        if (append) { var tmp = document.createElement('div'); tmp.innerHTML = h; while (tmp.firstChild) r.appendChild(tmp.firstChild); } else r.innerHTML = h;
+    } catch (e) { if (!append) r.innerHTML = '<div style="color:#ef4444;text-align:center;padding:20px">Error: ' + e.message + '</div>'; }
 }
 async function ppObjVincularTLC(ejId) {
     try {
@@ -414,7 +412,7 @@ async function ppObjVincularTLC(ejId) {
         var data = await res.json();
         if (data.success && data.ejercicio) {
             var ej = data.ejercicio;
-            _ppObjEjercicios.push({ id: 'tlc_' + ej.id, name: ej.titulo, category: ej.tema || '', thumbnail_svg: '', thumbnail_url: ej.imagen || '', fuente: 'tlc' });
+            _ppObjEjercicios.push({ id: 'tlc_' + ej.id, name: ej.titulo, category: ej.tema || '', thumbnail_svg: '', thumbnail_url: ej.imagen || '', fuente: 'tlc', url: ej.url || '' });
             var ov = document.getElementById('pp-ej-overlay'); if (ov) ov.remove();
             showToast('Ejercicio vinculado');
             ppObjRefreshForm();
@@ -527,7 +525,530 @@ async function ppEliminarTactiClip(i){if(!confirm('¿Eliminar?'))return;var v=pp
 
 // === PDF + PRESENTACION ===
 function ppAddBotonesSalida(){var b=document.getElementById('pp-status-badge');if(!b||!pp.planActual)return;if(b.innerHTML.indexOf('pp-btn-pdf')>=0)return;b.innerHTML='<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><button id="pp-btn-pdf" onclick="ppGenerarPDF()" style="padding:5px 12px;background:#4c1d95;border:1px solid #7c3aed;color:#c4b5fd;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600">📄 PDF</button><button onclick="ppPresentacion()" style="padding:5px 12px;background:#065f46;border:1px solid #10b981;color:#6ee7b7;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600">📺 Charla</button>'+b.innerHTML+'</div>'}
-async function ppGenerarPDF(){if(!pp.planActual||!pp.partidoActual)return;showToast('Generando PDF...');var plan=pp.planActual,par=pp.partidoActual;var doc=new jspdf.jsPDF('p','mm','a4');var y=15,cP=[30,58,95],cA=[245,158,11],cG=[100,116,139];doc.setFillColor(cP[0],cP[1],cP[2]);doc.rect(0,0,210,35,'F');doc.setTextColor(255,255,255);doc.setFontSize(20);doc.setFont('helvetica','bold');doc.text('PLAN DE PARTIDO',105,14,{align:'center'});doc.setFontSize(12);var eL=par.home_away==='home';doc.text(eL?((clubData&&clubData.name)||'Mi Equipo')+' vs '+par.opponent:par.opponent+' vs '+((clubData&&clubData.name)||'Mi Equipo'),105,22,{align:'center'});doc.setFontSize(9);doc.text(new Date(par.match_date+'T12:00:00').toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long',year:'numeric'})+(par.kick_off_time?' · '+par.kick_off_time.slice(0,5)+'h':'')+(par.competition?' · '+par.competition:''),105,29,{align:'center'});doc.setFillColor(cA[0],cA[1],cA[2]);doc.rect(0,35,210,2,'F');y=44;function aS(t){if(y>270){doc.addPage();y=15}doc.setFillColor(cP[0],cP[1],cP[2]);doc.rect(10,y,190,8,'F');doc.setTextColor(255,255,255);doc.setFontSize(10);doc.setFont('helvetica','bold');doc.text(t,15,y+5.5);y+=12;doc.setTextColor(50,50,50)}function aC(l,v){if(!v)return;if(y>275){doc.addPage();y=15}doc.setFontSize(8);doc.setFont('helvetica','bold');doc.setTextColor(cG[0],cG[1],cG[2]);doc.text(l,12,y);y+=4;doc.setFont('helvetica','normal');doc.setTextColor(50,50,50);doc.setFontSize(9);doc.splitTextToSize(v,186).forEach(function(ln){if(y>285){doc.addPage();y=15}doc.text(ln,12,y);y+=4});y+=2}aS('SCOUTING');if(plan.rival_formation)aC('Formacion:',plan.rival_formation);aC('Fuertes:',plan.rival_strengths);aC('Debiles:',plan.rival_weaknesses);var jg=plan.rival_players||[];if(jg.length){aS('JUGADORES ('+jg.length+')');jg.forEach(function(j){if(y>270){doc.addPage();y=15}doc.setFontSize(9);doc.setFont('helvetica','bold');doc.setTextColor(cP[0],cP[1],cP[2]);doc.text((j.number?j.number+'. ':'')+j.name+(j.position?' — '+j.position:''),12,y);y+=4;if(j.analysis){doc.setFont('helvetica','normal');doc.setTextColor(50,50,50);doc.setFontSize(8);doc.splitTextToSize(j.analysis,186).forEach(function(l){if(y>285){doc.addPage();y=15}doc.text(l,12,y);y+=3.5})}y+=3})}var fa=plan.tactical_phases||[];if(fa.length){aS('FASES DEL JUEGO RIVAL');fa.forEach(function(f){if(!f.notes)return;if(y>270){doc.addPage();y=15}doc.setFontSize(9);doc.setFont('helvetica','bold');doc.setTextColor(cA[0],cA[1],cA[2]);doc.text(f.title,12,y);y+=5;doc.setFont('helvetica','normal');doc.setTextColor(50,50,50);doc.setFontSize(8);doc.splitTextToSize(f.notes,186).forEach(function(l){if(y>285){doc.addPage();y=15}doc.text(l,12,y);y+=3.5});y+=4})}var ourPhases=ppGetOurPhases();var hasOur=false;PP_OUR_SECTIONS.forEach(function(sec){if(!sec.id)return;var d=ourPhases[sec.id];if(d&&d.notes)hasOur=true});if(hasOur){aS('PLAN TACTICO PROPIO');if(plan.our_formation)aC('Formacion:',plan.our_formation);PP_OUR_SECTIONS.forEach(function(sec){if(sec.type==='title'){if(y>275){doc.addPage();y=15}doc.setFontSize(9);doc.setFont('helvetica','bold');doc.setTextColor(cA[0],cA[1],cA[2]);doc.text(sec.label,12,y);y+=5}else{var d=ourPhases[sec.id];if(d&&d.notes)aC(sec.title+':',d.notes)}})}var ob=plan.weekly_objectives||[];if(ob.length){aS('PLAN SEMANAL ('+ob.length+' objetivos)');ob.forEach(function(o,i){if(y>270){doc.addPage();y=15}var cont=PP_CONTENIDOS.find(function(c){return c.id===o.contenido});doc.setFontSize(9);doc.setFont('helvetica','bold');doc.setTextColor(50,50,50);doc.text((i+1)+'. '+o.text,12,y);y+=4;var meta=[];if(cont)meta.push(cont.label);if(o.session_day)meta.push(o.session_day);if(o.ejercicios&&o.ejercicios.length)meta.push(o.ejercicios.length+' ejercicio'+(o.ejercicios.length>1?'s':''));if(meta.length){doc.setFont('helvetica','normal');doc.setTextColor(cG[0],cG[1],cG[2]);doc.setFontSize(7);doc.text(meta.join(' · '),14,y);y+=4}if(o.notas){doc.setFont('helvetica','normal');doc.setTextColor(80,80,80);doc.setFontSize(8);doc.text(o.notas,14,y);y+=4}y+=2;doc.setTextColor(50,50,50)})}var tp=doc.internal.getNumberOfPages();for(var i=1;i<=tp;i++){doc.setPage(i);doc.setFontSize(7);doc.setTextColor(150,150,150);doc.text('TopLiderCoach',105,292,{align:'center'});doc.text(i+'/'+tp,195,292,{align:'right'})}doc.save('PlanPartido_'+par.opponent.replace(/\s+/g,'_')+'.pdf');showToast('PDF generado')}
+
+function ppLoadImg(url){return new Promise(function(resolve){if(!url){resolve(null);return}if(url.indexOf('data:')===0){resolve(url);return}var img=new Image();img.crossOrigin='anonymous';img.onload=function(){try{var c=document.createElement('canvas');c.width=img.width;c.height=img.height;c.getContext('2d').drawImage(img,0,0);resolve(c.toDataURL('image/png'))}catch(e){resolve(null)}};img.onerror=function(){resolve(null)};img.src=url})}
+
+function ppGetImgSize(dataUrl){return new Promise(function(resolve){var img=new Image();img.onload=function(){resolve({w:img.naturalWidth,h:img.naturalHeight})};img.onerror=function(){resolve({w:4,h:3})};img.src=dataUrl})}
+
+async function ppGenerarPDF(){
+if(!pp.planActual||!pp.partidoActual)return;
+showToast('Generando PDF...');
+var plan=pp.planActual,par=pp.partidoActual;
+var doc=new jspdf.jsPDF('p','mm','a4');
+var W=210,MG=12,CW=W-MG*2;
+var eL=par.home_away==='home';
+var miEq=(clubData&&clubData.name)||'Mi Equipo';
+var rivalNom=par.opponent||'Rival';
+var fecha=new Date(par.match_date+'T12:00:00').toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+var hora=par.kick_off_time?par.kick_off_time.slice(0,5)+'h':'';
+
+var logoClub=null,logoRival=null;
+try{logoClub=await ppLoadImg(clubData&&clubData.logo_url)}catch(e){}
+try{logoRival=await ppLoadImg((pp.rivalActual&&pp.rivalActual.logo_url)||par.opponent_logo)}catch(e){}
+
+var y=0;
+var cDark=[15,23,42],cAccent=[245,158,11],cGreen=[34,197,94],cBlue=[59,130,246],cRed=[239,68,68],cPurple=[168,85,247],cGray=[100,116,139];
+
+function newPage(){doc.addPage();y=12;return y}
+function checkSpace(need){if(y+need>278){newPage()}return y}
+
+// =============================================
+// PORTADA — layout vertical
+// =============================================
+doc.setFillColor(cDark[0],cDark[1],cDark[2]);
+doc.rect(0,0,W,297,'F');
+doc.setFillColor(cAccent[0],cAccent[1],cAccent[2]);
+doc.rect(0,0,W,3,'F');
+
+doc.setTextColor(cAccent[0],cAccent[1],cAccent[2]);
+doc.setFontSize(11);doc.setFont('helvetica','normal');
+doc.text('TOPLIDERCOACH HUB',105,28,{align:'center'});
+
+doc.setFontSize(28);doc.setFont('helvetica','bold');
+doc.setTextColor(255,255,255);
+doc.text('PLAN DE PARTIDO',105,48,{align:'center'});
+
+// Equipo local (arriba)
+var localName=eL?miEq:rivalNom;
+var visitName=eL?rivalNom:miEq;
+var localLogo=eL?logoClub:logoRival;
+var visitLogo=eL?logoRival:logoClub;
+
+if(localLogo){try{doc.addImage(localLogo,'PNG',80,68,20,20)}catch(e){}}
+doc.setFontSize(16);doc.setFont('helvetica','bold');doc.setTextColor(255,255,255);
+doc.text(localName.toUpperCase(),105,96,{align:'center'});
+
+// VS
+doc.setFontSize(20);doc.setTextColor(cAccent[0],cAccent[1],cAccent[2]);doc.setFont('helvetica','bold');
+doc.text('VS',105,112,{align:'center'});
+doc.setDrawColor(cAccent[0],cAccent[1],cAccent[2]);doc.setLineWidth(0.3);
+doc.line(50,106,90,106);doc.line(120,106,160,106);
+
+// Equipo visitante (abajo)
+if(visitLogo){try{doc.addImage(visitLogo,'PNG',80,120,20,20)}catch(e){}}
+doc.setFontSize(16);doc.setFont('helvetica','bold');doc.setTextColor(255,255,255);
+doc.text(visitName.toUpperCase(),105,148,{align:'center'});
+
+// Linea separadora
+doc.setDrawColor(cAccent[0],cAccent[1],cAccent[2]);doc.setLineWidth(0.5);
+doc.line(60,160,150,160);
+
+// Info partido
+doc.setFontSize(12);doc.setFont('helvetica','normal');doc.setTextColor(200,210,230);
+doc.text(fecha,105,172,{align:'center'});
+var infoLine=[];
+if(hora)infoLine.push(hora);
+if(par.competition)infoLine.push(par.competition);
+if(par.stadium)infoLine.push(par.stadium);
+if(infoLine.length){doc.setFontSize(10);doc.text(infoLine.join('  |  '),105,180,{align:'center'})}
+
+var statusText={draft:'BORRADOR',ready:'LISTO',presented:'PRESENTADO'}[plan.status]||'BORRADOR';
+doc.setFontSize(9);doc.setTextColor(cAccent[0],cAccent[1],cAccent[2]);
+doc.text(statusText,105,195,{align:'center'});
+
+doc.setFillColor(cAccent[0],cAccent[1],cAccent[2]);
+doc.rect(0,294,W,3,'F');
+
+// =============================================
+// FUNCIONES AUXILIARES (sin emoji)
+// =============================================
+function miniHeader(){
+    doc.setFillColor(cDark[0],cDark[1],cDark[2]);doc.rect(0,0,W,20,'F');
+    if(localLogo){try{doc.addImage(localLogo,'PNG',MG+2,3,14,14)}catch(e){}}
+    doc.setTextColor(255,255,255);doc.setFontSize(9);doc.setFont('helvetica','bold');
+    doc.text(localName,MG+20,11);
+    doc.setTextColor(cAccent[0],cAccent[1],cAccent[2]);doc.setFontSize(10);
+    doc.text('VS',105,11,{align:'center'});
+    doc.setTextColor(255,255,255);doc.setFontSize(9);
+    doc.text(visitName,W-MG-2,11,{align:'right'});
+    if(visitLogo){try{doc.addImage(visitLogo,'PNG',W-MG-16,3,14,14)}catch(e){}}
+    doc.setFillColor(cAccent[0],cAccent[1],cAccent[2]);doc.rect(0,20,W,1.5,'F');
+}
+
+function sectionHeader(title,color){
+    checkSpace(14);
+    doc.setFillColor(color[0],color[1],color[2]);
+    doc.roundedRect(MG,y,CW,10,2,2,'F');
+    doc.setTextColor(255,255,255);doc.setFontSize(12);doc.setFont('helvetica','bold');
+    doc.text(title,MG+5,y+7);
+    y+=14;
+}
+
+function subHeader(title,color){
+    checkSpace(10);
+    doc.setFillColor(color[0],color[1],color[2]);
+    doc.rect(MG,y,3,7,'F');
+    doc.setTextColor(color[0],color[1],color[2]);doc.setFontSize(10);doc.setFont('helvetica','bold');
+    doc.text(title,MG+6,y+5.5);
+    y+=10;
+}
+
+function textBlock(text,indent){
+    if(!text)return;
+    checkSpace(8);
+    var ix=indent||0;
+    doc.setFontSize(9);doc.setFont('helvetica','normal');doc.setTextColor(50,50,50);
+    var lines=doc.splitTextToSize(text,CW-4-ix);
+    lines.forEach(function(ln){
+        checkSpace(4);
+        doc.text(ln,MG+2+ix,y+3);
+        y+=4;
+    });
+    y+=2;
+}
+
+async function addMediaImages(mediaArr){
+    if(!mediaArr||!mediaArr.length)return;
+    var imgs=mediaArr.filter(function(m){return m.type==='image'&&m.url&&m.url.length>50});
+    if(!imgs.length)return;
+    for(var ii=0;ii<imgs.length;ii++){
+        var m=imgs[ii];
+        var maxW=CW-20,maxH=80;
+        try{
+            var sz=await ppGetImgSize(m.url);
+            var ratio=sz.w/sz.h;
+            var drawW=maxW;
+            var drawH=drawW/ratio;
+            if(drawH>maxH){drawH=maxH;drawW=drawH*ratio}
+            checkSpace(drawH+8);
+            var imgX=MG+(CW-drawW)/2;
+            doc.addImage(m.url,'JPEG',imgX,y,drawW,drawH);
+            y+=drawH+2;
+            if(m.title){
+                doc.setFontSize(7);doc.setTextColor(cGray[0],cGray[1],cGray[2]);doc.setFont('helvetica','italic');
+                doc.text(m.title,105,y+2,{align:'center'});
+                y+=5;
+            }
+        }catch(e){y+=2}
+    }
+}
+
+// =============================================
+// PAGINA 2: SCOUTING
+// =============================================
+newPage();
+miniHeader();
+y=26;
+
+sectionHeader('SCOUTING DEL RIVAL',cDark);
+
+if(plan.rival_formation||plan.rival_style){
+    checkSpace(12);
+    doc.setFillColor(241,245,249);doc.roundedRect(MG,y,CW,10,2,2,'F');
+    doc.setFontSize(9);doc.setFont('helvetica','bold');doc.setTextColor(cDark[0],cDark[1],cDark[2]);
+    var formText=[];
+    if(plan.rival_formation)formText.push('Formacion: '+plan.rival_formation);
+    if(plan.rival_style)formText.push('Estilo: '+plan.rival_style);
+    doc.text(formText.join('     '),MG+5,y+6.5);
+    y+=14;
+}
+
+if(plan.rival_strengths||plan.rival_weaknesses){
+    checkSpace(30);
+    var halfW=(CW-4)/2;
+    var startY=y;
+    var endY1=startY,endY2=startY;
+    if(plan.rival_strengths){
+        doc.setFillColor(cGreen[0],cGreen[1],cGreen[2]);doc.roundedRect(MG,y,halfW,6,1.5,1.5,'F');
+        doc.setTextColor(255,255,255);doc.setFontSize(8);doc.setFont('helvetica','bold');
+        doc.text('PUNTOS FUERTES',MG+3,y+4.2);
+        var sy=y+9;
+        doc.setFontSize(8);doc.setFont('helvetica','normal');doc.setTextColor(50,50,50);
+        doc.splitTextToSize(plan.rival_strengths,halfW-6).forEach(function(ln){
+            if(sy<278){doc.text(ln,MG+3,sy);sy+=3.5}
+        });
+        endY1=sy;
+    }
+    if(plan.rival_weaknesses){
+        var rx=MG+halfW+4;
+        doc.setFillColor(cRed[0],cRed[1],cRed[2]);doc.roundedRect(rx,startY,halfW,6,1.5,1.5,'F');
+        doc.setTextColor(255,255,255);doc.setFontSize(8);doc.setFont('helvetica','bold');
+        doc.text('PUNTOS DEBILES',rx+3,startY+4.2);
+        var sy2=startY+9;
+        doc.setFontSize(8);doc.setFont('helvetica','normal');doc.setTextColor(50,50,50);
+        doc.splitTextToSize(plan.rival_weaknesses,halfW-6).forEach(function(ln){
+            if(sy2<278){doc.text(ln,rx+3,sy2);sy2+=3.5}
+        });
+        endY2=sy2;
+    }
+    y=Math.max(endY1,endY2)+4;
+}
+
+// =============================================
+// JUGADORES
+// =============================================
+var jg=plan.rival_players||[];
+if(jg.length){
+    checkSpace(14);
+    sectionHeader('JUGADORES RIVAL ('+jg.length+')',cDark);
+
+    var lineas=[
+        {key:'porteros',label:'PORTEROS',color:cGreen,poss:PP_LINEAS.porteros.posiciones},
+        {key:'defensas',label:'DEFENSAS',color:cBlue,poss:PP_LINEAS.defensas.posiciones},
+        {key:'medios',label:'MEDIOS',color:cAccent,poss:PP_LINEAS.medios.posiciones},
+        {key:'delanteros',label:'DELANTEROS',color:cRed,poss:PP_LINEAS.delanteros.posiciones}
+    ];
+
+    lineas.forEach(function(lin){
+        var jugLin=jg.filter(function(j){return lin.poss.indexOf(j.position)>=0});
+        if(!jugLin.length)return;
+        checkSpace(10);
+        subHeader(lin.label+' ('+jugLin.length+')',lin.color);
+
+        jugLin.forEach(function(j){
+            checkSpace(22);
+            doc.setFillColor(cDark[0],cDark[1],cDark[2]);
+            doc.circle(MG+6,y+5,4.5,'F');
+            doc.setTextColor(cAccent[0],cAccent[1],cAccent[2]);doc.setFontSize(9);doc.setFont('helvetica','bold');
+            doc.text(String(j.number||'?'),MG+6,y+6.2,{align:'center'});
+
+            doc.setTextColor(cDark[0],cDark[1],cDark[2]);doc.setFontSize(10);doc.setFont('helvetica','bold');
+            doc.text(j.name||'?',MG+14,y+4.5);
+            doc.setFontSize(7);doc.setFont('helvetica','normal');doc.setTextColor(cGray[0],cGray[1],cGray[2]);
+            var meta=[];
+            if(j.position)meta.push(j.position);
+            if(j.foot)meta.push(j.foot);
+            if(j.year)meta.push(String(j.year));
+            if(j.club_from)meta.push('Proc: '+j.club_from);
+            doc.text(meta.join(' - '),MG+14,y+8);
+
+            var stats=[];
+            if(j.games)stats.push('PJ:'+j.games);
+            if(j.minutes)stats.push(j.minutes+"'");
+            if(j.goals)stats.push(j.goals+' gol'+(j.goals>1?'es':''));
+            if(stats.length){
+                doc.setFontSize(7);doc.setTextColor(cAccent[0],cAccent[1],cAccent[2]);doc.setFont('helvetica','bold');
+                doc.text(stats.join(' - '),W-MG-2,y+4.5,{align:'right'});
+            }
+            y+=10;
+
+            if(j.analysis){
+                doc.setFontSize(8);doc.setFont('helvetica','normal');doc.setTextColor(60,60,70);
+                var alines=doc.splitTextToSize(j.analysis,CW-16);
+                alines.forEach(function(ln){
+                    checkSpace(4);
+                    doc.text(ln,MG+14,y+2);
+                    y+=3.5;
+                });
+            }
+            y+=2;
+            doc.setDrawColor(226,232,240);doc.setLineWidth(0.2);
+            doc.line(MG+14,y,W-MG,y);
+            y+=3;
+        });
+    });
+}
+
+// =============================================
+// FASES DEL JUEGO RIVAL
+// =============================================
+var fa=plan.tactical_phases||[];
+var fasesConContenido=fa.filter(function(f){return f.notes||(f.media&&f.media.length)});
+if(fasesConContenido.length){
+    checkSpace(14);
+    sectionHeader('FASES DEL JUEGO RIVAL',cDark);
+
+    var faseColors=[[15,110,86],[8,80,65],[153,60,29],[12,68,124],[60,52,137],[113,43,19]];
+    for(var fi=0;fi<fa.length;fi++){
+        var f=fa[fi];
+        if(!f.notes&&(!f.media||!f.media.length))continue;
+        checkSpace(16);
+
+        var fc=faseColors[fi%faseColors.length];
+        doc.setFillColor(fc[0],fc[1],fc[2]);doc.roundedRect(MG,y,CW,7,1.5,1.5,'F');
+        doc.setTextColor(255,255,255);doc.setFontSize(9);doc.setFont('helvetica','bold');
+        doc.text(f.title,MG+4,y+5);
+        y+=10;
+
+        if(f.notes){textBlock(f.notes)}
+        await addMediaImages(f.media);
+    }
+}
+
+// =============================================
+// PLAN TACTICO PROPIO
+// =============================================
+var ourPhases=ppGetOurPhases();
+var hasOur=false;
+PP_OUR_SECTIONS.forEach(function(sec){if(sec.id){var d=ourPhases[sec.id];if(d&&(d.notes||(d.media&&d.media.length)))hasOur=true}});
+
+if(hasOur){
+    checkSpace(14);
+    sectionHeader('PLAN TACTICO PROPIO'+(plan.our_formation?' — '+plan.our_formation:''),cDark);
+
+    for(var si=0;si<PP_OUR_SECTIONS.length;si++){
+        var sec=PP_OUR_SECTIONS[si];
+        if(sec.type==='title'){
+            checkSpace(10);
+            var tColor=sec.color==='#22c55e'?cGreen:sec.color==='#3b82f6'?cBlue:sec.color==='#f59e0b'?cAccent:cPurple;
+            subHeader(sec.label,tColor);
+            continue;
+        }
+        var d=ourPhases[sec.id];
+        if(!d||(!d.notes&&(!d.media||!d.media.length)))continue;
+
+        checkSpace(10);
+        doc.setFontSize(9);doc.setFont('helvetica','bold');
+        var secColor=sec.color==='#22c55e'?cGreen:sec.color==='#3b82f6'?cBlue:sec.color==='#f59e0b'?cAccent:cPurple;
+        doc.setTextColor(secColor[0],secColor[1],secColor[2]);
+        doc.text(sec.title+':',MG+6,y+3);
+        y+=6;
+
+        if(d.notes){textBlock(d.notes,4)}
+        await addMediaImages(d.media);
+    }
+}
+
+// =============================================
+// ABPs
+// =============================================
+var abpCards=ppGetAbpCards();
+if(abpCards.length){
+    checkSpace(14);
+    sectionHeader('ABPs — ACCIONES A BALON PARADO ('+abpCards.length+')',cPurple);
+
+    var jugP=pp.plantilla;
+    var jugR=(plan.rival_players||[]).map(function(j,i){return{id:'r_'+i,number:j.number,name:j.name}});
+
+    for(var ci=0;ci<abpCards.length;ci++){
+        var c=abpCards[ci];
+        checkSpace(30);
+        var esOf=c.tipo==='ofensiva';
+        var abpColor=esOf?cGreen:cBlue;
+
+        doc.setFillColor(abpColor[0],abpColor[1],abpColor[2]);doc.roundedRect(MG,y,CW,8,2,2,'F');
+        doc.setTextColor(255,255,255);doc.setFontSize(10);doc.setFont('helvetica','bold');
+        doc.text((c.name||'ABP '+(ci+1)),MG+4,y+5.5);
+        var tags=[c.tipo.toUpperCase(),c.subtipo,c.espacio,c.perfil,c.distancia].filter(Boolean);
+        doc.setFontSize(7);doc.setFont('helvetica','normal');
+        doc.text(tags.join(' | '),W-MG-2,y+5.5,{align:'right'});
+        y+=12;
+
+        // Imagen ABP respetando proporcion
+        if(c.imagen&&c.imagen.length>50){
+            try{
+                var abpSz=await ppGetImgSize(c.imagen);
+                var abpRatio=abpSz.w/abpSz.h;
+                var abpMaxW=CW-20,abpMaxH=70;
+                var abpW=abpMaxW,abpH=abpW/abpRatio;
+                if(abpH>abpMaxH){abpH=abpMaxH;abpW=abpH*abpRatio}
+                checkSpace(abpH+6);
+                var abpX=MG+(CW-abpW)/2;
+                doc.setDrawColor(abpColor[0],abpColor[1],abpColor[2]);doc.setLineWidth(0.8);
+                doc.roundedRect(abpX-1,y-1,abpW+2,abpH+2,2,2,'S');
+                doc.addImage(c.imagen,'JPEG',abpX,y,abpW,abpH);
+                y+=abpH+4;
+            }catch(e){}
+        }
+
+        if(esOf){
+            var hasRoles=false;
+            PP_ABP_ROLES_OF.forEach(function(r){if((c['of_'+r]||[]).length)hasRoles=true});
+            if(hasRoles){
+                checkSpace(8);
+                PP_ABP_ROLES_OF.forEach(function(r){
+                    var pls=c['of_'+r]||[];
+                    if(!pls.length)return;
+                    checkSpace(5);
+                    doc.setFontSize(8);doc.setFont('helvetica','bold');doc.setTextColor(abpColor[0],abpColor[1],abpColor[2]);
+                    doc.text(PP_ABP_ROLES_OF_LABELS[r]+':',MG+4,y+3);
+                    doc.setFont('helvetica','normal');doc.setTextColor(50,50,50);
+                    doc.text(pls.map(function(pid){return ppAbpPlayerName(pid,jugP)}).join(', '),MG+30,y+3);
+                    y+=5;
+                });
+            }
+            if(c.sena){
+                checkSpace(5);
+                doc.setFontSize(8);doc.setFont('helvetica','bold');doc.setTextColor(cPurple[0],cPurple[1],cPurple[2]);
+                doc.text('Sena:',MG+4,y+3);
+                doc.setFont('helvetica','normal');doc.setTextColor(50,50,50);
+                doc.text(c.sena,MG+20,y+3);
+                y+=5;
+            }
+        }
+
+        if(!esOf){
+            var marcas=c.marcas||[];
+            var hasMarcas=marcas.some(function(m){return m.rival_idx||m.propio_id});
+            if(hasMarcas){
+                checkSpace(8);
+                doc.setFontSize(8);doc.setFont('helvetica','bold');doc.setTextColor(abpColor[0],abpColor[1],abpColor[2]);
+                doc.text('MARCAS:',MG+4,y+3);y+=5;
+                marcas.forEach(function(m,mi){
+                    if(!m.rival_idx&&!m.propio_id)return;
+                    checkSpace(5);
+                    doc.setFillColor(mi%2===0?245:250,247,252);doc.roundedRect(MG+4,y-1,CW-8,5,1,1,'F');
+                    doc.setFontSize(7.5);doc.setFont('helvetica','normal');doc.setTextColor(50,50,50);
+                    doc.text(ppAbpPlayerName(m.rival_idx,jugR),MG+8,y+2.5);
+                    doc.setTextColor(cAccent[0],cAccent[1],cAccent[2]);doc.setFont('helvetica','bold');
+                    doc.text('vs',105,y+2.5,{align:'center'});
+                    doc.setTextColor(50,50,50);doc.setFont('helvetica','normal');
+                    doc.text(ppAbpPlayerName(m.propio_id,jugP),112,y+2.5);
+                    y+=5.5;
+                });
+            }
+            PP_ABP_ROLES_DF.forEach(function(r){
+                var pls=c['df_'+r]||[];
+                if(!pls.length)return;
+                checkSpace(5);
+                doc.setFontSize(8);doc.setFont('helvetica','bold');doc.setTextColor(abpColor[0],abpColor[1],abpColor[2]);
+                doc.text(PP_ABP_ROLES_DF_LABELS[r]+':',MG+4,y+3);
+                doc.setFont('helvetica','normal');doc.setTextColor(50,50,50);
+                doc.text(pls.map(function(pid){return ppAbpPlayerName(pid,jugP)}).join(', '),MG+30,y+3);
+                y+=5;
+            });
+            if(c.df_barrera&&c.df_barrera.length){
+                checkSpace(5);
+                doc.setFontSize(8);doc.setFont('helvetica','bold');doc.setTextColor(abpColor[0],abpColor[1],abpColor[2]);
+                doc.text('Barrera:',MG+4,y+3);
+                doc.setFont('helvetica','normal');doc.setTextColor(50,50,50);
+                doc.text(c.df_barrera.map(function(pid){return ppAbpPlayerName(pid,jugP)}).join(', '),MG+24,y+3);
+                y+=5;
+            }
+        }
+
+        if(c.explicacion){
+            checkSpace(8);
+            doc.setFontSize(8);doc.setFont('helvetica','bold');doc.setTextColor(cGray[0],cGray[1],cGray[2]);
+            doc.text('Explicacion:',MG+4,y+3);y+=4;
+            textBlock(c.explicacion,4);
+        }
+
+        y+=3;
+        doc.setDrawColor(226,232,240);doc.setLineWidth(0.3);
+        doc.line(MG,y,W-MG,y);
+        y+=5;
+    }
+}
+
+// =============================================
+// PLAN SEMANAL
+// =============================================
+var ob=plan.weekly_objectives||[];
+if(ob.length){
+    checkSpace(14);
+    sectionHeader('PLAN SEMANAL ('+ob.length+' objetivos)',cAccent);
+
+    ob.forEach(function(o,i){
+        checkSpace(16);
+        var cont=PP_CONTENIDOS.find(function(c){return c.id===o.contenido});
+        var cc=!cont?cGray:cont.color==='#f97316'?[249,115,22]:cont.color==='#eab308'?[234,179,8]:cont.color==='#22c55e'?cGreen:cont.color==='#3b82f6'?cBlue:cGray;
+
+        doc.setFillColor(cc[0],cc[1],cc[2]);doc.circle(MG+4,y+3,3,'F');
+        doc.setTextColor(255,255,255);doc.setFontSize(9);doc.setFont('helvetica','bold');
+        doc.text(String(i+1),MG+4,y+4.2,{align:'center'});
+
+        doc.setTextColor(cDark[0],cDark[1],cDark[2]);doc.setFontSize(10);
+        doc.text(o.text,MG+10,y+4.5);
+        y+=7;
+
+        var meta2=[];
+        if(cont)meta2.push(cont.label);
+        if(o.session_day)meta2.push(o.session_day);
+        if(o.ejercicios&&o.ejercicios.length)meta2.push(o.ejercicios.length+' ejercicio'+(o.ejercicios.length>1?'s':''));
+        if(meta2.length){
+            doc.setFontSize(7);doc.setFont('helvetica','normal');doc.setTextColor(cGray[0],cGray[1],cGray[2]);
+            doc.text(meta2.join('  |  '),MG+10,y+2);
+            y+=5;
+        }
+
+        if(o.notas){
+            doc.setFontSize(8);doc.setFont('helvetica','italic');doc.setTextColor(cGray[0],cGray[1],cGray[2]);
+            doc.text(o.notas,MG+10,y+2);
+            y+=5;
+        }
+
+        if(o.ejercicios&&o.ejercicios.length){
+            o.ejercicios.forEach(function(ej){
+                checkSpace(5);
+                doc.setFontSize(7);doc.setFont('helvetica','normal');doc.setTextColor(cPurple[0],cPurple[1],cPurple[2]);
+                doc.text('> '+ej.name+(ej.category?' ('+ej.category+')':''),MG+14,y+2);
+                y+=4;
+            });
+        }
+        y+=2;
+    });
+}
+
+// =============================================
+// PIE DE PAGINA
+// =============================================
+var tp=doc.internal.getNumberOfPages();
+for(var pg=1;pg<=tp;pg++){
+    doc.setPage(pg);
+    if(pg===1)continue;
+    doc.setFillColor(cDark[0],cDark[1],cDark[2]);doc.rect(0,287,W,10,'F');
+    doc.setFillColor(cAccent[0],cAccent[1],cAccent[2]);doc.rect(0,287,W,0.5,'F');
+    doc.setFontSize(7);doc.setTextColor(cGray[0],cGray[1],cGray[2]);
+    doc.text('TopLiderCoach HUB — '+localName+' vs '+visitName,105,292,{align:'center'});
+    doc.text(pg+'/'+tp,W-MG,292,{align:'right'});
+    doc.setTextColor(cAccent[0],cAccent[1],cAccent[2]);
+    doc.text(fecha,MG,292);
+}
+
+doc.save('PlanPartido_'+rivalNom.replace(/\s+/g,'_')+'.pdf');
+showToast('PDF generado');
+}
 
 function ppPresentacion(){if(!pp.planActual||!pp.partidoActual)return;var plan=pp.planActual,par=pp.partidoActual,sl=[];var rN=par.opponent;var eR=(pp.rivalActual&&pp.rivalActual.logo_url)?'<img src="'+pp.rivalActual.logo_url+'" style="width:120px;height:120px;object-fit:contain">':'<div style="width:120px;height:120px;background:#1e293b;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:60px">🛡️</div>';var eP=(clubData&&clubData.logo_url)?'<img src="'+clubData.logo_url+'" style="width:120px;height:120px;object-fit:contain">':'';var fe=new Date(par.match_date+'T12:00:00').toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'});sl.push('<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:24px">'+eR+'<div style="font-size:48px;font-weight:800;color:#fff;text-transform:uppercase">'+ppEsc(rN)+'</div><div style="font-size:24px;color:#f59e0b">'+(par.competition||'')+'</div><div style="font-size:20px;color:#94a3b8">'+fe+'</div></div>');if(plan.rival_formation){var sP=ppParseFormacion(plan.rival_formation);if(sP)sl.push('<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;padding:20px"><div style="font-size:28px;color:#fff;font-weight:700;margin-bottom:16px">'+ppEsc(rN)+' — '+plan.rival_formation+'</div>'+ppRenderCampo(sP,(plan.weekly_map&&plan.weekly_map.rival_lineup)||{},plan.rival_players||[],'big')+'</div>')}if(plan.rival_strengths||plan.rival_weaknesses){sl.push('<div style="padding:40px"><h2 style="font-size:36px;color:#fff;margin:0 0 30px;border-bottom:3px solid #f59e0b;padding-bottom:10px">Scouting</h2><div style="display:grid;grid-template-columns:1fr 1fr;gap:30px">'+(plan.rival_strengths?'<div><div style="font-size:18px;color:#22c55e;font-weight:700;margin-bottom:10px">💪 Fuertes</div><div style="font-size:16px;color:#e2e8f0;line-height:1.6;white-space:pre-wrap">'+ppEsc(plan.rival_strengths)+'</div></div>':'')+(plan.rival_weaknesses?'<div><div style="font-size:18px;color:#ef4444;font-weight:700;margin-bottom:10px">📉 Debiles</div><div style="font-size:16px;color:#e2e8f0;line-height:1.6;white-space:pre-wrap">'+ppEsc(plan.rival_weaknesses)+'</div></div>':'')+'</div></div>')}(plan.tactical_phases||[]).forEach(function(f){if(!f.notes&&(!f.media||!f.media.length))return;var imgs='';if(f.media&&f.media.length){var ii=f.media.filter(function(m){return (m.type==='image'||m.type==='video'||m.type==='link')&&m.url});if(ii.length){imgs='<div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:20px;justify-content:center">';ii.forEach(function(m){if(m.type==='image'){imgs+='<div style="text-align:center"><img src="'+m.url+'" onclick="ppMostrarVisor(this.src)" style="max-width:400px;max-height:300px;cursor:pointer;border-radius:8px;border:2px solid rgba(255,255,255,0.2)"><div style="font-size:12px;color:#94a3b8;margin-top:6px">'+ppEsc(m.title||'')+'</div></div>'}else{imgs+='<div style="text-align:center"><a href="'+ppEsc(m.url)+'" target="_blank" style="display:inline-flex;align-items:center;gap:8px;padding:10px 20px;background:#1e293b;border:2px solid #f97316;border-radius:10px;color:#f97316;text-decoration:none;font-size:14px;font-weight:600;cursor:pointer">🎬 '+ppEsc(m.title||'Ver video')+'</a></div>'}});imgs+='</div>'}}sl.push('<div style="padding:40px;overflow-y:auto;height:100%"><h2 style="font-size:32px;color:#fff;margin:0 0 24px;border-bottom:3px solid #f59e0b;padding-bottom:10px">'+ppEsc(f.title)+'</h2>'+(f.notes?'<div style="font-size:18px;color:#e2e8f0;line-height:1.8;white-space:pre-wrap">'+ppEsc(f.notes)+'</div>':'')+imgs+'</div>')});var ourPhases2=ppGetOurPhases();var currentTitle='';PP_OUR_SECTIONS.forEach(function(sec){if(sec.type==='title'){currentTitle=sec.label;return}var d=ourPhases2[sec.id];if(!d||(!d.notes&&(!d.media||!d.media.length)))return;var imgs='';if(d.media&&d.media.length){var ii=d.media.filter(function(m){return (m.type==='image'||m.type==='video'||m.type==='link')&&m.url});if(ii.length){imgs='<div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:20px;justify-content:center">';ii.forEach(function(m){if(m.type==='image'){imgs+='<div style="text-align:center"><img src="'+m.url+'" onclick="ppMostrarVisor(this.src)" style="max-width:400px;max-height:300px;cursor:pointer;border-radius:8px;border:2px solid rgba(255,255,255,0.2)"><div style="font-size:12px;color:#94a3b8;margin-top:6px">'+ppEsc(m.title||'')+'</div></div>'}else{imgs+='<div style="text-align:center"><a href="'+ppEsc(m.url)+'" target="_blank" style="display:inline-flex;align-items:center;gap:8px;padding:10px 20px;background:#1e293b;border:2px solid #f97316;border-radius:10px;color:#f97316;text-decoration:none;font-size:14px;font-weight:600;cursor:pointer">🎬 '+ppEsc(m.title||'Ver video')+'</a></div>'}});imgs+='</div>'}}sl.push('<div style="padding:40px;overflow-y:auto;height:100%"><div style="font-size:14px;color:'+sec.color+';text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">'+currentTitle+'</div><h2 style="font-size:32px;color:#fff;margin:0 0 24px;border-bottom:3px solid '+sec.color+';padding-bottom:10px">'+ppEsc(sec.title)+'</h2>'+(d.notes?'<div style="font-size:18px;color:#e2e8f0;line-height:1.8;white-space:pre-wrap">'+ppEsc(d.notes)+'</div>':'')+imgs+'</div>')});var abpCards=ppGetAbpCards();if(abpCards.length){sl.push('<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%"><h2 style="font-size:42px;color:#a855f7;font-weight:800;margin:0">🎯 ABPs</h2><div style="font-size:20px;color:#94a3b8;margin-top:10px">'+abpCards.length+' accion'+(abpCards.length>1?'es':'')+' a balon parado</div></div>');abpCards.forEach(function(c){var tags=[c.tipo,c.subtipo,c.espacio,c.perfil].filter(Boolean).join(' · ');var color=c.tipo==='ofensiva'?'#22c55e':'#3b82f6';var imgHtml=c.imagen&&c.imagen.length>50?'<div style="margin:16px auto;text-align:center"><img src="'+c.imagen+'" onclick="ppMostrarVisor(this.src)" style="max-width:700px;max-height:400px;border-radius:12px;border:3px solid '+color+';cursor:pointer"></div>':'';var rolesHtml='';if(c.tipo==='ofensiva'){var rols=[];PP_ABP_ROLES_OF.forEach(function(r){var pls=c['of_'+r]||[];if(pls.length)rols.push('<span style="color:'+color+';font-weight:700">'+PP_ABP_ROLES_OF_LABELS[r]+':</span> '+pls.map(function(pid){return ppAbpPlayerName(pid,pp.plantilla)}).join(', '))});if(c.sena)rols.push('<span style="color:#a855f7;font-weight:700">Seña:</span> '+ppEsc(c.sena));if(rols.length)rolesHtml='<div style="font-size:16px;color:#e2e8f0;line-height:2;margin-top:16px">'+rols.join('<br>')+'</div>'}if(c.tipo==='defensiva'){var rols=[];(c.marcas||[]).forEach(function(m,i){if(m.rival_idx||m.propio_id){var rn=ppAbpPlayerName(m.rival_idx,(pp.planActual.rival_players||[]).map(function(j,k){return{id:'r_'+k,number:j.number,name:j.name}}));var pn=ppAbpPlayerName(m.propio_id,pp.plantilla);rols.push('<span style="color:#f59e0b">Marca '+(i+1)+':</span> '+rn+' ⚔️ '+pn)}});PP_ABP_ROLES_DF.forEach(function(r){var pls=c['df_'+r]||[];if(pls.length)rols.push('<span style="color:'+color+';font-weight:700">'+PP_ABP_ROLES_DF_LABELS[r]+':</span> '+pls.map(function(pid){return ppAbpPlayerName(pid,pp.plantilla)}).join(', '))});if(rols.length)rolesHtml='<div style="font-size:15px;color:#e2e8f0;line-height:2;margin-top:16px">'+rols.join('<br>')+'</div>'}sl.push('<div style="padding:30px;overflow-y:auto;height:100%"><div style="display:flex;align-items:center;gap:12px;margin-bottom:8px"><div style="font-size:14px;color:'+color+';text-transform:uppercase;letter-spacing:1px;font-weight:700">'+ppEsc(c.tipo)+'</div><div style="font-size:12px;color:#64748b">'+ppEsc(tags)+'</div></div><h2 style="font-size:32px;color:#fff;margin:0 0 12px;border-bottom:3px solid '+color+';padding-bottom:10px">'+ppEsc(c.name||'ABP')+'</h2>'+imgHtml+rolesHtml+(c.explicacion?'<div style="font-size:16px;color:#94a3b8;margin-top:16px;line-height:1.6;white-space:pre-wrap">'+ppEsc(c.explicacion)+'</div>':'')+'</div>')})}
 (plan.linked_exercises||[]).forEach(function(ej){if(ej.thumbnail_svg)sl.push('<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;padding:40px"><div style="font-size:24px;color:#fff;font-weight:700;margin-bottom:16px">'+ppEsc(ej.name)+'</div><div style="width:80%;max-width:900px;aspect-ratio:8/5;border-radius:12px;overflow:hidden;background:#0f4c2a">'+ej.thumbnail_svg+'</div></div>')});sl.push('<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:20px">'+eP+'<div style="font-size:36px;font-weight:800;color:#f59e0b">VAMOS A POR ELLOS</div></div>');if(!sl.length){showToast('Sin contenido');return}window._ppPresSlides=sl;window._ppPresIdx=0;function render(){var c=document.getElementById('pp-pres-content');if(c)c.innerHTML=sl[window._ppPresIdx];var ct=document.getElementById('pp-pres-counter');if(ct)ct.textContent=(window._ppPresIdx+1)+' / '+sl.length}window._ppPresRender=render;var ov=document.createElement('div');ov.id='pp-presentacion';ov.style.cssText='position:fixed;inset:0;z-index:99999;background:#0a0a0a;display:flex;flex-direction:column';ov.innerHTML='<div id="pp-pres-content" style="flex:1;overflow-y:auto;display:flex;align-items:center;justify-content:center"></div><div style="padding:12px 20px;display:flex;align-items:center;justify-content:space-between;background:#111"><button onclick="ppPresAnterior()" style="padding:8px 20px;background:#1e293b;border:1px solid #334155;color:#94a3b8;border-radius:6px;cursor:pointer;font-size:14px">← Anterior</button><span id="pp-pres-counter" style="color:#64748b;font-size:14px"></span><div style="display:flex;gap:8px"><button onclick="ppPresSiguiente()" style="padding:8px 20px;background:#3b82f6;border:none;color:#fff;border-radius:6px;cursor:pointer;font-size:14px">Siguiente →</button><button onclick="ppPresCerrar()" style="padding:8px 16px;background:#7f1d1d;border:1px solid #dc2626;color:#fca5a5;border-radius:6px;cursor:pointer;font-size:14px">✕ Salir</button></div></div>';document.body.appendChild(ov);render();document.addEventListener('keydown',ppPresKeyHandler)}

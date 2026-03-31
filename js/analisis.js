@@ -22,7 +22,7 @@ async function cargarPartidosParaAnalisis() {
     
     if (partidos && partidos.length > 0) {
         partidos.forEach(p => {
-            const fecha = new Date(p.match_date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+            const fecha = new Date(p.match_date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
             const esLocal = p.home_away === 'home';
             const gF = p.team_goals || 0;
             const gC = p.opponent_goals || 0;
@@ -67,7 +67,7 @@ async function cargarAnalisisPartido() {
 
 function mostrarInfoPartido(partido) {
     const info = document.getElementById('analisis-partido-info');
-    const fecha = new Date(partido.match_date).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    const fecha = new Date(partido.match_date + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
     const esLocal = partido.home_away === 'home';
     const gF = partido.team_goals || 0;
     const gC = partido.opponent_goals || 0;
@@ -714,7 +714,7 @@ async function cargarHistorialRival(nombreRival) {
         let html = '<div class="historial-lista">';
         
         for (const p of partidos) {
-            const fecha = new Date(p.match_date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
+            const fecha = new Date(p.match_date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
             const esLocal = p.home_away === 'home';
             const gF = p.team_goals || 0;
             const gC = p.opponent_goals || 0;
@@ -754,7 +754,7 @@ async function generarPDFAnalisis() {
     const doc = new jsPDF();
     
     const partido = partidoSeleccionadoAnalisis;
-    const fecha = new Date(partido.match_date).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    const fecha = new Date(partido.match_date + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
     const esLocal = partido.home_away === 'home';
     const gF = partido.team_goals || 0;
     const gC = partido.opponent_goals || 0;
