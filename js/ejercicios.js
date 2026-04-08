@@ -99,12 +99,14 @@ const ejP = {
     lineWidth: 3,
     shapeFill: false,
     shapeFillOpacity: 0.3,
+    shapeFillType: 'solid',
 
     players: [],
     lines: [],
     shapes: [],
     texts: [],
     equipment: [],
+    connections: [],
     selectedEquipmentType: 'cone',
 
     selectedId: null,
@@ -142,7 +144,7 @@ function ejSaveHistory() {
         lines:   JSON.stringify(ejP.lines),
         shapes:  JSON.stringify(ejP.shapes),
         texts:     JSON.stringify(ejP.texts),
-        equipment: JSON.stringify(ejP.equipment)
+        equipment: JSON.stringify(ejP.equipment), connections: JSON.stringify(ejP.connections)
     };
     ejP.history = ejP.history.slice(0, ejP.histIdx + 1);
     ejP.history.push(snap);
@@ -159,7 +161,7 @@ function ejUndo() {
     ejP.lines     = JSON.parse(s.lines);
     ejP.shapes    = JSON.parse(s.shapes);
     ejP.texts     = JSON.parse(s.texts);
-    ejP.equipment = s.equipment ? JSON.parse(s.equipment) : [];
+    ejP.equipment = s.equipment ? JSON.parse(s.equipment) : []; ejP.connections = s.connections ? JSON.parse(s.connections) : [];
     ejP.selectedId = null;
     ejP.isUndoRedo = false;
     ejRenderSVG();
@@ -174,7 +176,7 @@ function ejRedo() {
     ejP.lines     = JSON.parse(s.lines);
     ejP.shapes    = JSON.parse(s.shapes);
     ejP.texts     = JSON.parse(s.texts);
-    ejP.equipment = s.equipment ? JSON.parse(s.equipment) : [];
+    ejP.equipment = s.equipment ? JSON.parse(s.equipment) : []; ejP.connections = s.connections ? JSON.parse(s.connections) : [];
     ejP.selectedId = null;
     ejP.isUndoRedo = false;
     ejRenderSVG();
@@ -199,6 +201,16 @@ function ejRenderSVG() {
             </pattern>`;
         }
     }
+    for (const s of ejP.shapes) {
+        if (s.fillType === 'hatched') {
+            var hCol = s.color || '#ffffff';
+            var hOp = s.fillOpacity ?? 0.5;
+            defs += '<pattern id="hatch-' + s.id + '" patternUnits="userSpaceOnUse" width="10" height="10" patternTransform="rotate(45)">';
+            defs += '<rect width="10" height="10" fill="' + hCol + '" opacity="' + (hOp * 0.15) + '"/>';
+            defs += '<line x1="0" y1="0" x2="0" y2="10" stroke="' + hCol + '" stroke-width="2.5" opacity="' + hOp + '"/>';
+            defs += '</pattern>';
+        }
+    }
     defs += '</defs>';
 
     // Campo
@@ -212,18 +224,20 @@ function ejRenderSVG() {
         const sw = s.strokeWidth || 3;
         const dash = s.dashed ? '10 5' : 'none';
         if (s.type === 'rect') {
+            var _rf = s.fillType === 'hatched' ? 'url(#hatch-' + s.id + ')' : (s.fill || 'none');
             html += `<rect data-id="${s.id}" data-type="shape"
                 x="${s.x||0}" y="${s.y||0}" width="${s.w||0}" height="${s.h||0}"
-                fill="${s.fill||'none'}" stroke="${s.color}" stroke-width="${sel?sw+1:sw}"
+                fill="${_rf}" stroke="${s.color}" stroke-width="${sel?sw+1:sw}"
                 stroke-dasharray="${dash}" style="cursor:${ejP.activeTool==='select'?'move':'crosshair'};pointer-events:${ejP.activeTool==='select'?'auto':'none'}"/>`;
             if (sel) {
                 html += `<rect x="${s.x-3}" y="${s.y-3}" width="${s.w+6}" height="${s.h+6}"
                     fill="none" stroke="#22c55e" stroke-width="1.5" stroke-dasharray="4 2" rx="2"/>`;
             }
         } else if (s.type === 'ellipse') {
+            var _ef = s.fillType === 'hatched' ? 'url(#hatch-' + s.id + ')' : (s.fill || 'none');
             html += `<ellipse data-id="${s.id}" data-type="shape"
                 cx="${s.cx}" cy="${s.cy}" rx="${s.rx}" ry="${s.ry}"
-                fill="${s.fill||'none'}" stroke="${s.color}" stroke-width="${sel?sw+1:sw}"
+                fill="${_ef}" stroke="${s.color}" stroke-width="${sel?sw+1:sw}"
                 stroke-dasharray="${dash}" style="cursor:${ejP.activeTool==='select'?'move':'crosshair'};pointer-events:${ejP.activeTool==='select'?'auto':'none'}"/>`;
             if (sel) {
                 html += `<ellipse cx="${s.cx}" cy="${s.cy}" rx="${s.rx+3}" ry="${s.ry+3}"
@@ -246,6 +260,8 @@ function ejRenderSVG() {
         </g>`;
     }
 
+    // Conexiones entre jugadores
+    for (var _ci = 0; _ci < ejP.connections.length; _ci++) { var conn = ejP.connections[_ci]; var _pFrom = ejP.players.find(function(p) { return p.id === conn.from; }); var _pTo = ejP.players.find(function(p) { return p.id === conn.to; }); if (_pFrom && _pTo) { var _cSel = conn.id === ejP.selectedId; var _cSw = conn.strokeWidth || 3; var _cDash = conn.dashed ? '10 5' : 'none'; html += '<g data-id="' + conn.id + '" data-type="connection" style="cursor:pointer"><line x1="' + _pFrom.x + '" y1="' + _pFrom.y + '" x2="' + _pTo.x + '" y2="' + _pTo.y + '" stroke="transparent" stroke-width="16"/><line x1="' + _pFrom.x + '" y1="' + _pFrom.y + '" x2="' + _pTo.x + '" y2="' + _pTo.y + '" stroke="' + conn.color + '" stroke-width="' + (_cSel ? _cSw + 1 : _cSw) + '" stroke-dasharray="' + _cDash + '" stroke-linecap="round"/>' + (_cSel ? '<circle cx="' + _pFrom.x + '" cy="' + _pFrom.y + '" r="6" fill="#22c55e" opacity="0.7"/><circle cx="' + _pTo.x + '" cy="' + _pTo.y + '" r="6" fill="#22c55e" opacity="0.7"/>' : '') + '</g>'; } }
     // Líneas y flechas
     for (const l of ejP.lines) {
         if (ejP.animMode && l.fromFrame !== undefined && (ejP.currentFrame < l.fromFrame || (l.toFrame !== undefined && ejP.currentFrame >= l.toFrame))) continue;
@@ -483,8 +499,8 @@ function ejSvgPointerDown(e) {
     ejRenderSVG();
     return;
 }
-
-    // Herramienta jugador
+// Herramienta conectar jugadores
+if (ejP.activeTool === 'connect') { if (!isBackground && el) { var _cid = parseInt(el.dataset.id); var _ctype = el.dataset.type; if (_ctype === 'player') { if (!ejP._connectFrom) { ejP._connectFrom = _cid; ejToast('Jugador seleccionado — clic en otro para conectar', 'info'); } else if (ejP._connectFrom !== _cid) { ejSaveHistory(); var _connId = ejP.nextId++; ejP.connections.push({ id: _connId, from: ejP._connectFrom, to: _cid, color: ejP.lineColor, strokeWidth: ejP.lineWidth, dashed: ejP.lineDashed }); ejP._connectFrom = _cid; ejP.selectedId = _connId; ejRenderSVG(); ejRenderToolbar(); } } } else { ejP._connectFrom = null; ejP.activeTool = 'select'; ejRenderToolbar(); } return; }    // Herramienta jugador
     if (ejP.activeTool === 'player' && isBackground) {
         ejSaveHistory();
         const scale = ejP.selectedSize === 'small' ? 0.6 : ejP.selectedSize === 'large' ? 1.4 : 1.0;
@@ -717,11 +733,11 @@ function ejSvgPointerUp(e) {
         if (ejP.activeTool === 'pencil' && t && t.points && t.points.length > 2) {
             newLine = { id, type: 'freehand', points: [...t.points], color, strokeWidth: sw, dashed };
         } else if (ejP.activeTool === 'rect' && t && t.w > 5 && t.h > 5) {
-            var shapeFillVal = ejP.shapeFill ? ejHexToRgba(color, ejP.shapeFillOpacity) : 'none';
-            newLine = { id, type: 'rect', x: t.x, y: t.y, w: t.w, h: t.h, color, fill: shapeFillVal, strokeWidth: sw, dashed };
+            var shapeFillVal = ejP.shapeFill ? (ejP.shapeFillType === 'hatched' ? 'hatched' : ejHexToRgba(color, ejP.shapeFillOpacity)) : 'none';
+            newLine = { id, type: 'rect', x: t.x, y: t.y, w: t.w, h: t.h, color, fill: shapeFillVal, fillType: ejP.shapeFill ? ejP.shapeFillType : null, fillOpacity: ejP.shapeFillOpacity, strokeWidth: sw, dashed };
         } else if (ejP.activeTool === 'ellipse' && t && t.rx > 5 && t.ry > 5) {
-            var shapeFillVal = ejP.shapeFill ? ejHexToRgba(color, ejP.shapeFillOpacity) : 'none';
-            newLine = { id, type: 'ellipse', cx: t.cx, cy: t.cy, rx: t.rx, ry: t.ry, color, fill: shapeFillVal, strokeWidth: sw, dashed };
+            var shapeFillVal = ejP.shapeFill ? (ejP.shapeFillType === 'hatched' ? 'hatched' : ejHexToRgba(color, ejP.shapeFillOpacity)) : 'none';
+            newLine = { id, type: 'ellipse', cx: t.cx, cy: t.cy, rx: t.rx, ry: t.ry, color, fill: shapeFillVal, fillType: ejP.shapeFill ? ejP.shapeFillType : null, fillOpacity: ejP.shapeFillOpacity, strokeWidth: sw, dashed };
         } else if (ejP.activeTool === 'curved' && t) {
             newLine = { id, type: 'curved', x1: t.x1, y1: t.y1, x2: t.x2, y2: t.y2,
                 cx: t.cx ?? (t.x1+t.x2)/2, cy: t.cy ?? (t.y1+t.y2)/2 - 40,
@@ -814,7 +830,7 @@ function ejDelete() {
     ejP.lines   = ejP.lines.filter(l => l.id !== id);
     ejP.shapes  = ejP.shapes.filter(s => s.id !== id);
     ejP.texts     = ejP.texts.filter(t => t.id !== id);
-    ejP.equipment = ejP.equipment.filter(eq => eq.id !== id);
+    ejP.equipment = ejP.equipment.filter(eq => eq.id !== id); ejP.connections = ejP.connections.filter(c => c.id !== id && c.from !== id && c.to !== id);
     ejP.selectedId = null;
     ejRenderSVG();
     ejRenderToolbar();
@@ -847,7 +863,7 @@ function ejElegirModo(modo) {
 function ejNuevaPizarra() {
     ejConfirm('¿Limpiar la pizarra y empezar desde cero?', () => {
     ejSaveHistory();
-    ejP.players = []; ejP.lines = []; ejP.shapes = []; ejP.texts = []; ejP.equipment = [];
+    ejP.players = []; ejP.lines = []; ejP.shapes = []; ejP.texts = []; ejP.equipment = []; ejP.connections = [];
     ejP.selectedId = null; ejP.playerCounts = {};
     ejFrameStop();
     ejP.animMode = false;
@@ -872,7 +888,7 @@ function ejNuevaPizarra() {
 function ejClearAll() {
     ejConfirm('¿Borrar toda la pizarra?', () => {
     ejSaveHistory();
-    ejP.players = []; ejP.lines = []; ejP.shapes = []; ejP.texts = []; ejP.equipment = [];
+    ejP.players = []; ejP.lines = []; ejP.shapes = []; ejP.texts = []; ejP.equipment = []; ejP.connections = [];
     ejP.selectedId = null; ejP.playerCounts = {};
     ejRenderSVG();
     ejRenderToolbar();
@@ -882,6 +898,7 @@ function ejClearAll() {
 function ejSetTool(tool) {
     ejP.activeTool = tool;
     ejP._addingRival = false;
+    ejP._connectFrom = null;
     ejRenderToolbar();
 }
 function ejHexToRgba(hex, opacity) {
@@ -1304,7 +1321,7 @@ ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin
                 {k:'line',    ico:'➖', lbl:'Línea'},
                 {k:'rect',    ico:'⬜', lbl:'Rect.'},
                 {k:'ellipse', ico:'⭕', lbl:'Círculo'},
-                {k:'text',    ico:'T',  lbl:'Texto'}
+                {k:'text',    ico:'T',  lbl:'Texto'},{k:'connect', ico:'🔗', lbl:'Conectar'}
             ].map(item=>`<button class="ej-btn-tool${t===item.k?' active':''}" onclick="ejSetTool('${item.k}')">${item.ico} ${item.lbl}</button>`).join('')}
         </div>
         <div class="ej-draw-opts">
@@ -1315,6 +1332,9 @@ ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin
             <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#9ca3af">
                 <input type="checkbox" ${ejP.shapeFill?'checked':''} onchange="ejP.shapeFill=this.checked;ejRenderToolbar()">
                 <span style="color:${ejP.shapeFill?'#22c55e':'#9ca3af'};font-weight:${ejP.shapeFill?'600':'400'}">🎨 Relleno zona</span>
+            </label>
+            ${ejP.shapeFill ? `<div style="display:flex;align-items:center;gap:4px;margin-top:4px"><span style="font-size:10px;color:#64748b">Tipo:</span><button onclick="ejP.shapeFillType='solid';ejRenderToolbar()" style="padding:2px 8px;font-size:10px;border-radius:4px;border:1px solid ${ejP.shapeFillType==='solid'?'#22c55e':'#334155'};background:${ejP.shapeFillType==='solid'?'#0f4c2a':'transparent'};color:${ejP.shapeFillType==='solid'?'#22c55e':'#64748b'};cursor:pointer">Sólido</button><button onclick="ejP.shapeFillType='hatched';ejRenderToolbar()" style="padding:2px 8px;font-size:10px;border-radius:4px;border:1px solid ${ejP.shapeFillType==='hatched'?'#f97316':'#334155'};background:${ejP.shapeFillType==='hatched'?'#78350f':'transparent'};color:${ejP.shapeFillType==='hatched'?'#f97316':'#64748b'};cursor:pointer">Rallado</button></div>` : ''}
+            <label style="display:none">
             </label>
             ${ejP.shapeFill ? '<div style="display:flex;align-items:center;gap:6px;margin-top:4px"><span style="font-size:10px;color:#64748b">Opacidad:</span><input type="range" min="10" max="70" value="'+Math.round(ejP.shapeFillOpacity*100)+'" oninput="ejP.shapeFillOpacity=this.value/100;ejRenderToolbar()" style="width:80px;accent-color:#22c55e"><span style="font-size:10px;color:#94a3b8;min-width:28px">'+Math.round(ejP.shapeFillOpacity*100)+'%</span></div>' : ''}
         </div>
@@ -2068,6 +2088,7 @@ async function ejEditarDibujo() {
         ejP.shapes    = data.board_data.shapes  || [];
         ejP.texts     = data.board_data.texts   || [];
         ejP.equipment = data.board_data.equipment || [];
+        ejP.connections = data.board_data.connections || [];
         ejP.fieldType = data.board_data.fieldType || 'full';
         ejP.selectedId = null;
         ejP._lastVideoUrl = data.animation_url || null;
@@ -2155,7 +2176,7 @@ let thumbnailSvg = window.ejThumbnailPendiente || null;
         board_data:  ejP.players.length > 0 ? {
             players: ejP.players, lines: ejP.lines,
             shapes: ejP.shapes, texts: ejP.texts,
-            equipment: ejP.equipment,
+            equipment: ejP.equipment,connections: ejP.connections,
             fieldType: ejP.fieldType,
             animFrames: ejP.animMode ? ejP.frames : [],
             animMode: ejP.animMode
@@ -2464,6 +2485,7 @@ async function ejBancoCargar(id) {
             ejP.shapes    = data.board_data.shapes  || [];
             ejP.texts     = data.board_data.texts   || [];
             ejP.equipment = data.board_data.equipment || [];
+            ejP.connections = data.board_data.connections || [];
             ejP.fieldType = data.board_data.fieldType || 'full';
             ejP.selectedId = null;
             ejEditandoId = data.id;
@@ -3072,7 +3094,7 @@ function ejColocarJugadorPlantilla(idx) {
             board_data: {
                 players: ejP.players, lines: ejP.lines,
                 shapes: ejP.shapes, texts: ejP.texts,
-                equipment: ejP.equipment,
+                equipment: ejP.equipment,connections: ejP.connections,
                 fieldType: ejP.fieldType,
                 animFrames: ejP.frames,
                 animMode: ejP.animMode
