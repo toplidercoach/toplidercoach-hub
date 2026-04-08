@@ -1439,9 +1439,9 @@ root.innerHTML = `
                 viewBox="0 0 ${ejP.svgW} ${ejP.svgH}"
                 style="width:100%;height:auto;display:block;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,.5);touch-action:none;cursor:crosshair">
           </svg>
+          <div id="ej-timeline-bar" style="display:none"></div>
         </div>
-        <div id="ej-timeline-bar" style="display:none;background:#0f172a;border:1px solid #1e3a5f;border-radius:8px;padding:8px 12px;margin-top:8px"></div>
-    </div>`;
+        </div>`;
 
     const svg = document.getElementById('ej-svg');
     svg.addEventListener('pointerdown', ejSvgPointerDown);
