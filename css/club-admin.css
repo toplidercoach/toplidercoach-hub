@@ -191,3 +191,15 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
     .profile-header{flex-direction:column;align-items:center;text-align:center}
     .profile-tabs{flex-wrap:wrap}.chk-grid{grid-template-columns:1fr}
 }
+/* Pestañas con iconos estilo GESDEP */
+.profile-icon-tabs{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:16px}
+.pit{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 4px;border-radius:var(--rs);cursor:pointer;transition:all .2s;background:var(--bg-card);border:1px solid transparent;text-align:center}
+.pit:hover{border-color:var(--accent);background:rgba(56,130,246,0.08)}
+.pit.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.pit .pit-icon{font-size:20px;line-height:1;opacity:0.7}
+.pit.active .pit-icon{opacity:1}
+.pit .pit-label{font-size:10px;font-weight:500;color:var(--ts2);line-height:1.2;letter-spacing:.3px}
+.pit.active .pit-label{color:#fff}
+.pit .pit-count{font-size:9px;color:var(--tm);font-weight:600}
+.pit.active .pit-count{color:rgba(255,255,255,0.8)}
+@media(max-width:768px){.profile-icon-tabs{grid-template-columns:repeat(4,1fr)}}
