@@ -3,6 +3,80 @@
 // Depende de: core.js (supabaseClient, clubId, usuario, registrarInit)
 // Ubicacion: js/club-mode/cm-core.js
 
+// ========== CATALOGO DE MODULOS DEL CLUB MODE (38 totales) ==========
+// Esta constante define TODOS los modulos posibles del Club Mode.
+// Sirve como referencia para construir UIs de permisos (club-admin-cargos)
+// y como fuente de verdad para validar claves de permiso.
+//
+// Estructura: { key, label, block }
+// - key: identificador unico que se guarda en club_roles.permissions
+// - label: texto en castellano para mostrar en UIs
+// - block: 'campo_comun' | 'campo_despacho' | 'oficina' | 'compartido'
+
+var CM_MODULOS = [
+    // ========== CAMPO - COMUNES (8) ==========
+    // Modulos que comparten todos los roles del campo (entrenadores, segundos, ...)
+    { key: 'plantilla',            label: 'Plantilla',                  block: 'campo_comun' },
+    { key: 'asistencia',           label: 'Asistencia y bienestar',     block: 'campo_comun' },
+    { key: 'entrenamientos',       label: 'Entrenamientos',             block: 'campo_comun' },
+    { key: 'pizarra',              label: 'Pizarra tactica',            block: 'campo_comun' },
+    { key: 'periodizacion',        label: 'Periodizacion deportiva',    block: 'campo_comun' },
+    { key: 'matchstats',           label: 'MatchStats / Competicion',   block: 'campo_comun' },
+    { key: 'analisis_postpartido', label: 'Analisis post-partido',      block: 'campo_comun' },
+    { key: 'cuerpo_tecnico_ia',    label: 'Cuerpo tecnico IA',          block: 'campo_comun' },
+
+    // ========== CAMPO - DESPACHOS PRIVADOS (5) ==========
+    // Cada despacho es propiedad de UN rol especifico. El entrenador NO los ve.
+    { key: 'modulo_medico',                label: 'Despacho medico',         block: 'campo_despacho' },
+    { key: 'modulo_fisio',                 label: 'Despacho fisio',          block: 'campo_despacho' },
+    { key: 'modulo_preparacion_fisica',    label: 'Preparacion fisica',      block: 'campo_despacho' },
+    { key: 'modulo_analista_video',        label: 'Analista de video',       block: 'campo_despacho' },
+    { key: 'modulo_utillero',              label: 'Utillero',                block: 'campo_despacho' },
+
+    // ========== OFICINA (18) ==========
+    // Modulos de gestion del club (no del equipo concreto)
+    { key: 'direccion_deportiva',     label: 'Direccion deportiva',     block: 'oficina' },
+    { key: 'scouting',                label: 'Scouting',                block: 'oficina' },
+    { key: 'marketing',               label: 'Marketing',               block: 'oficina' },
+    { key: 'economico',               label: 'Economico',               block: 'oficina' },
+    { key: 'cumplimiento_rfef',       label: 'Cumplimiento RFEF',       block: 'oficina' },
+    { key: 'pagos_cuotas',            label: 'Pagos y cuotas',          block: 'oficina' },
+    { key: 'administracion',          label: 'Administracion',          block: 'oficina' },
+    { key: 'vista_presidente',        label: 'Vista presidente',        block: 'oficina' },
+    { key: 'cantera',                 label: 'Cantera / formacion',     block: 'oficina' },
+    { key: 'redes_sociales',          label: 'Redes sociales',          block: 'oficina' },
+    { key: 'instalaciones',           label: 'Instalaciones',           block: 'oficina' },
+    { key: 'tienda',                  label: 'Tienda',                  block: 'oficina' },
+    { key: 'arbitros',                label: 'Arbitros',                block: 'oficina' },
+    { key: 'comunicacion_familias',   label: 'Comunicacion familias',   block: 'oficina' },
+    { key: 'eventos',                 label: 'Eventos',                 block: 'oficina' },
+    { key: 'transporte',              label: 'Transporte',              block: 'oficina' },
+    { key: 'patrocinadores',          label: 'Patrocinadores',          block: 'oficina' },
+    { key: 'miembros_permisos',       label: 'Miembros y permisos',     block: 'oficina' },
+
+    // ========== COMPARTIDOS (7) ==========
+    // Modulos que cruzan roles. Cada uno con sus reglas propias de visibilidad.
+    { key: 'panel_disponibilidad',    label: 'Panel de disponibilidad',          block: 'compartido' },
+    { key: 'configuracion_club',      label: 'Configuracion del club',           block: 'compartido' },
+    { key: 'plantilla_maestra',       label: 'Plantilla maestra (ficha jugador)', block: 'compartido' },
+    { key: 'calendario_general',      label: 'Calendario general',               block: 'compartido' },
+    { key: 'alimentacion_dietas',     label: 'Alimentacion y dietas',            block: 'compartido' },
+    { key: 'registro_federativo',     label: 'Registro federativo',              block: 'compartido' },
+    { key: 'historial_educativo',     label: 'Historial educativo del jugador',  block: 'compartido' }
+];
+
+// ========== HELPERS PARA CM_MODULOS ==========
+
+// Devuelve los modulos de un bloque concreto
+function cmGetModulosPorBloque(bloque) {
+    return CM_MODULOS.filter(function(m) { return m.block === bloque; });
+}
+
+// Busca un modulo por su clave
+function cmGetModuloByKey(key) {
+    return CM_MODULOS.find(function(m) { return m.key === key; });
+}
+
 // ========== ESTADO DEL CLUB MODE ==========
 var cmState = {
     activo: false,             // Tiene Club Mode este club?
@@ -27,13 +101,14 @@ async function cmInit() {
 
     try {
         // 1. Comprobar si el usuario es miembro del club
+        // .maybeSingle() devuelve null si no hay match (sin lanzar 406)
         var { data: miembro } = await supabaseClient
             .from('club_members')
             .select('*, club_roles(*)')
             .eq('club_id', clubId)
             .eq('wp_user_id', usuario.id)
             .eq('active', true)
-            .single();
+            .maybeSingle();
 
         if (!miembro) {
             // No es miembro de club -> Coach Mode autonomo
@@ -103,7 +178,6 @@ function cmMontarSelector() {
     if (!cmState.activo || cmState.equiposAcceso.length === 0) return;
 
     // Buscar contenedor en el header del HUB
-    // TODO: ajustar el id del elemento del HUB cuando se decida la posicion exacta
     var headerClub = document.getElementById('club-badge');
     if (!headerClub) {
         console.log('[Club Mode] Selector de equipo: contenedor no encontrado, se omite');
@@ -142,12 +216,10 @@ function cmSeleccionarEquipo(teamId) {
 
     console.log('[Club Mode] Equipo seleccionado: ' + equipo.name);
 
-    // Notificar a los modulos del HUB que el equipo ha cambiado
     if (typeof window.onClubTeamChange === 'function') {
         window.onClubTeamChange(equipo);
     }
 
-    // Disparar evento personalizado
     document.dispatchEvent(new CustomEvent('cmTeamChanged', { detail: equipo }));
 }
 
@@ -180,19 +252,20 @@ function cmPuedeVerEquipo(teamId) {
 function cmAplicarPermisos() {
     if (!cmState.activo) return;
 
-    // Mapeo de modulos del HUB a claves de permisos en club_roles.permissions
-    // TODO 0.3: Extender este mapeo con los 38 modulos del Club Mode completo
-    var mapeo = {
-        'planificador': 'planificador',
-        'pizarra': 'pizarra',
-        'matchstats': 'matchstats',
-        'asistencia': 'asistencia',
-        'miclub': 'mi_club',
+    // Mapeo de tabs del HUB actual a claves de permisos del Club Mode.
+    // null = el tab NO se controla por permisos (lo ven todos los miembros del club).
+    // TODO: cuando se integren los modulos nuevos del Club Mode al HUB, anadirlos aqui.
+    var MAPEO_HUB_PERMISOS = {
+        'planificador':  'entrenamientos',        // Planificador HUB -> Entrenamientos
+        'pizarra':       'pizarra',
+        'matchstats':    'matchstats',
+        'asistencia':    'asistencia',
+        'miclub':        'configuracion_club',    // Mi Club HUB -> Configuracion del club
         'periodizacion': 'periodizacion',
-        'analisis': 'analisis',
-        'plan_partido': 'plan_partido',
-        'staff': 'staff_ia',
-        'dashboard': 'dashboard'
+        'analisis':      'analisis_postpartido',
+        'plan_partido':  'matchstats',            // Plan partido es parte del flujo MatchStats
+        'staff':         'cuerpo_tecnico_ia',
+        'dashboard':     null                      // Dashboard general: lo ven todos
     };
 
     // Ocultar tabs de modulos sin permiso de ver
@@ -202,7 +275,8 @@ function cmAplicarPermisos() {
         var match = onclick.match(/cambiarModulo\('(\w+)'/);
         if (match) {
             var moduloHUB = match[1];
-            var moduloPerm = mapeo[moduloHUB];
+            var moduloPerm = MAPEO_HUB_PERMISOS[moduloHUB];
+            // Si la clave es null (no controlado) o el usuario tiene permiso, dejar visible
             if (moduloPerm && !cmPuedeVer(moduloPerm)) {
                 tab.style.display = 'none';
             }
@@ -247,4 +321,4 @@ registrarInit(function() {
     }, 500);
 });
 
-console.log('[Club Mode] cm-core.js cargado');
+console.log('[Club Mode] cm-core.js cargado (' + CM_MODULOS.length + ' modulos catalogados)');
