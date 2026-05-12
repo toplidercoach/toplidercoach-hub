@@ -426,3 +426,89 @@
         font-size: 11px;
     }
 }
+
+/* ============================================================
+   PANTALLA "EN DESARROLLO"
+   Se muestra a roles cuyo panel privado aún no se ha construido
+   (Médico, Fisio, Utillero, etc.)
+   ============================================================ */
+#cm-pantalla-desarrollo {
+    position: fixed;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: #f9fafb;
+    padding: 20px;
+    z-index: 100;
+    font-family: 'Outfit', system-ui, sans-serif;
+}
+
+.cm-dev-card {
+    background: #ffffff;
+    border-radius: 14px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.05);
+    padding: 48px 40px;
+    text-align: center;
+    max-width: 480px;
+    width: 100%;
+    border: 1px solid #e5e7eb;
+}
+
+.cm-dev-icon {
+    font-size: 56px;
+    margin-bottom: 18px;
+    line-height: 1;
+}
+
+.cm-dev-card h2 {
+    font-size: 24px;
+    font-weight: 700;
+    margin: 0 0 10px;
+    color: #111827;
+    letter-spacing: -0.02em;
+}
+
+.cm-dev-rol {
+    color: #6b7280;
+    font-size: 13px;
+    margin: 0 0 28px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.cm-dev-rol strong {
+    color: #6366f1;
+    font-weight: 700;
+}
+
+.cm-dev-msg {
+    color: #374151;
+    font-size: 16px;
+    line-height: 1.5;
+    margin: 0 0 6px;
+}
+
+.cm-dev-msg-sub {
+    color: #9ca3af;
+    font-size: 13px;
+    margin: 0 0 32px;
+}
+
+.cm-dev-btn {
+    background: #fff;
+    color: #6366f1;
+    border: 1.5px solid #6366f1;
+    padding: 10px 28px;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.cm-dev-btn:hover {
+    background: #6366f1;
+    color: #fff;
+}

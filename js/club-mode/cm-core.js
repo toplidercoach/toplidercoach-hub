@@ -291,8 +291,66 @@ function cmAplicarPermisos() {
         }
     }
 
+    // ===== PANTALLA "EN DESARROLLO" para roles sin pestañas visibles =====
+    // Si el usuario no es admin y no tiene ninguna pestaña funcional visible,
+    // su rol no tiene aún panel construido. Mostramos un mensaje claro.
+    if (!cmState.esAdmin) {
+        var pestanasFuncionales = Array.from(document.querySelectorAll('.main-tab')).filter(function(tab) {
+            var oc = tab.getAttribute('onclick') || '';
+            var m = oc.match(/cambiarModulo\('(\w+)'/);
+            if (!m) return false;
+            // Ignorar tacticlip (link externo) y club (manejado aparte)
+            return m[1] !== 'tacticlip' && m[1] !== 'club';
+        });
+        var visibles = pestanasFuncionales.filter(function(tab) {
+            return tab.style.display !== 'none';
+        });
+        if (visibles.length === 0) {
+            cmMostrarPantallaDesarrollo();
+        }
+    }
+
     // Los botones de edicion los gestionara cada modulo individualmente
     // consultando cmPuedeEditar() cuando renderice
+}
+
+// ========== PANTALLA "EN DESARROLLO" ==========
+// Se muestra a roles cuyo panel privado aún no se ha construido (Médico, Fisio, etc.)
+function cmMostrarPantallaDesarrollo() {
+    var pantalla = document.getElementById('cm-pantalla-desarrollo');
+    if (!pantalla) {
+        pantalla = document.createElement('div');
+        pantalla.id = 'cm-pantalla-desarrollo';
+        document.body.appendChild(pantalla);
+    }
+
+    var rolNombre = (cmState.rol && cmState.rol.name) ? cmState.rol.name : 'tu rol';
+    var nombreUsuario = 'usuario';
+    if (typeof usuario !== 'undefined' && usuario) {
+        nombreUsuario = usuario.display_name || usuario.name || usuario.username || 'usuario';
+    }
+
+    pantalla.innerHTML =
+        '<div class="cm-dev-card">' +
+            '<div class="cm-dev-icon">🛠️</div>' +
+            '<h2>Bienvenido, ' + nombreUsuario + '</h2>' +
+            '<p class="cm-dev-rol">Tu rol: <strong>' + rolNombre + '</strong></p>' +
+            '<p class="cm-dev-msg">Tu panel privado está en construcción.</p>' +
+            '<p class="cm-dev-msg-sub">Te avisaremos cuando esté listo.</p>' +
+            '<button class="cm-dev-btn" onclick="logout()">Cerrar sesión</button>' +
+        '</div>';
+
+    pantalla.style.display = 'flex';
+
+    // Ocultar el contenido normal del HUB
+    var mainTabs = document.querySelector('.main-tabs');
+    if (mainTabs) mainTabs.style.display = 'none';
+
+    document.querySelectorAll('.vista-modulo').forEach(function(v) {
+        v.style.display = 'none';
+    });
+
+    console.log('[Club Mode] Pantalla "En desarrollo" activada para rol:', rolNombre);
 }
 
 // ========== HELPERS PUBLICOS PARA MODULOS ==========

@@ -135,24 +135,51 @@ async function mostrarApp() {
 // ========== CLUB & TEMPORADA ==========
 async function inicializarClub() {
     try {
-        let { data: club, error } = await supabaseClient
-            .from('clubs')
-            .select('*')
+        let club = null;
+
+        // 0.7.A — PRIORIDAD CLUB MODE: ¿es miembro activo de algún club?
+        const { data: memberRow } = await supabaseClient
+            .from('club_members')
+            .select('club_id, role_id, team_ids, club_roles(name, is_admin, permissions, team_scope)')
             .eq('wp_user_id', usuario.id)
-            .single();
-        
-        if (error && error.code === 'PGRST116') {
-            const { data: nuevoClub } = await supabaseClient
+            .eq('active', true)
+            .limit(1)
+            .maybeSingle();
+
+        if (memberRow && memberRow.club_id) {
+            const { data: clubMembership } = await supabaseClient
                 .from('clubs')
-                .insert({
-                    wp_user_id: usuario.id,
-                    name: usuario.name || 'Mi Club',
-                    team_format: '11',
-                    max_players: 30
-                })
-                .select()
-                .single();
-            club = nuevoClub;
+                .select('*')
+                .eq('id', memberRow.club_id)
+                .maybeSingle();
+            if (clubMembership) {
+                club = clubMembership;
+                window.__cm_membership = memberRow; // para cm-core.js
+            }
+        }
+
+        // Si no es miembro, buscar como dueño (lógica original)
+        if (!club) {
+            const { data: clubPropio } = await supabaseClient
+                .from('clubs')
+                .select('*')
+                .eq('wp_user_id', usuario.id)
+                .maybeSingle();
+            if (clubPropio) {
+                club = clubPropio;
+            } else {
+                const { data: nuevoClub } = await supabaseClient
+                    .from('clubs')
+                    .insert({
+                        wp_user_id: usuario.id,
+                        name: usuario.name || 'Mi Club',
+                        team_format: '11',
+                        max_players: 30
+                    })
+                    .select()
+                    .single();
+                club = nuevoClub;
+            }
         }
         
         clubId = club.id;
