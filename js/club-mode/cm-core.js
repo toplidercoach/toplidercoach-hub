@@ -283,6 +283,14 @@ function cmAplicarPermisos() {
         }
     });
 
+    // Mostrar la pestaña "Club" si el usuario es admin del club
+    if (cmState.esAdmin) {
+        var tabClub = document.getElementById('cm-tab-club');
+        if (tabClub) {
+            tabClub.style.setProperty('display', 'flex', 'important');
+        }
+    }
+
     // Los botones de edicion los gestionara cada modulo individualmente
     // consultando cmPuedeEditar() cuando renderice
 }
@@ -320,5 +328,16 @@ registrarInit(function() {
         cmInit();
     }, 500);
 });
+
+// ========== REGISTRO DEL MODULO 'club' EN EL HUB ==========
+// Cuando el usuario hace clic en la pestaña "Club", se ejecuta este handler.
+// Por ahora solo hay una subpestaña (Miembros), pero en el futuro se ampliara.
+if (typeof registrarModulo === 'function') {
+    registrarModulo('club', function() {
+        if (typeof cmInitMiembros === 'function') {
+            cmInitMiembros('club-miembros');
+        }
+    });
+}
 
 console.log('[Club Mode] cm-core.js cargado (' + CM_MODULOS.length + ' modulos catalogados)');

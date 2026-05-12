@@ -22,6 +22,7 @@
     <link rel="stylesheet" href="css/miclub.css">
     <link rel="stylesheet" href="css/asistencia.css">
     <link rel="stylesheet" href="css/ejercicios.css">
+    <link rel="stylesheet" href="css/cm-club-mode.css">
 </head>
 <body>
     <!-- ==================== LOGIN ==================== -->
@@ -78,6 +79,7 @@
 <button class="main-tab config" onclick="cambiarModulo('config', this)">
         Mi Club
     </button>
+    <button class="main-tab club" id="cm-tab-club" style="display:none !important" onclick="cambiarModulo('club', this)">🏛️ Club</button>
     <button class="main-tab tacticlip" onclick="abrirPromoTactiClip()" style="display:flex;align-items:center;gap:6px;">
         <img src="https://toplidercoach.com/wp-content/uploads/2026/03/tacticlip-logo.png" alt="TactiClip" style="width:18px;height:18px;object-fit:contain;border-radius:3px;">
         TactiClip
@@ -1684,6 +1686,11 @@
     </div>
 </div>
 
+    <!-- ==================== MODULO: CLUB ==================== -->
+    <div id="modulo-club" class="vista-modulo">
+        <div id="club-miembros" class="vista-contenido active"></div>
+    </div>
+
     <!-- ==================== MODAL: PROMO TACTICLIP ==================== -->
 <div id="modal-tacticlip" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.75);align-items:center;justify-content:center;">
   <div style="background:#0f172a;border:1px solid #1e3a5f;border-radius:16px;max-width:480px;width:90%;overflow:hidden;box-shadow:0 25px 60px rgba(0,0,0,0.7);">
@@ -1766,5 +1773,6 @@ document.getElementById('modal-tacticlip').addEventListener('click', function(e)
 
     <!-- Club Mode -->
     <script src="js/club-mode/cm-core.js"></script>
+    <script src="js/club-mode/cm-miembros.js"></script>
 </body>
 </html>
