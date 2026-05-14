@@ -367,6 +367,7 @@ async function cmMedAbrirFicha(playerId, playerName, photoUrl) {
     ficha.innerHTML =
         '<div class="cmmed-ficha-header"><h3>' + avatarHtml + playerName + '</h3><button class="cmmed-ficha-close" onclick="cmMedCerrarFicha()">✕</button></div>' +
         '<div class="cmmed-tabs">' +
+            '<button class="cmmed-btn cmmed-btn-secondary cmmed-btn-sm" onclick="cmMedPDFHistorial(\'' + playerId + '\',\'' + playerName.replace(/'/g, "\\'") + '\')" style="margin-right:auto">PDF Historial</button>' +
             '<button class="cmmed-tab active" onclick="cmMedCambiarTab(\'antecedentes\',this)">Antecedentes</button>' +
             '<button class="cmmed-tab" onclick="cmMedCambiarTab(\'lesiones\',this)">Lesiones</button>' +
             '<button class="cmmed-tab" onclick="cmMedCambiarTab(\'sesiones\',this)">Sesiones</button>' +
@@ -644,6 +645,10 @@ async function cmMedGuardarLesion() {
     var res = await supabaseClient.from('cm_med_injuries').insert(lesion).select().single();
     if (res.error) { showToast('Error al registrar: ' + res.error.message, 'error'); return; }
     showToast('Lesion registrada');
+    var playerData = cmMedJugadoresData.find(function(j) { return j.playerId === playerId; });
+    var pName = playerData ? playerData.name : 'Jugador';
+    var zoneName = cmMedBodyZones.find(function(z) { return z.zone_id === zona; });
+    cmMedNotificar('injury_new', 'Nueva lesion: ' + pName, (zoneName ? zoneName.zone_name_es : zona), pName, 'injury', res.data.id);
     cmMedRegistrarAudit('INSERT', 'cm_med_injuries', res.data.id, 'Registro nueva lesion: ' + zona);
     await cmMedCambiarDisponibilidad(playerId, 'red', null);
     await cmMedCargarLesiones(playerId);
@@ -675,7 +680,10 @@ async function cmMedVerLesion(injuryId) {
 
     var container = document.getElementById('cmmed-tab-lesiones');
     container.innerHTML =
-        '<button class="cmmed-btn cmmed-btn-secondary cmmed-btn-sm" onclick="cmMedCargarLesiones(\''+cmMedJugadorActual+'\')" style="margin-bottom:14px">← Volver a lesiones</button>' +
+        '<div style="display:flex;justify-content:space-between;margin-bottom:14px">' +
+            '<button class="cmmed-btn cmmed-btn-secondary cmmed-btn-sm" onclick="cmMedCargarLesiones(\'' + cmMedJugadorActual + '\')">← Volver a lesiones</button>' +
+            '<button class="cmmed-btn cmmed-btn-secondary cmmed-btn-sm" onclick="cmMedPDFLesion(\'' + inj.id + '\')">PDF Informe lesion</button>' +
+        '</div>' +
         '<div style="background:#1e293b;border-radius:10px;padding:18px;margin-bottom:16px">' +
             '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px"><div><h4 style="margin:0;color:#e2e8f0">'+(inj.cm_med_body_zones?inj.cm_med_body_zones.zone_name_es:'Lesion')+'</h4><p style="color:#94a3b8;font-size:13px;margin:4px 0 0 0">'+fecha+' · '+(inj.cm_med_osiics_codes?inj.cm_med_osiics_codes.code+' - '+inj.cm_med_osiics_codes.description_es:'')+'</p></div><span class="cmmed-injury-status st-'+inj.status+'">'+statusLabels[inj.status]+'</span></div>' +
             (inj.description?'<p style="color:#cbd5e1;font-size:13px;margin-bottom:12px">'+inj.description+'</p>':'') +
@@ -729,6 +737,8 @@ async function cmMedDarAlta(injuryId) {
     var res = await supabaseClient.from('cm_med_injuries').update({ status: 'discharged', discharge_date: hoy.toISOString().split('T')[0], actual_days_lost: diasPerdidos }).eq('id', injuryId);
     if (res.error) { showToast('Error: ' + res.error.message, 'error'); return; }
     showToast('Alta medica registrada · ' + diasPerdidos + ' dias perdidos');
+    var playerData2 = cmMedJugadoresData.find(function(j) { return j.playerId === cmMedJugadorActual; });
+    cmMedNotificar('discharge', 'Alta medica: ' + (playerData2 ? playerData2.name : 'Jugador'), diasPerdidos + ' dias de baja', playerData2 ? playerData2.name : '', 'injury', injuryId);
     cmMedRegistrarAudit('UPDATE', 'cm_med_injuries', injuryId, 'Alta medica. Dias perdidos: ' + diasPerdidos);
 
     var otrasRes = await supabaseClient.from('cm_med_injuries').select('id').eq('club_id', clubId).eq('player_id', cmMedJugadorActual).in('status', ['active', 'recovering', 'rtp']).neq('id', injuryId).eq('archived', false);
@@ -838,6 +848,9 @@ async function cmMedCambiarDisponibilidad(playerId, status, btn) {
     }
     var jugador = cmMedJugadoresData.find(function(j) { return j.playerId === playerId; });
     if (jugador) jugador.avail = status;
+    var playerDataN = cmMedJugadoresData.find(function(j) { return j.playerId === playerId; });
+    var statusNames = { green: 'DISPONIBLE', amber: 'PRECAUCION', red: 'LESIONADO' };
+    if (playerDataN) cmMedNotificar('availability', (playerDataN.name) + ': ' + (statusNames[status] || status), 'Disponibilidad actualizada por el equipo medico', playerDataN.name, 'availability', playerId);
     cmMedRegistrarAudit('UPDATE', 'club_player_availability', playerId, 'Disponibilidad: ' + status);
 }
 
@@ -849,6 +862,265 @@ async function cmMedRegistrarAudit(action, tableName, recordId, details) {
             player_id: (tableName !== 'club_player_availability' && recordId) ? recordId : null,
             action: action, table_name: tableName, record_id: String(recordId || ''), details: details || null });
     } catch (e) { console.warn('Audit log error:', e); }
+}// ========== GENERACION PDF ==========
+async function cmMedPDFLesion(injuryId) {
+    showToast('Generando PDF...');
+
+    var injRes = await supabaseClient.from('cm_med_injuries')
+        .select('*, cm_med_osiics_codes(code, description_es, body_region), cm_med_body_zones(zone_name_es)')
+        .eq('id', injuryId).single();
+    var inj = injRes.data;
+    if (!inj) { showToast('Error: lesion no encontrada', 'error'); return; }
+
+    // Datos del jugador
+    var playerData = cmMedJugadoresData.find(function(j) { return j.playerId === inj.player_id; });
+    var playerName = playerData ? playerData.name : 'Jugador';
+
+    // Sesiones SOAP
+    var sesRes = await supabaseClient.from('cm_med_sessions').select('*')
+        .eq('injury_id', injuryId).eq('archived', false).order('session_date', { ascending: true });
+    var sessions = sesRes.data || [];
+
+    // OSTRC
+    var ostrcRes = await supabaseClient.from('cm_med_ostrc').select('*')
+        .eq('injury_id', injuryId).order('eval_date', { ascending: true });
+    var ostrcs = ostrcRes.data || [];
+
+    // Adjuntos
+    var attRes = await supabaseClient.from('cm_med_attachments').select('*')
+        .eq('injury_id', injuryId).eq('archived', false);
+    var attachments = attRes.data || [];
+
+    // Generar PDF
+    var doc = new jspdf.jsPDF('p', 'mm', 'a4');
+    var y = 20;
+    var margen = 20;
+    var ancho = 170;
+    var statusLabels = { active: 'Activa', recovering: 'En recuperacion', rtp: 'Return-to-Play', discharged: 'Alta medica' };
+    var mechLabels = { contact: 'Contacto', non_contact: 'Sin contacto', overuse: 'Sobrecarga', illness: 'Enfermedad' };
+
+    function checkPage(needed) { if (y + needed > 275) { doc.addPage(); y = 20; } }
+    function addTitle(text) { checkPage(12); doc.setFontSize(14); doc.setFont(undefined, 'bold'); doc.text(text, margen, y); y += 8; doc.setDrawColor(59, 130, 246); doc.line(margen, y, margen + ancho, y); y += 6; }
+    function addLabel(label, value) { checkPage(8); doc.setFontSize(9); doc.setFont(undefined, 'bold'); doc.setTextColor(100); doc.text(label + ':', margen, y); doc.setFont(undefined, 'normal'); doc.setTextColor(40); doc.text(String(value || '-'), margen + 45, y); y += 6; }
+    function addText(text, size) { checkPage(8); doc.setFontSize(size || 10); doc.setFont(undefined, 'normal'); doc.setTextColor(40); var lines = doc.splitTextToSize(String(text), ancho); doc.text(lines, margen, y); y += lines.length * 5; }
+
+    // === HEADER ===
+    doc.setFontSize(18); doc.setFont(undefined, 'bold'); doc.setTextColor(30);
+    doc.text('INFORME MEDICO DE LESION', margen, y); y += 10;
+    doc.setFontSize(9); doc.setFont(undefined, 'normal'); doc.setTextColor(120);
+    doc.text('Documento confidencial - Datos medicos protegidos (RGPD Art. 9)', margen, y); y += 4;
+    doc.text('Generado: ' + new Date().toLocaleDateString('es-ES') + ' ' + new Date().toLocaleTimeString('es-ES'), margen, y); y += 10;
+
+    // === DATOS DEL JUGADOR ===
+    addTitle('Datos del jugador');
+    addLabel('Nombre', playerName);
+    addLabel('Posicion', playerData ? playerData.position : '-');
+    addLabel('Equipo', playerData && playerData.teamNames ? playerData.teamNames.join(', ') : 'Sin equipo');
+    y += 4;
+
+    // === DATOS DE LA LESION ===
+    addTitle('Datos de la lesion');
+    var fecha = inj.injury_date ? new Date(inj.injury_date + 'T12:00:00').toLocaleDateString('es-ES') : '-';
+    addLabel('Fecha lesion', fecha);
+    addLabel('Zona corporal', inj.cm_med_body_zones ? inj.cm_med_body_zones.zone_name_es : '-');
+    addLabel('Diagnostico', inj.cm_med_osiics_codes ? inj.cm_med_osiics_codes.code + ' - ' + inj.cm_med_osiics_codes.description_es : '-');
+    addLabel('Region', inj.cm_med_osiics_codes ? inj.cm_med_osiics_codes.body_region : '-');
+    addLabel('Mecanismo', mechLabels[inj.mechanism] || '-');
+    addLabel('Contexto', inj.context === 'match' ? 'Partido' : inj.context === 'training' ? 'Entrenamiento' : inj.context || '-');
+    addLabel('Severidad', inj.severity || '-');
+    addLabel('Dias estimados', inj.estimated_days || '-');
+    addLabel('Estado actual', statusLabels[inj.status] || inj.status);
+    if (inj.discharge_date) addLabel('Fecha alta', new Date(inj.discharge_date + 'T12:00:00').toLocaleDateString('es-ES'));
+    if (inj.actual_days_lost) addLabel('Dias perdidos', inj.actual_days_lost);
+    if (inj.is_recurrence) addLabel('Recurrencia', 'Si');
+    if (inj.description) { y += 2; addLabel('Descripcion', ''); addText(inj.description); }
+    y += 4;
+
+    // === SESIONES SOAP ===
+    if (sessions.length > 0) {
+        addTitle('Sesiones de tratamiento (' + sessions.length + ')');
+        var tipoLabels = { treatment: 'Tratamiento', evaluation: 'Evaluacion', follow_up: 'Seguimiento', discharge: 'Alta' };
+        sessions.forEach(function(s, idx) {
+            checkPage(30);
+            var sf = new Date(s.session_date + 'T12:00:00').toLocaleDateString('es-ES');
+            doc.setFontSize(10); doc.setFont(undefined, 'bold'); doc.setTextColor(59, 130, 246);
+            doc.text('Sesion ' + (idx + 1) + ' - ' + sf + ' (' + (tipoLabels[s.session_type] || s.session_type) + ')', margen, y); y += 6;
+            doc.setTextColor(40);
+            if (s.subjective) { doc.setFont(undefined, 'bold'); doc.setFontSize(9); doc.text('S - Subjetivo:', margen, y); y += 4; doc.setFont(undefined, 'normal'); addText(s.subjective, 9); y += 2; }
+            if (s.objective) { doc.setFont(undefined, 'bold'); doc.setFontSize(9); doc.text('O - Objetivo:', margen, y); y += 4; doc.setFont(undefined, 'normal'); addText(s.objective, 9); y += 2; }
+            if (s.assessment) { doc.setFont(undefined, 'bold'); doc.setFontSize(9); doc.text('A - Analisis:', margen, y); y += 4; doc.setFont(undefined, 'normal'); addText(s.assessment, 9); y += 2; }
+            if (s.plan) { doc.setFont(undefined, 'bold'); doc.setFontSize(9); doc.text('P - Plan:', margen, y); y += 4; doc.setFont(undefined, 'normal'); addText(s.plan, 9); y += 2; }
+            y += 4;
+        });
+    }
+
+    // === OSTRC ===
+    if (ostrcs.length > 0) {
+        addTitle('Evaluaciones OSTRC (' + ostrcs.length + ')');
+        doc.setFontSize(9); doc.setFont(undefined, 'bold'); doc.setTextColor(100);
+        doc.text('Fecha', margen, y); doc.text('Partic.', margen + 30, y); doc.text('Volumen', margen + 50, y); doc.text('Rendim.', margen + 70, y); doc.text('Dolor', margen + 90, y); doc.text('TOTAL', margen + 110, y);
+        y += 5;
+        doc.setDrawColor(200); doc.line(margen, y, margen + 130, y); y += 4;
+        doc.setFont(undefined, 'normal'); doc.setTextColor(40);
+        ostrcs.forEach(function(e) {
+            checkPage(7);
+            var ef = new Date(e.eval_date + 'T12:00:00').toLocaleDateString('es-ES');
+            doc.text(ef, margen, y);
+            doc.text(String(e.q1_participation), margen + 35, y);
+            doc.text(String(e.q2_training), margen + 55, y);
+            doc.text(String(e.q3_performance), margen + 75, y);
+            doc.text(String(e.q4_pain), margen + 95, y);
+            doc.setFont(undefined, 'bold'); doc.text(String(e.total_score), margen + 115, y); doc.setFont(undefined, 'normal');
+            y += 6;
+        });
+        y += 4;
+    }
+
+    // === ADJUNTOS ===
+    if (attachments.length > 0) {
+        addTitle('Archivos adjuntos (' + attachments.length + ')');
+        var catLabels = { mri: 'RMN', ultrasound: 'Ecografia', xray: 'Radiografia', report: 'Informe', photo: 'Foto', other: 'Otro' };
+        attachments.forEach(function(a) {
+            checkPage(7);
+            var af = new Date(a.created_at).toLocaleDateString('es-ES');
+            doc.setFontSize(9); doc.setTextColor(40);
+            doc.text('- ' + a.file_name + ' (' + (catLabels[a.category] || 'Otro') + ', ' + af + ')', margen, y);
+            y += 5;
+        });
+    }
+
+    // === FOOTER ===
+    var totalPages = doc.internal.getNumberOfPages();
+    for (var p = 1; p <= totalPages; p++) {
+        doc.setPage(p);
+        doc.setFontSize(8); doc.setTextColor(150);
+        doc.text('TopLiderCoach - Panel Medico | Pagina ' + p + '/' + totalPages, margen, 290);
+    }
+
+    doc.save('Lesion_' + playerName.replace(/\s/g, '_') + '_' + (inj.injury_date || 'sin_fecha') + '.pdf');
+    showToast('PDF generado');
+    cmMedRegistrarAudit('EXPORT', 'cm_med_injuries', injuryId, 'Exporto PDF informe lesion');
+}
+
+async function cmMedPDFHistorial(playerId, playerName) {
+    showToast('Generando historial PDF...');
+
+    // Ficha medica
+    var recRes = await supabaseClient.from('cm_med_player_record').select('*')
+        .eq('club_id', clubId).eq('player_id', playerId).eq('archived', false).maybeSingle();
+    var record = recRes.data || {};
+
+    // Todas las lesiones
+    var injRes = await supabaseClient.from('cm_med_injuries')
+        .select('*, cm_med_osiics_codes(code, description_es), cm_med_body_zones(zone_name_es)')
+        .eq('club_id', clubId).eq('player_id', playerId).eq('archived', false)
+        .order('injury_date', { ascending: false });
+    var injuries = injRes.data || [];
+
+    var playerData = cmMedJugadoresData.find(function(j) { return j.playerId === playerId; });
+
+    var doc = new jspdf.jsPDF('p', 'mm', 'a4');
+    var y = 20;
+    var margen = 20;
+    var ancho = 170;
+
+    function checkPage(needed) { if (y + needed > 275) { doc.addPage(); y = 20; } }
+    function addTitle(text) { checkPage(12); doc.setFontSize(14); doc.setFont(undefined, 'bold'); doc.setTextColor(30); doc.text(text, margen, y); y += 8; doc.setDrawColor(59, 130, 246); doc.line(margen, y, margen + ancho, y); y += 6; }
+    function addLabel(label, value) { checkPage(8); doc.setFontSize(9); doc.setFont(undefined, 'bold'); doc.setTextColor(100); doc.text(label + ':', margen, y); doc.setFont(undefined, 'normal'); doc.setTextColor(40); doc.text(String(value || '-'), margen + 50, y); y += 6; }
+
+    // Header
+    doc.setFontSize(18); doc.setFont(undefined, 'bold'); doc.setTextColor(30);
+    doc.text('HISTORIAL MEDICO DEPORTIVO', margen, y); y += 10;
+    doc.setFontSize(9); doc.setFont(undefined, 'normal'); doc.setTextColor(120);
+    doc.text('Documento confidencial - Datos medicos protegidos (RGPD Art. 9)', margen, y); y += 4;
+    doc.text('Generado: ' + new Date().toLocaleDateString('es-ES'), margen, y); y += 10;
+
+    // Datos del jugador
+    addTitle('Datos del jugador');
+    addLabel('Nombre', playerName);
+    addLabel('Posicion', playerData ? playerData.position : '-');
+    addLabel('Equipo', playerData && playerData.teamNames ? playerData.teamNames.join(', ') : '-');
+    addLabel('Grupo sanguineo', record.blood_type);
+    addLabel('Lateralidad', record.laterality === 'right' ? 'Diestro' : record.laterality === 'left' ? 'Zurdo' : record.laterality === 'ambidextrous' ? 'Ambidiestro' : '-');
+    addLabel('Altura / Peso', (record.height_cm ? record.height_cm + ' cm' : '-') + ' / ' + (record.weight_kg ? record.weight_kg + ' kg' : '-'));
+    y += 4;
+
+    // Antecedentes
+    addTitle('Antecedentes medicos');
+    addLabel('Alergias', record.allergies);
+    addLabel('Enfermedades cronicas', record.chronic_conditions);
+    addLabel('Medicacion habitual', record.medications);
+    addLabel('Cirugias previas', record.surgical_history);
+    addLabel('Antecedentes familiares', record.family_history);
+    addLabel('Vacunaciones', record.vaccination_notes);
+    y += 4;
+
+    // Reconocimientos
+    addTitle('Reconocimientos medicos');
+    addLabel('Ultimo ECG', record.last_ecg_date ? new Date(record.last_ecg_date + 'T12:00:00').toLocaleDateString('es-ES') : '-');
+    addLabel('Ultima prueba esfuerzo', record.last_stress_test ? new Date(record.last_stress_test + 'T12:00:00').toLocaleDateString('es-ES') : '-');
+    addLabel('Ultimo analisis sangre', record.last_blood_test ? new Date(record.last_blood_test + 'T12:00:00').toLocaleDateString('es-ES') : '-');
+    addLabel('Certificado medico', record.medical_certificate_expiry ? new Date(record.medical_certificate_expiry + 'T12:00:00').toLocaleDateString('es-ES') : '-');
+    y += 4;
+
+    // Resumen lesiones
+    addTitle('Resumen de lesiones');
+    var totalInj = injuries.length;
+    var dischargedInj = injuries.filter(function(i) { return i.status === 'discharged'; });
+    var totalDays = dischargedInj.reduce(function(s, i) { return s + (i.actual_days_lost || 0); }, 0);
+    var avgDays = dischargedInj.length > 0 ? Math.round(totalDays / dischargedInj.length) : 0;
+    var activeNow = injuries.filter(function(i) { return i.status === 'active' || i.status === 'recovering'; }).length;
+
+    addLabel('Total lesiones', totalInj);
+    addLabel('Lesiones activas', activeNow);
+    addLabel('Total dias perdidos', totalDays);
+    addLabel('Media dias por lesion', avgDays);
+    y += 4;
+
+    // Lista de lesiones
+    if (injuries.length > 0) {
+        addTitle('Historial de lesiones (' + injuries.length + ')');
+        var statusLabels = { active: 'ACTIVA', recovering: 'EN RECUPERACION', rtp: 'RETURN-TO-PLAY', discharged: 'ALTA' };
+        var mechLabels = { contact: 'Contacto', non_contact: 'Sin contacto', overuse: 'Sobrecarga', illness: 'Enfermedad' };
+
+        injuries.forEach(function(inj, idx) {
+            checkPage(25);
+            var fecha = inj.injury_date ? new Date(inj.injury_date + 'T12:00:00').toLocaleDateString('es-ES') : '-';
+            doc.setFontSize(10); doc.setFont(undefined, 'bold'); doc.setTextColor(30);
+            doc.text((idx + 1) + '. ' + (inj.cm_med_body_zones ? inj.cm_med_body_zones.zone_name_es : 'Lesion') + ' - ' + fecha, margen, y); y += 5;
+            doc.setFontSize(9); doc.setFont(undefined, 'normal'); doc.setTextColor(80);
+            var details = [];
+            if (inj.cm_med_osiics_codes) details.push(inj.cm_med_osiics_codes.code + ' - ' + inj.cm_med_osiics_codes.description_es);
+            if (inj.mechanism) details.push('Mecanismo: ' + (mechLabels[inj.mechanism] || inj.mechanism));
+            if (inj.severity) details.push('Severidad: ' + inj.severity);
+            details.push('Estado: ' + (statusLabels[inj.status] || inj.status));
+            if (inj.actual_days_lost) details.push('Dias perdidos: ' + inj.actual_days_lost);
+            doc.text(details.join(' | '), margen + 4, y); y += 5;
+            if (inj.description) { doc.setTextColor(100); doc.text(inj.description.substring(0, 120), margen + 4, y); y += 5; }
+            y += 3;
+        });
+    }
+
+    // Notas
+    if (record.notes) {
+        addTitle('Notas del medico');
+        doc.setFontSize(9); doc.setFont(undefined, 'normal'); doc.setTextColor(40);
+        var lines = doc.splitTextToSize(record.notes, ancho);
+        checkPage(lines.length * 5);
+        doc.text(lines, margen, y); y += lines.length * 5;
+    }
+
+    // Footer
+    var totalPages = doc.internal.getNumberOfPages();
+    for (var p = 1; p <= totalPages; p++) {
+        doc.setPage(p);
+        doc.setFontSize(8); doc.setTextColor(150);
+        doc.text('TopLiderCoach - Panel Medico | Pagina ' + p + '/' + totalPages, margen, 290);
+    }
+
+    doc.save('Historial_' + playerName.replace(/\s/g, '_') + '.pdf');
+    showToast('Historial PDF generado');
+    cmMedRegistrarAudit('EXPORT', 'cm_med_player_record', playerId, 'Exporto PDF historial medico');
 }
  // ========== CUESTIONARIO OSTRC ==========
 function cmMedMostrarFormOSTRC(injuryId) {
@@ -1262,6 +1534,25 @@ async function cmMedRenderDashboard() {
             options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8', font: { size: 11 }, padding: 12 } } } }
         });
     }, 100);
+}
+// ========== NOTIFICACIONES INTERNAS ==========
+async function cmMedNotificar(type, title, message, playerName, relatedType, relatedId) {
+    console.log('NOTIFICAR:', type, title);
+    try {
+        var res = await supabaseClient.from('cm_notifications').insert({
+            club_id: clubId,
+            type: type,
+            title: title,
+            message: message || null,
+            icon: type === 'injury_new' ? 'injury' : type === 'discharge' ? 'check' : type === 'availability' ? 'semaphore' : 'bell',
+            player_name: playerName || null,
+            related_type: relatedType || null,
+            related_id: relatedId || null,
+            target_permission: 'entrenamientos',
+            created_by: usuario ? usuario.id : null
+        });
+        console.log('NOTIF RESULTADO:', res.error ? res.error.message : 'OK');
+    } catch (e) { console.error('Error creando notificacion:', e); }
 }
 // ========== AUTO-MONTAJE ==========
 (function cmMedAutoMontar() {
