@@ -141,6 +141,10 @@ function cmMedRenderPanel(container) {
     '<div class="cmmed-panel">' +
         '<div class="cmmed-header">' +
             '<h2>Panel Medico</h2>' +
+            '<div style="display:flex;gap:8px">' +
+                '<button class="cmmed-btn cmmed-btn-primary cmmed-btn-sm" id="cmmed-btn-jugadores" onclick="cmMedVistaJugadores()" style="opacity:0.5">Jugadores</button>' +
+                '<button class="cmmed-btn cmmed-btn-secondary cmmed-btn-sm" id="cmmed-btn-dashboard" onclick="cmMedVistaDashboard()">Dashboard</button>' +
+            '</div>' +
             '<div class="cmmed-filtro-bar">' +
                 '<label>Equipo:</label>' +
                 '<select id="cmmed-filtro-equipo" onchange="cmMedFiltrarEquipo(this.value)"><option value="all">Todos los equipos</option></select>' +
@@ -153,6 +157,7 @@ function cmMedRenderPanel(container) {
             '<div class="cmmed-stat red" onclick="cmMedFiltrarEstado(\'red\',this)"><div class="num" id="cmmed-stat-red">-</div><div class="label">Lesionados</div></div>' +
         '</div>' +
         '<div class="cmmed-filter-count" id="cmmed-filter-count"></div>' +
+        '<div id="cmmed-dashboard" style="display:none"></div>' +
         '<div class="cmmed-player-grid" id="cmmed-player-grid"><div class="cmmed-empty"><div class="icon">⏳</div><p>Cargando jugadores...</p></div></div>' +
     '</div>' +
     '<div class="cmmed-ficha-overlay" id="cmmed-ficha-overlay" style="display:none;" onclick="if(event.target===this)cmMedCerrarFicha()">' +
@@ -482,7 +487,121 @@ async function cmMedCargarLesiones(playerId) {
 }
 
 function cmMedMecanismoLabel(m) { var l = { contact: 'Contacto', non_contact: 'Sin contacto', overuse: 'Sobrecarga', illness: 'Enfermedad' }; return l[m] || m; }
+// ========== BODY MAP INTERACTIVO ==========
+var cmMedBodyChart = null;
+var cmMedBodyChartView = 'FRONT';
 
+function cmMedMapMuscleToZone(muscleId) {
+    var id = muscleId.toLowerCase();
+    var side = id.includes('left') ? 'l' : id.includes('right') ? 'r' : '';
+
+    // Cabeza y cuello
+    if (id.includes('head')) return 'front_head';
+    if (id.includes('neck')) return id.includes('back') ? 'back_neck' : 'front_neck';
+    if (id.includes('face')) return 'front_face';
+
+    // Hombros
+    if (id.includes('deltoid') || id.includes('shoulder')) {
+        if (id.includes('back') || id.includes('rear') || id.includes('posterior'))
+            return 'back_shoulder_' + (side || 'r');
+        return 'front_shoulder_' + (side || 'r');
+    }
+
+    // Pecho
+    if (id.includes('chest') || id.includes('pectoral') || id.includes('sternal'))
+        return 'front_chest_' + (side || 'r');
+
+    // Brazos
+    if (id.includes('bicep')) return 'front_upper_arm_' + (side || 'r');
+    if (id.includes('tricep')) return 'back_upper_arm_' + (side || 'r');
+    if (id.includes('forearm')) return 'front_forearm_' + (side || 'r');
+    if (id.includes('wrist') || id.includes('hand')) return 'front_wrist_hand_' + (side || 'r');
+    if (id.includes('elbow')) return 'front_elbow_' + (side || 'r');
+
+    // Abdomen
+    if (id.includes('abs') || id.includes('abdominal') || id.includes('rectus'))
+        return 'front_abdomen';
+    if (id.includes('oblique')) return 'front_hip_groin_' + (side || 'r');
+
+    // Cadera / ingle
+    if (id.includes('hip') || id.includes('groin') || id.includes('flexor') || id.includes('adductor'))
+        return 'front_hip_groin_' + (side || 'r');
+
+    // Muslo
+    if (id.includes('quadricep') || id.includes('quad') || id.includes('vastus') || id.includes('rectus-fem'))
+        return 'front_thigh_' + (side || 'r');
+    if (id.includes('hamstring') || id.includes('semitendinosus') || id.includes('semimembranosus'))
+        return 'back_hamstring_' + (side || 'r');
+    if (id.includes('abductor')) return 'front_thigh_' + (side || 'r');
+
+    // Gluteo
+    if (id.includes('gluteal') || id.includes('glute')) return 'back_glute_' + (side || 'r');
+
+    // Rodilla
+    if (id.includes('knee')) return 'front_knee_' + (side || 'r');
+
+    // Pierna
+    if (id.includes('calf') || id.includes('calves') || id.includes('gastrocnemius') || id.includes('soleus'))
+        return 'back_calf_' + (side || 'r');
+    if (id.includes('tibialis') || id.includes('shin')) return 'front_shin_' + (side || 'r');
+
+    // Tobillo / pie
+    if (id.includes('ankle') || id.includes('foot') || id.includes('feet') || id.includes('achilles'))
+        return 'front_ankle_foot_' + (side || 'r');
+
+    // Espalda
+    if (id.includes('trapezius') || id.includes('trap')) return 'back_upper_back_' + (side || 'r');
+    if (id.includes('upper-back') || id.includes('rhomboid') || id.includes('lats') || id.includes('lat'))
+        return 'back_upper_back_' + (side || 'r');
+    if (id.includes('lower-back') || id.includes('lumbar') || id.includes('erector'))
+        return 'back_lower_back';
+    if (id.includes('mid-back')) return 'back_mid_back';
+
+    console.warn('Body map: zona no mapeada para:', muscleId);
+    return null;
+}
+function cmMedInitBodyMap(containerId) {
+    if (typeof BodyMuscles === 'undefined') {
+        console.warn('body-muscles library not loaded');
+        return;
+    }
+    var container = document.getElementById(containerId);
+    if (!container || !BodyMuscles.BodyChart) return;
+
+    if (cmMedBodyChart) { try { cmMedBodyChart.destroy(); } catch(e){} }
+
+    cmMedBodyChart = new BodyMuscles.BodyChart(container, {
+        view: BodyMuscles.ViewSide.FRONT,
+        bodyState: {},
+        onMuscleClick: function(muscleId, muscleName) {
+            console.log('BODY MAP CLICK:', muscleId, muscleName);
+            var zoneId = cmMedMapMuscleToZone(muscleId);
+            if (zoneId) {
+                var select = document.getElementById('cmmed-inj-zone');
+                if (select) { select.value = zoneId; }
+                var label = document.getElementById('cmmed-bodymap-selected');
+                if (label) { label.textContent = muscleName + ' → ' + zoneId; }
+                // Highlight the selected muscle
+                var state = {};
+                state[muscleId] = { intensity: 5, selected: true };
+                cmMedBodyChart.update({ bodyState: state });
+            }
+        }
+    });
+}
+
+function cmMedToggleBodyView() {
+    if (!cmMedBodyChart) return;
+    if (cmMedBodyChartView === 'FRONT') {
+        cmMedBodyChartView = 'BACK';
+        cmMedBodyChart.update({ view: BodyMuscles.ViewSide.BACK });
+    } else {
+        cmMedBodyChartView = 'FRONT';
+        cmMedBodyChart.update({ view: BodyMuscles.ViewSide.FRONT });
+    }
+    var btn = document.getElementById('cmmed-bodymap-toggle');
+    if (btn) { btn.textContent = cmMedBodyChartView === 'FRONT' ? 'Ver posterior' : 'Ver frontal'; }
+}
 function cmMedMostrarFormLesion() {
     var container = document.getElementById('cmmed-form-lesion-container');
     var osiicsOpts = cmMedOsiicsCatalog.map(function(o) { return '<option value="'+o.code+'">'+o.code+' - '+o.description_es+'</option>'; }).join('');
@@ -495,12 +614,19 @@ function cmMedMostrarFormLesion() {
         '<div style="background:#0f172a;border:1px solid #3b82f6;border-radius:10px;padding:18px;margin-bottom:16px">' +
         '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><h4 style="margin:0;color:#60a5fa;font-size:15px">Registrar nueva lesion</h4><button class="cmmed-btn cmmed-btn-secondary cmmed-btn-sm" onclick="document.getElementById(\'cmmed-form-lesion-container\').innerHTML=\'\'">Cancelar</button></div>' +
         '<div class="cmmed-form-row"><div class="cmmed-form-group"><label>Fecha de la lesion *</label><input type="date" id="cmmed-inj-date" value="'+hoy+'"></div><div class="cmmed-form-group"><label>Mecanismo</label><select id="cmmed-inj-mechanism"><option value="">-- Seleccionar --</option><option value="non_contact">Sin contacto</option><option value="contact">Contacto</option><option value="overuse">Sobrecarga / sobreuso</option><option value="illness">Enfermedad</option></select></div></div>' +
+        '<div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:14px;margin-bottom:14px">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span style="color:#94a3b8;font-size:12px;font-weight:600">Selecciona la zona en el cuerpo</span><button type="button" class="cmmed-btn cmmed-btn-secondary cmmed-btn-sm" id="cmmed-bodymap-toggle" onclick="cmMedToggleBodyView()">Ver posterior</button></div>' +
+            '<div id="cmmed-bodymap-container" style="max-width:280px;margin:0 auto"></div>' +
+            '<div id="cmmed-bodymap-selected" style="text-align:center;color:#60a5fa;font-size:13px;margin-top:8px;min-height:20px"></div>' +
+        '</div>' +
         '<div class="cmmed-form-row"><div class="cmmed-form-group"><label>Zona corporal *</label><select id="cmmed-inj-zone"><option value="">-- Seleccionar zona --</option>'+zoneOpts+'</select></div><div class="cmmed-form-group"><label>Codigo OSIICS</label><select id="cmmed-inj-osiics"><option value="">-- Seleccionar diagnostico --</option>'+osiicsOpts+'</select></div></div>' +
         '<div class="cmmed-form-row"><div class="cmmed-form-group"><label>Contexto</label><select id="cmmed-inj-context"><option value="">-- Seleccionar --</option><option value="match">Partido</option><option value="training">Entrenamiento</option><option value="other">Otro</option></select></div><div class="cmmed-form-group"><label>Severidad estimada</label><select id="cmmed-inj-severity"><option value="">-- Seleccionar --</option><option value="minimal">Minima (1-3 dias)</option><option value="mild">Leve (4-7 dias)</option><option value="moderate">Moderada (8-28 dias)</option><option value="severe">Severa (+28 dias)</option></select></div></div>' +
         '<div class="cmmed-form-group"><label>Dias estimados de baja</label><input type="number" id="cmmed-inj-days" placeholder="Ej: 14" min="1"></div>' +
         '<div class="cmmed-form-group"><label>Descripcion / observaciones</label><textarea id="cmmed-inj-desc" placeholder="Descripcion de la lesion, circunstancias..."></textarea></div>' +
         '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:12px"><button class="cmmed-btn cmmed-btn-primary" onclick="cmMedGuardarLesion()">Registrar lesion</button></div></div>';
-}
+        setTimeout(function() { cmMedInitBodyMap('cmmed-bodymap-container'); }, 100);
+
+    }
 
 async function cmMedGuardarLesion() {
     var playerId = cmMedJugadorActual;
@@ -561,7 +687,19 @@ async function cmMedVerLesion(injuryId) {
                 '<button class="cmmed-btn cmmed-btn-sm '+(inj.status==='discharged'?'cmmed-btn-success':'cmmed-btn-secondary')+'" onclick="cmMedDarAlta(\''+inj.id+'\')">Alta medica</button>' +
             '</div></div></div>' +
         '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><h4 style="margin:0;color:#e2e8f0">Sesiones de tratamiento</h4><button class="cmmed-btn cmmed-btn-primary cmmed-btn-sm" onclick="cmMedMostrarFormSesion(\''+inj.id+'\')">+ Nueva sesion SOAP</button></div>' +
-        '<div id="cmmed-form-sesion-container"></div>' + sesHtml;
+        '<div id="cmmed-form-sesion-container"></div>' + sesHtml +
+        '<div style="margin-top:20px;padding-top:16px;border-top:1px solid #334155">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">' +
+                '<h4 style="margin:0;color:#e2e8f0">Archivos adjuntos</h4>' +
+                '<label class="cmmed-btn cmmed-btn-secondary cmmed-btn-sm" style="cursor:pointer">' +
+                    '<input type="file" id="cmmed-file-input" style="display:none" accept="image/*,.pdf,.doc,.docx" onchange="cmMedSubirArchivo(\'' + inj.id + '\')" multiple>' +
+                    '+ Subir archivo' +
+                '</label>' +
+            '</div>' +
+            '<div id="cmmed-adjuntos-lista"><div class="cmmed-empty" style="padding:20px"><p>Cargando adjuntos...</p></div></div>' +
+        '</div>';
+
+    cmMedCargarAdjuntos(inj.id);
 }
 
 async function cmMedCambiarEstadoLesion(injuryId, nuevoEstado) {
@@ -703,8 +841,256 @@ async function cmMedRegistrarAudit(action, tableName, recordId, details) {
             action: action, table_name: tableName, record_id: String(recordId || ''), details: details || null });
     } catch (e) { console.warn('Audit log error:', e); }
 }
+// ========== ARCHIVOS ADJUNTOS ==========
+async function cmMedCargarAdjuntos(injuryId) {
+    var container = document.getElementById('cmmed-adjuntos-lista');
+    if (!container) return;
 
+    var res = await supabaseClient.from('cm_med_attachments')
+        .select('*').eq('injury_id', injuryId).eq('archived', false).order('created_at', { ascending: false });
+    var files = res.data || [];
 
+    if (files.length === 0) {
+        container.innerHTML = '<p style="color:#64748b;font-size:13px;text-align:center;padding:14px">Sin archivos adjuntos</p>';
+        return;
+    }
+
+    var html = '';
+    files.forEach(function(f) {
+        var fecha = new Date(f.created_at).toLocaleDateString('es-ES');
+        var size = f.file_size ? (f.file_size < 1024000 ? Math.round(f.file_size / 1024) + ' KB' : (f.file_size / 1048576).toFixed(1) + ' MB') : '';
+        var icon = '📄';
+        if (f.file_type && f.file_type.startsWith('image/')) icon = '🖼️';
+        if (f.file_type && f.file_type.includes('pdf')) icon = '📕';
+        var catLabels = { mri: 'RMN', ultrasound: 'Ecografia', xray: 'Radiografia', report: 'Informe', photo: 'Foto', other: 'Otro' };
+
+        html +=
+            '<div style="display:flex;align-items:center;gap:10px;padding:10px;background:#1e293b;border-radius:8px;margin-bottom:6px">' +
+                '<span style="font-size:22px">' + icon + '</span>' +
+                '<div style="flex:1;min-width:0">' +
+                    '<div style="color:#e2e8f0;font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + f.file_name + '</div>' +
+                    '<div style="color:#94a3b8;font-size:11px">' + fecha + ' · ' + size + (f.category ? ' · ' + (catLabels[f.category] || f.category) : '') + '</div>' +
+                    (f.description ? '<div style="color:#94a3b8;font-size:11px;margin-top:2px">' + f.description + '</div>' : '') +
+                '</div>' +
+                '<button class="cmmed-btn cmmed-btn-primary cmmed-btn-sm" onclick="cmMedDescargarArchivo(\'' + f.id + '\',\'' + f.storage_path.replace(/'/g, "\\'") + '\',\'' + f.file_name.replace(/'/g, "\\'") + '\')">Ver</button>' +
+            '</div>';
+    });
+
+    container.innerHTML = html;
+}
+
+async function cmMedSubirArchivo(injuryId) {
+    var input = document.getElementById('cmmed-file-input');
+    if (!input || !input.files || input.files.length === 0) return;
+
+    var playerId = cmMedJugadorActual;
+    var totalFiles = input.files.length;
+    var uploaded = 0;
+
+    for (var i = 0; i < totalFiles; i++) {
+        var file = input.files[i];
+        if (file.size > 10485760) {
+            showToast('Archivo demasiado grande (max 10MB): ' + file.name, 'error');
+            continue;
+        }
+
+        // Ruta: club_id/player_id/injury_id/timestamp_filename
+        var timestamp = Date.now();
+        var safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+        var path = clubId + '/' + playerId + '/' + injuryId + '/' + timestamp + '_' + safeName;
+
+        // Subir a Supabase Storage
+        var upRes = await supabaseClient.storage.from('medical-files').upload(path, file);
+        if (upRes.error) {
+            console.error('Error subiendo:', upRes.error);
+            showToast('Error al subir ' + file.name + ': ' + upRes.error.message, 'error');
+            continue;
+        }
+
+        // Registrar en la tabla
+        var insRes = await supabaseClient.from('cm_med_attachments').insert({
+            club_id: clubId,
+            injury_id: injuryId,
+            player_id: playerId,
+            file_name: file.name,
+            file_type: file.type,
+            file_size: file.size,
+            storage_path: path,
+            category: cmMedDetectarCategoria(file.name, file.type),
+            uploaded_by: usuario ? usuario.id : null
+        });
+
+        if (insRes.error) {
+            console.error('Error registrando:', insRes.error);
+        } else {
+            uploaded++;
+            cmMedRegistrarAudit('INSERT', 'cm_med_attachments', injuryId, 'Subio archivo: ' + file.name);
+        }
+    }
+
+    input.value = '';
+    if (uploaded > 0) {
+        showToast(uploaded + ' archivo' + (uploaded > 1 ? 's subidos' : ' subido'));
+        cmMedCargarAdjuntos(injuryId);
+    }
+}
+
+async function cmMedDescargarArchivo(attachmentId, storagePath, fileName) {
+    var res = await supabaseClient.storage.from('medical-files').createSignedUrl(storagePath, 3600);
+    if (res.error || !res.data || !res.data.signedUrl) {
+        showToast('Error al obtener el archivo', 'error');
+        return;
+    }
+    window.open(res.data.signedUrl, '_blank');
+    cmMedRegistrarAudit('SELECT', 'cm_med_attachments', attachmentId, 'Descargo archivo: ' + fileName);
+}
+
+function cmMedDetectarCategoria(name, type) {
+    var n = name.toLowerCase();
+    if (n.includes('rmn') || n.includes('mri') || n.includes('resonancia')) return 'mri';
+    if (n.includes('eco') || n.includes('ultrasound')) return 'ultrasound';
+    if (n.includes('rx') || n.includes('xray') || n.includes('radiografia')) return 'xray';
+    if (n.includes('informe') || n.includes('report')) return 'report';
+    if (type && type.startsWith('image/')) return 'photo';
+    return 'other';
+}
+// ========== DASHBOARD MÉDICO ==========
+function cmMedVistaJugadores() {
+    document.getElementById('cmmed-player-grid').style.display = '';
+    document.getElementById('cmmed-stats-bar').style.display = '';
+    var fc = document.getElementById('cmmed-filter-count'); if(fc) fc.style.display = '';
+    document.getElementById('cmmed-dashboard').style.display = 'none';
+    document.getElementById('cmmed-btn-jugadores').style.opacity = '0.5';
+    document.getElementById('cmmed-btn-dashboard').style.opacity = '1';
+    document.getElementById('cmmed-btn-jugadores').className = 'cmmed-btn cmmed-btn-primary cmmed-btn-sm';
+    document.getElementById('cmmed-btn-dashboard').className = 'cmmed-btn cmmed-btn-secondary cmmed-btn-sm';
+}
+
+async function cmMedVistaDashboard() {
+    document.getElementById('cmmed-player-grid').style.display = 'none';
+    document.getElementById('cmmed-stats-bar').style.display = 'none';
+    var fc = document.getElementById('cmmed-filter-count'); if(fc) fc.style.display = 'none';
+    document.getElementById('cmmed-dashboard').style.display = 'block';
+    document.getElementById('cmmed-btn-dashboard').style.opacity = '0.5';
+    document.getElementById('cmmed-btn-jugadores').style.opacity = '1';
+    document.getElementById('cmmed-btn-dashboard').className = 'cmmed-btn cmmed-btn-primary cmmed-btn-sm';
+    document.getElementById('cmmed-btn-jugadores').className = 'cmmed-btn cmmed-btn-secondary cmmed-btn-sm';
+    await cmMedRenderDashboard();
+}
+
+async function cmMedRenderDashboard() {
+    var container = document.getElementById('cmmed-dashboard');
+    container.innerHTML = '<div class="cmmed-empty"><div class="icon">⏳</div><p>Calculando metricas...</p></div>';
+
+    // Cargar TODAS las lesiones del club (no solo activas)
+    var injRes = await supabaseClient.from('cm_med_injuries')
+        .select('*, cm_med_osiics_codes(description_es, body_region), cm_med_body_zones(zone_name_es, body_area)')
+        .eq('club_id', clubId).eq('archived', false).order('injury_date', { ascending: false });
+    var injuries = injRes.data || [];
+
+    // Cargar disponibilidad
+    var availRes = await supabaseClient.from('club_player_availability').select('status').eq('club_id', clubId);
+    var avails = availRes.data || [];
+
+    // ===== KPIs =====
+    var totalInjuries = injuries.length;
+    var activeNow = injuries.filter(function(i) { return i.status === 'active' || i.status === 'recovering'; }).length;
+    var discharged = injuries.filter(function(i) { return i.status === 'discharged'; });
+    var totalDaysLost = discharged.reduce(function(sum, i) { return sum + (i.actual_days_lost || 0); }, 0);
+    var avgDaysLost = discharged.length > 0 ? Math.round(totalDaysLost / discharged.length) : 0;
+    var recurrences = injuries.filter(function(i) { return i.is_recurrence; }).length;
+    var recurrenceRate = totalInjuries > 0 ? Math.round((recurrences / totalInjuries) * 100) : 0;
+    var availGreen = avails.filter(function(a) { return a.status === 'green'; }).length;
+    var availTotal = cmMedJugadoresData.length || avails.length || 1;
+    var availPercent = Math.round((availGreen / availTotal) * 100);
+
+    // ===== Datos para graficos =====
+    // Lesiones por mes
+    var byMonth = {};
+    injuries.forEach(function(i) {
+        var m = i.injury_date ? i.injury_date.substring(0, 7) : 'unknown';
+        byMonth[m] = (byMonth[m] || 0) + 1;
+    });
+    var monthLabels = Object.keys(byMonth).sort();
+    var monthData = monthLabels.map(function(m) { return byMonth[m]; });
+    var monthLabelsFormatted = monthLabels.map(function(m) {
+        var parts = m.split('-');
+        var meses = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+        return meses[parseInt(parts[1])-1] + ' ' + parts[0].substring(2);
+    });
+
+    // Zonas mas afectadas
+    var byZone = {};
+    injuries.forEach(function(i) {
+        var z = i.cm_med_body_zones ? i.cm_med_body_zones.zone_name_es : 'No especificada';
+        byZone[z] = (byZone[z] || 0) + 1;
+    });
+    var zonePairs = Object.entries(byZone).sort(function(a, b) { return b[1] - a[1]; }).slice(0, 10);
+    var zoneLabels = zonePairs.map(function(p) { return p[0]; });
+    var zoneData = zonePairs.map(function(p) { return p[1]; });
+
+    // Severidad
+    var bySeverity = { minimal: 0, mild: 0, moderate: 0, severe: 0, unknown: 0 };
+    injuries.forEach(function(i) { bySeverity[i.severity || 'unknown']++; });
+    var sevLabels = ['Minima (1-3d)', 'Leve (4-7d)', 'Moderada (8-28d)', 'Severa (+28d)', 'Sin clasificar'];
+    var sevData = [bySeverity.minimal, bySeverity.mild, bySeverity.moderate, bySeverity.severe, bySeverity.unknown];
+    var sevColors = ['#22c55e', '#84cc16', '#f59e0b', '#ef4444', '#64748b'];
+
+    // Mecanismo
+    var byMechanism = { contact: 0, non_contact: 0, overuse: 0, illness: 0, unknown: 0 };
+    injuries.forEach(function(i) { byMechanism[i.mechanism || 'unknown']++; });
+    var mechLabels = ['Contacto', 'Sin contacto', 'Sobrecarga', 'Enfermedad', 'No especificado'];
+    var mechData = [byMechanism.contact, byMechanism.non_contact, byMechanism.overuse, byMechanism.illness, byMechanism.unknown];
+    var mechColors = ['#ef4444', '#3b82f6', '#f59e0b', '#a855f7', '#64748b'];
+
+    // ===== RENDER =====
+    container.innerHTML =
+        '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:20px">' +
+            '<div style="background:#1e293b;border-radius:10px;padding:14px;text-align:center;border:1px solid #334155"><div style="font-size:28px;font-weight:700;color:#60a5fa">' + totalInjuries + '</div><div style="font-size:11px;color:#94a3b8;margin-top:2px">Total lesiones</div></div>' +
+            '<div style="background:#1e293b;border-radius:10px;padding:14px;text-align:center;border:1px solid #334155"><div style="font-size:28px;font-weight:700;color:#ef4444">' + activeNow + '</div><div style="font-size:11px;color:#94a3b8;margin-top:2px">Activas ahora</div></div>' +
+            '<div style="background:#1e293b;border-radius:10px;padding:14px;text-align:center;border:1px solid #334155"><div style="font-size:28px;font-weight:700;color:#f59e0b">' + avgDaysLost + '</div><div style="font-size:11px;color:#94a3b8;margin-top:2px">Media dias baja</div></div>' +
+            '<div style="background:#1e293b;border-radius:10px;padding:14px;text-align:center;border:1px solid #334155"><div style="font-size:28px;font-weight:700;color:#a855f7">' + totalDaysLost + '</div><div style="font-size:11px;color:#94a3b8;margin-top:2px">Total dias perdidos</div></div>' +
+            '<div style="background:#1e293b;border-radius:10px;padding:14px;text-align:center;border:1px solid #334155"><div style="font-size:28px;font-weight:700;color:#f97316">' + recurrenceRate + '%</div><div style="font-size:11px;color:#94a3b8;margin-top:2px">Tasa recurrencia</div></div>' +
+            '<div style="background:#1e293b;border-radius:10px;padding:14px;text-align:center;border:1px solid #334155"><div style="font-size:28px;font-weight:700;color:#22c55e">' + availPercent + '%</div><div style="font-size:11px;color:#94a3b8;margin-top:2px">Disponibilidad</div></div>' +
+        '</div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">' +
+            '<div style="background:#1e293b;border-radius:10px;padding:16px;border:1px solid #334155"><h4 style="margin:0 0 12px;color:#e2e8f0;font-size:14px">Lesiones por mes</h4><canvas id="cmmed-chart-monthly"></canvas></div>' +
+            '<div style="background:#1e293b;border-radius:10px;padding:16px;border:1px solid #334155"><h4 style="margin:0 0 12px;color:#e2e8f0;font-size:14px">Zonas mas afectadas</h4><canvas id="cmmed-chart-zones"></canvas></div>' +
+            '<div style="background:#1e293b;border-radius:10px;padding:16px;border:1px solid #334155"><h4 style="margin:0 0 12px;color:#e2e8f0;font-size:14px">Severidad</h4><canvas id="cmmed-chart-severity"></canvas></div>' +
+            '<div style="background:#1e293b;border-radius:10px;padding:16px;border:1px solid #334155"><h4 style="margin:0 0 12px;color:#e2e8f0;font-size:14px">Mecanismo de lesion</h4><canvas id="cmmed-chart-mechanism"></canvas></div>' +
+        '</div>';
+
+    // ===== DIBUJAR CHARTS =====
+    setTimeout(function() {
+        // Lesiones por mes (line)
+        new Chart(document.getElementById('cmmed-chart-monthly'), {
+            type: 'line',
+            data: { labels: monthLabelsFormatted, datasets: [{ label: 'Lesiones', data: monthData, borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.1)', tension: 0.3, fill: true, pointRadius: 4, pointBackgroundColor: '#3b82f6' }] },
+            options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#94a3b8', font: { size: 11 } }, grid: { color: '#1e293b' } }, y: { beginAtZero: true, ticks: { color: '#94a3b8', stepSize: 1 }, grid: { color: '#334155' } } } }
+        });
+
+        // Zonas (horizontal bar)
+        new Chart(document.getElementById('cmmed-chart-zones'), {
+            type: 'bar',
+            data: { labels: zoneLabels, datasets: [{ data: zoneData, backgroundColor: '#3b82f6', borderRadius: 4 }] },
+            options: { indexAxis: 'y', responsive: true, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { color: '#94a3b8', stepSize: 1 }, grid: { color: '#334155' } }, y: { ticks: { color: '#e2e8f0', font: { size: 11 } }, grid: { display: false } } } }
+        });
+
+        // Severidad (doughnut)
+        new Chart(document.getElementById('cmmed-chart-severity'), {
+            type: 'doughnut',
+            data: { labels: sevLabels, datasets: [{ data: sevData, backgroundColor: sevColors, borderWidth: 0 }] },
+            options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8', font: { size: 11 }, padding: 12 } } } }
+        });
+
+        // Mecanismo (doughnut)
+        new Chart(document.getElementById('cmmed-chart-mechanism'), {
+            type: 'doughnut',
+            data: { labels: mechLabels, datasets: [{ data: mechData, backgroundColor: mechColors, borderWidth: 0 }] },
+            options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8', font: { size: 11 }, padding: 12 } } } }
+        });
+    }, 100);
+}
 // ========== AUTO-MONTAJE ==========
 (function cmMedAutoMontar() {
     var intentos = 0;
