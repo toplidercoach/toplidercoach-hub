@@ -596,10 +596,12 @@ function renderizarConvocatoria() {
         convocadosPartido.splice(idx, 1);
         const idxTit = titularesPartido.indexOf(spId);
         if (idxTit > -1) titularesPartido.splice(idxTit, 1);
+        // Limpiar solo el slot de ESTE jugador, conservar el resto de la alineacion
+        const slotIdxC = slotsTitularesMap.indexOf(spId);
+        if (slotIdxC > -1) slotsTitularesMap[slotIdxC] = null;
     } else {
         convocadosPartido.push(spId);
     }
-    slotsTitularesMap = [];
     slotVacioIdx = null;
     renderizarConvocatoria();
 }
@@ -725,11 +727,37 @@ function renderizarConvocatoria() {
             }
         }
         
+        // Detecta lado del jugador por su posicion (Lateral Izquierdo, Extremo Derecho, etc.)
+        const ladoJugador = (sp) => {
+            const p = ((sp.players?.position) || '').toLowerCase();
+            if (p.includes('izquierd')) return 'IZQ';
+            if (p.includes('derech')) return 'DER';
+            return 'CEN';
+        };
+        // Detecta lado del slot por su coordenada x en el campo
+        const ladoSlot = (s) => s.x < 35 ? 'IZQ' : (s.x > 65 ? 'DER' : 'CEN');
+        
         ['DEF', 'MED', 'DEL'].forEach(cat => {
             const jugadoresCat = titOrdenados.filter(sp => categoriaPosicion(sp.players?.position) === cat);
-            const slotsLibres = posiciones.map((p, i) => ({...p, idx: i})).filter(p => p.tipo === cat && !slotsTitularesMap[p.idx]);
+            let slotsLibres = posiciones.map((p, i) => ({...p, idx: i})).filter(p => p.tipo === cat && !slotsTitularesMap[p.idx]);
             
+            // 1a pasada: emparejar laterales/extremos a sus slots laterales correctos
+            ['IZQ', 'DER', 'CEN'].forEach(lado => {
+                const jugs = jugadoresCat.filter(sp => ladoJugador(sp) === lado && titOrdenados.indexOf(sp) >= 0);
+                const slotsLado = slotsLibres.filter(s => ladoSlot(s) === lado);
+                jugs.forEach(sp => {
+                    const slot = slotsLado.shift();
+                    if (slot) {
+                        slotsTitularesMap[slot.idx] = String(sp.id);
+                        titOrdenados.splice(titOrdenados.indexOf(sp), 1);
+                        slotsLibres = slotsLibres.filter(s => s.idx !== slot.idx);
+                    }
+                });
+            });
+            
+            // 2a pasada: jugadores sin lado emparejado (mismatches) van al primer slot libre
             jugadoresCat.forEach(sp => {
+                if (titOrdenados.indexOf(sp) < 0) return;
                 const slot = slotsLibres.shift();
                 if (slot) {
                     slotsTitularesMap[slot.idx] = String(sp.id);
