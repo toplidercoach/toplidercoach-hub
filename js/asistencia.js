@@ -216,7 +216,8 @@ async function cargarAsistenciaRango() {
         const { data: asistencias } = await supabaseClient
             .from('asistencia_sesiones')
             .select('*')
-            .in('sesion_id', sesionIds);
+            .in('sesion_id', sesionIds)
+            .range(0, 9999);
         
         // Calcular stats por jugador
         let htmlRows = '';
@@ -697,7 +698,7 @@ async function generarPDFPlantillaGeneral() {
         // Asistencias
         const sesionIds = sesiones.map(s => s.id);
         const { data: asistencias } = await supabaseClient
-            .from('asistencia_sesiones').select('*').in('sesion_id', sesionIds);
+            .from('asistencia_sesiones').select('*').in('sesion_id', sesionIds).range(0, 9999);
         
         // Calcular stats por jugador
         const statsJugadores = jugadores.map(j => {
