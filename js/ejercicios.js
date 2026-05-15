@@ -2210,7 +2210,7 @@ let thumbnailSvg = window.ejThumbnailPendiente || null;
             animFrames: ejP.animMode ? ejP.frames : [],
             animMode: ejP.animMode
         } : null,
-        thumbnail_svg: thumbnailSvg ? ejComprimirThumbSVG(thumbnailSvg) : null,
+        thumbnail_svg: window._ejPdfThumbData || (thumbnailSvg ? ejComprimirThumbSVG(thumbnailSvg) : null),
         
         source: 'custom'
     };
@@ -2455,8 +2455,12 @@ grid.innerHTML = html;
             var ex = list[svgIdx];
             if (ex && ex.thumbnail_svg) {
                 try {
-                    var blob = new Blob([ex.thumbnail_svg], {type: 'image/svg+xml'});
-                    img.src = URL.createObjectURL(blob);
+                    if (ex.thumbnail_svg.startsWith('data:')) {
+                        img.src = ex.thumbnail_svg;
+                    } else {
+                        var blob = new Blob([ex.thumbnail_svg], {type: 'image/svg+xml'});
+                        img.src = URL.createObjectURL(blob);
+                    }
                 } catch(err) {}
             }
         }
