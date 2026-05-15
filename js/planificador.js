@@ -55,7 +55,7 @@ registrarSubTab('planificador', 'calendario', cargarCalendarioUnificado);
                     };
                     
                     return `
-                    <div class="ejercicio-card" onclick="seleccionarEjercicio(${ej.id})">
+                    <div class="ejercicio-card" onclick="seleccionarEjercicio('${ej.id}')">
                         <img src="${ej.imagen || 'https://via.placeholder.com/80x60?text=Sin+img'}" alt="">
                         <div class="info">
                             <div class="titulo">${ej.titulo}</div>
@@ -239,6 +239,10 @@ registrarSubTab('planificador', 'calendario', cargarCalendarioUnificado);
         }
         
         function seleccionarEjercicio(ejercicioId) {
+            // Si el ID es un UUID (ejercicio propio), redirigir a seleccionarMiEjercicio
+            if (typeof ejercicioId === 'string' && ejercicioId.indexOf('-') > 0) {
+                return seleccionarMiEjercicio(ejercicioId);
+            }
             const detalle = document.getElementById('detalle-ejercicio');
             detalle.innerHTML = '<div class="loading">Cargando detalles...</div>';
             
@@ -373,7 +377,7 @@ registrarSubTab('planificador', 'calendario', cargarCalendarioUnificado);
                     lista.innerHTML = '<p style="text-align:center;color:#9ca3af;padding:20px;font-size:13px;">Arrastra ejercicios aqui</p>';
               } else {
                     lista.innerHTML = sesion[seccion].map((ej, idx) => `
-                        <div class="ejercicio-en-sesion" onclick="seleccionarEjercicio(${ej.id})" style="cursor: pointer;">
+                        <div class="ejercicio-en-sesion" onclick="seleccionarEjercicio('${ej.id}')" style="cursor: pointer;">
                             <div>
                                 <div class="nombre">${ej.titulo}</div>
                                 <div class="duracion">${ej.duracion} min</div>
