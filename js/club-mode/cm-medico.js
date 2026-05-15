@@ -712,7 +712,7 @@ function cmMedMostrarFormLesion() {
             '<div id="cmmed-bodymap-container" style="max-width:280px;margin:0 auto"></div>' +
             '<div id="cmmed-bodymap-selected" style="text-align:center;color:#60a5fa;font-size:13px;margin-top:8px;min-height:20px"></div>' +
         '</div>' +
-        '<div class="cmmed-form-row"><div class="cmmed-form-group"><label>Zona corporal *</label><select id="cmmed-inj-zone"><option value="">-- Seleccionar zona --</option>'+zoneOpts+'</select></div><div class="cmmed-form-group"><label>Codigo OSIICS</label><select id="cmmed-inj-osiics"><option value="">-- Seleccionar diagnostico --</option>'+osiicsOpts+'</select></div></div>' +
+        '<div class="cmmed-form-row"><div class="cmmed-form-group"><label>Zona corporal *</label><select id="cmmed-inj-zone"><option value="">-- Seleccionar zona --</option>'+zoneOpts+'</select></div><div class="cmmed-form-group"><label>Codigo OSIICS</label><div style="position:relative"><input type="text" id="cmmed-inj-osiics-search" placeholder="Buscar diagnostico..." autocomplete="off" oninput="cmMedFiltrarOSIICS(this.value)" onfocus="cmMedFiltrarOSIICS(this.value)"><input type="hidden" id="cmmed-inj-osiics" value=""><div id="cmmed-osiics-results" style="display:none;position:absolute;top:100%;left:0;right:0;max-height:200px;overflow-y:auto;background:#1e293b;border:1px solid #3b82f6;border-radius:0 0 8px 8px;z-index:100"></div></div></div></div>' +
         '<div class="cmmed-form-row"><div class="cmmed-form-group"><label>Contexto</label><select id="cmmed-inj-context"><option value="">-- Seleccionar --</option><option value="match">Partido</option><option value="training">Entrenamiento</option><option value="other">Otro</option></select></div><div class="cmmed-form-group"><label>Severidad estimada</label><select id="cmmed-inj-severity"><option value="">-- Seleccionar --</option><option value="minimal">Minima (1-3 dias)</option><option value="mild">Leve (4-7 dias)</option><option value="moderate">Moderada (8-28 dias)</option><option value="severe">Severa (+28 dias)</option></select></div></div>' +
         '<div class="cmmed-form-group"><label>Dias estimados de baja</label><input type="number" id="cmmed-inj-days" placeholder="Ej: 14" min="1"></div>' +
         '<div class="cmmed-form-group"><label>Descripcion / observaciones</label><textarea id="cmmed-inj-desc" placeholder="Descripcion de la lesion, circunstancias..."></textarea></div>' +
@@ -720,7 +720,54 @@ function cmMedMostrarFormLesion() {
         setTimeout(function() { cmMedInitBodyMap('cmmed-bodymap-container'); }, 100);
 
     }
+function cmMedFiltrarOSIICS(query) {
+    var results = document.getElementById('cmmed-osiics-results');
+    if (!results) return;
 
+    var q = query.toLowerCase().trim();
+    if (q.length < 2) { results.style.display = 'none'; return; }
+
+    var filtrados = cmMedOsiicsCatalog.filter(function(o) {
+        return o.code.toLowerCase().includes(q) ||
+               o.description_es.toLowerCase().includes(q) ||
+               o.body_region.toLowerCase().includes(q) ||
+               (o.injury_type && o.injury_type.toLowerCase().includes(q));
+    }).slice(0, 15);
+
+    if (filtrados.length === 0) {
+        results.innerHTML = '<div style="padding:10px;color:#64748b;font-size:12px">Sin resultados</div>';
+        results.style.display = 'block';
+        return;
+    }
+
+    var html = '';
+    filtrados.forEach(function(o) {
+        html += '<div style="padding:8px 12px;cursor:pointer;font-size:12px;border-bottom:1px solid #334155;transition:background .1s" ' +
+            'onmouseover="this.style.background=\'#334155\'" onmouseout="this.style.background=\'transparent\'" ' +
+            'onclick="cmMedSeleccionarOSIICS(\'' + o.code + '\',\'' + o.description_es.replace(/'/g, "\\'") + '\')">' +
+            '<span style="color:#3b82f6;font-weight:600">' + o.code + '</span> ' +
+            '<span style="color:#e2e8f0">' + o.description_es + '</span>' +
+            '<div style="color:#64748b;font-size:11px">' + o.body_region + ' · ' + o.injury_type + '</div>' +
+        '</div>';
+    });
+
+    results.innerHTML = html;
+    results.style.display = 'block';
+}
+
+function cmMedSeleccionarOSIICS(code, desc) {
+    document.getElementById('cmmed-inj-osiics').value = code;
+    document.getElementById('cmmed-inj-osiics-search').value = code + ' - ' + desc;
+    document.getElementById('cmmed-osiics-results').style.display = 'none';
+}
+
+// Cerrar dropdown al clic fuera
+document.addEventListener('click', function(e) {
+    var results = document.getElementById('cmmed-osiics-results');
+    if (results && !e.target.closest('#cmmed-inj-osiics-search') && !e.target.closest('#cmmed-osiics-results')) {
+        results.style.display = 'none';
+    }
+});
 async function cmMedGuardarLesion() {
     var playerId = cmMedJugadorActual;
     var fecha = document.getElementById('cmmed-inj-date').value;
