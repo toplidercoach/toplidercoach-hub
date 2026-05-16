@@ -1698,14 +1698,24 @@ function ejCapturarMiniatura() {
 }
 
 function ejActualizarFichaMedia() {
-    // Miniatura
+    // Miniatura — usar siempre <img> (como el Banco)
     const thumbContainer = document.getElementById('ej-ficha-thumb');
     if (thumbContainer) {
         const svgSource = window.ejThumbnailPendiente;
         if (svgSource) {
-            thumbContainer.innerHTML = svgSource;
-            const svg = thumbContainer.querySelector('svg');
-            if (svg) { svg.setAttribute('width','100%'); svg.setAttribute('height','100%'); svg.style.borderRadius='8px'; svg.style.display='block'; }
+            var imgSrc = '';
+            var trimmed = (typeof svgSource === 'string') ? svgSource.trim() : svgSource;
+            if (trimmed.indexOf('data:') === 0) {
+                imgSrc = trimmed;
+            } else {
+                try {
+                    var blob = new Blob([trimmed], {type: 'image/svg+xml'});
+                    imgSrc = URL.createObjectURL(blob);
+                } catch(e) { console.warn('Blob thumb error', e); }
+            }
+            if (imgSrc) {
+                thumbContainer.innerHTML = '<img src="' + imgSrc + '" style="width:100%;height:100%;object-fit:contain;border-radius:8px;display:block">';
+            }
         } else {
             thumbContainer.innerHTML = '<span style="color:#475569;font-size:11px">Dibuja en la pizarra y pulsa "Usar en ficha"</span>';
         }
@@ -2013,6 +2023,11 @@ function ejPrepararThumbParaPDF() {
         return el ? new XMLSerializer().serializeToString(el) : null;
     })();
     if (!svgSource) return;
+    // Si ya es data URL (PNG/JPG), usarlo directamente para el PDF
+    if (typeof svgSource === 'string' && svgSource.trim().indexOf('data:') === 0) {
+        window._ejPdfThumbData = svgSource.trim();
+        return;
+    }
     const parser = new DOMParser();
     const clone = parser.parseFromString(svgSource, 'image/svg+xml').documentElement;
     clone.setAttribute('width', 800);
@@ -2026,6 +2041,9 @@ function ejPrepararThumbParaPDF() {
     img.onload = () => {
         ctx.drawImage(img, 0, 0, 800, 500);
         window._ejPdfThumbData = canvas.toDataURL('image/png');
+    };
+    img.onerror = () => {
+        console.warn('ejPrepararThumbParaPDF: fallo al cargar SVG');
     };
     img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
 }
@@ -2210,7 +2228,7 @@ let thumbnailSvg = window.ejThumbnailPendiente || null;
             animFrames: ejP.animMode ? ejP.frames : [],
             animMode: ejP.animMode
         } : null,
-        thumbnail_svg: window._ejPdfThumbData || (thumbnailSvg ? ejComprimirThumbSVG(thumbnailSvg) : null),
+        thumbnail_svg: (thumbnailSvg ? ejComprimirThumbSVG(thumbnailSvg) : null) || window._ejPdfThumbData,
         
         source: 'custom'
     };
