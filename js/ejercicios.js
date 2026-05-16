@@ -1506,14 +1506,14 @@ function ejBuildFicha() {
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;background:#0f172a;border:1px solid #1e3a5f;border-radius:10px;overflow:hidden;margin-bottom:16px">
             <div style="padding:14px 16px;border-right:1px solid #1e3a5f">
                 <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">🎨 Miniatura</div>
-                <div id="ej-ficha-thumb" style="width:100%;aspect-ratio:8/5;border-radius:8px;background:#1e3a5f;display:flex;align-items:center;justify-content:center;overflow:hidden">
+                <div id="ej-ficha-thumb" style="width:100%;height:200px;border-radius:8px;background:#1e3a5f;display:flex;align-items:center;justify-content:center;overflow:hidden">
                     <span style="color:#475569;font-size:11px">Dibuja en la pizarra y pulsa "Usar en ficha"</span>
                 </div>
                 
             </div>
             <div style="padding:14px 16px">
                 <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">🎬 Vídeo animación</div>
-                <div id="ej-ficha-video" style="width:100%;aspect-ratio:8/5;border-radius:8px;background:#1e3a5f;display:flex;align-items:center;justify-content:center;overflow:hidden">
+                <div id="ej-ficha-video" style="width:100%;height:200px;border-radius:8px;background:#1e3a5f;display:flex;align-items:center;justify-content:center;overflow:hidden">
                     <span style="color:#475569;font-size:11px">Exporta MP4 desde la pizarra</span>
                 </div>
                 <div id="ej-ficha-video-btns" style="margin-top:6px;display:flex;gap:6px"></div>
