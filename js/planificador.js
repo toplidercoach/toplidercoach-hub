@@ -860,11 +860,15 @@ if (s.players && s.players.length > 0) {
             // Recuperar miniaturas de ejercicios propios que se guardaron sin imagen
             for (const sec of secciones) {
                 for (const ej of sec.datos) {
-                    if (!ej.imagen && typeof ej.id === 'string' && ej.id.indexOf('-') > 0) {
+                    if ((!ej.imagen || ej.imagen.indexOf('data:') !== 0) && typeof ej.id === 'string' && ej.id.indexOf('-') > 0) {
                         try {
                             const resEj = await supabaseClient.from('custom_exercises').select('thumbnail_svg').eq('id', ej.id).single();
                             if (resEj.data && resEj.data.thumbnail_svg) {
-                                ej.imagen = await ejSvgToPng(resEj.data.thumbnail_svg);
+                                if (resEj.data.thumbnail_svg.indexOf('data:') === 0) {
+                                    ej.imagen = resEj.data.thumbnail_svg;
+                                } else {
+                                    ej.imagen = await ejSvgToPng(resEj.data.thumbnail_svg);
+                                }
                             }
                         } catch(e) { /* sin miniatura, se deja vacío */ }
                     }
