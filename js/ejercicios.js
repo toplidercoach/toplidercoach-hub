@@ -2015,7 +2015,7 @@ function ejComprimirThumbSVG(svgStr) {
         .replace(/<image[^>]*data-bg="1"[^>]*href="data:image\/webp;base64,[^"]*"[^>]*\/>/g, campo)
         .replace(/<image[^>]*href="data:image\/svg\+xml;base64,[^"]*"[^>]*data-bg="1"[^>]*\/>/g, campo)
         .replace(/<image[^>]*data-bg="1"[^>]*href="data:image\/svg\+xml;base64,[^"]*"[^>]*\/>/g, campo)
-        .replace(/<image[^>]*href="data:image\/png;base64,[^"]*"[^>]*\/?>(<\/image>)?/g, '');
+        .replace(/<image[^>]*data-bg="1"[^>]*href="data:image\/png;base64,[^"]*"[^>]*\/?>(<\/image>)?/g, '');
 }
 function ejPrepararThumbParaPDF() {
     const svgSource = window.ejThumbnailPendiente || (() => {
