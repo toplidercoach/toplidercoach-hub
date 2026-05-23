@@ -425,8 +425,8 @@ cmFisioGenerarInformeDiario = async function() {
     // Colores
     var teal = [20, 184, 166];
     var dark = [15, 23, 42];
-    var gray = [148, 163, 184];
-    var white = [226, 232, 240];
+    var gray = [100, 116, 139];
+    var white = [30, 41, 59];
     var green = [34, 197, 94];
     var amber = [245, 158, 11];
     var red = [239, 68, 68];

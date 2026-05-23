@@ -79,6 +79,8 @@
 <button class="main-tab config" onclick="cambiarModulo('config', this)">
         Mi Club
     </button>
+    
+  
     <button class="main-tab club" id="cm-tab-club" style="display:none !important" onclick="cambiarModulo('club', this)">🏛️ Club</button>
     <button class="main-tab tacticlip" onclick="abrirPromoTactiClip()" style="display:flex;align-items:center;gap:6px;">
         <img src="https://toplidercoach.com/wp-content/uploads/2026/03/tacticlip-logo.png" alt="TactiClip" style="width:18px;height:18px;object-fit:contain;border-radius:3px;">
@@ -1630,6 +1632,21 @@
         </div>
     </div>
 </div>
+<!-- ===================<!-- ==================== MODULO: MEDICO ==================== -->
+<div id="modulo-medico" class="vista-modulo">
+    <div id="medico-container"></div>
+</div>
+
+<!-- ==================== MODULO: FISIO ==================== -->
+<div id="modulo-fisio" class="vista-modulo">
+    <div id="fisio-container"></div>
+</div>
+
+<!-- ==================== MODULO: PAGOS ==================== -->
+<div id="modulo-pagos" class="vista-modulo">
+    <div id="pagos-container"></div>
+</div>
+
 <!-- ==================== MODAL: CHAT STAFF ==================== -->
 <div id="modal-chat-staff" class="modal-overlay" style="display: none;" onclick="cerrarChatStaff(event)">
     <div class="modal-content" style="max-width: 600px;" onclick="event.stopPropagation()">
@@ -1783,5 +1800,6 @@ document.getElementById('modal-tacticlip').addEventListener('click', function(e)
     <script src="js/club-mode/cm-notifications.js"></script>
     <script src="js/club-mode/cm-presence.js"></script>
     <script src="js/club-mode/cm-chat.js"></script>
+    <script src="js/club-mode/cm-pagos.js"></script>
 </body>
 </html>

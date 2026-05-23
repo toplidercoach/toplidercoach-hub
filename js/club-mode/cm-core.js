@@ -266,7 +266,9 @@ function cmAplicarPermisos() {
         'plan_partido':  'matchstats',            // Plan partido es parte del flujo MatchStats
         'staff':         'cuerpo_tecnico_ia',
         'dashboard':     null,                     // Dashboard general: lo ven todos
-        'medico':        'modulo_medico'           // Panel medico -> Despacho medico
+        'medico':        'modulo_medico',          // Panel medico -> Despacho medico
+        'pagos':         'pagos_cuotas',           // Pagos y cuotas -> Oficina
+        'fisio':         'modulo_fisio'             // Panel fisio -> Despacho fisio     
     };
 
     // Ocultar tabs de modulos sin permiso de ver
@@ -395,6 +397,33 @@ if (typeof registrarModulo === 'function') {
     registrarModulo('club', function() {
         if (typeof cmInitMiembros === 'function') {
             cmInitMiembros('club-miembros');
+        }
+    });
+}
+
+// ========== REGISTRO DEL MODULO 'medico' EN EL HUB ==========
+if (typeof registrarModulo === 'function') {
+    registrarModulo('medico', function() {
+        if (typeof cmMedInit === 'function') {
+            cmMedInit('medico-container');
+        }
+    });
+}
+
+// ========== REGISTRO DEL MODULO 'fisio' EN EL HUB ==========
+if (typeof registrarModulo === 'function') {
+    registrarModulo('fisio', function() {
+        if (typeof cmFisioInit === 'function') {
+            cmFisioInit('fisio-container');
+        }
+    });
+}
+
+// ========== REGISTRO DEL MODULO 'pagos' EN EL HUB ==========
+if (typeof registrarModulo === 'function') {
+    registrarModulo('pagos', function() {
+        if (typeof cmPayInit === 'function') {
+            cmPayInit('pagos-container');
         }
     });
 }

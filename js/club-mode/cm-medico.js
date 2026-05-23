@@ -166,7 +166,7 @@ function cmMedRenderPanel(container) {
 }
 
 
-// ========== CARGAR JUGADORES (TODOS LOS EQUIPOS) ==========
+// ========== CARGAR JUGADORES (DESDE CLUB_PLAYERS) ==========
 async function cmMedCargarJugadores() {
     var grid = document.getElementById('cmmed-player-grid');
     if (!grid) return;
@@ -176,20 +176,14 @@ async function cmMedCargarJugadores() {
         var teamsRes = await supabaseClient.from('club_teams').select('id, name, category').eq('club_id', clubId).eq('active', true).order('category').order('name');
         cmMedEquipos = teamsRes.data || [];
 
-        // 2. Cargar todas las temporadas activas
-        var seasonsRes = await supabaseClient.from('seasons').select('id, name').eq('club_id', clubId).eq('is_active', true);
-        cmMedTemporadas = seasonsRes.data || [];
+        // Mapa team_id -> nombre del equipo
+        var teamNames = {};
+        cmMedEquipos.forEach(function(t) { teamNames[t.id] = t.name; });
 
-        if (cmMedTemporadas.length === 0) {
-            grid.innerHTML = '<div class="cmmed-empty"><div class="icon">👥</div><p>No hay temporadas activas en este club</p></div>';
-            return;
-        }
-
-        // Poblar filtro de equipos (con club_teams, no seasons)
+        // Poblar filtro de equipos
         var selectEquipo = document.getElementById('cmmed-filtro-equipo');
         if (selectEquipo) {
-            var totalEquipos = cmMedEquipos.length;
-            var optsHtml = '<option value="all">Todos los equipos (' + totalEquipos + ')</option>';
+            var optsHtml = '<option value="all">Todos los equipos (' + cmMedEquipos.length + ')</option>';
             cmMedEquipos.forEach(function(t) {
                 var cat = t.category ? ' (' + t.category + ')' : '';
                 optsHtml += '<option value="' + t.id + '">' + t.name + cat + '</option>';
@@ -199,21 +193,31 @@ async function cmMedCargarJugadores() {
             if (cmMedFiltroEquipo !== 'all') selectEquipo.value = cmMedFiltroEquipo;
         }
 
-        // 3. Cargar todos los jugadores con team_id
-        var seasonIds = cmMedTemporadas.map(function(s) { return s.id; });
-        var spRes = await supabaseClient.from('season_players').select('shirt_number, player_id, season_id, team_id, players(id, name, position, photo_url)').in('season_id', seasonIds).order('shirt_number');
-        var spData = spRes.data || [];
+        // 2. Cargar jugadores del club (club_players es la tabla canonica de Club Mode)
+        var cpRes = await supabaseClient.from('club_players')
+            .select('id, name, first_name, last_name, positions_main, photo_url')
+            .eq('club_id', clubId).eq('active', true);
+        var cpData = cpRes.data || [];
 
-        if (spData.length === 0) {
-            grid.innerHTML = '<div class="cmmed-empty"><div class="icon">👥</div><p>No hay jugadores en las temporadas activas</p></div>';
+        if (cpData.length === 0) {
+            grid.innerHTML = '<div class="cmmed-empty"><div class="icon">👥</div><p>No hay jugadores registrados en este club</p></div>';
             return;
         }
 
-        // Mapa team_id -> nombre del equipo
-        var teamNames = {};
-        cmMedEquipos.forEach(function(t) { teamNames[t.id] = t.name; });
+        // 3. Cargar asignaciones de equipo/dorsal (club_player_seasons)
+        var cpsRes = await supabaseClient.from('club_player_seasons')
+            .select('player_id, team_id, shirt_number')
+            .eq('club_id', clubId).eq('active', true);
+        var cpsData = cpsRes.data || [];
 
-        // 4. Disponibilidad
+        // Mapa player_id -> [{teamId, dorsal}]
+        var seasonMap = {};
+        cpsData.forEach(function(cps) {
+            if (!seasonMap[cps.player_id]) seasonMap[cps.player_id] = [];
+            seasonMap[cps.player_id].push({ teamId: cps.team_id, dorsal: cps.shirt_number });
+        });
+
+        // 4. Disponibilidad (semaforo)
         var availRes = await supabaseClient.from('club_player_availability').select('player_id, status').eq('club_id', clubId);
         var availMap = {};
         (availRes.data || []).forEach(function(a) { availMap[a.player_id] = a.status; });
@@ -226,34 +230,32 @@ async function cmMedCargarJugadores() {
             injMap[inj.player_id].push(inj);
         });
 
-        // 6. Construir array deduplicado
-        var vistos = {};
+        // 6. Construir array de jugadores
         cmMedJugadoresData = [];
-
-        spData.forEach(function(sp) {
-            var p = sp.players;
-            if (!p) return;
-
-            if (vistos[p.id]) {
-                var existing = cmMedJugadoresData.find(function(j) { return j.playerId === p.id; });
-                if (existing && sp.team_id && existing.teamIds.indexOf(sp.team_id) === -1) {
-                    existing.teamIds.push(sp.team_id);
-                    existing.teamNames.push(teamNames[sp.team_id] || 'Sin equipo');
+        cpData.forEach(function(p) {
+            var asignaciones = seasonMap[p.id] || [];
+            var tIds = [];
+            var tNames = [];
+            var dorsal = '';
+            asignaciones.forEach(function(a) {
+                if (a.teamId && tIds.indexOf(a.teamId) === -1) {
+                    tIds.push(a.teamId);
+                    tNames.push(teamNames[a.teamId] || 'Sin equipo');
                 }
-                return;
-            }
-            vistos[p.id] = true;
+                if (a.dorsal && !dorsal) dorsal = a.dorsal;
+            });
+            if (tNames.length === 0) tNames = ['Sin equipo'];
 
             var injuries = injMap[p.id] || [];
-            var tIds = sp.team_id ? [sp.team_id] : [];
-            var tNames = sp.team_id ? [teamNames[sp.team_id] || 'Sin equipo'] : ['Sin equipo'];
+            var posicion = (p.positions_main && p.positions_main.length > 0) ? p.positions_main[0] : '';
+            var nombre = p.name || ((p.first_name || '') + ' ' + (p.last_name || '')).trim() || 'Jugador';
 
             cmMedJugadoresData.push({
                 playerId: p.id,
-                name: p.name,
-                position: p.position || '',
+                name: nombre,
+                position: posicion,
                 photoUrl: p.photo_url || '',
-                dorsal: sp.shirt_number || '',
+                dorsal: dorsal,
                 teamIds: tIds,
                 teamNames: tNames,
                 avail: availMap[p.id] || 'unknown',
@@ -263,14 +265,12 @@ async function cmMedCargarJugadores() {
         });
 
         cmMedRenderJugadores();
-// Comprobar certificados medicos proximos a caducar
         cmMedComprobarCertificados();
     } catch (e) {
         console.error('cmMedCargarJugadores:', e);
         grid.innerHTML = '<div class="cmmed-empty"><div class="icon">⚠️</div><p>Error al cargar jugadores</p></div>';
     }
 }
-
 // ========== RENDERIZAR CON FILTROS ==========
 function cmMedRenderJugadores() {
     var grid = document.getElementById('cmmed-player-grid');
