@@ -26,8 +26,8 @@
 #ej-toolbar { width:380px; min-width:380px; background:#1f2937; border-radius:8px; border:1px solid #374151; padding:12px; display:flex; flex-direction:column; gap:4px; max-height:calc(100vh - 180px); overflow-y:auto; flex-shrink:0; }
 #ej-toolbar::-webkit-scrollbar { width:4px; }
 #ej-toolbar::-webkit-scrollbar-thumb { background:#4b5563; border-radius:2px; }
-#ej-canvas-area { flex:1; min-width:0; max-height:calc(100vh - 145px); overflow:hidden; display:flex; align-items:flex-start; }
-#ej-canvas-area svg { width:100%; height:auto; max-height:calc(100vh - 145px); }
+#ej-canvas-area { flex:1; min-width:0; display:flex; flex-direction:column; }
+#ej-canvas-area svg { width:100%; height:auto; max-height:calc(100vh - 215px); }
 .ej-btn-tool { width:100%; display:flex; align-items:center; gap:10px; padding:11px 14px; background:#374151; color:#d1d5db; border:1px solid transparent; border-radius:6px; font-size:13px; font-weight:500; cursor:pointer; text-align:left; transition:all .15s; }
 .ej-btn-tool:hover { background:#4b5563; color:#f9fafb; }
 .ej-btn-tool.active { background:#22c55e; color:#111827; border-color:#16a34a; }
@@ -162,17 +162,15 @@
     max-width: 100%;
 }
 .ej-btn-equipment.active span { color: #22c55e; }
-/* ── Timeline superpuesta sobre el campo ── */
+/* ── Timeline DEBAJO del campo (no superpuesta) ── */
 #ej-timeline-bar {
-    position: absolute !important;
-    bottom: 8px;
-    left: 8px;
-    right: 8px;
+    position: relative;
     z-index: 5;
-    background: rgba(15, 23, 42, 0.88) !important;
-    backdrop-filter: blur(6px);
-    border: 1px solid rgba(59, 130, 246, 0.3) !important;
-    border-radius: 8px !important;
-    padding: 6px 10px !important;
-    margin-top: 0 !important;
+    width: 100%;
+    box-sizing: border-box;
+    background: rgba(15, 23, 42, 0.95);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    border-radius: 8px;
+    padding: 8px 10px;
+    margin-top: 8px;
 }
