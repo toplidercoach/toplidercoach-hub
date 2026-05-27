@@ -268,7 +268,9 @@ function cmAplicarPermisos() {
         'dashboard':     null,                     // Dashboard general: lo ven todos
         'medico':        'modulo_medico',          // Panel medico -> Despacho medico
         'pagos':         'pagos_cuotas',           // Pagos y cuotas -> Oficina
-        'fisio':         'modulo_fisio'             // Panel fisio -> Despacho fisio     
+        'fisio':         'modulo_fisio',           // Panel fisio -> Despacho fisio
+        'familias':      'comunicacion_familias',  // Comunicacion a familias -> Oficina
+        'prepfisica':    'modulo_preparacion_fisica' // Preparacion fisica -> Campo compartido
     };
 
     // Ocultar tabs de modulos sin permiso de ver
@@ -401,31 +403,12 @@ if (typeof registrarModulo === 'function') {
     });
 }
 
-// ========== REGISTRO DEL MODULO 'medico' EN EL HUB ==========
-if (typeof registrarModulo === 'function') {
-    registrarModulo('medico', function() {
-        if (typeof cmMedInit === 'function') {
-            cmMedInit('medico-container');
-        }
-    });
-}
-
-// ========== REGISTRO DEL MODULO 'fisio' EN EL HUB ==========
-if (typeof registrarModulo === 'function') {
-    registrarModulo('fisio', function() {
-        if (typeof cmFisioInit === 'function') {
-            cmFisioInit('fisio-container');
-        }
-    });
-}
-
-// ========== REGISTRO DEL MODULO 'pagos' EN EL HUB ==========
-if (typeof registrarModulo === 'function') {
-    registrarModulo('pagos', function() {
-        if (typeof cmPayInit === 'function') {
-            cmPayInit('pagos-container');
-        }
-    });
-}
+// ========== REGISTRO DE MODULOS PRIVADOS (medico, fisio, pagos, familias) ==========
+// Estos modulos NO se registran aqui: cada uno se auto-registra desde su propio
+// archivo (cm-medico.js, cm-fisio.js, cm-pagos.js, cm-familias.js) en su bloque
+// de auto-montaje, que crea la pestana, crea el contenedor correcto y llama a
+// registrarModulo con ese contenedor. Registrarlos tambien aqui causaba un doble
+// registro hacia contenedores que no existian. Se elimino para dejar un unico
+// punto de registro por modulo.
 
 console.log('[Club Mode] cm-core.js cargado (' + CM_MODULOS.length + ' modulos catalogados)');

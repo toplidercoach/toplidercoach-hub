@@ -202,14 +202,16 @@ async function cmFisioCargarJugadores() {
     if (!grid) return;
 
     try {
+        // 1. Equipos del club
         var teamsRes = await supabaseClient.from('club_teams').select('id, name, category').eq('club_id', clubId).eq('active', true).order('category').order('name');
         cmFisioEquipos = teamsRes.data || [];
 
-        var seasonsRes = await supabaseClient.from('seasons').select('id, name').eq('club_id', clubId).eq('is_active', true);
-        cmFisioTemporadas = seasonsRes.data || [];
+        // 2. Jugadores del club (tabla canonica del Club Mode)
+        var playersRes = await supabaseClient.from('club_players').select('id, name, photo_url, positions_main').eq('club_id', clubId).eq('active', true).order('name');
+        var playersData = playersRes.data || [];
 
-        if (cmFisioTemporadas.length === 0) {
-            grid.innerHTML = '<div class="cmfisio-empty"><div class="icon">--</div><p>No hay temporadas activas</p></div>';
+        if (playersData.length === 0) {
+            grid.innerHTML = '<div class="cmfisio-empty"><div class="icon">--</div><p>No hay jugadores en el club</p></div>';
             return;
         }
 
@@ -225,25 +227,23 @@ async function cmFisioCargarJugadores() {
             if (cmFisioFiltroEquipo !== 'all') selectEquipo.value = cmFisioFiltroEquipo;
         }
 
-        // Cargar jugadores
-        var seasonIds = cmFisioTemporadas.map(function(s) { return s.id; });
-        var spRes = await supabaseClient.from('season_players').select('shirt_number, player_id, season_id, team_id, players(id, name, position, photo_url)').in('season_id', seasonIds).order('shirt_number');
-        var spData = spRes.data || [];
-
-        if (spData.length === 0) {
-            grid.innerHTML = '<div class="cmfisio-empty"><div class="icon">--</div><p>No hay jugadores en las temporadas activas</p></div>';
-            return;
-        }
-
         var teamNames = {};
         cmFisioEquipos.forEach(function(t) { teamNames[t.id] = t.name; });
 
-        // Disponibilidad
+        // 3. Cruce con club_player_seasons para equipo y dorsal
+        var seasonsRes = await supabaseClient.from('club_player_seasons').select('player_id, team_id, shirt_number, position').eq('club_id', clubId).eq('active', true);
+        var seasonsByPlayer = {};
+        (seasonsRes.data || []).forEach(function(s) {
+            if (!seasonsByPlayer[s.player_id]) seasonsByPlayer[s.player_id] = [];
+            seasonsByPlayer[s.player_id].push(s);
+        });
+
+        // 4. Disponibilidad
         var availRes = await supabaseClient.from('club_player_availability').select('player_id, status').eq('club_id', clubId);
         var availMap = {};
         (availRes.data || []).forEach(function(a) { availMap[a.player_id] = a.status; });
 
-        // Lesiones activas (del medico)
+        // 5. Lesiones activas (del medico)
         var injRes = await supabaseClient.from('cm_med_injuries').select('player_id, body_zone, status, cm_med_body_zones(zone_name_es)').eq('club_id', clubId).in('status', ['active', 'recovering']).eq('archived', false);
         var injMap = {};
         (injRes.data || []).forEach(function(inj) {
@@ -251,28 +251,27 @@ async function cmFisioCargarJugadores() {
             injMap[inj.player_id].push(inj);
         });
 
-        // Sesiones de fisio hoy (para badge)
+        // 6. Sesiones de fisio hoy (para badge)
         var hoy = new Date().toISOString().split('T')[0];
         var sesRes = await supabaseClient.from('cm_fisio_sessions').select('player_id').eq('club_id', clubId).eq('session_date', hoy).eq('archived', false);
         var sesHoySet = {};
         (sesRes.data || []).forEach(function(s) { sesHoySet[s.player_id] = true; });
 
-        // Deduplicar
-        var vistos = {};
+        // 7. Construir array de jugadores
         cmFisioJugadoresData = [];
-
-        spData.forEach(function(sp) {
-            var p = sp.players;
-            if (!p) return;
-            if (vistos[p.id]) {
-                var existing = cmFisioJugadoresData.find(function(j) { return j.playerId === p.id; });
-                if (existing && sp.team_id && existing.teamIds.indexOf(sp.team_id) === -1) {
-                    existing.teamIds.push(sp.team_id);
-                    if (teamNames[sp.team_id]) existing.teamNames.push(teamNames[sp.team_id]);
+        playersData.forEach(function(p) {
+            // Equipos y dorsal a partir de club_player_seasons
+            var temporadas = seasonsByPlayer[p.id] || [];
+            var teamIds = [];
+            var teamNamesList = [];
+            var dorsal = '-';
+            temporadas.forEach(function(s) {
+                if (s.team_id && teamIds.indexOf(s.team_id) === -1) {
+                    teamIds.push(s.team_id);
+                    teamNamesList.push(teamNames[s.team_id] || 'Sin equipo');
                 }
-                return;
-            }
-            vistos[p.id] = true;
+                if (s.shirt_number && dorsal === '-') dorsal = s.shirt_number;
+            });
 
             var avail = availMap[p.id] || 'unknown';
             if (avail === 'unknown') avail = 'green'; // default
@@ -283,15 +282,18 @@ async function cmFisioCargarJugadores() {
                 injZone = activeInjuries[0].cm_med_body_zones.zone_name_es;
             }
 
+            // Posicion: primera de positions_main
+            var posicion = (p.positions_main && p.positions_main.length > 0) ? p.positions_main[0] : '-';
+
             cmFisioJugadoresData.push({
                 playerId: p.id,
                 name: p.name || 'Sin nombre',
-                position: p.position || '-',
+                position: posicion,
                 photoUrl: p.photo_url || '',
-                dorsal: sp.shirt_number || '-',
+                dorsal: dorsal,
                 avail: avail,
-                teamIds: sp.team_id ? [sp.team_id] : [],
-                teamNames: sp.team_id && teamNames[sp.team_id] ? [teamNames[sp.team_id]] : [],
+                teamIds: teamIds,
+                teamNames: teamNamesList,
                 activeInjuryZone: injZone,
                 activeInjuries: activeInjuries.length,
                 sesionHoy: sesHoySet[p.id] || false
@@ -777,12 +779,12 @@ async function cmFisioGenerarInformeDiario() {
         return;
     }
 
-    // Obtener nombres de jugadores
+    // Obtener nombres de jugadores (tabla canonica club_players)
     var playerIds = sesiones.map(function(s) { return s.player_id; });
-    var playerRes = await supabaseClient.from('season_players').select('player_id, team_id, players(id, name)').in('player_id', playerIds);
+    var playerRes = await supabaseClient.from('club_players').select('id, name').in('id', playerIds);
     var playerMap = {};
-    (playerRes.data || []).forEach(function(sp) {
-        if (sp.players) playerMap[sp.players.id] = sp.players.name;
+    (playerRes.data || []).forEach(function(p) {
+        playerMap[p.id] = p.name;
     });
 
     var teamMap = {};
@@ -827,10 +829,10 @@ async function cmFisioEnviarInforme() {
     var sesiones = sesRes.data || [];
 
     var playerIds = sesiones.map(function(s) { return s.player_id; });
-    var playerRes = await supabaseClient.from('season_players').select('player_id, team_id, players(id, name)').in('player_id', playerIds);
+    var playerRes = await supabaseClient.from('club_players').select('id, name').in('id', playerIds);
     var playerMap = {};
-    (playerRes.data || []).forEach(function(sp) {
-        if (sp.players) playerMap[sp.players.id] = sp.players.name;
+    (playerRes.data || []).forEach(function(p) {
+        playerMap[p.id] = p.name;
     });
 
     var teamMap = {};
