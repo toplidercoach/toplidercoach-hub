@@ -1506,14 +1506,14 @@ function ejBuildFicha() {
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;background:#0f172a;border:1px solid #1e3a5f;border-radius:10px;overflow:hidden;margin-bottom:16px">
             <div style="padding:14px 16px;border-right:1px solid #1e3a5f">
                 <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">🎨 Miniatura</div>
-                <div id="ej-ficha-thumb" style="width:100%;aspect-ratio:8/5;border-radius:8px;background:#1e3a5f;display:flex;align-items:center;justify-content:center;overflow:hidden">
+                <div id="ej-ficha-thumb" style="width:100%;height:200px;border-radius:8px;background:#1e3a5f;display:flex;align-items:center;justify-content:center;overflow:hidden">
                     <span style="color:#475569;font-size:11px">Dibuja en la pizarra y pulsa "Usar en ficha"</span>
                 </div>
                 
             </div>
             <div style="padding:14px 16px">
                 <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">🎬 Vídeo animación</div>
-                <div id="ej-ficha-video" style="width:100%;aspect-ratio:8/5;border-radius:8px;background:#1e3a5f;display:flex;align-items:center;justify-content:center;overflow:hidden">
+                <div id="ej-ficha-video" style="width:100%;height:200px;border-radius:8px;background:#1e3a5f;display:flex;align-items:center;justify-content:center;overflow:hidden">
                     <span style="color:#475569;font-size:11px">Exporta MP4 desde la pizarra</span>
                 </div>
                 <div id="ej-ficha-video-btns" style="margin-top:6px;display:flex;gap:6px"></div>
@@ -1698,14 +1698,24 @@ function ejCapturarMiniatura() {
 }
 
 function ejActualizarFichaMedia() {
-    // Miniatura
+    // Miniatura — usar siempre <img> (como el Banco)
     const thumbContainer = document.getElementById('ej-ficha-thumb');
     if (thumbContainer) {
         const svgSource = window.ejThumbnailPendiente;
         if (svgSource) {
-            thumbContainer.innerHTML = svgSource;
-            const svg = thumbContainer.querySelector('svg');
-            if (svg) { svg.setAttribute('width','100%'); svg.setAttribute('height','100%'); svg.style.borderRadius='8px'; svg.style.display='block'; }
+            var imgSrc = '';
+            var trimmed = (typeof svgSource === 'string') ? svgSource.trim() : svgSource;
+            if (trimmed.indexOf('data:') === 0) {
+                imgSrc = trimmed;
+            } else {
+                try {
+                    var blob = new Blob([trimmed], {type: 'image/svg+xml'});
+                    imgSrc = URL.createObjectURL(blob);
+                } catch(e) { console.warn('Blob thumb error', e); }
+            }
+            if (imgSrc) {
+                thumbContainer.innerHTML = '<img src="' + imgSrc + '" style="width:100%;height:100%;object-fit:contain;border-radius:8px;display:block">';
+            }
         } else {
             thumbContainer.innerHTML = '<span style="color:#475569;font-size:11px">Dibuja en la pizarra y pulsa "Usar en ficha"</span>';
         }
@@ -2005,7 +2015,7 @@ function ejComprimirThumbSVG(svgStr) {
         .replace(/<image[^>]*data-bg="1"[^>]*href="data:image\/webp;base64,[^"]*"[^>]*\/>/g, campo)
         .replace(/<image[^>]*href="data:image\/svg\+xml;base64,[^"]*"[^>]*data-bg="1"[^>]*\/>/g, campo)
         .replace(/<image[^>]*data-bg="1"[^>]*href="data:image\/svg\+xml;base64,[^"]*"[^>]*\/>/g, campo)
-        .replace(/<image[^>]*href="data:image\/png;base64,[^"]*"[^>]*\/?>(<\/image>)?/g, '');
+        .replace(/<image[^>]*data-bg="1"[^>]*href="data:image\/png;base64,[^"]*"[^>]*\/?>(<\/image>)?/g, '');
 }
 function ejPrepararThumbParaPDF() {
     const svgSource = window.ejThumbnailPendiente || (() => {
@@ -2013,6 +2023,11 @@ function ejPrepararThumbParaPDF() {
         return el ? new XMLSerializer().serializeToString(el) : null;
     })();
     if (!svgSource) return;
+    // Si ya es data URL (PNG/JPG), usarlo directamente para el PDF
+    if (typeof svgSource === 'string' && svgSource.trim().indexOf('data:') === 0) {
+        window._ejPdfThumbData = svgSource.trim();
+        return;
+    }
     const parser = new DOMParser();
     const clone = parser.parseFromString(svgSource, 'image/svg+xml').documentElement;
     clone.setAttribute('width', 800);
@@ -2026,6 +2041,9 @@ function ejPrepararThumbParaPDF() {
     img.onload = () => {
         ctx.drawImage(img, 0, 0, 800, 500);
         window._ejPdfThumbData = canvas.toDataURL('image/png');
+    };
+    img.onerror = () => {
+        console.warn('ejPrepararThumbParaPDF: fallo al cargar SVG');
     };
     img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
 }
@@ -2210,7 +2228,7 @@ let thumbnailSvg = window.ejThumbnailPendiente || null;
             animFrames: ejP.animMode ? ejP.frames : [],
             animMode: ejP.animMode
         } : null,
-        thumbnail_svg: window._ejPdfThumbData || (thumbnailSvg ? ejComprimirThumbSVG(thumbnailSvg) : null),
+        thumbnail_svg: (thumbnailSvg ? ejComprimirThumbSVG(thumbnailSvg) : null) || window._ejPdfThumbData,
         
         source: 'custom'
     };

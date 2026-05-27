@@ -55,7 +55,7 @@ registrarSubTab('planificador', 'calendario', cargarCalendarioUnificado);
                     };
                     
                     return `
-                    <div class="ejercicio-card" onclick="seleccionarEjercicio(${ej.id})">
+                    <div class="ejercicio-card" onclick="seleccionarEjercicio('${ej.id}')">
                         <img src="${ej.imagen || 'https://via.placeholder.com/80x60?text=Sin+img'}" alt="">
                         <div class="info">
                             <div class="titulo">${ej.titulo}</div>
@@ -239,6 +239,10 @@ registrarSubTab('planificador', 'calendario', cargarCalendarioUnificado);
         }
         
         function seleccionarEjercicio(ejercicioId) {
+            // Si el ID es un UUID (ejercicio propio), redirigir a seleccionarMiEjercicio
+            if (typeof ejercicioId === 'string' && ejercicioId.indexOf('-') > 0) {
+                return seleccionarMiEjercicio(ejercicioId);
+            }
             const detalle = document.getElementById('detalle-ejercicio');
             detalle.innerHTML = '<div class="loading">Cargando detalles...</div>';
             
@@ -372,12 +376,15 @@ registrarSubTab('planificador', 'calendario', cargarCalendarioUnificado);
                 if (sesion[seccion].length === 0) {
                     lista.innerHTML = '<p style="text-align:center;color:#9ca3af;padding:20px;font-size:13px;">Arrastra ejercicios aqui</p>';
               } else {
+                    const totalEnSeccion = sesion[seccion].length;
                     lista.innerHTML = sesion[seccion].map((ej, idx) => `
-                        <div class="ejercicio-en-sesion" onclick="seleccionarEjercicio(${ej.id})" style="cursor: pointer;">
+                        <div class="ejercicio-en-sesion" onclick="seleccionarEjercicio('${ej.id}')" style="cursor: pointer;">
                             <div>
                                 <div class="nombre">${ej.titulo}</div>
                                 <div class="duracion">${ej.duracion} min</div>
                             </div>
+                            <button onclick="event.stopPropagation(); moverEjercicio('${seccion}', ${idx}, -1)" title="Subir" ${idx === 0 ? 'disabled' : ''} style="background:#e5e7eb; border:none; border-radius:4px; padding:4px 8px; cursor:${idx === 0 ? 'not-allowed' : 'pointer'}; opacity:${idx === 0 ? '0.3' : '1'}; font-size:11px; color:#374151; margin-right:2px;">▲</button>
+                            <button onclick="event.stopPropagation(); moverEjercicio('${seccion}', ${idx}, 1)" title="Bajar" ${idx === totalEnSeccion - 1 ? 'disabled' : ''} style="background:#e5e7eb; border:none; border-radius:4px; padding:4px 8px; cursor:${idx === totalEnSeccion - 1 ? 'not-allowed' : 'pointer'}; opacity:${idx === totalEnSeccion - 1 ? '0.3' : '1'}; font-size:11px; color:#374151; margin-right:4px;">▼</button>
                             <button onclick="event.stopPropagation(); quitarEjercicio('${seccion}', ${idx})">Quitar</button>
                         </div>
                     `).join('');
@@ -388,6 +395,14 @@ registrarSubTab('planificador', 'calendario', cargarCalendarioUnificado);
         }
         function quitarEjercicio(seccion, idx) {
             sesion[seccion].splice(idx, 1);
+            renderizarSesion();
+        }
+        function moverEjercicio(seccion, idx, direccion) {
+            const nuevoIdx = idx + direccion;
+            if (nuevoIdx < 0 || nuevoIdx >= sesion[seccion].length) return;
+            const tmp = sesion[seccion][idx];
+            sesion[seccion][idx] = sesion[seccion][nuevoIdx];
+            sesion[seccion][nuevoIdx] = tmp;
             renderizarSesion();
         }
         
@@ -842,6 +857,24 @@ if (s.players && s.players.length > 0) {
                 { nombre: 'PARTE FINAL', datos: s.cool_down || [], color: [0, 153, 76] }
             ];
             
+            // Recuperar miniaturas de ejercicios propios que se guardaron sin imagen
+            for (const sec of secciones) {
+                for (const ej of sec.datos) {
+                    if ((!ej.imagen || ej.imagen.indexOf('data:') !== 0) && typeof ej.id === 'string' && ej.id.indexOf('-') > 0) {
+                        try {
+                            const resEj = await supabaseClient.from('custom_exercises').select('thumbnail_svg').eq('id', ej.id).single();
+                            if (resEj.data && resEj.data.thumbnail_svg) {
+                                if (resEj.data.thumbnail_svg.indexOf('data:') === 0) {
+                                    ej.imagen = resEj.data.thumbnail_svg;
+                                } else {
+                                    ej.imagen = await ejSvgToPng(resEj.data.thumbnail_svg);
+                                }
+                            }
+                        } catch(e) { /* sin miniatura, se deja vacío */ }
+                    }
+                }
+            }
+            
             for (const sec of secciones) {
                 if (sec.datos.length > 0) {
                     const tiempoSeccion = sec.datos.reduce((sum, e) => sum + (e.duracion || 0), 0);
@@ -1209,8 +1242,12 @@ async function cargarMisEjerciciosBiblioteca() {
             
             if (ej.thumbnail_svg) {
                 try {
-                    var blob = new Blob([ej.thumbnail_svg], {type: 'image/svg+xml'});
-                    thumbSrc = URL.createObjectURL(blob);
+                    if (ej.thumbnail_svg.startsWith('data:')) {
+                        thumbSrc = ej.thumbnail_svg;
+                    } else {
+                        var blob = new Blob([ej.thumbnail_svg], {type: 'image/svg+xml'});
+                        thumbSrc = URL.createObjectURL(blob);
+                    }
                 } catch(e) {
                     thumbSrc = '';
                 }
@@ -1273,9 +1310,14 @@ function seleccionarMiEjercicio(id) {
             var thumbHTML = '';
             if (ej.thumbnail_svg) {
                 try {
-                    var blob = new Blob([ej.thumbnail_svg], {type: 'image/svg+xml'});
-                    var blobUrl = URL.createObjectURL(blob);
-                    thumbHTML = '<img src="' + blobUrl + '" alt="' + ej.name + '" style="width:100%;border-radius:8px;margin-bottom:10px">';
+                    var imgSrc;
+                    if (ej.thumbnail_svg.startsWith('data:')) {
+                        imgSrc = ej.thumbnail_svg;
+                    } else {
+                        var blob = new Blob([ej.thumbnail_svg], {type: 'image/svg+xml'});
+                        imgSrc = URL.createObjectURL(blob);
+                    }
+                    thumbHTML = '<img src="' + imgSrc + '" alt="' + ej.name + '" style="width:100%;border-radius:8px;margin-bottom:10px">';
                 } catch(e) {}
             }
             
