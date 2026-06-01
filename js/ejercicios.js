@@ -866,14 +866,12 @@ function ejElegirModo(modo) {
         // Activar modo animación directamente
         if (!ejP.animMode) ejToggleAnimMode();
     } else {
-        // Asegurar que animación está desactivada
-        if (ejP.animMode) {
-            ejP.animMode = false;
-            ejP.frames = [];
-            ejP.currentFrame = 0;
-            var bar = document.getElementById('ej-timeline-bar');
-            if (bar) bar.style.display = 'none';
-        }
+        // Modo estático: desactivar animación y ocultar SIEMPRE la barra
+        ejP.animMode = false;
+        ejP.frames = [];
+        ejP.currentFrame = 0;
+        var bar = document.getElementById('ej-timeline-bar');
+        if (bar) { bar.style.display = 'none'; bar.innerHTML = ''; }
     }
     // Abrir sección jugadores por defecto
     // Mostrar toolbar

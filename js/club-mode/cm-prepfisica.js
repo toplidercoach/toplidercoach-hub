@@ -4,6 +4,7 @@
 var cmPfJugadorActual=null,cmPfTabActiva='pruebas',cmPfCatalogoPruebas=[],cmPfCatalogosReady=false;
 var cmPfFiltroEquipo='all',cmPfAntroEditId=null,cmPfJugadoresData=[],cmPfEquipos=[];
 var cmPfGpsConfig=null,cmPfCsvData=null,cmPfCsvMapping={},cmPfCsvPlayerMapping={};
+var cmPfInformeData=null,cmPfInformeFiltroTipo='',cmPfInformeFiltroPos='';
 var cmPfVistaActiva='jugadores',cmPfSesionesData=[],cmPfEjerciciosClub=[];
 
 async function cmPfInit(cid){var c=document.getElementById(cid);if(!c)return;if(!cmPfCatalogosReady)await cmPfCargarCatalogos();await cmPfCargarGpsConfig();await cmPfCargarEjercicios();cmPfRenderPanel(c);await cmPfCargarJugadores();}
@@ -75,7 +76,7 @@ function cmPfRenderJugadores(){var g=document.getElementById('cmpf-player-grid')
 // ========== FICHA ==========
 function cmPfAbrirFicha(pid){var j=cmPfJugadoresData.find(function(j){return j.id===pid;});if(!j)return;cmPfJugadorActual=j;cmPfTabActiva='pruebas';var o=document.getElementById('cmpf-ficha-overlay');if(o)o.style.display='flex';cmPfRenderFicha();}
 function cmPfCerrarFicha(){cmPfJugadorActual=null;var o=document.getElementById('cmpf-ficha-overlay');if(o)o.style.display='none';}
-function cmPfCambiarTab(t){cmPfTabActiva=t;document.querySelectorAll('.cmpf-tab').forEach(function(b){b.classList.toggle('active',b.getAttribute('data-tab')===t);});document.querySelectorAll('.cmpf-tab-content').forEach(function(c){c.classList.toggle('active',c.id==='cmpf-tab-'+t);});if(t==='pruebas')cmPfCargarPruebas();else if(t==='antropometria')cmPfCargarAntropometria();else if(t==='gps')cmPfCargarGps();else if(t==='informe')cmPfRenderInformePlaceholder();}
+function cmPfCambiarTab(t){cmPfTabActiva=t;document.querySelectorAll('.cmpf-tab').forEach(function(b){b.classList.toggle('active',b.getAttribute('data-tab')===t);});document.querySelectorAll('.cmpf-tab-content').forEach(function(c){c.classList.toggle('active',c.id==='cmpf-tab-'+t);});if(t==='pruebas')cmPfCargarPruebas();else if(t==='antropometria')cmPfCargarAntropometria();else if(t==='gps')cmPfCargarGps();else if(t==='informe')cmPfCargarInforme();}
 function cmPfRenderFicha(){var f=document.getElementById('cmpf-ficha');if(!f||!cmPfJugadorActual)return;var j=cmPfJugadorActual;f.innerHTML='<div class="cmpf-ficha-header"><h3>'+j.name+'<span style="font-size:13px;color:#94a3b8;font-weight:400"> '+(j.position||'')+(j.team_name?' \u00B7 '+j.team_name:'')+(j.dorsal?' #'+j.dorsal:'')+'</span></h3><button class="cmpf-ficha-close" onclick="cmPfCerrarFicha()">&times;</button></div><div class="cmpf-tabs"><button class="cmpf-tab active" data-tab="pruebas" onclick="cmPfCambiarTab(\'pruebas\')">Pruebas</button><button class="cmpf-tab" data-tab="antropometria" onclick="cmPfCambiarTab(\'antropometria\')">Antropometria</button><button class="cmpf-tab" data-tab="gps" onclick="cmPfCambiarTab(\'gps\')">GPS</button><button class="cmpf-tab" data-tab="informe" onclick="cmPfCambiarTab(\'informe\')">Informe</button></div><div class="cmpf-tab-content active" id="cmpf-tab-pruebas"><div class="cmpf-empty"><div class="icon">...</div><p>Cargando...</p></div></div><div class="cmpf-tab-content" id="cmpf-tab-antropometria"></div><div class="cmpf-tab-content" id="cmpf-tab-gps"></div><div class="cmpf-tab-content" id="cmpf-tab-informe"></div>';cmPfCargarPruebas();}
 
 // ================================================================
@@ -200,9 +201,354 @@ function cmPfCsvStep3(){var keys=['player_name','total_distance_m','hsr_distance
 async function cmPfCsvImportar(){var tipo=document.getElementById('cmpf-csv-type').value;var fecha=document.getElementById('cmpf-csv-date').value;var titulo=(document.getElementById('cmpf-csv-title')||{}).value||'';if(!fecha){showToast('Indica fecha');return;}var csvN={};cmPfCsvData.rows.forEach(function(r){var n=r[cmPfCsvMapping.player_name];if(n)csvN[n]=true;});var pm={};Object.keys(csvN).forEach(function(cn){var sel=document.getElementById('cmpf-csv-player-'+cn.replace(/[^a-zA-Z0-9]/g,'_'));if(sel&&sel.value)pm[cn]=sel.value;});try{var ins=await supabaseClient.from('cm_pf_gps_sessions').insert({club_id:clubId,session_date:fecha,session_type:tipo,title:titulo||null,source:'csv'}).select('id').single();if(ins.error)throw ins.error;var sid=ins.data.id;var rows=[];var mp=cmPfCsvMapping;var vf=function(row,key){if(mp[key]===undefined)return null;var v=row[mp[key]];if(!v||v==='')return null;var n=parseFloat(v.replace(',','.'));return isNaN(n)?null:n;};cmPfCsvData.rows.forEach(function(row){var cn=row[mp.player_name];var pid=pm[cn];if(!pid)return;var seg=mp.segment_name!==undefined&&row[mp.segment_name]?row[mp.segment_name]:'TOTAL';rows.push({club_id:clubId,session_id:sid,player_id:pid,segment_name:seg,total_distance_m:vf(row,'total_distance_m'),hsr_distance_m:vf(row,'hsr_distance_m'),sprint_distance_m:vf(row,'sprint_distance_m'),max_speed_kmh:vf(row,'max_speed_kmh'),sprint_count:vf(row,'sprint_count'),accel_count:vf(row,'accel_count'),decel_count:vf(row,'decel_count'),player_load:vf(row,'player_load'),extra_metrics:{hmld_m:vf(row,'hmld_m'),avg_metabolic_power:vf(row,'avg_metabolic_power'),distance_per_min:vf(row,'distance_per_min')},z1_distance_m:vf(row,'z1_distance_m'),z2_distance_m:vf(row,'z2_distance_m'),z3_distance_m:vf(row,'z3_distance_m'),z4_distance_m:vf(row,'z4_distance_m'),z5_distance_m:vf(row,'z5_distance_m')});});if(!rows.length){showToast('Ningun jugador mapeado');return;}var res=await supabaseClient.from('cm_pf_gps_player_data').insert(rows);if(res.error)throw res.error;showToast(rows.length+' registros importados');document.getElementById('cmpf-csv-import').style.display='none';cmPfCargarGps();}catch(e){showToast('Error: '+(e.message||e));}}
 
 // ================================================================
-// TAB 4: INFORME (placeholder — Paso 4)
+// TAB 4: INFORME Y COMPARATIVAS GPS
 // ================================================================
-function cmPfRenderInformePlaceholder(){var c=document.getElementById('cmpf-tab-informe');if(!c)return;c.innerHTML='<div class="cmpf-wip"><div class="icon">---</div><h4>Informe fisico y comparativas</h4><p>Jugador vs equipo, radar, ranking por posicion, ACWR cruzado, PDF</p><p style="margin-top:8px;color:#14b8a6;font-size:12px">Siguiente paso</p></div>';}
+
+async function cmPfCargarInforme(){
+    var c=document.getElementById('cmpf-tab-informe');
+    if(!c||!cmPfJugadorActual)return;
+    c.innerHTML='<div class="cmpf-empty"><div class="icon">...</div><p>Cargando comparativas...</p></div>';
+    try{
+        var r=await supabaseClient.from('cm_pf_gps_player_data')
+            .select('player_id,total_distance_m,hsr_distance_m,sprint_distance_m,max_speed_kmh,sprint_count,accel_count,decel_count,player_load,extra_metrics,cm_pf_gps_sessions(session_date,session_type)')
+            .eq('club_id',clubId).eq('segment_name','TOTAL').eq('archived',false);
+        var allData=r.data||[];
+        var pr=await supabaseClient.from('club_players').select('id,name,positions_main')
+            .eq('club_id',clubId).eq('active',true);
+        var players={};
+        (pr.data||[]).forEach(function(p){players[p.id]=p;});
+        cmPfInformeData={raw:allData,players:players};
+        cmPfRenderInforme();
+    }catch(e){console.error(e);c.innerHTML='<div class="cmpf-empty"><p>Error cargando datos</p></div>';}
+}
+
+function cmPfGetPosGroup(pos){
+    if(!pos)return'otro';
+    var p=pos.toLowerCase();
+    if(p.indexOf('portero')>=0||p==='gk'||p==='pt')return'portero';
+    if(p.indexOf('central')>=0||p.indexOf('lateral')>=0||p.indexOf('defens')>=0||p==='df'||p==='dfc'||p==='ld'||p==='li'||p==='cb'||p==='rb'||p==='lb')return'defensa';
+    if(p.indexOf('medio')>=0||p.indexOf('pivote')>=0||p.indexOf('interior')>=0||p==='mc'||p==='mcd'||p==='mco'||p==='cm'||p==='cdm'||p==='cam')return'medio';
+    if(p.indexOf('extrem')>=0||p.indexOf('delant')>=0||p.indexOf('punt')>=0||p==='dc'||p==='ei'||p==='ed'||p==='st'||p==='lw'||p==='rw'||p==='cf')return'delantero';
+    return'otro';
+}
+
+function cmPfCalcularEstadisticas(){
+    if(!cmPfInformeData)return null;
+    var raw=cmPfInformeData.raw;
+    var players=cmPfInformeData.players;
+    var jugActual=cmPfJugadorActual;
+    var metrics=['total_distance_m','hsr_distance_m','sprint_distance_m','max_speed_kmh','sprint_count','accel_count','decel_count','player_load'];
+    var metLabels={total_distance_m:'TD(m)',hsr_distance_m:'HSR(m)',sprint_distance_m:'Sprint(m)',max_speed_kmh:'Vmax(km/h)',sprint_count:'N.Sprint',accel_count:'Acc HI',decel_count:'Dec HI',player_load:'PL'};
+
+    // Filtrar por tipo sesion
+    var filtered=raw;
+    if(cmPfInformeFiltroTipo){
+        filtered=raw.filter(function(d){return d.cm_pf_gps_sessions&&d.cm_pf_gps_sessions.session_type===cmPfInformeFiltroTipo;});
+    }
+
+    // Agrupar por jugador y calcular promedios
+    var porJugador={};
+    filtered.forEach(function(d){
+        if(!porJugador[d.player_id])porJugador[d.player_id]={count:0,sums:{}};
+        var pj=porJugador[d.player_id];
+        pj.count++;
+        metrics.forEach(function(m){
+            var v=parseFloat(d[m])||0;
+            if(v>0){
+                if(!pj.sums[m])pj.sums[m]={total:0,n:0};
+                pj.sums[m].total+=v;pj.sums[m].n++;
+            }
+        });
+        // m/min y hmld desde extra_metrics
+        if(d.extra_metrics){
+            var mmin=parseFloat(d.extra_metrics.distance_per_min)||0;
+            if(mmin>0){if(!pj.sums['m_min'])pj.sums['m_min']={total:0,n:0};pj.sums['m_min'].total+=mmin;pj.sums['m_min'].n++;}
+            var hmld=parseFloat(d.extra_metrics.hmld_m)||0;
+            if(hmld>0){if(!pj.sums['hmld'])pj.sums['hmld']={total:0,n:0};pj.sums['hmld'].total+=hmld;pj.sums['hmld'].n++;}
+        }
+    });
+
+    var allMetrics=metrics.concat(['m_min','hmld']);
+    var allLabels=Object.assign({},metLabels,{m_min:'m/min',hmld:'HMLD(m)'});
+
+    // Promedios por jugador
+    var promedios={};
+    Object.keys(porJugador).forEach(function(pid){
+        var pj=porJugador[pid];
+        promedios[pid]={count:pj.count};
+        allMetrics.forEach(function(m){
+            if(pj.sums[m]&&pj.sums[m].n>0)promedios[pid][m]=Math.round(pj.sums[m].total/pj.sums[m].n*100)/100;
+            else promedios[pid][m]=null;
+        });
+    });
+
+    // Grupo de comparacion (equipo o misma posicion)
+    var posActual=cmPfGetPosGroup((jugActual.position||''));
+    var grupoIds=Object.keys(promedios);
+    if(cmPfInformeFiltroPos==='misma'&&posActual!=='otro'){
+        grupoIds=grupoIds.filter(function(pid){
+            var p=players[pid];if(!p)return false;
+            return cmPfGetPosGroup((p.positions_main&&p.positions_main[0])||'')===posActual;
+        });
+    }
+
+    // Media y desviacion tipica del grupo
+    var grupoStats={};
+    allMetrics.forEach(function(m){
+        var vals=grupoIds.map(function(pid){return promedios[pid][m];}).filter(function(v){return v!=null&&v>0;});
+        if(vals.length>=2){
+            var mean=vals.reduce(function(a,b){return a+b;},0)/vals.length;
+            var variance=vals.reduce(function(a,v){return a+(v-mean)*(v-mean);},0)/vals.length;
+            grupoStats[m]={mean:Math.round(mean*100)/100,sd:Math.round(Math.sqrt(variance)*100)/100,n:vals.length};
+        }else if(vals.length===1){
+            grupoStats[m]={mean:vals[0],sd:0,n:1};
+        }
+    });
+
+    // Z-scores del jugador actual
+    var jugProm=promedios[jugActual.id]||{};
+    var zScores={};
+    allMetrics.forEach(function(m){
+        if(jugProm[m]!=null&&grupoStats[m]&&grupoStats[m].sd>0){
+            zScores[m]=Math.round((jugProm[m]-grupoStats[m].mean)/grupoStats[m].sd*100)/100;
+        }else{zScores[m]=null;}
+    });
+
+    // Percentiles para radar (0-100)
+    var percentiles={};
+    allMetrics.forEach(function(m){
+        var vals=grupoIds.map(function(pid){return promedios[pid][m];}).filter(function(v){return v!=null&&v>0;});
+        vals.sort(function(a,b){return a-b;});
+        if(vals.length>=2&&jugProm[m]!=null){
+            var rank=0;vals.forEach(function(v){if(jugProm[m]>=v)rank++;});
+            percentiles[m]=Math.round(rank/vals.length*100);
+        }
+    });
+
+    // Rankings por metrica
+    var rankings={};
+    allMetrics.forEach(function(m){
+        var arr=grupoIds.filter(function(pid){return promedios[pid][m]!=null&&promedios[pid][m]>0;}).map(function(pid){
+            var p=players[pid]||{};
+            return{pid:pid,name:p.name||'?',pos:(p.positions_main&&p.positions_main[0])||'',value:promedios[pid][m],count:promedios[pid].count};
+        });
+        arr.sort(function(a,b){return b.value-a.value;});
+        arr.forEach(function(r,i){r.rank=i+1;});
+        rankings[m]=arr;
+    });
+
+    return{jugProm:jugProm,grupoStats:grupoStats,zScores:zScores,percentiles:percentiles,rankings:rankings,allMetrics:allMetrics,allLabels:allLabels,nJugadores:grupoIds.length,posActual:posActual};
+}
+
+function cmPfRenderInforme(){
+    var c=document.getElementById('cmpf-tab-informe');
+    if(!c||!cmPfJugadorActual)return;
+    var stats=cmPfCalcularEstadisticas();
+    if(!stats||!stats.jugProm.count){
+        c.innerHTML='<div class="cmpf-empty"><p>Sin datos GPS suficientes para comparar.<br>Registra sesiones GPS del jugador y del equipo primero.</p></div>';return;
+    }
+
+    var h='';
+    // Filtros
+    h+='<div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap">';
+    h+='<select id="cmpf-inf-tipo" onchange="cmPfInformeFiltroTipo=this.value;cmPfRenderInforme()" style="background:#1e293b;border:1px solid #334155;color:#e2e8f0;padding:6px 10px;border-radius:6px;font-size:12px">';
+    h+='<option value=""'+(cmPfInformeFiltroTipo===''?' selected':'')+'>Tipo: Todos</option>';
+    h+='<option value="training"'+(cmPfInformeFiltroTipo==='training'?' selected':'')+'>Solo entrenos</option>';
+    h+='<option value="match"'+(cmPfInformeFiltroTipo==='match'?' selected':'')+'>Solo partidos</option></select>';
+    h+='<select id="cmpf-inf-pos" onchange="cmPfInformeFiltroPos=this.value;cmPfRenderInforme()" style="background:#1e293b;border:1px solid #334155;color:#e2e8f0;padding:6px 10px;border-radius:6px;font-size:12px">';
+    h+='<option value=""'+(cmPfInformeFiltroPos===''?' selected':'')+'>Grupo: Equipo completo</option>';
+    h+='<option value="misma"'+(cmPfInformeFiltroPos==='misma'?' selected':'')+'>Solo mi posicion ('+stats.posActual+')</option></select>';
+    h+='<span style="color:#64748b;font-size:11px">'+stats.nJugadores+' jugadores | '+stats.jugProm.count+' sesiones propias</span>';
+    h+='<button class="cmpf-btn cmpf-btn-primary cmpf-btn-sm" onclick="cmPfGenerarPdfInforme()" style="margin-left:auto">Exportar PDF</button>';
+    h+='</div>';
+
+    // SECCION 1: Z-SCORES
+    h+='<div class="cmpf-section-title">Z-Scores — Jugador vs Grupo</div>';
+    h+='<div style="overflow-x:auto"><table class="cmpf-table"><thead><tr><th>Metrica</th><th style="text-align:right">Tu media</th><th style="text-align:right">Media grupo</th><th style="text-align:right">Desv.Tip</th><th style="text-align:center">Z-Score</th><th style="text-align:center">Percentil</th></tr></thead><tbody>';
+    stats.allMetrics.forEach(function(m){
+        var gs=stats.grupoStats[m];if(!gs)return;
+        var jv=stats.jugProm[m];var z=stats.zScores[m];var pct=stats.percentiles[m];
+        var zColor='#94a3b8',zBg='#1e293b';
+        if(z!=null){
+            if(z>=1){zColor='#22c55e';zBg='#052e16';}
+            else if(z>=0.5){zColor='#4ade80';zBg='#052e16';}
+            else if(z<=-1){zColor='#ef4444';zBg='#450a0a';}
+            else if(z<=-0.5){zColor='#f87171';zBg='#450a0a';}
+        }
+        h+='<tr><td style="font-weight:600">'+stats.allLabels[m]+'</td>';
+        h+='<td style="text-align:right;color:#14b8a6;font-weight:700">'+(jv!=null?jv:'-')+'</td>';
+        h+='<td style="text-align:right">'+gs.mean+'</td>';
+        h+='<td style="text-align:right;color:#64748b">'+gs.sd+'</td>';
+        h+='<td style="text-align:center"><span style="display:inline-block;padding:2px 10px;border-radius:4px;font-weight:700;background:'+zBg+';color:'+zColor+'">'+(z!=null?z:'-')+'</span></td>';
+        h+='<td style="text-align:center">'+(pct!=null?'<span style="color:#a78bfa;font-weight:600">P'+pct+'</span>':'-')+'</td>';
+        h+='</tr>';
+    });
+    h+='</tbody></table></div>';
+
+    // SECCION 2: RADAR
+    h+='<div class="cmpf-section-title" style="margin-top:24px">Perfil Radar — Percentiles</div>';
+    h+='<div class="cmpf-chart-container" style="max-width:500px;margin:0 auto"><canvas id="cmpf-canvas-radar" height="350"></canvas></div>';
+
+    // SECCION 3: RANKINGS
+    h+='<div class="cmpf-section-title" style="margin-top:24px">Ranking por metrica</div>';
+    h+='<div style="margin-bottom:10px"><select id="cmpf-rank-metric" onchange="cmPfRenderRankingTable(this.value)" style="background:#1e293b;border:1px solid #334155;color:#e2e8f0;padding:6px 10px;border-radius:6px;font-size:12px">';
+    stats.allMetrics.forEach(function(m,i){
+        if(!stats.grupoStats[m])return;
+        h+='<option value="'+m+'"'+(i===0?' selected':'')+'>'+stats.allLabels[m]+'</option>';
+    });
+    h+='</select></div>';
+    h+='<div id="cmpf-ranking-table"></div>';
+
+    c.innerHTML=h;
+    cmPfRenderRadarChart(stats);
+    var firstMetric=stats.allMetrics.find(function(m){return stats.grupoStats[m];});
+    if(firstMetric)cmPfRenderRankingTable(firstMetric);
+}
+
+function cmPfRenderRadarChart(stats){
+    var ctx=document.getElementById('cmpf-canvas-radar');
+    if(!ctx||typeof Chart==='undefined')return;
+    if(window.cmPfChartRadar)window.cmPfChartRadar.destroy();
+    var radarMetrics=stats.allMetrics.filter(function(m){
+        return stats.jugProm[m]!=null&&stats.percentiles[m]!=null&&stats.grupoStats[m];
+    });
+    if(radarMetrics.length<3){ctx.parentElement.innerHTML='<p style="color:#64748b;font-size:12px;text-align:center;padding:20px">Minimo 3 metricas con datos para generar radar</p>';return;}
+    var labels=radarMetrics.map(function(m){return stats.allLabels[m];});
+    var playerData=radarMetrics.map(function(m){return stats.percentiles[m]||0;});
+    var groupData=radarMetrics.map(function(){return 50;});
+    window.cmPfChartRadar=new Chart(ctx,{
+        type:'radar',
+        data:{labels:labels,datasets:[
+            {label:cmPfJugadorActual.name,data:playerData,borderColor:'#14b8a6',backgroundColor:'rgba(20,184,166,0.15)',borderWidth:2,pointRadius:4,pointBackgroundColor:'#14b8a6'},
+            {label:'Media grupo (P50)',data:groupData,borderColor:'#f59e0b',backgroundColor:'rgba(245,158,11,0.08)',borderWidth:1,borderDash:[4,4],pointRadius:3,pointBackgroundColor:'#f59e0b'}
+        ]},
+        options:{responsive:true,maintainAspectRatio:false,
+            plugins:{legend:{labels:{color:'#94a3b8',font:{size:11}}}},
+            scales:{r:{beginAtZero:true,max:100,
+                ticks:{display:false,stepSize:25},
+                grid:{color:'#334155'},angleLines:{color:'#334155'},
+                pointLabels:{color:'#e2e8f0',font:{size:11}}
+            }}
+        }
+    });
+}
+
+function cmPfRenderRankingTable(metricKey){
+    var cont=document.getElementById('cmpf-ranking-table');if(!cont)return;
+    var stats=cmPfCalcularEstadisticas();if(!stats)return;
+    var ranking=stats.rankings[metricKey]||[];
+    if(!ranking.length){cont.innerHTML='<p style="color:#64748b;font-size:12px">Sin datos para esta metrica</p>';return;}
+    var h='<div style="overflow-x:auto"><table class="cmpf-table"><thead><tr><th style="width:40px">#</th><th>Jugador</th><th>Pos</th><th style="text-align:right">Media</th><th style="text-align:right">Sesiones</th></tr></thead><tbody>';
+    ranking.forEach(function(r){
+        var isMe=r.pid===cmPfJugadorActual.id;
+        var rowBg=isMe?'background:#0d3d3e;':'';
+        var borderL=isMe?'border-left:3px solid #14b8a6;':'';
+        var nameCol=isMe?'color:#14b8a6;font-weight:700':'font-weight:600';
+        var medal='';
+        if(r.rank===1)medal='&#129351; ';else if(r.rank===2)medal='&#129352; ';else if(r.rank===3)medal='&#129353; ';
+        h+='<tr style="'+rowBg+borderL+'"><td style="color:#64748b;font-weight:700">'+medal+r.rank+'</td>';
+        h+='<td style="'+nameCol+'">'+r.name+'</td>';
+        h+='<td style="color:#94a3b8;font-size:11px">'+r.pos+'</td>';
+        h+='<td style="text-align:right;color:#e2e8f0;font-weight:600">'+r.value+'</td>';
+        h+='<td style="text-align:right;color:#64748b">'+r.count+'</td></tr>';
+    });
+    h+='</tbody></table></div>';
+    cont.innerHTML=h;
+}
+
+async function cmPfGenerarPdfInforme(){
+    if(!cmPfJugadorActual||typeof jspdf==='undefined'){showToast('jsPDF no disponible');return;}
+    var stats=cmPfCalcularEstadisticas();
+    if(!stats||!stats.jugProm.count){showToast('Sin datos');return;}
+    var doc=new jspdf.jsPDF('p','mm','a4');
+    var w=doc.internal.pageSize.getWidth();
+    var y=20;
+
+    // Cabecera
+    doc.setFontSize(18);doc.setTextColor(20,184,166);
+    doc.text('Informe Comparativo GPS',w/2,y,{align:'center'});y+=10;
+    doc.setFontSize(12);doc.setTextColor(60,60,60);
+    doc.text(cmPfJugadorActual.name+(cmPfJugadorActual.position?' - '+cmPfJugadorActual.position:'')+(cmPfJugadorActual.team_name?' - '+cmPfJugadorActual.team_name:''),w/2,y,{align:'center'});y+=7;
+    doc.setFontSize(9);doc.setTextColor(120,120,120);
+    var filtroTxt='Grupo: '+(cmPfInformeFiltroPos==='misma'?'misma posicion ('+stats.posActual+')':'equipo completo');
+    filtroTxt+=' | Tipo: '+(cmPfInformeFiltroTipo==='training'?'entrenos':cmPfInformeFiltroTipo==='match'?'partidos':'todos');
+    filtroTxt+=' | '+stats.nJugadores+' jugadores | '+stats.jugProm.count+' sesiones propias';
+    doc.text(filtroTxt,w/2,y,{align:'center'});y+=4;
+    doc.setDrawColor(200);doc.line(15,y,w-15,y);y+=8;
+
+    // Tabla Z-Scores
+    doc.setFontSize(11);doc.setTextColor(40,40,40);
+    doc.text('Z-Scores',15,y);y+=6;
+    doc.setFontSize(7);doc.setTextColor(120,120,120);
+    var cols=[{x:15,t:'Metrica'},{x:55,t:'Tu media'},{x:80,t:'Media grupo'},{x:110,t:'Desv.Tip'},{x:138,t:'Z-Score'},{x:165,t:'Percentil'}];
+    cols.forEach(function(c){doc.text(c.t,c.x,y);});y+=2;
+    doc.line(15,y,w-15,y);y+=4;
+    doc.setFontSize(9);
+    stats.allMetrics.forEach(function(m){
+        var gs=stats.grupoStats[m];if(!gs)return;
+        var jv=stats.jugProm[m];var z=stats.zScores[m];var pct=stats.percentiles[m];
+        doc.setTextColor(50,50,50);doc.text(stats.allLabels[m],15,y);
+        doc.setTextColor(20,184,166);doc.text(jv!=null?String(jv):'-',55,y);
+        doc.setTextColor(90,90,90);doc.text(String(gs.mean),80,y);
+        doc.setTextColor(150,150,150);doc.text(String(gs.sd),110,y);
+        if(z!=null){
+            if(z>=0.5)doc.setTextColor(34,197,94);
+            else if(z<=-0.5)doc.setTextColor(239,68,68);
+            else doc.setTextColor(100,100,100);
+            doc.text(String(z),138,y);
+        }else{doc.setTextColor(150,150,150);doc.text('-',138,y);}
+        doc.setTextColor(120,120,120);doc.text(pct!=null?'P'+pct:'-',165,y);
+        y+=5;
+    });
+    y+=4;
+
+    // Radar como imagen
+    var radarCanvas=document.getElementById('cmpf-canvas-radar');
+    if(radarCanvas){
+        try{
+            var imgData=radarCanvas.toDataURL('image/png');
+            var imgW=80,imgH=80;
+            if(y+imgH+10>275){doc.addPage();y=20;}
+            doc.setFontSize(11);doc.setTextColor(40,40,40);
+            doc.text('Perfil Radar (percentiles)',15,y);y+=4;
+            doc.addImage(imgData,'PNG',(w-imgW)/2,y,imgW,imgH);y+=imgH+6;
+        }catch(e){console.warn('No se pudo exportar radar',e);}
+    }
+
+    // Top 5 TD
+    var tdRanking=stats.rankings['total_distance_m']||[];
+    if(tdRanking.length){
+        if(y+50>280){doc.addPage();y=20;}
+        doc.setFontSize(11);doc.setTextColor(40,40,40);
+        doc.text('Ranking - Distancia Total (Top 5)',15,y);y+=6;
+        doc.setFontSize(7);doc.setTextColor(120,120,120);
+        doc.text('#',15,y);doc.text('Jugador',25,y);doc.text('Pos',95,y);doc.text('Media',115,y);doc.text('Sesiones',145,y);y+=2;
+        doc.line(15,y,w-15,y);y+=4;
+        doc.setFontSize(9);
+        tdRanking.slice(0,5).forEach(function(r){
+            if(r.pid===cmPfJugadorActual.id)doc.setTextColor(20,184,166);else doc.setTextColor(60,60,60);
+            doc.text(String(r.rank),15,y);doc.text(r.name.substring(0,30),25,y);doc.text(r.pos,95,y);doc.text(String(r.value),115,y);doc.text(String(r.count),145,y);
+            y+=5;
+        });
+        var meInRank=tdRanking.find(function(r){return r.pid===cmPfJugadorActual.id;});
+        if(meInRank&&meInRank.rank>5){
+            y+=2;doc.setTextColor(100,100,100);doc.text('...',18,y);y+=4;
+            doc.setTextColor(20,184,166);
+            doc.text(String(meInRank.rank),15,y);doc.text(meInRank.name.substring(0,30),25,y);doc.text(meInRank.pos,95,y);doc.text(String(meInRank.value),115,y);doc.text(String(meInRank.count),145,y);
+        }
+    }
+
+    // Pie de pagina
+    var totalPages=doc.internal.getNumberOfPages();
+    for(var pg=1;pg<=totalPages;pg++){
+        doc.setPage(pg);
+        doc.setFontSize(7);doc.setTextColor(170,170,170);
+        doc.text('TopLiderCoach HUB - Informe generado '+new Date().toLocaleDateString('es-ES'),w/2,doc.internal.pageSize.getHeight()-8,{align:'center'});
+    }
+
+    doc.save('Informe_GPS_'+cmPfJugadorActual.name.replace(/\s+/g,'_')+'.pdf');
+    showToast('PDF generado');
+}
 
 // ================================================================
 // HELPERS

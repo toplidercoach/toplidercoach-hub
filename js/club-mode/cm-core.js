@@ -270,7 +270,8 @@ function cmAplicarPermisos() {
         'pagos':         'pagos_cuotas',           // Pagos y cuotas -> Oficina
         'fisio':         'modulo_fisio',           // Panel fisio -> Despacho fisio
         'familias':      'comunicacion_familias',  // Comunicacion a familias -> Oficina
-        'prepfisica':    'modulo_preparacion_fisica' // Preparacion fisica -> Campo compartido
+        'prepfisica':    'modulo_preparacion_fisica', // Preparacion fisica -> Campo compartido
+        'scouting':      'scouting'                   // Scouting -> Oficina
     };
 
     // Ocultar tabs de modulos sin permiso de ver
