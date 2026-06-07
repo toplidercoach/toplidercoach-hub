@@ -83,6 +83,9 @@ const ejP = {
     fieldType: 'full',
     fieldColor: '#1a6b30',
     svgW: 800, svgH: 500,
+    fieldRealW: 105, fieldRealH: 68,
+    showEII: false,
+    numTeams: 2,
 
     activeTool: 'select',
     myColor: 'blue',
@@ -200,6 +203,10 @@ function ejRenderSVG() {
                 <rect x="3" width="3" height="10" fill="${tc.fill2}"/>
             </pattern>`;
         }
+        if (p.photo) {
+            var _pr = 14 * (p.scale ?? 1);
+            defs += '<clipPath id="pclip-' + p.id + '"><circle cx="0" cy="0" r="' + _pr + '"/></clipPath>';
+        }
     }
     for (const s of ejP.shapes) {
         if (s.fillType === 'hatched') {
@@ -225,14 +232,20 @@ function ejRenderSVG() {
         const dash = s.dashed ? '10 5' : 'none';
         if (s.type === 'rect') {
             var _rf = s.fillType === 'hatched' ? 'url(#hatch-' + s.id + ')' : (s.fill || 'none');
+            var _selMode = ejP.activeTool === 'select';
             html += `<rect data-id="${s.id}" data-type="shape"
                 x="${s.x||0}" y="${s.y||0}" width="${s.w||0}" height="${s.h||0}"
                 fill="${_rf}" stroke="${s.color}" stroke-width="${sel?sw+1:sw}"
-                stroke-dasharray="${dash}" style="cursor:${ejP.activeTool==='select'?'move':'crosshair'};pointer-events:${ejP.activeTool==='select'?'auto':'none'}"/>`;
+                stroke-dasharray="${dash}" style="cursor:${_selMode?'move':'crosshair'};pointer-events:${_selMode?'all':'none'}"/>`;
             if (sel) {
                 html += `<rect x="${s.x-3}" y="${s.y-3}" width="${s.w+6}" height="${s.h+6}"
-                    fill="none" stroke="#22c55e" stroke-width="1.5" stroke-dasharray="4 2" rx="2"/>`;
+                    fill="none" stroke="#22c55e" stroke-width="1.5" stroke-dasharray="4 2" rx="2" style="pointer-events:none"/>`;
+                var _hc = [['tl',s.x,s.y,'nwse'],['tr',s.x+s.w,s.y,'nesw'],['bl',s.x,s.y+s.h,'nesw'],['br',s.x+s.w,s.y+s.h,'nwse']];
+                for (var _hi=0; _hi<4; _hi++) {
+                    html += '<circle cx="'+_hc[_hi][1]+'" cy="'+_hc[_hi][2]+'" r="7" fill="#22c55e" stroke="#fff" stroke-width="2" data-rsz="'+s.id+'-'+_hc[_hi][0]+'" style="cursor:'+_hc[_hi][3]+'-resize"/>';
+                }
             }
+            html += ejEtiquetaZonaSVG(s);
         } else if (s.type === 'ellipse') {
             var _ef = s.fillType === 'hatched' ? 'url(#hatch-' + s.id + ')' : (s.fill || 'none');
             html += `<ellipse data-id="${s.id}" data-type="shape"
@@ -277,6 +290,10 @@ function ejRenderSVG() {
             const hl = 8+sw;
             html += `<g data-id="${l.id}" data-type="line" style="cursor:${ejP.activeTool==='select'?'move':'pointer'}">
                 <path d="${d}" stroke="transparent" stroke-width="16" fill="none"/>
+                <g transform="translate(1.4,2.2)" opacity="0.28" style="pointer-events:none">
+                    <path d="${d}" stroke="#000" stroke-width="${sel?sw+1:sw}" stroke-dasharray="${dash}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                    <polygon points="${last.x},${last.y} ${last.x-hl*Math.cos(ang-.4)},${last.y-hl*Math.sin(ang-.4)} ${last.x-hl*Math.cos(ang+.4)},${last.y-hl*Math.sin(ang+.4)}" fill="#000"/>
+                </g>
                 <path d="${d}" stroke="${l.color}" stroke-width="${sel?sw+1:sw}"
                     stroke-dasharray="${dash}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
                 <polygon points="${last.x},${last.y} ${last.x-hl*Math.cos(ang-.4)},${last.y-hl*Math.sin(ang-.4)} ${last.x-hl*Math.cos(ang+.4)},${last.y-hl*Math.sin(ang+.4)}" fill="${l.color}"/>
@@ -288,11 +305,29 @@ function ejRenderSVG() {
             const hl = 8+sw;
             html += `<g data-id="${l.id}" data-type="line" style="cursor:${ejP.activeTool==='select'?'move':'pointer'}">
                 <path d="M${l.x1} ${l.y1} Q${cx} ${cy} ${l.x2} ${l.y2}" stroke="transparent" stroke-width="16" fill="none"/>
+                <g transform="translate(1.4,2.2)" opacity="0.28" style="pointer-events:none">
+                    <path d="M${l.x1} ${l.y1} Q${cx} ${cy} ${l.x2} ${l.y2}" stroke="#000" stroke-width="${sel?sw+1:sw}" stroke-dasharray="${dash}" fill="none" stroke-linecap="round"/>
+                    <polygon points="${l.x2},${l.y2} ${l.x2-hl*Math.cos(ang-.4)},${l.y2-hl*Math.sin(ang-.4)} ${l.x2-hl*Math.cos(ang+.4)},${l.y2-hl*Math.sin(ang+.4)}" fill="#000"/>
+                </g>
                 <path d="M${l.x1} ${l.y1} Q${cx} ${cy} ${l.x2} ${l.y2}"
                     stroke="${l.color}" stroke-width="${sel?sw+1:sw}"
                     stroke-dasharray="${dash}" fill="none" stroke-linecap="round"/>
                 <polygon points="${l.x2},${l.y2} ${l.x2-hl*Math.cos(ang-.4)},${l.y2-hl*Math.sin(ang-.4)} ${l.x2-hl*Math.cos(ang+.4)},${l.y2-hl*Math.sin(ang+.4)}" fill="${l.color}"/>
                 ${sel ? `<circle cx="${cx}" cy="${cy}" r="7" fill="#22c55e" stroke="white" stroke-width="2" data-ctrl="${l.id}" style="cursor:grab"/>` : ''}
+                ${sel ? `<circle cx="${l.x1}" cy="${l.y1}" r="5" fill="#22c55e" data-ep="${l.id}-1"/><circle cx="${l.x2}" cy="${l.y2}" r="5" fill="#22c55e" data-ep="${l.id}-2"/>` : ''}
+            </g>`;
+        } else if (l.type === 'dribble') {
+            const ang = Math.atan2(l.y2-l.y1, l.x2-l.x1);
+            const hl = 8+sw;
+            const wd = ejWavyPath(l.x1, l.y1, l.x2, l.y2, 5, 18);
+            html += `<g data-id="${l.id}" data-type="line" style="cursor:${ejP.activeTool==='select'?'move':'pointer'}">
+                <line x1="${l.x1}" y1="${l.y1}" x2="${l.x2}" y2="${l.y2}" stroke="transparent" stroke-width="16"/>
+                <g transform="translate(1.4,2.2)" opacity="0.28" style="pointer-events:none">
+                    <path d="${ejWavyPath(l.x1, l.y1, l.x2, l.y2, 5, 18)}" stroke="#000" stroke-width="${sel?sw+1:sw}" stroke-dasharray="${dash}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                    <polygon points="${l.x2},${l.y2} ${l.x2-hl*Math.cos(ang-.4)},${l.y2-hl*Math.sin(ang-.4)} ${l.x2-hl*Math.cos(ang+.4)},${l.y2-hl*Math.sin(ang+.4)}" fill="#000"/>
+                </g>
+                <path d="${wd}" stroke="${l.color}" stroke-width="${sel?sw+1:sw}" stroke-dasharray="${dash}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                <polygon points="${l.x2},${l.y2} ${l.x2-hl*Math.cos(ang-.4)},${l.y2-hl*Math.sin(ang-.4)} ${l.x2-hl*Math.cos(ang+.4)},${l.y2-hl*Math.sin(ang+.4)}" fill="${l.color}"/>
                 ${sel ? `<circle cx="${l.x1}" cy="${l.y1}" r="5" fill="#22c55e" data-ep="${l.id}-1"/><circle cx="${l.x2}" cy="${l.y2}" r="5" fill="#22c55e" data-ep="${l.id}-2"/>` : ''}
             </g>`;
         } else {
@@ -302,9 +337,11 @@ function ejRenderSVG() {
             const hl = 8+sw;
             html += `<g data-id="${l.id}" data-type="line" style="cursor:${ejP.activeTool==='select'?'move':'pointer'}">
                 <line x1="${l.x1}" y1="${l.y1}" x2="${l.x2}" y2="${l.y2}" stroke="transparent" stroke-width="16"/>
+                <line x1="${l.x1+1.4}" y1="${l.y1+2.2}" x2="${l.x2+1.4}" y2="${l.y2+2.2}"
+                    stroke="#000" opacity="0.28" stroke-width="${sel?sw+1:sw}" stroke-dasharray="${dash}" stroke-linecap="round" style="pointer-events:none"/>
                 <line x1="${l.x1}" y1="${l.y1}" x2="${l.x2}" y2="${l.y2}"
-                    stroke="${l.color}" stroke-width="${sel?sw+1:sw}" stroke-dasharray="${dash}"/>
-                ${l.hasArrow ? `<polygon points="${l.x2},${l.y2} ${l.x2-hl*Math.cos(ang-.4)},${l.y2-hl*Math.sin(ang-.4)} ${l.x2-hl*Math.cos(ang+.4)},${l.y2-hl*Math.sin(ang+.4)}" fill="${l.color}"/>` : ''}
+                    stroke="${l.color}" stroke-width="${sel?sw+1:sw}" stroke-dasharray="${dash}" stroke-linecap="round"/>
+                ${l.hasArrow ? `<polygon points="${l.x2+1.4},${l.y2+2.2} ${l.x2-hl*Math.cos(ang-.4)+1.4},${l.y2-hl*Math.sin(ang-.4)+2.2} ${l.x2-hl*Math.cos(ang+.4)+1.4},${l.y2-hl*Math.sin(ang+.4)+2.2}" fill="#000" opacity="0.28" style="pointer-events:none"/><polygon points="${l.x2},${l.y2} ${l.x2-hl*Math.cos(ang-.4)},${l.y2-hl*Math.sin(ang-.4)} ${l.x2-hl*Math.cos(ang+.4)},${l.y2-hl*Math.sin(ang+.4)}" fill="${l.color}"/>` : ''}
                 ${sel ? `<circle cx="${l.x1}" cy="${l.y1}" r="5" fill="#22c55e" data-ep="${l.id}-1"/><circle cx="${l.x2}" cy="${l.y2}" r="5" fill="#22c55e" data-ep="${l.id}-2"/>` : ''}
             </g>`;
         }
@@ -320,6 +357,7 @@ function ejRenderSVG() {
         } else if (t.type === 'rect') {
             var prevFill = ejP.shapeFill ? ejHexToRgba(ejP.lineColor, ejP.shapeFillOpacity) : 'none';
             html += `<rect x="${t.x}" y="${t.y}" width="${t.w}" height="${t.h}" fill="${prevFill}" stroke="${ejP.lineColor}" stroke-width="${sw}" stroke-dasharray="${dash}" opacity="0.7"/>`;
+            html += ejEtiquetaZonaSVG(t);
         } else if (t.type === 'ellipse') {
             var prevFill = ejP.shapeFill ? ejHexToRgba(ejP.lineColor, ejP.shapeFillOpacity) : 'none';
             html += `<ellipse cx="${t.cx}" cy="${t.cy}" rx="${t.rx}" ry="${t.ry}" fill="${prevFill}" stroke="${ejP.lineColor}" stroke-width="${sw}" stroke-dasharray="${dash}" opacity="0.7"/>`;
@@ -330,15 +368,24 @@ function ejRenderSVG() {
             const cx = t.cx ?? (t.x1+t.x2)/2, cy = t.cy ?? (t.y1+t.y2)/2 - 40;
             html += `<path d="M${t.x1} ${t.y1} Q${cx} ${cy} ${t.x2} ${t.y2}" stroke="${ejP.lineColor}" stroke-width="${sw}" fill="none" opacity="0.7"/>`;
             html += `<circle cx="${cx}" cy="${cy}" r="5" fill="#facc15" opacity="0.7"/>`;
+        } else if (t.type === 'dribble') {
+            html += `<path d="${ejWavyPath(t.x1, t.y1, t.x2, t.y2, 5, 18)}" stroke="${ejP.lineColor}" stroke-width="${sw}" fill="none" stroke-linecap="round" opacity="0.7"/>`;
         }
     }
 
     // Textos
     for (const t of ejP.texts) {
         const sel = t.id === ejP.selectedId;
+        const tsize = t.size || 16;
+        const tweight = t.bold ? 700 : 500;
+        const tcolor = t.color || '#ffffff';
+        const approxW = (String(t.text).length * tsize * 0.56) + 16;
+        const boxH = tsize + 12;
         html += `<g data-id="${t.id}" data-type="text" transform="translate(${t.x},${t.y})" style="cursor:move">
-            ${sel ? `<rect x="-55" y="-15" width="110" height="30" fill="none" stroke="#22c55e" stroke-width="1.5" rx="4"/>` : ''}
-            <text text-anchor="middle" dominant-baseline="central" fill="${t.color||'#ffffff'}" font-size="${t.size||16}" font-weight="500" font-family="system-ui">${t.text}</text>
+            ${t.bg ? `<rect x="${-approxW/2}" y="${-boxH/2}" width="${approxW}" height="${boxH}" rx="5" fill="rgba(15,23,42,0.82)" stroke="${tcolor}" stroke-width="1.2"/>` : ''}
+            ${!t.bg ? `<text text-anchor="middle" dominant-baseline="central" x="1.2" y="2" fill="#000" opacity="0.35" font-size="${tsize}" font-weight="${tweight}" font-family="${t.font || 'system-ui, sans-serif'}" style="pointer-events:none">${t.text}</text>` : ''}
+            <text text-anchor="middle" dominant-baseline="central" fill="${tcolor}" font-size="${tsize}" font-weight="${tweight}" font-family="${t.font || 'system-ui, sans-serif'}">${t.text}</text>
+            ${sel ? `<rect x="${-approxW/2-4}" y="${-boxH/2-4}" width="${approxW+8}" height="${boxH+8}" fill="none" stroke="#22c55e" stroke-width="1.5" stroke-dasharray="4 2" rx="5" style="pointer-events:none"/>` : ''}
         </g>`;
     }
 
@@ -356,11 +403,21 @@ function ejRenderSVG() {
         const textColor = ['yellow','white','atletico','juventus'].includes(p.color) ? '#1e293b' : '#ffffff';
         const fillAttr = tc.striped ? `url(#stp-${p.id})` : tc.fill;
 
+        var _hasPhoto = !!p.photo;
         html += `<g data-id="${p.id}" data-type="player" transform="translate(${p.x},${p.y})" style="cursor:move">
-            ${p.hasVest ? `<circle r="${r+4}" fill="none" stroke="${vc.fill}" stroke-width="4" stroke-dasharray="8 4"/>` : ''}
-            <circle r="${r}" fill="${fillAttr}" stroke="${sel?'#22c55e':tc.stroke}" stroke-width="${sel?3:2}"/>
-            ${p.showNumber && p.number ? `<text text-anchor="middle" dominant-baseline="central" fill="${textColor}" font-size="${fs}" font-weight="600" font-family="system-ui">${p.number}</text>` : ''}
-            ${p.showName && p.name ? `<text text-anchor="middle" y="${r+10}" fill="#ffffff" font-size="9" font-weight="600" font-family="system-ui" style="text-shadow:0 1px 2px rgba(0,0,0,.8)">${p.name.split(' ')[0]}</text>` : ''}
+            <ellipse cx="${r*0.18}" cy="${r*0.62}" rx="${r*0.92}" ry="${r*0.42}" fill="rgba(0,0,0,0.30)" style="pointer-events:none"/>
+            ${p.hasVest ? `<circle r="${r+4}" fill="none" stroke="${vc.fill}" stroke-width="4" stroke-dasharray="8 4"/>` : ''}`;
+        if (_hasPhoto) {
+            html += `<circle r="${r}" fill="#0f172a"/>
+            <image href="${ejFotoCache[p.photo] || p.photo}" x="${-r}" y="${-r}" width="${r*2}" height="${r*2}" preserveAspectRatio="xMidYMid slice" clip-path="url(#pclip-${p.id})" style="pointer-events:none"/>
+            <circle r="${r}" fill="none" stroke="${sel?'#22c55e':tc.stroke}" stroke-width="${sel?3:2.5}"/>
+            ${p.showNumber && p.number ? `<circle cx="${r*0.72}" cy="${r*0.72}" r="${r*0.56}" fill="${tc.fill}" stroke="#fff" stroke-width="1.2"/><text x="${r*0.72}" y="${r*0.72}" text-anchor="middle" dominant-baseline="central" fill="${textColor}" font-size="${fs*0.82}" font-weight="700" font-family="system-ui">${p.number}</text>` : ''}`;
+        } else {
+            html += `<circle r="${r}" fill="${fillAttr}" stroke="${sel?'#22c55e':tc.stroke}" stroke-width="${sel?3:2}"/>
+            <ellipse cx="0" cy="${-r*0.32}" rx="${r*0.62}" ry="${r*0.40}" fill="rgba(255,255,255,0.16)" style="pointer-events:none"/>
+            ${p.showNumber && p.number ? `<text text-anchor="middle" dominant-baseline="central" fill="${textColor}" font-size="${fs}" font-weight="700" font-family="system-ui">${p.number}</text>` : ''}`;
+        }
+        html += `${p.showName && p.name ? `<text text-anchor="middle" y="${r+11}" fill="#ffffff" font-size="9" font-weight="600" font-family="system-ui" style="text-shadow:0 1px 2px rgba(0,0,0,.8)">${p.name.split(' ')[0]}</text>` : ''}
         </g>`;
     }
 // Fantasmas del frame anterior - no mostrar durante exportación
@@ -411,6 +468,13 @@ for (const l of trajs) {
         }
     }
 }
+    // Panel de parámetros flotante: visible en todos los rectángulos con análisis activo
+    if (ejP.showEII && !ejP._exporting) {
+        for (var _pi = 0; _pi < ejP.shapes.length; _pi++) {
+            var _psh = ejP.shapes[_pi];
+            if (_psh.type === 'rect') html += ejPanelParametrosSVG(_psh);
+        }
+    }
     svg.innerHTML = html;
 }
 
@@ -430,6 +494,24 @@ function ejGetPos(e) {
 // =============================================
 // EVENT HANDLERS DEL SVG
 // =============================================
+// Detecta si hay un jugador o material justo bajo el punto (para priorizarlo sobre las zonas)
+function ejHitElemento(pos) {
+    for (var i = ejP.players.length - 1; i >= 0; i--) {
+        var p = ejP.players[i];
+        var r = 14 * (p.scale != null ? p.scale : 1);
+        var dx = pos.x - p.x, dy = pos.y - p.y;
+        if (dx * dx + dy * dy <= (r + 3) * (r + 3)) return { id: p.id, type: 'player' };
+    }
+    for (var j = ejP.equipment.length - 1; j >= 0; j--) {
+        var eq = ejP.equipment[j];
+        var et = EJ_EQUIPMENT_TYPES.find(function(t){ return t.key === eq.eqType; });
+        var w = (et ? et.w : 40) * (eq.scale || 1);
+        var h = (et ? et.h : 40) * (eq.scale || 1);
+        if (Math.abs(pos.x - eq.x) <= w / 2 && Math.abs(pos.y - eq.y) <= h / 2) return { id: eq.id, type: 'equipment' };
+    }
+    return null;
+}
+
 function ejSvgPointerDown(e) {
     const svg = document.getElementById('ej-svg');
     if (!svg) return;
@@ -452,10 +534,21 @@ function ejSvgPointerDown(e) {
         return;
     }
 
-    // Click en punto de control de trayectoria curva (animación)
-    if (target.dataset.trajCtrl) {
-        ejP.isDragging = true;
-        ejP._trajCtrlId = target.dataset.trajCtrl;
+    // Click en tirador de redimensión de rectángulo
+    if (target.dataset.rsz) {
+        var _parts = target.dataset.rsz.split('-');
+        var _rid = parseInt(_parts[0]);
+        var _corner = _parts[1];
+        var _sh = ejP.shapes.find(function(s){ return s.id === _rid; });
+        if (_sh) {
+            ejP.isDragging = true;
+            ejP._rszId = _rid;
+            ejP._rszCorner = _corner;
+            if (_corner === 'tl') ejP._rszAnchor = { x: _sh.x + _sh.w, y: _sh.y + _sh.h };
+            else if (_corner === 'tr') ejP._rszAnchor = { x: _sh.x, y: _sh.y + _sh.h };
+            else if (_corner === 'bl') ejP._rszAnchor = { x: _sh.x + _sh.w, y: _sh.y };
+            else ejP._rszAnchor = { x: _sh.x, y: _sh.y };
+        }
         return;
     }
 
@@ -464,11 +557,16 @@ function ejSvgPointerDown(e) {
     const isBackground = !el || target.dataset.bg;
 
   if (!isBackground && ejP.activeTool === 'select') {
-    const id = parseInt(el.dataset.id);
+    var id = parseInt(el.dataset.id);
+    var type = el.dataset.type;
+    // Prioridad: si el clic cae sobre una zona/forma pero hay un jugador o material justo debajo, se coge ese
+    if (type === 'shape') {
+        var _hit = ejHitElemento(pos);
+        if (_hit) { id = _hit.id; type = _hit.type; }
+    }
     ejP.selectedId = id;
     ejP.isDragging = true;
     ejP._ctrlId = null;
-    const type = el.dataset.type;
     if (type === 'player') ejP.expandedSection = 'players';
     else if (type === 'equipment') ejP.expandedSection = 'material';
     else ejP.expandedSection = 'draw';
@@ -520,6 +618,7 @@ if (ejP.activeTool === 'connect') { if (!isBackground && el) { var _cid = parseI
             ejP.players.push({
                 id, x: pos.x, y: pos.y, color,
                 scale, number: p.number, name: p.name,
+                photo: p.photo || null,
                 showNumber: ejP._plantillaLabel !== 'name',
                 showName: ejP._plantillaLabel === 'name' || ejP._plantillaLabel === 'both',
                 hasVest: false, vestColor: ejP.vestColor
@@ -537,7 +636,7 @@ if (ejP.activeTool === 'connect') { if (!isBackground && el) { var _cid = parseI
                 showNumber: ejP.showNumbers,
                 hasVest: ejP.hasVest, vestColor: ejP.vestColor
             });
-            ejP.activeTool = 'select';
+            // Mantener activo "Añadir jugador" para colocar varios seguidos
         }
         ejP.selectedId = id;
         ejRenderSVG();
@@ -551,7 +650,6 @@ if (ejP.activeTool === 'connect') { if (!isBackground && el) { var _cid = parseI
         const id = ejP.nextId++;
         ejP.equipment.push({ id, x: pos.x, y: pos.y, eqType: ejP.selectedEquipmentType, scale: ({'ball':0.20,'cone':0.20,'marker':0.20,'goalSmall':0.95}[ejP.selectedEquipmentType] || 0.5), rotation: 0 });
 ejP.selectedId = id;
-        ejP.activeTool = 'select';
         ejP.expandedSection = 'material';
 ejRenderSVG();
 ejRenderToolbar();
@@ -564,16 +662,19 @@ return;
             if (text) {
                 ejSaveHistory();
                 const id = ejP.nextId++;
-                ejP.texts.push({ id, x: pos.x, y: pos.y, text, color: '#ffffff', size: 16 });
+                ejP.texts.push({ id, x: pos.x, y: pos.y, text, color: ejP.lineColor || '#ffffff', size: 18, bold: false, bg: false });
                 ejP.selectedId = id;
+                ejP.activeTool = 'select';
+                ejP.expandedSection = 'draw';
                 ejRenderSVG();
+                ejRenderToolbar();
             }
         });
         return;
     }
 
  // Herramientas de dibujo
-    const drawTools = ['arrow','line','rect','ellipse','curved','pencil'];
+    const drawTools = ['arrow','line','rect','ellipse','curved','pencil','dribble'];
     if (drawTools.includes(ejP.activeTool) && ejP.animMode) {
         const SNAP_PLAYER = 30;
         const SNAP_BALL = 22;
@@ -628,7 +729,7 @@ if (snapElem) {
         } else if (ejP.activeTool === 'ellipse') {
             ejP.tempShape = { type: 'ellipse', cx: pos.x, cy: pos.y, rx: 0, ry: 0 };
         } else {
-            ejP.tempShape = { type: ejP.activeTool === 'curved' ? 'curved' : 'line',
+            ejP.tempShape = { type: ejP.activeTool === 'curved' ? 'curved' : (ejP.activeTool === 'dribble' ? 'dribble' : 'line'),
                 x1: pos.x, y1: pos.y, x2: pos.x, y2: pos.y };
         }
         return;
@@ -673,6 +774,22 @@ function ejSvgPointerMove(e) {
         if (frame && frame.trajectories) {
             const traj = frame.trajectories.find(t => t.id === id);
             if (traj) { traj.cx = pos.x; traj.cy = pos.y; }
+        }
+        ejRenderSVG();
+        return;
+    }
+
+    // Redimensionar rectángulo con tirador
+    if (ejP.isDragging && ejP._rszId) {
+        var _shr = ejP.shapes.find(function(s){ return s.id === ejP._rszId; });
+        if (_shr) {
+            var ax = ejP._rszAnchor.x, ay = ejP._rszAnchor.y;
+            _shr.x = Math.min(ax, pos.x);
+            _shr.y = Math.min(ay, pos.y);
+            _shr.w = Math.abs(pos.x - ax);
+            _shr.h = Math.abs(pos.y - ay);
+            if (_shr.w < 8) _shr.w = 8;
+            if (_shr.h < 8) _shr.h = 8;
         }
         ejRenderSVG();
         return;
@@ -742,6 +859,9 @@ function ejSvgPointerUp(e) {
     ejP._ctrlId = null;
     ejP._trajCtrlId = null;
     ejP._epDrag = null;
+    ejP._rszId = null;
+    ejP._rszCorner = null;
+    ejP._rszAnchor = null;
 
     // Fin de dibujo
     if (ejP.isDrawing && ejP.drawStart) {
@@ -764,6 +884,12 @@ function ejSvgPointerUp(e) {
             newLine = { id, type: 'curved', x1: t.x1, y1: t.y1, x2: t.x2, y2: t.y2,
                 cx: t.cx ?? (t.x1+t.x2)/2, cy: t.cy ?? (t.y1+t.y2)/2 - 40,
                 color, strokeWidth: sw, dashed, hasArrow: true };
+        } else if (ejP.activeTool === 'dribble' && t) {
+            var _drDx = pos.x - ejP.drawStart.x, _drDy = pos.y - ejP.drawStart.y;
+            if (Math.sqrt(_drDx*_drDx + _drDy*_drDy) > 5) {
+                newLine = { id, type: 'dribble', x1: t.x1, y1: t.y1, x2: t.x2, y2: t.y2,
+                    color, strokeWidth: sw, dashed, hasArrow: true };
+            }
         } else {
             const dx = pos.x - ejP.drawStart.x, dy = pos.y - ejP.drawStart.y;
             if (Math.sqrt(dx*dx+dy*dy) > 5) {
@@ -920,25 +1046,292 @@ function ejSetTool(tool) {
     ejP._addingRival = false;
     ejP._connectFrom = null;
     ejRenderToolbar();
+    ejRenderSVG();
 }
 function ejHexToRgba(hex, opacity) {
     var r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
     return 'rgba('+r+','+g+','+b+','+opacity+')';
 }
+
+// ====== ANÁLISIS EII (juegos reducidos) ======
+const EJ_CAMPO_PX = { w: 760, h: 470 };
+
+// Matriz de Castellano y Casamichana (2016)
+function ejCualidadEII(eii, nJug) {
+    if (!nJug || nJug <= 0) return null;
+    var pocos = nJug <= 4;
+    var pocoEspacio = eii <= 100;
+    if (pocos && pocoEspacio)  return { label: 'Fuerza',      col: '#f97316' };
+    if (pocos && !pocoEspacio) return { label: 'Resistencia', col: '#22c55e' };
+    if (!pocos && pocoEspacio) return { label: 'Activación',  col: '#eab308' };
+    return { label: 'Velocidad', col: '#3b82f6' };
+}
+
+function ejContarJugadoresEnRect(s) {
+    var x1 = Math.min(s.x, s.x + s.w), x2 = Math.max(s.x, s.x + s.w);
+    var y1 = Math.min(s.y, s.y + s.h), y2 = Math.max(s.y, s.y + s.h);
+    var n = 0;
+    for (var i = 0; i < ejP.players.length; i++) {
+        var p = ejP.players[i];
+        if (p.x >= x1 && p.x <= x2 && p.y >= y1 && p.y <= y2) n++;
+    }
+    return n;
+}
+
+// Interpolación lineal por tramos entre puntos de anclaje conocidos del campo
+function ejInterpPx(val, px, m) {
+    if (val <= px[0]) {
+        var f0 = (val - px[0]) / (px[1] - px[0]);
+        return m[0] + f0 * (m[1] - m[0]);
+    }
+    for (var i = 0; i < px.length - 1; i++) {
+        if (val <= px[i+1]) {
+            var f = (val - px[i]) / (px[i+1] - px[i]);
+            return m[i] + f * (m[i+1] - m[i]);
+        }
+    }
+    var n = px.length;
+    var fn = (val - px[n-2]) / (px[n-1] - px[n-2]);
+    return m[n-2] + fn * (m[n-1] - m[n-2]);
+}
+
+// Anclas px→m según tipo de campo, con largo (L) y ancho (A) totales.
+// El área grande es fija: 40,32 m (ancho) × 16,5 m (fondo).
+function ejAnclasCampo() {
+    var ft = ejP.fieldType;
+    var L = ejP.fieldRealW || 105;
+    var A = ejP.fieldRealH || 68;
+    var lat = (A - 40.32) / 2;
+    if (ft === 'half') {
+        return {
+            xPx: [20, 175, 625, 780], xM: [0, lat, lat + 40.32, A],
+            yPx: [15, 163, 485],      yM: [0, 16.5, L / 2]
+        };
+    }
+    if (ft === 'halfDown') {
+        return {
+            xPx: [20, 175, 625, 780], xM: [0, lat, lat + 40.32, A],
+            yPx: [15, 337, 485],      yM: [L / 2, 16.5, 0]
+        };
+    }
+    if (ft === 'blank') {
+        return {
+            xPx: [20, 780], xM: [0, L],
+            yPx: [15, 485], yM: [0, A]
+        };
+    }
+    return {
+        xPx: [20, 128, 400, 672, 780], xM: [0, 16.5, L / 2, L - 16.5, L],
+        yPx: [15, 133, 367, 485],      yM: [0, lat, lat + 40.32, A]
+    };
+}
+
+// Bandas del modelo tridimensional (Casamichana y Castellano)
+function ejBandaEII(eii) {
+    if (eii < 50) return 0;
+    if (eii < 100) return 1;
+    if (eii < 200) return 2;
+    if (eii <= 300) return 3;
+    return -1; // fuera del rango de juego reducido
+}
+function ejBandaJug(jpe) {
+    if (jpe <= 3) return 0;
+    if (jpe <= 5) return 1;
+    if (jpe <= 7) return 2;
+    return 3;
+}
+// Demandas físicas estimadas (Tabla 6 del libro). Niveles 1-4 (+ a ++++)
+function ejDemandas(eii, jpe) {
+    var fE = ejBandaEII(eii);
+    if (fE < 0) return null;
+    var cJ = ejBandaJug(jpe);
+    var A = [4, 3, 2, 1][fE];
+    var V = [1, 2, 3, 4][fE];
+    var pocos = cJ <= 1;
+    var FC = (fE <= 1) ? (pocos ? 3 : 1) : (pocos ? 4 : 2);
+    return { A: A, FC: FC, V: V };
+}
+
+function ejAnalizarZona(s) {
+    var an = ejAnclasCampo();
+    var x1 = Math.min(s.x, s.x + s.w), x2 = Math.max(s.x, s.x + s.w);
+    var y1 = Math.min(s.y, s.y + s.h), y2 = Math.max(s.y, s.y + s.h);
+    var anchoM = Math.abs(ejInterpPx(x2, an.xPx, an.xM) - ejInterpPx(x1, an.xPx, an.xM));
+    var largoM = Math.abs(ejInterpPx(y2, an.yPx, an.yM) - ejInterpPx(y1, an.yPx, an.yM));
+    var areaM2 = anchoM * largoM;
+    var nJug = ejContarJugadoresEnRect(s);
+    var nEq = ejP.numTeams || 2;
+    var jugEq = nJug > 0 ? Math.round(nJug / nEq) : 0;
+    var eii = nJug > 0 ? areaM2 / nJug : null;
+    var cual = (eii != null) ? ejCualidadEII(eii, jugEq) : null;
+    var demandas = (eii != null) ? ejDemandas(eii, jugEq) : null;
+    return { anchoM: anchoM, largoM: largoM, areaM2: areaM2, nJug: nJug, jugEq: jugEq, eii: eii, cual: cual, demandas: demandas };
+}
+
+function ejEtiquetaZonaSVG(s) {
+    if (!ejP.showEII) return '';
+    if (Math.abs(s.w) < 25 || Math.abs(s.h) < 25) return '';
+    var z = ejAnalizarZona(s);
+    var rx = Math.min(s.x, s.x + s.w);
+    var ry = Math.min(s.y, s.y + s.h);
+    var rw = Math.abs(s.w);
+    var rh = Math.abs(s.h);
+    var dimTxt = z.anchoM.toFixed(1) + ' × ' + z.largoM.toFixed(1) + ' m';
+    var out = '';
+    var dimW = dimTxt.length * 6.5 + 12;
+    var dimX = rx + rw / 2;
+    var dimY = ry - 10; if (dimY < 12) dimY = ry + 16;
+    out += '<rect x="' + (dimX - dimW/2) + '" y="' + (dimY - 11) + '" width="' + dimW + '" height="16" rx="3" fill="rgba(15,23,42,0.85)"/>';
+    out += '<text x="' + dimX + '" y="' + (dimY - 3) + '" text-anchor="middle" fill="#fff" font-size="11" font-weight="600" font-family="system-ui">' + dimTxt + '</text>';
+    if (z.nJug > 0 && z.cual) {
+        var fueraRango = z.eii > 300;
+        var badgeLabel = fueraRango ? 'ESPACIO AMPLIO' : z.cual.label.toUpperCase();
+        var badgeCol = fueraRango ? '#f59e0b' : z.cual.col;
+        var datos = Math.round(z.areaM2) + ' m² · ' + z.nJug + ' jug · EII ' + z.eii.toFixed(0);
+        var bw = datos.length * 6.2 + badgeLabel.length * 7 + 36;
+        var bx = rx + rw / 2 - bw / 2;
+        var by = ry + rh + 8;
+        if (by + 24 > 500) by = ry - 50;
+        out += '<rect x="' + bx + '" y="' + by + '" width="' + bw + '" height="22" rx="5" fill="rgba(15,23,42,0.9)" stroke="' + badgeCol + '" stroke-width="1.5"/>';
+        out += '<text x="' + (bx + 8) + '" y="' + (by + 15) + '" fill="#cbd5e1" font-size="10" font-family="system-ui">' + datos + '</text>';
+        var badgeW = badgeLabel.length * 7 + 14;
+        out += '<rect x="' + (bx + bw - badgeW - 5) + '" y="' + (by + 4) + '" width="' + badgeW + '" height="14" rx="3" fill="' + badgeCol + '"/>';
+        out += '<text x="' + (bx + bw - badgeW/2 - 5) + '" y="' + (by + 14) + '" text-anchor="middle" fill="#0f172a" font-size="10" font-weight="700" font-family="system-ui">' + badgeLabel + '</text>';
+    } else {
+        var l0 = Math.round(z.areaM2) + ' m² · 0 jug';
+        var bw0 = l0.length * 6.2 + 16;
+        var bx0 = rx + rw / 2 - bw0 / 2;
+        var by0 = ry + rh + 8;
+        if (by0 + 20 > 500) by0 = ry - 26;
+        out += '<rect x="' + bx0 + '" y="' + by0 + '" width="' + bw0 + '" height="18" rx="4" fill="rgba(15,23,42,0.85)"/>';
+        out += '<text x="' + (bx0 + 8) + '" y="' + (by0 + 13) + '" fill="#94a3b8" font-size="10" font-family="system-ui">' + l0 + '</text>';
+    }
+    return out;
+}
+function ejPanelParametrosSVG(s) {
+    var z = ejAnalizarZona(s);
+    if (!z.nJug) return '';
+    var cardW = 196, cardH = 172;
+    var rx = Math.min(s.x, s.x + s.w), ry = Math.min(s.y, s.y + s.h);
+    var rw = Math.abs(s.w);
+    var cx = rx + rw + 12;
+    if (cx + cardW > 795) cx = rx - cardW - 12;
+    if (cx < 5) cx = 5;
+    var cy = ry;
+    if (cy + cardH > 495) cy = 495 - cardH;
+    if (cy < 5) cy = 5;
+    var fuera = z.eii > 300;
+    var col = fuera ? '#f59e0b' : (z.cual ? z.cual.col : '#64748b');
+    var lbl = fuera ? 'ESPACIO AMPLIO' : (z.cual ? z.cual.label.toUpperCase() : '-');
+    var px = cx + 12, py = cy + 16;
+    var g = '<g style="pointer-events:none" font-family="system-ui">';
+    g += '<rect x="' + cx + '" y="' + cy + '" width="' + cardW + '" height="' + cardH + '" rx="9" fill="rgba(15,23,42,0.96)" stroke="' + col + '" stroke-width="1.5"/>';
+    g += '<text x="' + px + '" y="' + py + '" fill="#64748b" font-size="9" font-weight="700" letter-spacing="1">PARAMETROS</text>';
+    py += 26;
+    var eiiTxt = z.eii.toFixed(0);
+    g += '<text x="' + px + '" y="' + py + '" fill="#fff" font-size="26" font-weight="800">' + eiiTxt + '</text>';
+    g += '<text x="' + (px + eiiTxt.length * 16 + 6) + '" y="' + py + '" fill="#94a3b8" font-size="10">m2/jug</text>';
+    py += 18;
+    var bw = lbl.length * 6.5 + 14;
+    g += '<rect x="' + px + '" y="' + (py - 10) + '" width="' + bw + '" height="16" rx="4" fill="' + col + '"/>';
+    g += '<text x="' + (px + bw / 2) + '" y="' + (py + 1) + '" text-anchor="middle" fill="#0f172a" font-size="9.5" font-weight="700">' + lbl + '</text>';
+    py += 22;
+    g += '<text x="' + px + '" y="' + py + '" fill="#cbd5e1" font-size="9">' + Math.round(z.areaM2) + ' m2 . ' + z.nJug + ' jug . ' + z.jugEq + '/equipo</text>';
+    py += 8;
+    function fila(yy, etiqueta, nivel, c) {
+        var o = '<text x="' + px + '" y="' + (yy + 8) + '" fill="#94a3b8" font-size="9.5" font-weight="600">' + etiqueta + '</text>';
+        var bx0 = px + 34;
+        for (var i = 0; i < 4; i++) {
+            var on = nivel && i < nivel;
+            o += '<rect x="' + (bx0 + i * 16) + '" y="' + yy + '" width="13" height="9" rx="2" fill="' + (on ? c : '#1e293b') + '" stroke="' + (on ? c : '#334155') + '" stroke-width="1"/>';
+        }
+        o += '<text x="' + (bx0 + 70) + '" y="' + (yy + 8) + '" fill="' + (nivel ? c : '#475569') + '" font-size="9.5" font-weight="700">' + (nivel ? Array(nivel + 1).join('+') : '-') + '</text>';
+        return o;
+    }
+    var dem = z.demandas;
+    g += fila(py, 'ACC', dem ? dem.A : 0, '#f97316'); py += 16;
+    g += fila(py, 'FC', dem ? dem.FC : 0, '#ef4444'); py += 16;
+    g += fila(py, 'VEL', dem ? dem.V : 0, '#3b82f6'); py += 16;
+    if (fuera) g += '<text x="' + px + '" y="' + (py + 6) + '" fill="#f59e0b" font-size="8.5">Fuera de rango de juego reducido</text>';
+    g += '</g>';
+    return g;
+}
+
+function ejWavyPath(x1, y1, x2, y2, amplitude, wavelength) {
+    var dx = x2 - x1, dy = y2 - y1;
+    var len = Math.sqrt(dx*dx + dy*dy);
+    if (len < 1) return 'M' + x1 + ' ' + y1;
+    var ux = dx / len, uy = dy / len;
+    var px = -uy, py = ux;
+    var waves = Math.max(2, Math.round(len / wavelength));
+    var steps = waves * 10;
+    var d = 'M' + x1.toFixed(1) + ' ' + y1.toFixed(1);
+    for (var i = 1; i <= steps; i++) {
+        var tt = i / steps;
+        var along = tt * len;
+        var taper = tt > 0.82 ? (1 - tt) / 0.18 : 1;
+        var off = Math.sin(tt * waves * Math.PI * 2) * amplitude * taper;
+        var bx = x1 + ux * along + px * off;
+        var by = y1 + uy * along + py * off;
+        d += ' L' + bx.toFixed(1) + ' ' + by.toFixed(1);
+    }
+    return d;
+}
+
 function ejGetFieldSVG(type, color) {
-    var c1 = color, c2 = ejLightenColor(color, 12);
-    // Detectar si el fondo es claro → líneas negras
-    var r = parseInt(color.slice(1,3),16), g = parseInt(color.slice(3,5),16), b = parseInt(color.slice(5,7),16);
-    var brightness = (r * 299 + g * 587 + b * 114) / 1000;
-    var lineCol = brightness > 160 ? '#222' : '#fff';
-    var dotCol = brightness > 160 ? '#333' : '#fff';
-    if (color === '#ffffff') { c2 = '#f0f0f0'; }
+    var isGrid = (color === 'grid');
+    var c1, c2, brightness, lineCol, dotCol;
+    if (isGrid) {
+        c1 = '#fbfcfe'; c2 = '#fbfcfe';
+        brightness = 255;
+        lineCol = '#3a4a5a'; dotCol = '#3a4a5a';
+    } else {
+        c1 = color; c2 = ejLightenColor(color, 12);
+        var r = parseInt(color.slice(1,3),16), g = parseInt(color.slice(3,5),16), b = parseInt(color.slice(5,7),16);
+        brightness = (r * 299 + g * 587 + b * 114) / 1000;
+        lineCol = brightness > 160 ? '#222' : '#fff';
+        dotCol = brightness > 160 ? '#333' : '#fff';
+        if (color === '#ffffff') { c2 = '#f0f0f0'; }
+    }
     var W = 800, H = 500;
     var s = '';
-    // Fondo + franjas
+    // Degradados para dar profundidad al césped (solo campos verdes/oscuros)
+    var _depth = !isGrid && brightness <= 160;
+    if (_depth) {
+        s += '<defs>'
+            + '<linearGradient id="ejGrassShade" x1="0" y1="0" x2="0" y2="1">'
+            + '<stop offset="0%" stop-color="#ffffff" stop-opacity="0.07"/>'
+            + '<stop offset="42%" stop-color="#ffffff" stop-opacity="0"/>'
+            + '<stop offset="100%" stop-color="#000000" stop-opacity="0.14"/>'
+            + '</linearGradient>'
+            + '<radialGradient id="ejVignette" cx="50%" cy="47%" r="62%">'
+            + '<stop offset="58%" stop-color="#000000" stop-opacity="0"/>'
+            + '<stop offset="100%" stop-color="#000000" stop-opacity="0.30"/>'
+            + '</radialGradient>'
+            + '</defs>';
+    }
+    // Fondo + franjas (o cuadrícula tipo cuaderno)
     s += '<rect width="'+W+'" height="'+H+'" fill="'+c1+'"/>';
-    for (var i = 0; i < 12; i++) {
-        s += '<rect x="'+(20+i*63.3)+'" y="15" width="63" height="470" fill="'+(i%2===0?c2:c1)+'"/>';
+    if (isGrid) {
+        s += '<defs>'
+            + '<pattern id="ejGridSmall" width="24" height="24" patternUnits="userSpaceOnUse">'
+            + '<path d="M24 0 L0 0 0 24" fill="none" stroke="#d4deec" stroke-width="0.8"/>'
+            + '</pattern>'
+            + '<pattern id="ejGridBig" width="120" height="120" patternUnits="userSpaceOnUse">'
+            + '<path d="M120 0 L0 0 0 120" fill="none" stroke="#b9c8de" stroke-width="1.3"/>'
+            + '</pattern>'
+            + '</defs>';
+        s += '<rect x="20" y="15" width="760" height="470" fill="url(#ejGridSmall)"/>';
+        s += '<rect x="20" y="15" width="760" height="470" fill="url(#ejGridBig)"/>';
+    } else {
+        for (var i = 0; i < 12; i++) {
+            s += '<rect x="'+(20+i*63.3)+'" y="15" width="63" height="470" fill="'+(i%2===0?c2:c1)+'"/>';
+        }
+    }
+    // Capa de luz/sombra + viñeta sobre el césped
+    if (_depth) {
+        s += '<rect x="20" y="15" width="760" height="470" fill="url(#ejGrassShade)" pointer-events="none"/>';
+        s += '<rect x="20" y="15" width="760" height="470" fill="url(#ejVignette)" pointer-events="none"/>';
     }
     // Líneas según tipo
     var L = 'fill="none" stroke="'+lineCol+'" stroke-width="2"';
@@ -997,6 +1390,7 @@ function ejSetFieldColor(color) {
 function ejSetField(type) {
     ejP.fieldType = type;
     ejRenderSVG();
+    ejRenderToolbar();
 }
 
 function ejApplyFormation(key, isRival) {
@@ -1105,9 +1499,10 @@ function ejChangeLineColor(color) {
     ejSaveHistory();
     ejRenderSVG();
 }
-function ejCapturarParaFicha() {
+async function ejCapturarParaFicha() {
     const svgEl = document.getElementById('ej-svg');
     if (!svgEl) { ejToast('No hay pizarra para capturar', 'warning'); return; }
+    await ejPrecargarFotosJugadores();
     
     // Limpiar datos del ejercicio anterior si es pizarra libre
     const lbl = document.getElementById('ej-pizarra-nombre-label');
@@ -1141,12 +1536,36 @@ function ejCapturarParaFicha() {
     // Actualizar miniatura y vídeo en la ficha
     setTimeout(() => {
         ejActualizarFichaMedia();
+        ejAutoRellenarEIIDesdePizarra();
         const msg = document.getElementById('ej-ficha-msg');
-        if (msg) msg.innerHTML = '<span style="color:#a855f7">📸 Miniatura capturada — rellena los datos y pulsa Guardar</span>';
+        if (msg) msg.innerHTML = '<span style="color:#a855f7">📸 Miniatura y medidas capturadas — revisa los datos y pulsa Guardar</span>';
         setTimeout(() => { if (msg) msg.innerHTML = ''; }, 4000);
     }, 300);
 }
-function ejExportPNG() {
+var ejFotoCache = {};
+async function ejPrecargarFotosJugadores() {
+    var urls = [];
+    for (var i = 0; i < ejP.players.length; i++) {
+        var u = ejP.players[i].photo;
+        if (u && !ejFotoCache[u] && urls.indexOf(u) < 0) urls.push(u);
+    }
+    for (var k = 0; k < urls.length; k++) {
+        var url = urls[k];
+        try {
+            var resp = await fetch(url, { mode: 'cors' });
+            if (!resp.ok) continue;
+            var blob = await resp.blob();
+            ejFotoCache[url] = await new Promise(function(res, rej){
+                var rd = new FileReader();
+                rd.onload = function(){ res(rd.result); };
+                rd.onerror = function(){ rej(new Error('read')); };
+                rd.readAsDataURL(blob);
+            });
+        } catch(e) { /* CORS u otro problema: se queda con la URL original */ }
+    }
+}
+async function ejExportPNG() {
+    await ejPrecargarFotosJugadores();
     ejP.selectedId = null;
     ejRenderSVG();
     setTimeout(() => {
@@ -1185,6 +1604,7 @@ function ejRenderToolbar() {
     const selPlayer    = sel ? ejP.players.find(p => p.id === sel) : null;
     const selLine      = sel ? (ejP.lines.find(l => l.id === sel) || ejP.shapes.find(s => s.id === sel)) : null;
     const selEquipment = sel ? ejP.equipment.find(eq => eq.id === sel) : null;
+    const selText      = sel ? ejP.texts.find(tx => tx.id === sel) : null;
 
     // Generar swatches de color
     function colorSwatches(colorKey, solid, striped, onclickFn) {
@@ -1213,7 +1633,7 @@ function ejRenderToolbar() {
 
     function sectionHeader(id, icon, label) {
         const open = ejP.expandedSection === id;
-        return `<div class="ej-section-header${open?' open':''}" onclick="ejToggleSection('${id}')">${icon} ${label}</div>`;
+        return `<div class="ej-section-header ej-sec-${id}${open?' open':''}" onclick="ejToggleSection('${id}')">${icon} ${label}</div>`;
     }
 
     const playersOpen = ejP.expandedSection === 'players';
@@ -1221,6 +1641,11 @@ function ejRenderToolbar() {
     const actionsOpen = ejP.expandedSection === 'actions';
 
     tb.innerHTML = `
+    <!-- BOTÓN SELECCIONAR — siempre visible -->
+    <button class="ej-btn-tool${t==='select'?' active':''}" onclick="ejSetTool('select')" title="Seleccionar y mover" style="justify-content:center;font-weight:600">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M4 0L4 20L9 15H16L4 0Z"/></svg>
+        Seleccionar / Mover
+    </button>
   <!-- BOTÓN MODO ANIMACIÓN (solo visible en modo animado) -->
 ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin-bottom:6px;width:100%;padding:8px;border-radius:6px;text-align:center;color:#fff;font-size:12px;font-weight:600">
         🎬 Modo Animación ON
@@ -1230,28 +1655,23 @@ ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin
     ${sectionHeader('players','⚽','Jugadores')}
     ${playersOpen ? `
     <div class="ej-section-body">
-        <div class="ej-team-block">
-            <label class="ej-team-label blue">🔵 Mi equipo</label>
-            ${colorSwatches(ejP.myColor, true, true, 'ejSetMyColor')}
-            <label style="font-size:10px;color:#9ca3af;margin-top:4px;display:block">🧤 Portero (nº1):</label>
-            ${colorSwatches(ejP.myGkColor, true, false, 'ejSetMyGkColor')}
-            <div class="ej-formations">${formationBtns('ejApplyFormation_my')}</div>
+        <div style="display:flex;gap:6px;background:#0b1220;border:1px solid #2f405c;border-radius:8px;padding:4px">
+            <button onclick="ejP._addingRival=false;ejRenderToolbar()" style="flex:1;padding:8px;border-radius:6px;border:none;cursor:pointer;font-size:12px;font-weight:700;background:${!ejP._addingRival?'#1d4ed8':'transparent'};color:${!ejP._addingRival?'#fff':'#64748b'}">🔵 Mi equipo</button>
+            <button onclick="ejP._addingRival=true;ejRenderToolbar()" style="flex:1;padding:8px;border-radius:6px;border:none;cursor:pointer;font-size:12px;font-weight:700;background:${ejP._addingRival?'#b91c1c':'transparent'};color:${ejP._addingRival?'#fff':'#64748b'}">🔴 Rival</button>
         </div>
-        <div class="ej-team-block rival">
-            <label class="ej-team-label red">🔴 Equipo rival</label>
-            ${colorSwatches(ejP.rivalColor, true, true, 'ejSetRivalColor')}
-            <label style="font-size:10px;color:#9ca3af;margin-top:4px;display:block">🧤 Portero (nº1):</label>
-            ${colorSwatches(ejP.rivalGkColor, true, false, 'ejSetRivalGkColor')}
-            <div class="ej-formations rival">${formationBtns('ejApplyFormation_rival')}</div>
+        <button class="ej-btn-tool${t==='player'&&!ejP._plantillaMode?' active':''}" onclick="ejSetTool('player');ejP._plantillaMode=false;ejRenderToolbar()" style="justify-content:center;font-weight:600">
+            ➕ Añadir jugador ${ejP._addingRival?'(rival)':'(mi equipo)'}
+        </button>
+        <button onclick="ejCargarPlantilla()" style="width:100%;padding:11px;background:#1e3a5f;border:1px solid #2563eb;color:#93c5fd;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600">
+            👥 Cargar mi plantilla
+        </button>
+        <div>
+            <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin:2px 0 4px">Formación rápida ${ejP._addingRival?'· rival':'· mi equipo'}</div>
+            <div class="ej-formations${ejP._addingRival?' rival':''}">${formationBtns(ejP._addingRival?'ejApplyFormation_rival':'ejApplyFormation_my')}</div>
         </div>
-        <div class="ej-opts-block">
-            <label class="ej-opts-label">Opciones</label>
-            <button onclick="ejCargarPlantilla()" style="width:100%;padding:7px;background:#1e3a5f;border:1px solid #2563eb;color:#93c5fd;border-radius:6px;cursor:pointer;font-size:12px;margin-bottom:6px">
-                👥 Cargar mi plantilla
-            </button>
-            ${ejP._plantilla && ejP._plantilla.length ? `
-            <div style="margin-bottom:8px">
-                <div style="font-size:10px;color:#64748b;margin-bottom:4px;text-transform:uppercase">Mi plantilla — clic para colocar</div>
+        ${ejP._plantilla && ejP._plantilla.length ? `
+        <div style="background:#0b1220;border:1px solid #2f405c;border-radius:8px;padding:8px">
+            <div style="font-size:10px;color:#64748b;margin-bottom:4px;text-transform:uppercase">Mi plantilla — clic para colocar</div>
             <div style="display:flex;gap:4px;margin-bottom:6px">
                 ${['num','name','both'].map(opt => {
                     const lbl = opt==='num'?'Nº':opt==='name'?'Nombre':'Nº+Nombre';
@@ -1259,44 +1679,39 @@ ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin
                     return `<button onclick="ejP._plantillaLabel='${opt}';ejRenderToolbar()" style="flex:1;padding:3px;font-size:9px;border-radius:4px;border:1px solid ${active?'#3b82f6':'#334155'};background:${active?'#1e3a5f':'transparent'};color:${active?'#93c5fd':'#64748b'};cursor:pointer">${lbl}</button>`;
                 }).join('')}
             </div>
-                <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;max-height:200px;overflow-y:auto">
-                    ${ejP._plantilla.map((p, i) => {
-                        const isGk = p.position && p.position.toLowerCase().includes('portero');
-                        const col = isGk ? EJ_TEAM_COLORS[ejP.myGkColor] : EJ_TEAM_COLORS[ejP.myColor];
-                        const active = ejP._plantillaSelIdx === i;
-                        return `<div onclick="ejColocarJugadorPlantilla(${i})" title="${p.name}" style="
-                            display:flex;flex-direction:column;align-items:center;gap:2px;
-                            padding:4px 2px;border-radius:6px;cursor:pointer;
-                            background:${active?'#1e3a5f':'transparent'};
-                            border:1px solid ${active?'#3b82f6':'transparent'}">
-                            <div style="width:28px;height:28px;border-radius:50%;background:${col?.fill||'#3b82f6'};border:2px solid ${col?.stroke||'#2563eb'};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff">
-                                ${p.number}
-                            </div>
-                            <span style="font-size:8px;color:#9ca3af;text-align:center;line-height:1.1;max-width:36px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name.split(' ')[0]}</span>
-                        </div>`;
-                    }).join('')}
-                </div>
-            </div>` : ''}
-            <button class="ej-btn-tool${t==='player'&&!ejP._addingRival&&!ejP._plantillaMode?' active':''}" onclick="ejSetTool('player');ejP._addingRival=false;ejP._plantillaMode=false;ejRenderToolbar()">
-                + Jugador (mi equipo)
-            </button>
-            <button class="ej-btn-tool${t==='player'&&ejP._addingRival?' active':''}" onclick="ejSetTool('player');ejP._addingRival=true;ejRenderToolbar()" style="border-color:#ef4444">
-                + Jugador (rival)
-            </button>
-            <div class="ej-size-row">
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;max-height:220px;overflow-y:auto">
+                ${ejP._plantilla.map((p, i) => {
+                    const isGk = p.position && p.position.toLowerCase().includes('portero');
+                    const col = isGk ? EJ_TEAM_COLORS[ejP.myGkColor] : EJ_TEAM_COLORS[ejP.myColor];
+                    const active = ejP._plantillaSelIdx === i;
+                    const avatar = p.photo
+                        ? `<div style="width:30px;height:30px;border-radius:50%;background-image:url('${p.photo}');background-size:cover;background-position:center;border:2px solid ${col?.stroke||'#2563eb'}"></div>`
+                        : `<div style="width:30px;height:30px;border-radius:50%;background:${col?.fill||'#3b82f6'};border:2px solid ${col?.stroke||'#2563eb'};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff">${p.number}</div>`;
+                    return `<div onclick="ejColocarJugadorPlantilla(${i})" title="${p.name}" style="display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 2px;border-radius:6px;cursor:pointer;background:${active?'#1e3a5f':'transparent'};border:1px solid ${active?'#3b82f6':'transparent'}">${avatar}<span style="font-size:8px;color:#9ca3af;text-align:center;line-height:1.1;max-width:40px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name.split(' ')[0]}</span></div>`;
+                }).join('')}
+            </div>
+        </div>` : ''}
+        <div class="ej-section-header ej-sec-apariencia${ejP._apariencia?' open':''}" onclick="ejP._apariencia=!ejP._apariencia;ejRenderToolbar()" style="margin-top:2px">🎨 Apariencia</div>
+        ${ejP._apariencia ? `
+        <div class="ej-section-body">
+            <label style="font-size:11px;color:#9ca3af">Color ${ejP._addingRival?'rival':'mi equipo'}:</label>
+            ${colorSwatches(ejP._addingRival?ejP.rivalColor:ejP.myColor, true, true, ejP._addingRival?'ejSetRivalColor':'ejSetMyColor')}
+            <label style="font-size:11px;color:#9ca3af;margin-top:4px;display:block">🧤 Portero (nº1):</label>
+            ${colorSwatches(ejP._addingRival?ejP.rivalGkColor:ejP.myGkColor, true, false, ejP._addingRival?'ejSetRivalGkColor':'ejSetMyGkColor')}
+            <div class="ej-size-row" style="margin-top:6px">
                 <span>Tamaño nuevo:</span>
                 ${['small','medium','large'].map(s=>
                     `<button class="ej-sz${ejP.selectedSize===s?' active':''}" onclick="ejP.selectedSize='${s}';ejRenderToolbar()">${s==='small'?'S':s==='medium'?'M':'L'}</button>`
                 ).join('')}
             </div>
             <label class="ej-check"><input type="checkbox" ${ejP.showNumbers?'checked':''} onchange="ejP.showNumbers=this.checked"> Mostrar números</label>
-            <label class="ej-check"><input type="checkbox" ${ejP.hasVest?'checked':''} onchange="ejP.hasVest=this.checked"> Con peto</label>
+            <label class="ej-check"><input type="checkbox" ${ejP.hasVest?'checked':''} onchange="ejP.hasVest=this.checked;ejRenderToolbar()"> Con peto</label>
             ${ejP.hasVest ? `<div class="ej-swatches">${
                 Object.entries(EJ_TEAM_COLORS).filter(([,v])=>!v.striped).map(([k,v])=>
                     `<div class="ej-swatch${ejP.vestColor===k?' active':''}" style="background:${v.fill}" onclick="ejP.vestColor='${k}';ejRenderToolbar()"></div>`
                 ).join('')
             }</div>` : ''}
-        </div>
+        </div>` : ''}
         ${selPlayer ? `
         <div class="ej-selected-block">
             <div style="font-size:11px;color:#9ca3af;margin-bottom:4px">Jugador seleccionado</div>
@@ -1314,37 +1729,60 @@ ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin
         </div>` : ''}
     </div>` : ''}
 
-    <!-- SECCIÓN DIBUJO -->
-    ${sectionHeader('draw','✏️','Dibujo y Campos')}
-   
-         ${drawOpen ? `
+    <!-- SECCIÓN CAMPO -->
+    ${sectionHeader('campo','🏟️','Campo')}
+    ${ejP.expandedSection === 'campo' ? `
     <div class="ej-section-body">
+        <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px">Tipo de campo</div>
         <div class="ej-field-btns">
             ${['full','half','halfDown','blank'].map(f=>`<button class="ej-btn-sm${ejP.fieldType===f?' active':''}" onclick="ejSetField('${f}')">${f==='full'?'Completo':f==='half'?'Medio ↑':f==='halfDown'?'Medio ↓':'Libre'}</button>`).join('')}
         </div>
-        <div style="display:flex;gap:4px;margin-top:6px">
+        <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin:8px 0 2px">Color del césped</div>
+        <div style="display:flex;gap:4px">
             ${['#1a6b30','#1a8540','#2d8a4e','#0f4c2a','#1e3a5f','#0a1628','#2c2c2c','#ffffff'].map(c =>
                 '<div onclick="ejSetFieldColor(\''+c+'\')" style="width:22px;height:22px;border-radius:50%;background:'+c+';cursor:pointer;border:2px solid '+(ejP.fieldColor===c?(c==='#ffffff'?'#3b82f6':'#fff'):'transparent')+(c==='#ffffff'?';box-shadow:inset 0 0 0 1px #cbd5e1':'')+'"></div>'
             ).join('')}
+            <div onclick="ejSetFieldColor('grid')" title="Cuaderno cuadriculado" style="width:22px;height:22px;border-radius:50%;cursor:pointer;border:2px solid ${ejP.fieldColor==='grid'?'#3b82f6':'#cbd5e1'};background-color:#fff;background-image:linear-gradient(#c7d2e3 1px,transparent 1px),linear-gradient(90deg,#c7d2e3 1px,transparent 1px);background-size:6px 6px"></div>
         </div>
         <div style="margin-top:8px;padding-top:8px;border-top:1px solid #334155">
-            <button class="ej-btn-tool${t==='select'?' active':''}" onclick="ejSetTool('select')" title="Seleccionar">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M4 0L4 20L9 15H16L4 0Z"/></svg>
-                Seleccionar
-            </button>
+            <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#9ca3af;margin-bottom:6px">
+                <input type="checkbox" ${ejP.showEII?'checked':''} onchange="ejP.showEII=this.checked;ejRenderSVG()">
+                <span style="color:${ejP.showEII?'#22c55e':'#9ca3af'};font-weight:${ejP.showEII?'600':'400'}">📐 Análisis de zona (EII)</span>
+            </label>
+            <div style="font-size:10px;color:#64748b;margin-bottom:4px">Introduce las medidas totales de tu campo (m)</div>
+            <div style="display:flex;gap:4px;align-items:center">
+                <input type="number" min="1" value="${ejP.fieldRealW}" onchange="ejP.fieldRealW=parseFloat(this.value)||105;ejRenderSVG()" title="Largo del campo (de portería a portería)" style="width:54px;padding:4px 6px;background:#0f172a;border:1px solid #334155;color:#fff;border-radius:6px;font-size:12px;text-align:center">
+                <span style="color:#64748b;font-size:11px">largo ×</span>
+                <input type="number" min="1" value="${ejP.fieldRealH}" onchange="ejP.fieldRealH=parseFloat(this.value)||68;ejRenderSVG()" title="Ancho del campo (de banda a banda)" style="width:54px;padding:4px 6px;background:#0f172a;border:1px solid #334155;color:#fff;border-radius:6px;font-size:12px;text-align:center">
+                <span style="color:#64748b;font-size:11px">ancho m</span>
+            </div>
+            <div style="font-size:9px;color:#475569;margin-top:3px">El área se mantiene en 40,3 × 16,5 m; cambia lo que mide el resto</div>
+            <div style="display:flex;align-items:center;gap:6px;margin-top:6px">
+                <span style="font-size:10px;color:#64748b">Equipos:</span>
+                ${[1,2,3].map(function(nt){ return '<button onclick="ejP.numTeams='+nt+';ejRenderToolbar();ejRenderSVG()" style="width:26px;padding:3px;font-size:11px;border-radius:5px;border:1px solid '+((ejP.numTeams||2)===nt?'#22c55e':'#334155')+';background:'+((ejP.numTeams||2)===nt?'#0f4c2a':'transparent')+';color:'+((ejP.numTeams||2)===nt?'#22c55e':'#94a3b8')+';cursor:pointer">'+nt+'</button>'; }).join('')}
+            </div>
         </div>
-        <div class="ej-draw-tools">
+    </div>` : ''}
+
+    <!-- SECCIÓN DIBUJO -->
+    ${sectionHeader('draw','✏️','Dibujo')}
+    ${drawOpen ? `
+    <div class="ej-section-body">
+        <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px">Herramientas</div>
+        <div class="ej-equipment-grid">
             ${[
                 {k:'pencil',  ico:'✏️', lbl:'Lápiz'},
                 {k:'arrow',   ico:'➡️', lbl:'Flecha'},
                 {k:'curved',  ico:'↗️', lbl:'Curva'},
+                {k:'dribble', ico:'〰️', lbl:'Conducción'},
                 {k:'line',    ico:'➖', lbl:'Línea'},
                 {k:'rect',    ico:'⬜', lbl:'Rect.'},
                 {k:'ellipse', ico:'⭕', lbl:'Círculo'},
-                {k:'text',    ico:'T',  lbl:'Texto'},{k:'connect', ico:'🔗', lbl:'Conectar'}
-            ].map(item=>`<button class="ej-btn-tool${t===item.k?' active':''}" onclick="ejSetTool('${item.k}')">${item.ico} ${item.lbl}</button>`).join('')}
+                {k:'text',    ico:'T',  lbl:'Texto'},
+                {k:'connect', ico:'🔗', lbl:'Conectar'}
+            ].map(item=>`<button class="ej-btn-equipment${t===item.k?' active':''}" onclick="ejSetTool('${item.k}')" title="${item.lbl}"><span style="font-size:18px;line-height:1">${item.ico}</span><span>${item.lbl}</span></button>`).join('')}
         </div>
-        <div class="ej-draw-opts">
+        <div class="ej-draw-opts" style="margin-top:8px">
             <span>Grosor: <input type="range" min="1" max="10" value="${ejP.lineWidth}" oninput="ejP.lineWidth=+this.value" style="width:80px;vertical-align:middle;accent-color:#22c55e"></span>
             <label><input type="checkbox" ${ejP.lineDashed?'checked':''} onchange="ejP.lineDashed=this.checked;ejRenderToolbar()"> Discontinua</label>
         </div>
@@ -1354,14 +1792,31 @@ ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin
                 <span style="color:${ejP.shapeFill?'#22c55e':'#9ca3af'};font-weight:${ejP.shapeFill?'600':'400'}">🎨 Relleno zona</span>
             </label>
             ${ejP.shapeFill ? `<div style="display:flex;align-items:center;gap:4px;margin-top:4px"><span style="font-size:10px;color:#64748b">Tipo:</span><button onclick="ejP.shapeFillType='solid';ejRenderToolbar()" style="padding:2px 8px;font-size:10px;border-radius:4px;border:1px solid ${ejP.shapeFillType==='solid'?'#22c55e':'#334155'};background:${ejP.shapeFillType==='solid'?'#0f4c2a':'transparent'};color:${ejP.shapeFillType==='solid'?'#22c55e':'#64748b'};cursor:pointer">Sólido</button><button onclick="ejP.shapeFillType='hatched';ejRenderToolbar()" style="padding:2px 8px;font-size:10px;border-radius:4px;border:1px solid ${ejP.shapeFillType==='hatched'?'#f97316':'#334155'};background:${ejP.shapeFillType==='hatched'?'#78350f':'transparent'};color:${ejP.shapeFillType==='hatched'?'#f97316':'#64748b'};cursor:pointer">Rallado</button></div>` : ''}
-            <label style="display:none">
-            </label>
             ${ejP.shapeFill ? '<div style="display:flex;align-items:center;gap:6px;margin-top:4px"><span style="font-size:10px;color:#64748b">Opacidad:</span><input type="range" min="10" max="70" value="'+Math.round(ejP.shapeFillOpacity*100)+'" oninput="ejP.shapeFillOpacity=this.value/100;ejRenderToolbar()" style="width:80px;accent-color:#22c55e"><span style="font-size:10px;color:#94a3b8;min-width:28px">'+Math.round(ejP.shapeFillOpacity*100)+'%</span></div>' : ''}
         </div>
-        <label style="font-size:11px;color:#9ca3af">Color de línea:</label>
+        <label style="font-size:11px;color:#9ca3af;margin-top:4px">Color de línea:</label>
         <div class="ej-line-colors">
             ${EJ_LINE_COLORS.map(c=>`<div class="ej-lcolor${ejP.lineColor===c.c?' active':''}" style="background:${c.c}" title="${c.n}" onclick="ejP.lineColor='${c.c}';ejRenderToolbar()"></div>`).join('')}
         </div>
+        ${selText ? `
+        <div style="margin-top:8px;padding-top:8px;border-top:1px solid #334155;background:#0b1220;border:1px solid #2f405c;border-radius:8px;padding:8px">
+            <div style="font-size:11px;color:#9ca3af;margin-bottom:6px">📝 Texto seleccionado</div>
+            <button onclick="ejEditarTexto()" style="width:100%;padding:7px;margin-bottom:8px;background:#1e3a5f;border:1px solid #2563eb;color:#93c5fd;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">✏️ Editar texto</button>
+            <label style="font-size:11px;color:#9ca3af;display:block;margin-bottom:3px">Tipo de letra:</label>
+            <select onchange="ejChangeTextFont(this.value)" style="width:100%;padding:5px 6px;margin-bottom:8px;background:#0f172a;border:1px solid #334155;color:#fff;border-radius:6px;font-size:12px;cursor:pointer">
+                ${[['system-ui, sans-serif','Moderna'],['Georgia, serif','Clásica'],["'Arial Black', Impact, sans-serif",'Titular'],["'Trebuchet MS', sans-serif",'Redondeada'],["'Courier New', monospace",'Máquina']].map(function(o){ var cur=(selText.font||'system-ui, sans-serif')===o[0]; return '<option value="'+o[0]+'"'+(cur?' selected':'')+' style="font-family:'+o[0]+'">'+o[1]+'</option>'; }).join('')}
+            </select>
+            <div class="ej-size-row" style="margin-bottom:6px">
+                <span style="font-size:11px;color:#9ca3af">Tamaño:</span>
+                ${[['S',14],['M',18],['L',26],['XL',36]].map(function(o){ return '<button class="ej-sz'+(((selText.size||18)===o[1])?' active':'')+'" onclick="ejChangeTextSize('+o[1]+')">'+o[0]+'</button>'; }).join('')}
+            </div>
+            <label class="ej-check"><input type="checkbox" ${selText.bold?'checked':''} onchange="ejToggleTextBold(this.checked)"> Negrita</label>
+            <label class="ej-check"><input type="checkbox" ${selText.bg?'checked':''} onchange="ejToggleTextBg(this.checked)"> Recuadro de fondo</label>
+            <label style="font-size:11px;color:#9ca3af;margin-top:4px;display:block">Color del texto:</label>
+            <div class="ej-line-colors">
+                ${EJ_LINE_COLORS.map(function(c){ return '<div class="ej-lcolor'+((selText.color===c.c)?' active':'')+'" style="background:'+c.c+'" title="'+c.n+'" onclick="ejChangeTextColor(\''+c.c+'\')"></div>'; }).join('')}
+            </div>
+        </div>` : ''}
         <div class="ej-actions-row" style="margin-top:8px;padding-top:8px;border-top:1px solid #334155">
             <button class="ej-act-btn undo" onclick="ejUndo()" title="Deshacer (Ctrl+Z)">↩ Deshacer</button>
             <button class="ej-act-btn redo" onclick="ejRedo()" title="Rehacer (Ctrl+Y)">↪ Rehacer</button>
@@ -1408,6 +1863,50 @@ ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin
     `;
 }
 
+function ejSvgDblClick(e) {
+    var el = e.target.closest ? e.target.closest('[data-type="text"]') : null;
+    if (!el) return;
+    ejEditarTexto(parseInt(el.dataset.id));
+}
+function ejEditarTexto(id) {
+    var tid = id != null ? id : ejP.selectedId;
+    var t = ejP.texts.find(function(x){ return x.id === tid; });
+    if (!t) return;
+    ejPrompt('Editar texto:', t.text, function(nuevo) {
+        if (nuevo != null) {
+            ejSaveHistory();
+            t.text = nuevo;
+            ejP.selectedId = tid;
+            ejRenderSVG();
+            ejRenderToolbar();
+        }
+    });
+}
+function ejChangeTextColor(color) {
+    if (!ejP.selectedId) return;
+    ejP.texts = ejP.texts.map(function(t){ return t.id === ejP.selectedId ? Object.assign({}, t, { color: color }) : t; });
+    ejSaveHistory(); ejRenderSVG(); ejRenderToolbar();
+}
+function ejChangeTextSize(size) {
+    if (!ejP.selectedId) return;
+    ejP.texts = ejP.texts.map(function(t){ return t.id === ejP.selectedId ? Object.assign({}, t, { size: size }) : t; });
+    ejSaveHistory(); ejRenderSVG(); ejRenderToolbar();
+}
+function ejChangeTextFont(font) {
+    if (!ejP.selectedId) return;
+    ejP.texts = ejP.texts.map(function(t){ return t.id === ejP.selectedId ? Object.assign({}, t, { font: font }) : t; });
+    ejSaveHistory(); ejRenderSVG(); ejRenderToolbar();
+}
+function ejToggleTextBold(b) {
+    if (!ejP.selectedId) return;
+    ejP.texts = ejP.texts.map(function(t){ return t.id === ejP.selectedId ? Object.assign({}, t, { bold: b }) : t; });
+    ejSaveHistory(); ejRenderSVG(); ejRenderToolbar();
+}
+function ejToggleTextBg(b) {
+    if (!ejP.selectedId) return;
+    ejP.texts = ejP.texts.map(function(t){ return t.id === ejP.selectedId ? Object.assign({}, t, { bg: b }) : t; });
+    ejSaveHistory(); ejRenderSVG(); ejRenderToolbar();
+}
 function ejToggleSection(id) {
     ejP.expandedSection = ejP.expandedSection === id ? '' : id;
     ejRenderToolbar();
@@ -1468,6 +1967,7 @@ root.innerHTML = `
     svg.addEventListener('pointermove', ejSvgPointerMove);
     svg.addEventListener('pointerup',   ejSvgPointerUp);
     svg.addEventListener('pointerleave', ejSvgPointerUp);
+    svg.addEventListener('dblclick', ejSvgDblClick);
 
     // Teclas
 // Empezar con todo colapsado
@@ -1908,6 +2408,25 @@ function ejGenerarPDF(nombre) {
     }
 
     // ======================================================
+    // ANALISIS JUEGOS REDUCIDOS (cualidad + demandas)
+    // ======================================================
+    var analisisTxt = ejTextoAnalisisEII(a, l, j);
+    if (analisisTxt) {
+        analisisTxt = analisisTxt.replace(/ · /g, '   |   ');
+        doc.setFillColor(...tableBg);
+        doc.roundedRect(mL, y, contentW, 10, 2, 2, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(7);
+        doc.setTextColor(...gray);
+        doc.text('ANALISIS JUEGOS REDUCIDOS', mL + 4, y + 4);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9);
+        doc.setTextColor(...black);
+        doc.text(analisisTxt, mL + 4, y + 8);
+        y += 13;
+    }
+
+    // ======================================================
     // SECCIONES DE TEXTO
     // ======================================================
     var sections = [
@@ -2076,6 +2595,45 @@ async function ejEliminarEjercicio() {
     }
     });
 }
+function ejAutoRellenarEIIDesdePizarra() {
+    // Coge el rectángulo con más jugadores dentro (la zona de análisis principal)
+    var mejor = null, maxJug = 0;
+    for (var i = 0; i < ejP.shapes.length; i++) {
+        var s = ejP.shapes[i];
+        if (s.type !== 'rect') continue;
+        var z = ejAnalizarZona(s);
+        if (z.nJug > maxJug) { maxJug = z.nJug; mejor = z; }
+    }
+    if (!mejor || maxJug === 0) return;
+    var anchoEl = document.getElementById('ej-ancho');
+    var largoEl = document.getElementById('ej-largo');
+    var jugEl = document.getElementById('ej-jugadores');
+    // Solo rellena lo que esté vacío, para no pisar lo que el entrenador haya escrito
+    if (anchoEl && !anchoEl.value) anchoEl.value = mejor.anchoM.toFixed(1);
+    if (largoEl && !largoEl.value) largoEl.value = mejor.largoM.toFixed(1);
+    if (jugEl && !jugEl.value) jugEl.value = mejor.nJug;
+    ejCalcEII();
+}
+function ejTextoAnalisisEII(a, l, j) {
+    if (!a || !l || !j) return '';
+    var eiiNum = (a * l) / j;
+    var nEq = ejP.numTeams || 2;
+    var jugEq = Math.round(j / nEq);
+    var fuera = eiiNum > 300;
+    var cual = ejCualidadEII(eiiNum, jugEq);
+    var dem = ejDemandas(eiiNum, jugEq);
+    var lbl = fuera ? 'Espacio amplio' : (cual ? cual.label : '');
+    var partes = [];
+    if (lbl) partes.push(lbl);
+    if (dem) {
+        partes.push('ACC ' + Array(dem.A + 1).join('+'));
+        partes.push('FC ' + Array(dem.FC + 1).join('+'));
+        partes.push('VEL ' + Array(dem.V + 1).join('+'));
+    } else {
+        partes.push('Fuera de rango de juego reducido');
+    }
+    return partes.join(' · ');
+}
 function ejCalcEII() {
     const a = parseFloat(document.getElementById('ej-ancho')?.value);
     const l = parseFloat(document.getElementById('ej-largo')?.value);
@@ -2083,10 +2641,27 @@ function ejCalcEII() {
     const el = document.getElementById('ej-eii-display');
     if (!el) return;
     if (a && l && j) {
-        const eii = ((a * l) / j).toFixed(1);
-        el.textContent = `EII: ${eii} m²/jug`;
+        var eiiNum = (a * l) / j;
+        var nEq = ejP.numTeams || 2;
+        var jugEq = Math.round(j / nEq);
+        var fuera = eiiNum > 300;
+        var cual = ejCualidadEII(eiiNum, jugEq);
+        var dem = ejDemandas(eiiNum, jugEq);
+        var col = fuera ? '#f59e0b' : (cual ? cual.col : '#9ca3af');
+        var lbl = fuera ? 'ESPACIO AMPLIO' : (cual ? cual.label.toUpperCase() : '');
+        var out = '<span style="color:#e2e8f0;font-weight:700">' + eiiNum.toFixed(1) + '</span> <span style="color:#64748b;font-size:11px">m²/jug</span>';
+        if (lbl) out += ' <span style="background:' + col + ';color:#0f172a;font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px">' + lbl + '</span>';
+        if (dem) {
+            out += '<div style="font-size:10px;color:#94a3b8;margin-top:3px">'
+                + 'ACC <span style="color:#f97316;font-weight:700">' + Array(dem.A + 1).join('+') + '</span> · '
+                + 'FC <span style="color:#ef4444;font-weight:700">' + Array(dem.FC + 1).join('+') + '</span> · '
+                + 'VEL <span style="color:#3b82f6;font-weight:700">' + Array(dem.V + 1).join('+') + '</span></div>';
+        } else {
+            out += '<div style="font-size:10px;color:#f59e0b;margin-top:3px">Fuera de rango de juego reducido</div>';
+        }
+        el.innerHTML = out;
     } else {
-        el.textContent = '';
+        el.innerHTML = '';
     }
 }
 async function ejSubirThumbnail(ejercicioId) {
@@ -2215,6 +2790,7 @@ let thumbnailSvg = window.ejThumbnailPendiente || null;
         coach_notes: document.getElementById('ej-notas')?.value || null,
         field_width:  a, field_length: l, field_area: (a && l ? a*l : null),
         eii,
+        eii_analysis: ejTextoAnalisisEII(a, l, j),
         materials:   document.getElementById('ej-material')?.value || null,
         tema:        document.getElementById('ej-tema')?.value || null,
         num_goalkeepers: parseInt(document.getElementById('ej-porteros')?.value) || null,
@@ -3144,7 +3720,7 @@ async function ejCargarPlantilla() {
         // Cargar jugadores de la temporada
         const { data, error } = await supabaseClient
             .from('season_players')
-            .select('shirt_number, player_id, players(name, position)')
+            .select('shirt_number, player_id, players(name, position, photo_url)')
             .eq('season_id', seasonIdActual)
             .order('shirt_number', { ascending: true });
 
@@ -3153,7 +3729,8 @@ async function ejCargarPlantilla() {
             playerId: sp.player_id,
             number: sp.shirt_number,
             name: sp.players?.name || '?',
-            position: sp.players?.position || ''
+            position: sp.players?.position || '',
+            photo: sp.players?.photo_url || null
         }));
         ejRenderToolbar();
     } catch(err) {
@@ -3241,6 +3818,8 @@ async function ejExportarAnimacionMP4() {
         ejToast('Guarda el ejercicio primero desde la Ficha antes de exportar vídeo.', 'warning');
         return;
     }
+
+    await ejPrecargarFotosJugadores();
 
     const msg = document.getElementById('ej-anim-msg');
     ejP._exportingVideo = true; ejRenderTimeline();
