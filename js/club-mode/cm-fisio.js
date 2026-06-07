@@ -13,6 +13,11 @@ var cmFisioTecnicasCatalog = [];
 var cmFisioCatalogosReady = false;
 
 // ========== FILTROS ==========
+// Obedecer al selector global de la cabecera (Opcion A)
+document.addEventListener('cmTeamChanged', function() {
+    cmFisioFiltroEquipo = (typeof cmState !== 'undefined' && cmState.equipoSeleccionado) ? cmState.equipoSeleccionado.id : 'all';
+    if (document.getElementById('cmfisio-player-grid')) cmFisioCargarJugadores();
+});
 var cmFisioFiltroEquipo = 'all';
 var cmFisioFiltroEstado = 'all';
 var cmFisioJugadoresData = [];
@@ -176,10 +181,6 @@ function cmFisioRenderPanel(container) {
                 '<button class="cmfisio-btn cmfisio-btn-secondary cmfisio-btn-sm" id="cmfisio-btn-calendario" onclick="if(typeof cmFisioCalToggleVista===\'function\')cmFisioCalToggleVista()">Calendario</button>' +
                 '<button class="cmfisio-btn cmfisio-btn-primary cmfisio-btn-sm" onclick="cmFisioGenerarInformeDiario()">Informe diario</button>' +
             '</div>' +
-            '<div class="cmfisio-filtro-bar">' +
-                '<label>Equipo:</label>' +
-                '<select id="cmfisio-filtro-equipo" onchange="cmFisioFiltrarEquipo(this.value)"><option value="all">Todos los equipos</option></select>' +
-            '</div>' +
         '</div>' +
         '<div class="cmfisio-stats-bar" id="cmfisio-stats-bar">' +
             '<div class="cmfisio-stat total active-filter" onclick="cmFisioFiltrarEstado(\'all\',this)"><div class="num" id="cmfisio-stat-total">-</div><div class="label">Plantilla</div></div>' +
@@ -313,13 +314,14 @@ function cmFisioRenderJugadores() {
     var grid = document.getElementById('cmfisio-player-grid');
     if (!grid) return;
 
-    var filtrados = cmFisioJugadoresData.filter(function(j) {
+    var visibles = (typeof cmJugadorVisible === 'function') ? cmFisioJugadoresData.filter(function(j) { return cmJugadorVisible(j.teamIds); }) : cmFisioJugadoresData;
+    var filtrados = visibles.filter(function(j) {
         if (cmFisioFiltroEquipo !== 'all' && j.teamIds.indexOf(cmFisioFiltroEquipo) === -1) return false;
         if (cmFisioFiltroEstado !== 'all' && j.avail !== cmFisioFiltroEstado) return false;
         return true;
     });
 
-    var datosEquipo = cmFisioJugadoresData.filter(function(j) {
+    var datosEquipo = visibles.filter(function(j) {
         if (cmFisioFiltroEquipo !== 'all' && j.teamIds.indexOf(cmFisioFiltroEquipo) === -1) return false;
         return true;
     });
@@ -897,19 +899,19 @@ async function cmFisioEnviarInforme() {
 }
 
 
-// ========== AUTO-MONTAJE ==========
+/// ========== AUTO-MONTAJE ==========
 (function cmFisioAutoMontar() {
     var intentos = 0;
     var intervalo = setInterval(function() {
         intentos++;
-        if (intentos > 20) { clearInterval(intervalo); return; }
+        if (intentos > 40) { clearInterval(intervalo); return; }
         if (typeof cmState === 'undefined' || !cmState.activo) return;
-        if (!cmPuedeVer('modulo_fisio')) { clearInterval(intervalo); return; }
-        clearInterval(intervalo);
-
-        if (document.getElementById('cm-tab-fisio')) return;
+        if (typeof cmPuedeVer !== 'function' || !cmPuedeVer('modulo_fisio')) return;
+        if (document.getElementById('cm-tab-fisio')) { clearInterval(intervalo); return; }
         var mainTabs = document.querySelector('.main-tabs');
         if (!mainTabs) return;
+
+        clearInterval(intervalo);
 
         var tab = document.createElement('button');
         tab.className = 'main-tab';
@@ -929,19 +931,12 @@ async function cmFisioEnviarInforme() {
 
         if (typeof registrarModulo === 'function') { registrarModulo('fisio', function() { cmFisioInit('modulo-fisio'); }); }
 
-        // Si habia pantalla "en desarrollo", ocultarla
         var pd = document.getElementById('cm-pantalla-desarrollo');
-        if (pd) {
-            pd.style.display = 'none';
-            var mt = document.querySelector('.main-tabs');
-            if (mt) mt.style.display = '';
-            document.querySelectorAll('.vista-modulo').forEach(function(v) { v.style.display = ''; });
-        }
+        if (pd) { pd.style.display = 'none'; var mt = document.querySelector('.main-tabs'); if (mt) mt.style.display = ''; document.querySelectorAll('.vista-modulo').forEach(function(v) { v.style.display = ''; }); }
 
-        // Si es la unica pestana visible, activarla
         var tv = Array.from(document.querySelectorAll('.main-tab')).filter(function(t) { return t.style.display !== 'none'; });
         if (tv.length === 1 && tv[0].id === 'cm-tab-fisio') { cambiarModulo('fisio', tab); }
 
         console.log('[Panel Fisio] Auto-montado y registrado');
-    }, 500);
+    }, 300);
 })();

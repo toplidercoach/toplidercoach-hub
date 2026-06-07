@@ -15,6 +15,11 @@ var cmMedBodyZones = [];
 var cmMedCatalogosReady = false;
 
 // ========== FILTROS ==========
+// Obedecer al selector global de la cabecera (Opcion A)
+document.addEventListener('cmTeamChanged', function() {
+    cmMedFiltroEquipo = (typeof cmState !== 'undefined' && cmState.equipoSeleccionado) ? cmState.equipoSeleccionado.id : 'all';
+    if (document.getElementById('cmmed-player-grid')) cmMedCargarJugadores();
+});
 var cmMedFiltroEquipo = 'all';
 var cmMedFiltroEstado = 'all';
 var cmMedJugadoresData = [];
@@ -145,10 +150,6 @@ function cmMedRenderPanel(container) {
                 '<button class="cmmed-btn cmmed-btn-primary cmmed-btn-sm" id="cmmed-btn-jugadores" onclick="cmMedVistaJugadores()" style="opacity:0.5">Jugadores</button>' +
                 '<button class="cmmed-btn cmmed-btn-secondary cmmed-btn-sm" id="cmmed-btn-dashboard" onclick="cmMedVistaDashboard()">Dashboard</button>' +
             '</div>' +
-            '<div class="cmmed-filtro-bar">' +
-                '<label>Equipo:</label>' +
-                '<select id="cmmed-filtro-equipo" onchange="cmMedFiltrarEquipo(this.value)"><option value="all">Todos los equipos</option></select>' +
-            '</div>' +
         '</div>' +
         '<div class="cmmed-stats-bar" id="cmmed-stats-bar">' +
             '<div class="cmmed-stat total active-filter" onclick="cmMedFiltrarEstado(\'all\',this)"><div class="num" id="cmmed-stat-total">-</div><div class="label">Plantilla</div></div>' +
@@ -172,15 +173,17 @@ async function cmMedCargarJugadores() {
     if (!grid) return;
 
     try {
-        // 1. Cargar equipos del club
-        var teamsRes = await supabaseClient.from('club_teams').select('id, name, category').eq('club_id', clubId).eq('active', true).order('category').order('name');
-        cmMedEquipos = teamsRes.data || [];
+        // 1. Equipos VISIBLES para este miembro (respeta permisos del club)
+        cmMedEquipos = (typeof cmEquiposVisibles === 'function') ? cmEquiposVisibles() : [];
+        // Fallback (sin Club Mode): cargar todos
+        if (cmMedEquipos.length === 0 && (typeof cmEsClubMode !== 'function' || !cmEsClubMode())) {
+            var teamsRes = await supabaseClient.from('club_teams').select('id, name, category').eq('club_id', clubId).eq('active', true).order('category').order('name');
+            cmMedEquipos = teamsRes.data || [];
+        }
 
-        // Mapa team_id -> nombre del equipo
         var teamNames = {};
         cmMedEquipos.forEach(function(t) { teamNames[t.id] = t.name; });
 
-        // Poblar filtro de equipos
         var selectEquipo = document.getElementById('cmmed-filtro-equipo');
         if (selectEquipo) {
             var optsHtml = '<option value="all">Todos los equipos (' + cmMedEquipos.length + ')</option>';
@@ -193,7 +196,7 @@ async function cmMedCargarJugadores() {
             if (cmMedFiltroEquipo !== 'all') selectEquipo.value = cmMedFiltroEquipo;
         }
 
-        // 2. Cargar jugadores del club (club_players es la tabla canonica de Club Mode)
+        // 2. Jugadores del club
         var cpRes = await supabaseClient.from('club_players')
             .select('id, name, first_name, last_name, positions_main, photo_url')
             .eq('club_id', clubId).eq('active', true);
@@ -204,13 +207,12 @@ async function cmMedCargarJugadores() {
             return;
         }
 
-        // 3. Cargar asignaciones de equipo/dorsal (club_player_seasons)
+        // 3. Asignaciones de equipo/dorsal
         var cpsRes = await supabaseClient.from('club_player_seasons')
             .select('player_id, team_id, shirt_number')
             .eq('club_id', clubId).eq('active', true);
         var cpsData = cpsRes.data || [];
 
-        // Mapa player_id -> [{teamId, dorsal}]
         var seasonMap = {};
         cpsData.forEach(function(cps) {
             if (!seasonMap[cps.player_id]) seasonMap[cps.player_id] = [];
@@ -263,6 +265,11 @@ async function cmMedCargarJugadores() {
                 activeInjuryZone: injuries.length > 0 && injuries[0].cm_med_body_zones ? injuries[0].cm_med_body_zones.zone_name_es : null
             });
         });
+
+        // 7. Limitar a jugadores de equipos visibles para este miembro
+        if (typeof cmJugadorVisible === 'function') {
+            cmMedJugadoresData = cmMedJugadoresData.filter(function(j) { return cmJugadorVisible(j.teamIds); });
+        }
 
         cmMedRenderJugadores();
         cmMedComprobarCertificados();
@@ -1942,14 +1949,19 @@ async function cmMedNotificar(type, title, message, playerName, relatedType, rel
     var intentos = 0;
     var intervalo = setInterval(function() {
         intentos++;
-        if (intentos > 20) { clearInterval(intervalo); return; }
+        if (intentos > 40) { clearInterval(intervalo); return; }
+        // Esperar a que el club este activo
         if (typeof cmState === 'undefined' || !cmState.activo) return;
-        if (!cmPuedeVer('modulo_medico')) { clearInterval(intervalo); return; }
-        clearInterval(intervalo);
-
-        if (document.getElementById('cm-tab-medico')) return;
+        // Esperar a tener permiso. NO matamos el intervalo: los permisos pueden tardar un tick.
+        if (typeof cmPuedeVer !== 'function' || !cmPuedeVer('modulo_medico')) return;
+        // Si la pestana ya existe, hemos terminado
+        if (document.getElementById('cm-tab-medico')) { clearInterval(intervalo); return; }
+        // Esperar a que exista la barra de pestanas
         var mainTabs = document.querySelector('.main-tabs');
         if (!mainTabs) return;
+
+        // --- A partir de aqui montamos de verdad: ahora si paramos el intervalo ---
+        clearInterval(intervalo);
 
         var tab = document.createElement('button');
         tab.className = 'main-tab';
@@ -1976,5 +1988,5 @@ async function cmMedNotificar(type, title, message, playerName, relatedType, rel
         if (tv.length === 1 && tv[0].id === 'cm-tab-medico') { cambiarModulo('medico', tab); }
 
         console.log('[Panel Medico] Auto-montado y registrado');
-    }, 500);
+    }, 300);
 })();

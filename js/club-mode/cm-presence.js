@@ -236,7 +236,7 @@ function cmPresRenderUser(u) {
 
     var esYo = usuario && u.wp_user_id === usuario.id;
     var nombreDisplay = u.display_name + (esYo ? ' (tu)' : '');
-    var clickChat = esYo ? '' : ' onclick="cmPresCerrarPanel();cmChatIniciar(' + u.wp_user_id + ',\'' + u.display_name.replace(/'/g, "\\'") + '\',\'' + (u.role_name || '').replace(/'/g, "\\'") + '\')" style="cursor:pointer" title="Enviar mensaje"';
+    var clickChat = esYo ? '' : ' onclick="cmPresCerrarPanel();cmChatIniciar(\'' + u.wp_user_id + '\',\'' + u.display_name.replace(/'/g, "\\'") + '\',\'' + (u.role_name || '').replace(/'/g, "\\'") + '\')" style="cursor:pointer" title="Enviar mensaje"';
 
     return '<div class="cm-pres-user"' + clickChat + '>' +
         '<div class="cm-pres-avatar">' + initials + '</div>' +

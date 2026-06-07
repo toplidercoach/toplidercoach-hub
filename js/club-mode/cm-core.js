@@ -106,7 +106,7 @@ async function cmInit() {
             .from('club_members')
             .select('*, club_roles(*)')
             .eq('club_id', clubId)
-            .eq('wp_user_id', usuario.id)
+            .eq((window.cmAuthSource === 'supabase' && usuario.authUid) ? 'auth_user_id' : 'wp_user_id', (window.cmAuthSource === 'supabase' && usuario.authUid) ? usuario.authUid : usuario.id)
             .eq('active', true)
             .maybeSingle();
 
@@ -147,7 +147,7 @@ async function cmInit() {
             if (ultimo) {
                 encontrado = cmState.equiposAcceso.find(function(e) { return e.id === ultimo; });
             }
-            cmState.equipoSeleccionado = encontrado || cmState.equiposAcceso[0];
+            cmState.equipoSeleccionado = encontrado || null;
         }
 
         // 6. Montar el selector de equipo en el header
@@ -177,14 +177,12 @@ async function cmCargarEquipos() {
 function cmMontarSelector() {
     if (!cmState.activo || cmState.equiposAcceso.length === 0) return;
 
-    // Buscar contenedor en el header del HUB
     var headerClub = document.getElementById('club-badge');
     if (!headerClub) {
         console.log('[Club Mode] Selector de equipo: contenedor no encontrado, se omite');
         return;
     }
 
-    // Crear el contenedor del selector si no existe
     var container = document.getElementById('cm-team-selector');
     if (!container) {
         container = document.createElement('div');
@@ -193,8 +191,9 @@ function cmMontarSelector() {
         headerClub.parentNode.insertBefore(container, headerClub.nextSibling);
     }
 
-    // Generar opciones del selector
-    var opciones = cmState.equiposAcceso.map(function(e) {
+    var sinSel = cmState.equipoSeleccionado ? '' : ' selected';
+    var opciones = '<option value="__all__"' + sinSel + '>Todos mis equipos (' + cmState.equiposAcceso.length + ')</option>';
+    opciones += cmState.equiposAcceso.map(function(e) {
         var selected = cmState.equipoSeleccionado && cmState.equipoSeleccionado.id === e.id ? ' selected' : '';
         var cat = e.category ? ' (' + e.category + ')' : '';
         return '<option value="' + e.id + '"' + selected + '>' + e.name + cat + '</option>';
@@ -208,21 +207,20 @@ function cmMontarSelector() {
 
 // ========== CAMBIAR EQUIPO SELECCIONADO ==========
 function cmSeleccionarEquipo(teamId) {
+    if (teamId === '__all__') {
+        cmState.equipoSeleccionado = null;
+        localStorage.setItem('cm_team_selected', '__all__');
+        document.dispatchEvent(new CustomEvent('cmTeamChanged', { detail: null }));
+        return;
+    }
     var equipo = cmState.equiposAcceso.find(function(e) { return e.id === teamId; });
     if (!equipo) return;
-
     cmState.equipoSeleccionado = equipo;
     localStorage.setItem('cm_team_selected', teamId);
-
     console.log('[Club Mode] Equipo seleccionado: ' + equipo.name);
-
-    if (typeof window.onClubTeamChange === 'function') {
-        window.onClubTeamChange(equipo);
-    }
-
+    if (typeof window.onClubTeamChange === 'function') window.onClubTeamChange(equipo);
     document.dispatchEvent(new CustomEvent('cmTeamChanged', { detail: equipo }));
 }
-
 // ========== SISTEMA DE PERMISOS ==========
 
 // Comprueba si el usuario puede VER un modulo
@@ -247,6 +245,20 @@ function cmPuedeVerEquipo(teamId) {
     if (cmState.esAdmin || cmState.teamScope === 'all') return true;
     return cmState.equiposAcceso.some(function(e) { return e.id === teamId; });
 }
+// ===== EQUIPOS / JUGADORES VISIBLES (compartido por todos los modulos) =====
+// Equipos que el miembro puede ver (respeta su alcance: 'all' o asignados).
+function cmEquiposVisibles() {
+    return cmState.activo ? cmState.equiposAcceso.slice() : [];
+}
+// True si un jugador (por sus team ids) es visible para el miembro actual.
+function cmJugadorVisible(teamIds) {
+    if (!cmState.activo) return true;
+    if (cmState.esAdmin || cmState.teamScope === 'all') return true;
+    if (!teamIds || teamIds.length === 0) return false;
+    return teamIds.some(function(id) {
+        return cmState.equiposAcceso.some(function(e) { return e.id === id; });
+    });
+}
 
 // ========== APLICAR PERMISOS A LA UI DEL HUB ==========
 function cmAplicarPermisos() {
@@ -260,7 +272,7 @@ function cmAplicarPermisos() {
         'pizarra':       'pizarra',
         'matchstats':    'matchstats',
         'asistencia':    'asistencia',
-        'miclub':        'configuracion_club',    // Mi Club HUB -> Configuracion del club
+        'config':        'configuracion_club',    // Mi Club HUB -> Configuracion del club
         'periodizacion': 'periodizacion',
         'analisis':      'analisis_postpartido',
         'plan_partido':  'matchstats',            // Plan partido es parte del flujo MatchStats
@@ -275,6 +287,20 @@ function cmAplicarPermisos() {
     };
 
     // Ocultar tabs de modulos sin permiso de ver
+    // Ocultar Dashboard y TactiClip a roles que no son de campo
+    if (!cmState.esAdmin) {
+        var CM_CAMPO_KEYS = ['entrenamientos','pizarra','asistencia','matchstats','periodizacion','analisis_postpartido','cuerpo_tecnico_ia'];
+        var cmEsRolCampo = CM_CAMPO_KEYS.some(function(k) { return cmPuedeVer(k); });
+        if (!cmEsRolCampo) {
+            document.querySelectorAll('.main-tab').forEach(function(td) {
+                var ocd = td.getAttribute('onclick') || '';
+                if (/cambiarModulo\('dashboard'/.test(ocd) || /abrirPromoTactiClip/.test(ocd)) {
+                    td.style.setProperty('display', 'none', 'important');
+                }
+            });
+        }
+    }
+
     var tabs = document.querySelectorAll('.main-tab');
     tabs.forEach(function(tab) {
         var onclick = tab.getAttribute('onclick') || '';
@@ -284,7 +310,7 @@ function cmAplicarPermisos() {
             var moduloPerm = MAPEO_HUB_PERMISOS[moduloHUB];
             // Si la clave es null (no controlado) o el usuario tiene permiso, dejar visible
             if (moduloPerm && !cmPuedeVer(moduloPerm)) {
-                tab.style.display = 'none';
+                tab.style.setProperty('display', 'none', 'important');
             }
         }
     });

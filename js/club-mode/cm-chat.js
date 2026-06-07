@@ -191,7 +191,7 @@ async function cmChatMostrarLista() {
         var preview = c.lastMessage.length > 35 ? c.lastMessage.substring(0, 35) + '...' : c.lastMessage;
 
         html +=
-            '<div class="cm-chat-conv' + (c.unread > 0 ? ' has-unread' : '') + '" onclick="cmChatIniciar(' + c.userId + ',\'' + c.name.replace(/'/g, "\\'") + '\',\'\')">' +
+            '<div class="cm-chat-conv' + (c.unread > 0 ? ' has-unread' : '') + '" onclick="cmChatIniciar(\'' + c.userId + '\',\'' + c.name.replace(/'/g, "\\'") + '\',\'\')">' +
                 '<div class="cm-chat-conv-avatar">' + initials.toUpperCase() + '</div>' +
                 '<div class="cm-chat-conv-info">' +
                     '<div class="cm-chat-conv-name">' + c.name + '</div>' +

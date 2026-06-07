@@ -69,45 +69,140 @@ function registrarInit(callback) {
 }
 
 // ========== AUTENTICACIÓN ==========
+// Dos caminos independientes:
+//   1) WordPress  -> entrenador autonomo (Plan Entrenador). SIN CAMBIOS, va primero.
+//   2) Supabase   -> miembro de club (Plan Club). Solo si WordPress no reconoce al usuario.
 async function login() {
     const username = document.getElementById('username').value;
     const password = document.getElementById('password').value;
     const errorDiv = document.getElementById('login-error');
-    
+
     if (!username || !password) {
         errorDiv.textContent = 'Por favor, introduce usuario y contrasena';
         errorDiv.style.display = 'block';
         return;
     }
-    
+
+    // ===== 1) WordPress (entrenador autonomo) — flujo original intacto =====
+    let wpMessage = null;
     try {
         const response = await fetch(API_BASE + '/auth', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username, password })
         });
-        
+
         const data = await response.json();
-        
+
         if (data.success) {
             usuario = data.user;
             token = data.token;
+            window.cmAuthSource = 'wp';
             localStorage.setItem('hub_user', JSON.stringify(usuario));
             localStorage.setItem('hub_token', token);
+            localStorage.removeItem('cm_auth');
             mostrarApp();
+            return;
         } else {
-            errorDiv.textContent = data.message || 'Error de autenticacion';
-            errorDiv.style.display = 'block';
+            wpMessage = data.message || null;
         }
     } catch (error) {
-        errorDiv.textContent = 'Error de conexion';
-        errorDiv.style.display = 'block';
+        // Sin conexion con WordPress: seguimos probando el camino de club
+    }
+
+    // ===== 2) Supabase Auth (miembro de club) =====
+    try {
+        const { data: sb, error } = await supabaseClient.auth.signInWithPassword({
+            email: username,
+            password: password
+        });
+
+        if (!error && sb && sb.user) {
+            const acc = await cmResolverAcceso(sb.user);
+            if (acc.ok) {
+                usuario = acc.usuario;
+                token = sb.session ? sb.session.access_token : null;
+                window.cmAuthSource = 'supabase';
+                localStorage.setItem('hub_user', JSON.stringify(usuario));
+                localStorage.setItem('cm_auth', 'supabase');
+                localStorage.removeItem('hub_token');
+                mostrarApp();
+                return;
+            } else {
+                // Credenciales validas pero sin acceso (sin club o licencia inactiva)
+                await supabaseClient.auth.signOut();
+                errorDiv.textContent = acc.motivo;
+                errorDiv.style.display = 'block';
+                return;
+            }
+        }
+    } catch (e) {
+        // Ignorar: caemos al mensaje final
+    }
+
+    // ===== 3) Ninguno reconocio al usuario =====
+    errorDiv.textContent = wpMessage || 'Usuario o contrasena incorrectos';
+    errorDiv.style.display = 'block';
+}
+
+// ===== CLUB MODE: resolver acceso de un miembro autenticado por Supabase Auth =====
+// Comprueba que es miembro ACTIVO de un club con LICENCIA ACTIVA.
+// Devuelve { ok:true, usuario } o { ok:false, motivo }.
+async function cmResolverAcceso(authUser) {
+    try {
+        const { data: m } = await supabaseClient
+            .from('club_members')
+            .select('*')
+            .eq('auth_user_id', authUser.id)
+            .eq('active', true)
+            .limit(1)
+            .maybeSingle();
+
+        if (!m) {
+            return { ok: false, motivo: 'Tu cuenta no pertenece a ningun club activo.' };
+        }
+
+        const { data: c } = await supabaseClient
+            .from('clubs')
+            .select('*')
+            .eq('id', m.club_id)
+            .maybeSingle();
+
+        if (!c) {
+            return { ok: false, motivo: 'No se encontro el club asociado a tu cuenta.' };
+        }
+
+        const licenciaActiva = c.license_status === 'active' &&
+            (!c.license_valid_until || new Date(c.license_valid_until) > new Date());
+
+        if (!licenciaActiva) {
+            return { ok: false, motivo: 'Tu club no tiene una licencia activa. Contacta con el administrador del club.' };
+        }
+
+        // Dejar preparado el club y la ficha de miembro para inicializarClub() y cm-core.js
+        window.__cm_club = c;
+        window.__cm_membership = m;
+
+        const usuarioObj = {
+            id: m.id,                                 // id de la fila club_members
+            name: m.display_name || authUser.email,
+            display_name: m.display_name || authUser.email,
+            email: m.email || authUser.email,
+            tipo: 'club_supabase',
+            authUid: authUser.id
+        };
+        return { ok: true, usuario: usuarioObj };
+    } catch (e) {
+        console.error('[Club Mode] Error resolviendo acceso:', e);
+        return { ok: false, motivo: 'Error comprobando el acceso. Intentalo de nuevo.' };
     }
 }
 
 function logout() {
     localStorage.removeItem('hub_user');
     localStorage.removeItem('hub_token');
+    localStorage.removeItem('cm_auth');
+    try { if (supabaseClient && supabaseClient.auth) supabaseClient.auth.signOut(); } catch (e) {}
     location.reload();
 }
 
@@ -137,7 +232,35 @@ async function inicializarClub() {
     try {
         let club = null;
 
-        // 0.7.A — PRIORIDAD CLUB MODE: ¿es miembro activo de algún club?
+        // ===== Club Mode por Supabase Auth: el club ya se resolvio en el login =====
+        if (window.cmAuthSource === 'supabase' && window.__cm_club) {
+            club = window.__cm_club;
+            clubId = club.id;
+            clubData = club;
+
+            document.getElementById('club-nombre-header').textContent = club.name;
+            const iniSb = club.name ? club.name.charAt(0).toUpperCase() : '?';
+            document.getElementById('club-initial').textContent = iniSb;
+            if (club.logo_url) {
+                document.getElementById('club-badge').innerHTML =
+                    '<img src="' + club.logo_url + '" alt="">' +
+                    '<span>' + club.name + '</span>';
+            }
+
+            // Hook accepted_at: primer login del miembro
+            if (window.__cm_membership && window.__cm_membership.accepted_at === null) {
+                await supabaseClient
+                    .from('club_members')
+                    .update({ accepted_at: new Date().toISOString() })
+                    .eq('id', window.__cm_membership.id);
+                console.log('[Club Mode] Primer login del miembro registrado (accepted_at)');
+            }
+
+            await cargarTemporadaActiva();
+            return;
+        }
+
+        // 0.7.A — PRIORIDAD CLUB MODE: ¿es miembro activo de algún club? (camino WordPress)
         const { data: memberRow } = await supabaseClient
             .from('club_members')
             .select('id, accepted_at, club_id, role_id, team_ids, club_roles(name, is_admin, permissions, team_scope)')
@@ -293,16 +416,40 @@ function cambiarSubTab(modulo, subtab, btn) {
 }
 
 // ========== INICIALIZACIÓN ==========
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
+    // Restaurar sesion de miembro de club (Supabase Auth) si la hay
+    if (localStorage.getItem('cm_auth') === 'supabase') {
+        try {
+            const { data: s } = await supabaseClient.auth.getSession();
+            if (s && s.session && s.session.user) {
+                const acc = await cmResolverAcceso(s.session.user);
+                if (acc.ok) {
+                    usuario = acc.usuario;
+                    token = s.session.access_token;
+                    window.cmAuthSource = 'supabase';
+                    mostrarApp();
+                    return;
+                }
+            }
+            // Sesion invalida o sin acceso: limpiar
+            await supabaseClient.auth.signOut();
+            localStorage.removeItem('cm_auth');
+        } catch (e) {
+            localStorage.removeItem('cm_auth');
+        }
+    }
+
+    // Sesion WordPress (entrenador autonomo) — igual que hoy
     var savedUser = localStorage.getItem('hub_user');
     var savedToken = localStorage.getItem('hub_token');
-    
+
     if (savedUser && savedToken) {
         usuario = JSON.parse(savedUser);
         token = savedToken;
+        window.cmAuthSource = 'wp';
         mostrarApp();
     }
-    
+
     document.getElementById('password').addEventListener('keypress', function(e) {
         if (e.key === 'Enter') login();
     });

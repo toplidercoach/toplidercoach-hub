@@ -3219,15 +3219,14 @@ async function cmDdExportarPDF(playerId, tipo) {
     var intentos = 0;
     var intervalo = setInterval(function() {
         intentos++;
-        if (intentos > 20) { clearInterval(intervalo); return; }
+        if (intentos > 40) { clearInterval(intervalo); return; }
         if (typeof cmState === 'undefined' || !cmState.activo) return;
-        if (!cmPuedeVer('direccion_deportiva')) { clearInterval(intervalo); return; }
-        clearInterval(intervalo);
-
-        if (document.getElementById('cm-tab-dd')) return;
-
+        if (typeof cmPuedeVer !== 'function' || !cmPuedeVer('direccion_deportiva')) return;
+        if (document.getElementById('cm-tab-dd')) { clearInterval(intervalo); return; }
         var mainTabs = document.querySelector('.main-tabs');
         if (!mainTabs) return;
+
+        clearInterval(intervalo);
 
         var tab = document.createElement('button');
         tab.className = 'main-tab';
@@ -3268,5 +3267,5 @@ async function cmDdExportarPDF(playerId, tipo) {
         }
 
         console.log('[Dir.Deportiva] Auto-montado y registrado');
-    }, 500);
+    }, 300);
 })();

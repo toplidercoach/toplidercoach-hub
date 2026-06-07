@@ -2520,22 +2520,21 @@ async function cmScApiImportar(fixtureId) {
 }
 
 
-// ============================================================
+/// ============================================================
 // AUTO-MONTAJE DEL MODULO
 // ============================================================
 (function cmScAutoMontar() {
     var intentos = 0;
     var intervalo = setInterval(function() {
         intentos++;
-        if (intentos > 20) { clearInterval(intervalo); return; }
+        if (intentos > 40) { clearInterval(intervalo); return; }
         if (typeof cmState === 'undefined' || !cmState.activo) return;
-        if (!cmPuedeVer('scouting')) { clearInterval(intervalo); return; }
-        clearInterval(intervalo);
-
-        if (document.getElementById('cm-tab-scouting')) return;
-
+        if (typeof cmPuedeVer !== 'function' || !cmPuedeVer('scouting')) return;
+        if (document.getElementById('cm-tab-scouting')) { clearInterval(intervalo); return; }
         var mainTabs = document.querySelector('.main-tabs');
         if (!mainTabs) return;
+
+        clearInterval(intervalo);
 
         var tab = document.createElement('button');
         tab.className = 'main-tab';
@@ -2576,5 +2575,5 @@ async function cmScApiImportar(fixtureId) {
         }
 
         console.log('[Scouting] Auto-montado y registrado');
-    }, 500);
+    }, 300);
 })();

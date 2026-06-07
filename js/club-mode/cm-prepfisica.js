@@ -3,6 +3,11 @@
 // ============================================================
 var cmPfJugadorActual=null,cmPfTabActiva='pruebas',cmPfCatalogoPruebas=[],cmPfCatalogosReady=false;
 var cmPfFiltroEquipo='all',cmPfAntroEditId=null,cmPfJugadoresData=[],cmPfEquipos=[];
+// Obedecer al selector global de la cabecera (Opcion A)
+document.addEventListener('cmTeamChanged', function() {
+    cmPfFiltroEquipo = (typeof cmState !== 'undefined' && cmState.equipoSeleccionado) ? cmState.equipoSeleccionado.id : 'all';
+    if (document.getElementById('cmpf-player-grid')) cmPfRenderJugadores();
+});
 var cmPfGpsConfig=null,cmPfCsvData=null,cmPfCsvMapping={},cmPfCsvPlayerMapping={};
 var cmPfInformeData=null,cmPfInformeFiltroTipo='',cmPfInformeFiltroPos='';
 var cmPfVistaActiva='jugadores',cmPfSesionesData=[],cmPfEjerciciosClub=[];
@@ -55,7 +60,6 @@ container.innerHTML=
 '<div class="cmpf-header"><h2>Preparacion Fisica</h2></div>'+
 '<div class="cmpf-vista-toggle"><button class="cmpf-vista-btn active" data-vista="jugadores" onclick="cmPfCambiarVista(\'jugadores\')">Jugadores</button><button class="cmpf-vista-btn" data-vista="sesiones" onclick="cmPfCambiarVista(\'sesiones\')">Sesiones GPS</button></div>'+
 '<div id="cmpf-vista-jugadores">'+
-'<div class="cmpf-filtro-bar" style="margin-bottom:12px"><label style="color:#94a3b8;font-size:12px;font-weight:600">Equipo:</label><select id="cmpf-filtro-equipo" onchange="cmPfFiltrarEquipo(this.value)"><option value="all">Todos</option></select></div>'+
 '<div class="cmpf-stats-bar"><div class="cmpf-stat"><div class="num" id="cmpf-stat-total">-</div><div class="label">Jugadores</div></div><div class="cmpf-stat"><div class="num" id="cmpf-stat-tests" style="color:#60a5fa">-</div><div class="label">Con pruebas</div></div><div class="cmpf-stat"><div class="num" id="cmpf-stat-anthro" style="color:#a78bfa">-</div><div class="label">Antropometria</div></div><div class="cmpf-stat"><div class="num" id="cmpf-stat-gps" style="color:#fbbf24">-</div><div class="label">Con GPS</div></div></div>'+
 '<div class="cmpf-filter-count" id="cmpf-filter-count"></div>'+
 '<div class="cmpf-player-grid" id="cmpf-player-grid"><div class="cmpf-empty"><div class="icon">...</div><p>Cargando...</p></div></div>'+
@@ -71,7 +75,7 @@ container.innerHTML=
 // ========== CARGAR JUGADORES ==========
 async function cmPfCargarJugadores(){var grid=document.getElementById('cmpf-player-grid');if(!grid)return;try{var tr=await supabaseClient.from('club_teams').select('id,name,category').eq('club_id',clubId).eq('active',true).order('category').order('name');cmPfEquipos=tr.data||[];var pr=await supabaseClient.from('club_players').select('id,name,photo_url,positions_main').eq('club_id',clubId).eq('active',true).order('name');var pd=pr.data||[];if(!pd.length){grid.innerHTML='<div class="cmpf-empty"><p>No hay jugadores</p></div>';return;}var sel=document.getElementById('cmpf-filtro-equipo');if(sel){var o='<option value="all">Todos ('+cmPfEquipos.length+')</option>';cmPfEquipos.forEach(function(t){o+='<option value="'+t.id+'">'+t.name+(t.category?' ('+t.category+')':'')+'</option>';});sel.innerHTML=o;if(cmPfFiltroEquipo!=='all')sel.value=cmPfFiltroEquipo;}var tn={};cmPfEquipos.forEach(function(t){tn[t.id]=t.name;});var sr=await supabaseClient.from('club_player_seasons').select('player_id,team_id,shirt_number,position').eq('club_id',clubId).eq('active',true);var sp={};(sr.data||[]).forEach(function(s){if(!sp[s.player_id])sp[s.player_id]=[];sp[s.player_id].push(s);});var tc={},ac={},gc={};var r1=await supabaseClient.from('cm_pf_test_results').select('player_id').eq('club_id',clubId).eq('archived',false);(r1.data||[]).forEach(function(r){tc[r.player_id]=(tc[r.player_id]||0)+1;});var r2=await supabaseClient.from('cm_pf_anthropometry').select('player_id').eq('club_id',clubId).eq('archived',false);(r2.data||[]).forEach(function(r){ac[r.player_id]=(ac[r.player_id]||0)+1;});var r3=await supabaseClient.from('cm_pf_gps_player_data').select('player_id').eq('club_id',clubId).eq('archived',false).eq('segment_name','TOTAL');(r3.data||[]).forEach(function(r){gc[r.player_id]=(gc[r.player_id]||0)+1;});cmPfJugadoresData=pd.map(function(p){var ss=sp[p.id]||[];var tid=ss.length?ss[0].team_id:null;return{id:p.id,name:p.name,photo_url:p.photo_url,position:(p.positions_main&&p.positions_main[0])||(ss.length?ss[0].position:'')||'',team_id:tid,team_name:tid?(tn[tid]||''):'',dorsal:ss.length?ss[0].shirt_number:null,test_count:tc[p.id]||0,anthro_count:ac[p.id]||0,gps_count:gc[p.id]||0};});cmPfRenderJugadores();}catch(e){console.error(e);grid.innerHTML='<div class="cmpf-empty"><p>Error</p></div>';}}
 function cmPfFiltrarEquipo(v){cmPfFiltroEquipo=v;cmPfRenderJugadores();}
-function cmPfRenderJugadores(){var g=document.getElementById('cmpf-player-grid');if(!g)return;var jj=cmPfJugadoresData;if(cmPfFiltroEquipo!=='all')jj=jj.filter(function(j){return j.team_id===cmPfFiltroEquipo;});var el=function(i,v){var e=document.getElementById(i);if(e)e.textContent=v;};el('cmpf-stat-total',jj.length);el('cmpf-stat-tests',jj.filter(function(j){return j.test_count>0;}).length);el('cmpf-stat-anthro',jj.filter(function(j){return j.anthro_count>0;}).length);el('cmpf-stat-gps',jj.filter(function(j){return j.gps_count>0;}).length);var fc=document.getElementById('cmpf-filter-count');if(fc)fc.textContent=cmPfFiltroEquipo!=='all'?jj.length+' jugadores':'';if(!jj.length){g.innerHTML='<div class="cmpf-empty"><p>Sin jugadores</p></div>';return;}var h='';jj.forEach(function(j){var av=j.photo_url?'<img src="'+j.photo_url+'">':(j.name?j.name.split(' ').map(function(p){return p.charAt(0);}).join('').substring(0,2).toUpperCase():'?');var m='';if(j.position)m+=j.position;if(j.team_name)m+='<span class="cmpf-player-team-tag">'+j.team_name+'</span>';h+='<div class="cmpf-player-card" onclick="cmPfAbrirFicha(\''+j.id+'\')"><div class="cmpf-player-avatar">'+av+'</div><div class="cmpf-player-info"><div class="cmpf-player-name">'+(j.name||'?')+'</div><div class="cmpf-player-meta">'+m+'</div></div>'+(j.dorsal?'<div class="cmpf-player-dorsal">#'+j.dorsal+'</div>':'')+'</div>';});g.innerHTML=h;}
+function cmPfRenderJugadores(){var g=document.getElementById('cmpf-player-grid');if(!g)return;var jj=cmPfJugadoresData;if(typeof cmJugadorVisible==='function')jj=jj.filter(function(j){return cmJugadorVisible(j.team_id?[j.team_id]:[]);});if(cmPfFiltroEquipo!=='all')jj=jj.filter(function(j){return j.team_id===cmPfFiltroEquipo;});var el=function(i,v){var e=document.getElementById(i);if(e)e.textContent=v;};el('cmpf-stat-total',jj.length);el('cmpf-stat-tests',jj.filter(function(j){return j.test_count>0;}).length);el('cmpf-stat-anthro',jj.filter(function(j){return j.anthro_count>0;}).length);el('cmpf-stat-gps',jj.filter(function(j){return j.gps_count>0;}).length);var fc=document.getElementById('cmpf-filter-count');if(fc)fc.textContent=cmPfFiltroEquipo!=='all'?jj.length+' jugadores':'';if(!jj.length){g.innerHTML='<div class="cmpf-empty"><p>Sin jugadores</p></div>';return;}var h='';jj.forEach(function(j){var av=j.photo_url?'<img src="'+j.photo_url+'">':(j.name?j.name.split(' ').map(function(p){return p.charAt(0);}).join('').substring(0,2).toUpperCase():'?');var m='';if(j.position)m+=j.position;if(j.team_name)m+='<span class="cmpf-player-team-tag">'+j.team_name+'</span>';h+='<div class="cmpf-player-card" onclick="cmPfAbrirFicha(\''+j.id+'\')"><div class="cmpf-player-avatar">'+av+'</div><div class="cmpf-player-info"><div class="cmpf-player-name">'+(j.name||'?')+'</div><div class="cmpf-player-meta">'+m+'</div></div>'+(j.dorsal?'<div class="cmpf-player-dorsal">#'+j.dorsal+'</div>':'')+'</div>';});g.innerHTML=h;}
 
 // ========== FICHA ==========
 function cmPfAbrirFicha(pid){var j=cmPfJugadoresData.find(function(j){return j.id===pid;});if(!j)return;cmPfJugadorActual=j;cmPfTabActiva='pruebas';var o=document.getElementById('cmpf-ficha-overlay');if(o)o.style.display='flex';cmPfRenderFicha();}
@@ -845,12 +849,12 @@ function cmPfSelSegCompleta(btn, seg) {
 // ================================================================
 (function cmPfAutoMontar(){
     var n=0;var iv=setInterval(function(){
-        n++;if(n>20){clearInterval(iv);return;}
+        n++;if(n>40){clearInterval(iv);return;}
         if(typeof cmState==='undefined'||!cmState.activo)return;
-        if(!cmPuedeVer('modulo_preparacion_fisica')){clearInterval(iv);return;}
-        clearInterval(iv);
-        if(document.getElementById('cm-tab-prepfisica'))return;
+        if(typeof cmPuedeVer!=='function'||!cmPuedeVer('modulo_preparacion_fisica'))return;
+        if(document.getElementById('cm-tab-prepfisica')){clearInterval(iv);return;}
         var mt=document.querySelector('.main-tabs');if(!mt)return;
+        clearInterval(iv);
         var t=document.createElement('button');t.className='main-tab';t.id='cm-tab-prepfisica';
         t.setAttribute('onclick',"cambiarModulo('prepfisica',this)");
         t.innerHTML='<span class="tab-icon">&#127947;</span><span>Prep. Fisica</span>';mt.appendChild(t);
@@ -865,5 +869,5 @@ function cmPfSelSegCompleta(btn, seg) {
         var tv=Array.from(document.querySelectorAll('.main-tab')).filter(function(b){return b.style.display!=='none';});
         if(tv.length===1&&tv[0].id==='cm-tab-prepfisica')cambiarModulo('prepfisica',t);
         console.log('[Prep. Fisica] Auto-montado');
-    },500);
+    },300);
 })();
