@@ -40,6 +40,9 @@ var cmEcoBudgetMap    = {};         // { category_id: amount_cents } presupuesta
 var cmEcoRealGasto    = {};         // { category_id: cents } gastado real
 var cmEcoRealIngreso  = {};         // { category_id: cents } ingresado real
 var cmEcoTesoreria    = null;       // { cobrado, pagado, cuotas }
+var cmEcoContaSub     = 'diario';   // sub-pestana de Contabilidad: diario | mayor | balance
+var cmEcoAsientos     = [];         // asientos del diario del ejercicio
+var cmEcoCuentasConta = [];         // plan de cuentas para los selectores
 
 var CMECO_NIVEL_LABEL = {
     ninguno:'Sin control economico', elemental:'Control Elemental',
@@ -176,6 +179,11 @@ function cmEcoRenderPanel(container) {
         '.cmeco-fg input,.cmeco-fg select,.cmeco-fg textarea{width:100%;padding:8px 12px;background:#1e293b;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-size:13px;font-family:inherit;box-sizing:border-box}' +
         '.cmeco-fg textarea{min-height:50px;resize:vertical}' +
         '.cmeco-fg input:focus,.cmeco-fg select:focus,.cmeco-fg textarea:focus{border-color:#3b82f6;outline:none}' +
+        '.cmeco-as-head{display:grid;grid-template-columns:1fr 120px 120px 34px;gap:8px;margin:6px 0;font-size:11px;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:.5px}' +
+        '.cmeco-as-row{display:grid;grid-template-columns:1fr 120px 120px 34px;gap:8px;margin-bottom:8px;align-items:center}' +
+        '.cmeco-as-row select,.cmeco-as-row input{padding:7px 9px;background:#1e293b;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-size:12px;font-family:inherit;box-sizing:border-box;width:100%}' +
+        '.cmeco-as-row input{text-align:right}.cmeco-as-row select:focus,.cmeco-as-row input:focus{border-color:#3b82f6;outline:none}' +
+        '.cmeco-as-resumen{margin-top:14px;padding:10px 14px;background:#1e293b;border:1px solid #334155;border-radius:8px;color:#e2e8f0;font-size:13px;text-align:right}' +
         '.cmeco-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}.cmeco-row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}' +
         '.cmeco-drop{border:1px dashed #475569;border-radius:10px;padding:16px;text-align:center;color:#94a3b8;font-size:13px;background:#0b1322;margin-bottom:14px}' +
         '.cmeco-drop input{display:none}.cmeco-drop label{display:inline-block;margin-top:8px;cursor:pointer;background:#3b82f6;color:#fff;padding:7px 14px;border-radius:6px;font-weight:600}' +
@@ -193,6 +201,7 @@ function cmEcoRenderPanel(container) {
             '<button class="cmeco-tab" id="cmeco-tab-ingresos" onclick="cmEcoCambiarTab(\'ingresos\',this)">Ingresos</button>' +
             '<button class="cmeco-tab" id="cmeco-tab-presupuesto" onclick="cmEcoCambiarTab(\'presupuesto\',this)">Presupuesto</button>' +
             '<button class="cmeco-tab" id="cmeco-tab-resultados" onclick="cmEcoCambiarTab(\'resultados\',this)">Resultados</button>' +
+            '<button class="cmeco-tab" id="cmeco-tab-contabilidad" onclick="cmEcoCambiarTab(\'contabilidad\',this)">Contabilidad</button>' +
             '<button class="cmeco-tab" id="cmeco-tab-cumplimiento" onclick="cmEcoCambiarTab(\'cumplimiento\',this)">Control RFEF</button>' +
             '<button class="cmeco-tab" id="cmeco-tab-config" onclick="cmEcoCambiarTab(\'config\',this)">Configuracion</button>' +
         '</div>' +
@@ -230,6 +239,7 @@ function cmEcoCambiarTab(tab, btn) {
     if (tab === 'ingresos')     cmEcoTabIngresos(cont);
     if (tab === 'presupuesto')  cmEcoTabPresupuesto(cont);
     if (tab === 'resultados')   cmEcoTabResultados(cont);
+    if (tab === 'contabilidad') cmEcoTabContabilidad(cont);
     if (tab === 'cumplimiento') cmEcoTabCumplimiento(cont);
     if (tab === 'config')       cmEcoTabConfig(cont);
 }
@@ -475,13 +485,18 @@ async function cmEcoAprobar(sid) {
         .update({ status: 'aprobada', approved_by: cmEcoMiembroId(), approved_at: new Date().toISOString(), updated_at: new Date().toISOString() })
         .eq('id', sid);
     if (res.error) { showToast('Error al aprobar: ' + res.error.message, 'error'); return; }
-    showToast('Gasto aprobado');
+    var sheet = await cmEcoCargarHoja(sid);
+    var as = sheet ? await cmEcoAsientoGastoDevengo(sheet) : null;
+    if (as && as.ok && !as.dup) showToast('Gasto aprobado &middot; Asiento ' + as.num + ' creado');
+    else if (as && !as.ok) showToast('Gasto aprobado (sin asiento: ' + as.error + ')', 'error');
+    else showToast('Gasto aprobado');
     cmEcoCargarGastos();
 }
 async function cmEcoRechazar(sid) {
     var res = await supabaseClient.from('cm_eco_expense_sheets')
         .update({ status: 'rechazada', updated_at: new Date().toISOString() }).eq('id', sid);
     if (res.error) { showToast('Error al rechazar: ' + res.error.message, 'error'); return; }
+    await cmEcoBorrarAsientoOrigen('cm_eco_expense_sheets', sid, 'devengo');
     showToast('Gasto rechazado');
     cmEcoCargarGastos();
 }
@@ -489,6 +504,8 @@ async function cmEcoReabrir(sid) {
     var res = await supabaseClient.from('cm_eco_expense_sheets')
         .update({ status: 'enviada', updated_at: new Date().toISOString() }).eq('id', sid);
     if (res.error) { showToast('Error: ' + res.error.message, 'error'); return; }
+    await cmEcoBorrarAsientoOrigen('cm_eco_expense_sheets', sid, 'devengo');
+    await cmEcoBorrarAsientoOrigen('cm_eco_expense_sheets', sid, 'pago');
     showToast('Gasto devuelto al buzon');
     cmEcoCargarGastos();
 }
@@ -547,6 +564,10 @@ async function cmEcoConfirmarPago() {
             .update({ status: 'pagada', paid_at: fecha, payment_method: metodo, updated_at: new Date().toISOString() })
             .in('id', ids);
         if (res.error) throw res.error;
+        for (var k = 0; k < ids.length; k++) {
+            var sh = await cmEcoCargarHoja(ids[k]);
+            if (sh) await cmEcoAsientoGastoPago(sh);
+        }
         showToast(ids.length === 1 ? 'Gasto pagado' : ids.length + ' gastos pagados');
         cmEcoSeleccion = {};
         cmEcoCerrarModalPago();
@@ -801,6 +822,10 @@ async function cmEcoReembolsar(mid) {
         .update({ status: 'pagada', paid_at: hoyStr, payment_method: 'transferencia', updated_at: new Date().toISOString() })
         .in('id', ids);
     if (res.error) { showToast('Error al reembolsar: ' + res.error.message, 'error'); return; }
+    for (var k = 0; k < ids.length; k++) {
+        var sh = await cmEcoCargarHoja(ids[k]);
+        if (sh) await cmEcoAsientoGastoPago(sh);
+    }
     showToast(ids.length === 1 ? 'Reembolso registrado' : ids.length + ' gastos reembolsados');
     cmEcoCargarReembolsos();
 }
@@ -944,9 +969,12 @@ async function cmEcoGuardarIngreso() {
             status: 'cobrado', payment_method: metodo, source_ref: ref,
             created_by: cmEcoMiembroId(), created_at: new Date().toISOString()
         };
-        var res = await supabaseClient.from('cm_eco_incomes').insert(fila);
+        var res = await supabaseClient.from('cm_eco_incomes').insert(fila).select().single();
         if (res.error) throw res.error;
-        showToast('Ingreso registrado');
+        var as = await cmEcoAsientoIngreso(res.data);
+        if (as && as.ok && !as.dup) showToast('Ingreso registrado &middot; Asiento ' + as.num + ' creado');
+        else if (as && !as.ok) showToast('Ingreso guardado, pero sin asiento: ' + as.error, 'error');
+        else showToast('Ingreso registrado');
         cmEcoCerrarModalIngreso();
         cmEcoCargarIngresos();
     } catch (e) {
@@ -1167,6 +1195,725 @@ function cmEcoRenderResultados(ctaById, ingCta, gastoCta, cuotas) {
         '</div>';
 }
 
+
+// ============== MOTOR DE ASIENTOS AUTOMATICOS ==============
+// Cuentas "de sistema" cacheadas por codigo: { '572': uuid, '4700': uuid, ... }
+var cmEcoCtaCodigo = null;
+
+async function cmEcoCargarCuentasSistema() {
+    if (cmEcoCtaCodigo) return cmEcoCtaCodigo;
+    var r = await supabaseClient.from('cm_eco_accounts')
+        .select('id,code').eq('club_id', clubId).eq('is_active', true).range(0, 9999);
+    cmEcoCtaCodigo = {};
+    (r.data || []).forEach(function(c) { cmEcoCtaCodigo[c.code] = c.id; });
+    return cmEcoCtaCodigo;
+}
+
+function cmEcoCtaId(code) {
+    return cmEcoCtaCodigo ? cmEcoCtaCodigo[code] : null;
+}
+
+// Siguiente numero correlativo del ejercicio (consulta la BD, fiable)
+async function cmEcoSiguienteNumAsiento() {
+    var r = await supabaseClient.from('cm_eco_journal')
+        .select('entry_number').eq('club_id', clubId).eq('fiscal_year_id', cmEcoEjercicio.id)
+        .order('entry_number', { ascending: false }).limit(1);
+    var max = (r.data && r.data[0] && r.data[0].entry_number) ? r.data[0].entry_number : 0;
+    return max + 1;
+}
+
+// Crea un asiento automatico con sus lineas. Valida cuadre y evita duplicados.
+// opts: { fecha, descripcion, tipo, source_table, source_id, source_event,
+//         lineas:[{ code | account_id, debit_cents, credit_cents, desc }] }
+async function cmEcoCrearAsientoAuto(opts) {
+    try {
+        await cmEcoCargarCuentasSistema();
+        // 1) no duplicar: si ya hay asiento para esta operacion y evento, salir
+        if (opts.source_table && opts.source_id) {
+            var q = supabaseClient.from('cm_eco_journal').select('id')
+                .eq('club_id', clubId).eq('source_table', opts.source_table).eq('source_id', opts.source_id);
+            if (opts.source_event) q = q.eq('source_event', opts.source_event);
+            var dup = await q;
+            if (dup.data && dup.data.length) return { ok: true, dup: true };
+        }
+        // 2) resolver cuentas y validar cuadre
+        var lineas = [], sumD = 0, sumH = 0;
+        for (var i = 0; i < opts.lineas.length; i++) {
+            var L = opts.lineas[i];
+            var accId = L.account_id || cmEcoCtaId(L.code);
+            if (!accId) return { ok: false, error: 'Falta la cuenta ' + (L.code || '') + ' en el plan' };
+            var d = L.debit_cents || 0, h = L.credit_cents || 0;
+            if (d === 0 && h === 0) continue;
+            lineas.push({ account_id: accId, debit_cents: d, credit_cents: h, line_order: i, line_description: L.desc || null });
+            sumD += d; sumH += h;
+        }
+        if (lineas.length < 2) return { ok: false, error: 'asiento con menos de 2 lineas' };
+        if (sumD !== sumH) return { ok: false, error: 'asiento descuadrado' };
+        // 3) insertar cabecera + lineas
+        var num = await cmEcoSiguienteNumAsiento();
+        var ahora = new Date().toISOString();
+        var rj = await supabaseClient.from('cm_eco_journal').insert({
+            club_id: clubId, fiscal_year_id: cmEcoEjercicio.id, entry_number: num,
+            entry_date: opts.fecha, description: opts.descripcion, entry_type: opts.tipo || 'automatico',
+            source_table: opts.source_table || null, source_id: opts.source_id || null, source_event: opts.source_event || null,
+            created_by: cmEcoMiembroId(), created_at: ahora, updated_at: ahora
+        }).select().single();
+        if (rj.error) throw rj.error;
+        var jid = rj.data.id;
+        lineas.forEach(function(l) { l.journal_id = jid; l.club_id = clubId; });
+        var rl = await supabaseClient.from('cm_eco_journal_lines').insert(lineas);
+        if (rl.error) throw rl.error;
+        return { ok: true, id: jid, num: num };
+    } catch (e) {
+        console.error('cmEcoCrearAsientoAuto:', e);
+        return { ok: false, error: e.message || String(e) };
+    }
+}
+
+// Asiento de un ingreso cobrado:
+//   Debe  Tesoreria (572/570)      total
+//   Haber Cuenta de ingreso (7xx)  base
+//   Haber IVA repercutido (4750)   iva
+async function cmEcoAsientoIngreso(inc) {
+    var ctaIngreso = null;
+    if (inc.category_id) {
+        var rc = await supabaseClient.from('cm_eco_categories').select('account_id').eq('id', inc.category_id).single();
+        ctaIngreso = rc.data ? rc.data.account_id : null;
+    }
+    if (!ctaIngreso) return { ok: false, error: 'la categoria no tiene cuenta contable asignada' };
+    var tesoreria = (inc.payment_method && /efect|caja|metal/i.test(inc.payment_method)) ? '570' : '572';
+    var total = inc.total_cents || 0;
+    var iva = inc.vat_cents || 0;
+    var base = inc.base_cents || 0;
+    if (base === 0 && total > 0) base = total - iva;
+    var nombre = inc.source_name || inc.description || 'Ingreso';
+    var lineas = [
+        { code: tesoreria, debit_cents: total, credit_cents: 0, desc: nombre },
+        { account_id: ctaIngreso, debit_cents: 0, credit_cents: base, desc: nombre }
+    ];
+    if (iva > 0) lineas.push({ code: '4750', debit_cents: 0, credit_cents: iva, desc: 'IVA repercutido' });
+    return cmEcoCrearAsientoAuto({
+        fecha: inc.income_date,
+        descripcion: 'Ingreso: ' + nombre,
+        tipo: 'automatico',
+        source_table: 'cm_eco_incomes',
+        source_id: inc.id,
+        source_event: 'cobro',
+        lineas: lineas
+    });
+}
+
+// Cuenta contable de cada categoria, cacheada: { cat_id: account_id }
+var cmEcoCatCuenta = null;
+async function cmEcoCargarCatCuentas() {
+    if (cmEcoCatCuenta) return cmEcoCatCuenta;
+    var r = await supabaseClient.from('cm_eco_categories').select('id,account_id').eq('club_id', clubId).range(0, 9999);
+    cmEcoCatCuenta = {};
+    (r.data || []).forEach(function(c) { cmEcoCatCuenta[c.id] = c.account_id; });
+    return cmEcoCatCuenta;
+}
+
+// Carga una hoja de gasto con sus items
+async function cmEcoCargarHoja(sid) {
+    var rs = await supabaseClient.from('cm_eco_expense_sheets').select('*').eq('id', sid).single();
+    if (rs.error || !rs.data) return null;
+    var ri = await supabaseClient.from('cm_eco_expense_items').select('*').eq('sheet_id', sid).range(0, 9999);
+    rs.data.items = ri.data || [];
+    return rs.data;
+}
+
+function cmEcoHoyStr() {
+    var h = new Date();
+    return h.getFullYear() + '-' + String(h.getMonth() + 1).padStart(2, '0') + '-' + String(h.getDate()).padStart(2, '0');
+}
+
+// Asiento de DEVENGO de un gasto (al aprobarlo):
+//   Debe  Cuenta(s) de gasto (6xx)   base de cada item
+//   Debe  IVA soportado (4700)       iva total
+//   Haber 551 (si lo adelanto un miembro) o 410 (si paga el club)  total
+async function cmEcoAsientoGastoDevengo(sheet) {
+    await cmEcoCargarCatCuentas();
+    var items = sheet.items || [];
+    var lineas = [], ivaTotal = 0;
+    items.forEach(function(it) {
+        var cta = cmEcoCatCuenta[it.category_id];
+        var base = it.base_cents || 0;
+        ivaTotal += (it.vat_cents || 0);
+        if (cta && base > 0) lineas.push({ account_id: cta, debit_cents: base, credit_cents: 0, desc: it.supplier_name || it.description || 'Gasto' });
+    });
+    if (lineas.length === 0) {
+        var cta0 = items[0] ? cmEcoCatCuenta[items[0].category_id] : null;
+        var sinIva = (sheet.total_cents || 0) - ivaTotal;
+        if (cta0 && sinIva > 0) lineas.push({ account_id: cta0, debit_cents: sinIva, credit_cents: 0, desc: sheet.title || 'Gasto' });
+    }
+    if (ivaTotal > 0) lineas.push({ code: '4700', debit_cents: ivaTotal, credit_cents: 0, desc: 'IVA soportado' });
+    var contrapartida = sheet.paid_by_member ? '551' : '410';
+    lineas.push({ code: contrapartida, debit_cents: 0, credit_cents: sheet.total_cents || 0, desc: sheet.title || 'Gasto' });
+    var fecha = (items[0] && items[0].expense_date) ? items[0].expense_date : cmEcoHoyStr();
+    return cmEcoCrearAsientoAuto({
+        fecha: fecha,
+        descripcion: 'Gasto: ' + (sheet.title || ''),
+        source_table: 'cm_eco_expense_sheets', source_id: sheet.id, source_event: 'devengo',
+        lineas: lineas
+    });
+}
+
+// Asiento de PAGO de un gasto (al pagarlo / reembolsarlo):
+//   Debe  551 o 410   total
+//   Haber Tesoreria (572/570)   total
+async function cmEcoAsientoGastoPago(sheet) {
+    var contrapartida = sheet.paid_by_member ? '551' : '410';
+    var tesoreria = (sheet.payment_method && /efect|caja|metal/i.test(sheet.payment_method)) ? '570' : '572';
+    var total = sheet.total_cents || 0;
+    var lineas = [
+        { code: contrapartida, debit_cents: total, credit_cents: 0, desc: sheet.title || 'Pago' },
+        { code: tesoreria, debit_cents: 0, credit_cents: total, desc: sheet.title || 'Pago' }
+    ];
+    return cmEcoCrearAsientoAuto({
+        fecha: sheet.paid_at || cmEcoHoyStr(),
+        descripcion: 'Pago: ' + (sheet.title || ''),
+        source_table: 'cm_eco_expense_sheets', source_id: sheet.id, source_event: 'pago',
+        lineas: lineas
+    });
+}
+
+// Revierte el asiento automatico de una operacion (ejercicio abierto)
+async function cmEcoBorrarAsientoOrigen(source_table, source_id, source_event) {
+    try {
+        var q = supabaseClient.from('cm_eco_journal').delete()
+            .eq('club_id', clubId).eq('source_table', source_table).eq('source_id', source_id);
+        if (source_event) q = q.eq('source_event', source_event);
+        var r = await q;
+        return !r.error;
+    } catch (e) { console.error('cmEcoBorrarAsientoOrigen:', e); return false; }
+}
+
+// ====================== CONTABILIDAD (PARTIDA DOBLE) ======================
+
+function cmEcoTabContabilidad(cont) {
+    if (!cmEcoEjercicio) {
+        cont.innerHTML = '<div class="cmeco-empty"><div class="icon">&#129518;</div><h3>Sin ejercicio contable activo</h3><p>Se necesita un ejercicio para llevar la contabilidad.</p></div>';
+        return;
+    }
+    cont.innerHTML =
+        '<div style="display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap">' +
+            '<button class="cmeco-btn cmeco-btn-sm" id="cmeco-sub-diario" onclick="cmEcoContaSubTab(\'diario\')">Libro Diario</button>' +
+            '<button class="cmeco-btn cmeco-btn-sm" id="cmeco-sub-mayor" onclick="cmEcoContaSubTab(\'mayor\')">Libro Mayor</button>' +
+            '<button class="cmeco-btn cmeco-btn-sm" id="cmeco-sub-sumas" onclick="cmEcoContaSubTab(\'sumas\')">Sumas y saldos</button>' +
+            '<button class="cmeco-btn cmeco-btn-sm" id="cmeco-sub-balance" onclick="cmEcoContaSubTab(\'balance\')">Balance situacion</button>' +
+            '<button class="cmeco-btn cmeco-btn-sm" id="cmeco-sub-pyg" onclick="cmEcoContaSubTab(\'pyg\')">Resultado (PyG)</button>' +
+        '</div>' +
+        '<div id="cmeco-conta-cont"></div>';
+    cmEcoContaSubTab(cmEcoContaSub || 'diario');
+}
+
+function cmEcoContaSubTab(sub) {
+    cmEcoContaSub = sub;
+    ['diario', 'mayor', 'sumas', 'balance', 'pyg'].forEach(function(s) {
+        var b = document.getElementById('cmeco-sub-' + s);
+        if (b) b.className = 'cmeco-btn cmeco-btn-sm ' + (s === sub ? 'cmeco-btn-primary' : 'cmeco-btn-secondary');
+    });
+    var c = document.getElementById('cmeco-conta-cont');
+    if (!c) return;
+    if (sub === 'diario') { cmEcoDiario(c); return; }
+    if (sub === 'mayor') { cmEcoMayor(c); return; }
+    if (sub === 'sumas') { cmEcoBalance(c); return; }
+    if (sub === 'balance') { cmEcoBalanceSituacion(c); return; }
+    if (sub === 'pyg') { cmEcoResultadoConta(c); return; }
+}
+
+function cmEcoDiario(c) {
+    c.innerHTML =
+        '<div class="cmeco-toolbar">' +
+            '<div style="color:#94a3b8;font-size:13px">Asientos del ejercicio <b style="color:#e2e8f0">' + cmEcoEsc(cmEcoEjercicio.name || '') + '</b></div>' +
+            '<div style="display:flex;gap:8px">' +
+                '<button class="cmeco-btn cmeco-btn-secondary" onclick="cmEcoExportarDiarioCSV()">Exportar CSV</button>' +
+                (cmEcoPuedeEditar() ? '<button class="cmeco-btn cmeco-btn-primary" onclick="cmEcoAbrirModalAsiento()">+ Nuevo asiento</button>' : '') +
+            '</div>' +
+        '</div>' +
+        '<div id="cmeco-diario-lista"><div class="cmeco-empty"><div class="icon">&#8987;</div><p>Cargando...</p></div></div>';
+    cmEcoCargarDiario();
+}
+
+async function cmEcoCargarDiario() {
+    var cont = document.getElementById('cmeco-diario-lista');
+    if (!cont) return;
+    try {
+        if (cmEcoCuentasConta.length === 0) {
+            var rac = await supabaseClient.from('cm_eco_accounts')
+                .select('id,code,name,account_type').eq('club_id', clubId).eq('is_active', true).order('code');
+            cmEcoCuentasConta = rac.data || [];
+        }
+        var rj = await supabaseClient.from('cm_eco_journal')
+            .select('*, cm_eco_journal_lines(*)')
+            .eq('club_id', clubId).eq('fiscal_year_id', cmEcoEjercicio.id)
+            .order('entry_number', { ascending: true }).range(0, 9999);
+        if (rj.error) throw rj.error;
+        cmEcoAsientos = rj.data || [];
+        cmEcoRenderDiario();
+    } catch (e) {
+        console.error('cmEcoCargarDiario:', e);
+        cont.innerHTML = '<div class="cmeco-empty"><div class="icon">&#9888;</div><p>Error al cargar el diario</p></div>';
+    }
+}
+
+function cmEcoRenderDiario() {
+    var cont = document.getElementById('cmeco-diario-lista');
+    if (!cont) return;
+    if (!cmEcoAsientos.length) {
+        cont.innerHTML = '<div class="cmeco-empty"><div class="icon">&#128221;</div><h3>Sin asientos</h3><p>Empieza por el asiento de apertura con los saldos iniciales, o crea un asiento nuevo.</p></div>';
+        return;
+    }
+    var ctaById = {};
+    cmEcoCuentasConta.forEach(function(c) { ctaById[c.id] = c.code + ' ' + c.name; });
+    var html = '';
+    cmEcoAsientos.forEach(function(a) {
+        var lineas = (a.cm_eco_journal_lines || []).slice().sort(function(x, y) { return (x.line_order || 0) - (y.line_order || 0); });
+        var totD = lineas.reduce(function(s, l) { return s + (l.debit_cents || 0); }, 0);
+        var totH = lineas.reduce(function(s, l) { return s + (l.credit_cents || 0); }, 0);
+        var badge = a.entry_type === 'apertura' ? ' &middot; <span style="color:#a78bfa">Apertura</span>'
+            : (a.entry_type === 'automatico' ? ' &middot; <span style="color:#38bdf8">Automatico</span>' : '');
+        var filas = lineas.map(function(l) {
+            return '<tr><td>' + cmEcoEsc(ctaById[l.account_id] || '(cuenta?)') + '</td>' +
+                '<td class="num">' + (l.debit_cents ? cmEcoCentsToEur(l.debit_cents) : '') + '</td>' +
+                '<td class="num">' + (l.credit_cents ? cmEcoCentsToEur(l.credit_cents) : '') + '</td></tr>';
+        }).join('');
+        html +=
+            '<div style="border:1px solid #1e293b;border-radius:10px;margin-bottom:12px;overflow:hidden">' +
+                '<div style="background:#1e293b;padding:10px 14px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap">' +
+                    '<span style="color:#f1f5f9;font-weight:600;font-size:13px">Asiento ' + (a.entry_number || '-') + ' &middot; ' + cmEcoFechaCorta(a.entry_date) + badge + '</span>' +
+                    '<span style="color:#94a3b8;font-size:12px">' + cmEcoEsc(a.description || '') + '</span>' +
+                '</div>' +
+                '<table class="cmeco-table"><thead><tr><th>Cuenta</th><th class="num">Debe</th><th class="num">Haber</th></tr></thead><tbody>' +
+                    filas +
+                    '<tr style="border-top:2px solid #334155"><td style="font-weight:700;color:#f1f5f9">Totales</td>' +
+                    '<td class="num" style="font-weight:700;color:#f1f5f9">' + cmEcoCentsToEur(totD) + '</td>' +
+                    '<td class="num" style="font-weight:700;color:#f1f5f9">' + cmEcoCentsToEur(totH) + '</td></tr>' +
+                '</tbody></table>' +
+            '</div>';
+    });
+    cont.innerHTML = html;
+}
+
+var cmEcoCtaOptsHTML = '';
+
+function cmEcoAbrirModalAsiento() {
+    if (!cmEcoPuedeEditar()) { showToast('No tienes permiso para crear asientos', 'error'); return; }
+    cmEcoCtaOptsHTML = '<option value="">Cuenta...</option>' +
+        cmEcoCuentasConta.map(function(c) { return '<option value="' + c.id + '">' + cmEcoEsc(c.code + ' ' + c.name) + '</option>'; }).join('');
+    var hoy = new Date().toISOString().slice(0, 10);
+    var overlay = document.createElement('div');
+    overlay.className = 'cmeco-modal-overlay';
+    overlay.id = 'cmeco-modal-asiento';
+    overlay.onclick = function(e) { if (e.target === overlay) cmEcoCerrarModalAsiento(); };
+    overlay.innerHTML =
+        '<div class="cmeco-modal" style="max-width:760px">' +
+            '<div class="cmeco-modal-header"><h3>Nuevo asiento</h3>' +
+                '<button class="cmeco-modal-close" onclick="cmEcoCerrarModalAsiento()">&times;</button></div>' +
+            '<div class="cmeco-modal-body">' +
+                '<div style="display:grid;grid-template-columns:140px 1fr 150px;gap:12px">' +
+                    '<div class="cmeco-fg"><label>Fecha</label><input type="date" id="cmeco-as-fecha" value="' + hoy + '"></div>' +
+                    '<div class="cmeco-fg"><label>Concepto</label><input type="text" id="cmeco-as-desc" placeholder="Descripcion del asiento"></div>' +
+                    '<div class="cmeco-fg"><label>Tipo</label><select id="cmeco-as-tipo"><option value="manual">Normal</option><option value="apertura">Apertura</option></select></div>' +
+                '</div>' +
+                '<div class="cmeco-as-head"><div>Cuenta</div><div style="text-align:right">Debe</div><div style="text-align:right">Haber</div><div></div></div>' +
+                '<div id="cmeco-as-lineas"></div>' +
+                '<button class="cmeco-btn cmeco-btn-secondary cmeco-btn-sm" onclick="cmEcoAddLineaAsiento()" style="margin-top:4px">+ Anadir linea</button>' +
+                '<div class="cmeco-as-resumen" id="cmeco-as-resumen"></div>' +
+            '</div>' +
+            '<div class="cmeco-modal-footer">' +
+                '<button class="cmeco-btn cmeco-btn-secondary" onclick="cmEcoCerrarModalAsiento()">Cancelar</button>' +
+                '<button class="cmeco-btn cmeco-btn-primary" onclick="cmEcoGuardarAsiento()">Guardar asiento</button>' +
+            '</div>' +
+        '</div>';
+    document.body.appendChild(overlay);
+    cmEcoAddLineaAsiento();
+    cmEcoAddLineaAsiento();
+    cmEcoRecalcAsiento();
+}
+
+function cmEcoCerrarModalAsiento() {
+    var o = document.getElementById('cmeco-modal-asiento');
+    if (o) o.remove();
+}
+
+function cmEcoFilaAsientoHTML() {
+    return '<div class="cmeco-as-row">' +
+        '<select class="cmeco-as-cta">' + cmEcoCtaOptsHTML + '</select>' +
+        '<input type="text" inputmode="decimal" class="cmeco-as-debe" placeholder="0,00" oninput="cmEcoRecalcAsiento()">' +
+        '<input type="text" inputmode="decimal" class="cmeco-as-haber" placeholder="0,00" oninput="cmEcoRecalcAsiento()">' +
+        '<button class="cmeco-btn cmeco-btn-secondary cmeco-btn-sm" onclick="this.parentElement.remove();cmEcoRecalcAsiento()" title="Quitar">&times;</button>' +
+    '</div>';
+}
+
+function cmEcoAddLineaAsiento() {
+    var c = document.getElementById('cmeco-as-lineas');
+    if (c) c.insertAdjacentHTML('beforeend', cmEcoFilaAsientoHTML());
+}
+
+function cmEcoRecalcAsiento() {
+    var rows = document.querySelectorAll('#cmeco-as-lineas .cmeco-as-row');
+    var totD = 0, totH = 0;
+    rows.forEach(function(r) {
+        totD += cmEcoEurToCents(r.querySelector('.cmeco-as-debe').value) || 0;
+        totH += cmEcoEurToCents(r.querySelector('.cmeco-as-haber').value) || 0;
+    });
+    var res = document.getElementById('cmeco-as-resumen');
+    if (!res) return;
+    var cuadra = (totD === totH && totD > 0);
+    var estado = cuadra
+        ? '<span style="color:#22c55e;font-weight:700">&#10003; Cuadra</span>'
+        : '<span style="color:#f59e0b;font-weight:700">No cuadra (diferencia ' + cmEcoCentsToEur(Math.abs(totD - totH)) + ' EUR)</span>';
+    res.innerHTML = 'Debe: <b>' + cmEcoCentsToEur(totD) + '</b> &nbsp;&nbsp; Haber: <b>' + cmEcoCentsToEur(totH) + '</b> &nbsp;&nbsp; ' + estado;
+}
+
+async function cmEcoGuardarAsiento() {
+    var fecha = (document.getElementById('cmeco-as-fecha') || {}).value || '';
+    var desc = (document.getElementById('cmeco-as-desc') || {}).value || '';
+    var tipo = (document.getElementById('cmeco-as-tipo') || {}).value || 'manual';
+    if (!fecha) { showToast('Indica la fecha del asiento', 'error'); return; }
+
+    var rows = document.querySelectorAll('#cmeco-as-lineas .cmeco-as-row');
+    var lineas = [];
+    var errLinea = false;
+    rows.forEach(function(r) {
+        var cta = r.querySelector('.cmeco-as-cta').value;
+        var debe = cmEcoEurToCents(r.querySelector('.cmeco-as-debe').value) || 0;
+        var haber = cmEcoEurToCents(r.querySelector('.cmeco-as-haber').value) || 0;
+        if (!cta && debe === 0 && haber === 0) return;          // fila vacia: se ignora
+        if (!cta) { errLinea = true; return; }                   // importe sin cuenta
+        if (debe > 0 && haber > 0) { errLinea = true; return; }  // no puede tener ambos
+        if (debe === 0 && haber === 0) { errLinea = true; return; } // cuenta sin importe
+        lineas.push({ account_id: cta, debit_cents: debe, credit_cents: haber });
+    });
+    if (errLinea) { showToast('Revisa las lineas: cada una necesita una cuenta y un importe en Debe O en Haber', 'error'); return; }
+    if (lineas.length < 2) { showToast('Un asiento necesita al menos 2 lineas', 'error'); return; }
+    var sumD = lineas.reduce(function(s, l) { return s + l.debit_cents; }, 0);
+    var sumH = lineas.reduce(function(s, l) { return s + l.credit_cents; }, 0);
+    if (sumD !== sumH) { showToast('El asiento no cuadra: Debe ' + cmEcoCentsToEur(sumD) + ' / Haber ' + cmEcoCentsToEur(sumH), 'error'); return; }
+    if (sumD === 0) { showToast('El asiento no puede ser por importe cero', 'error'); return; }
+
+    var maxN = cmEcoAsientos.reduce(function(m, a) { return Math.max(m, a.entry_number || 0); }, 0);
+    var ahora = new Date().toISOString();
+    try {
+        var rj = await supabaseClient.from('cm_eco_journal').insert({
+            club_id: clubId,
+            fiscal_year_id: cmEcoEjercicio.id,
+            entry_number: maxN + 1,
+            entry_date: fecha,
+            description: desc,
+            entry_type: tipo,
+            created_by: cmEcoMiembroId(),
+            created_at: ahora,
+            updated_at: ahora
+        }).select().single();
+        if (rj.error) throw rj.error;
+        var jid = rj.data.id;
+        var payload = lineas.map(function(l, i) {
+            return { journal_id: jid, club_id: clubId, account_id: l.account_id, debit_cents: l.debit_cents, credit_cents: l.credit_cents, line_order: i };
+        });
+        var rl = await supabaseClient.from('cm_eco_journal_lines').insert(payload);
+        if (rl.error) throw rl.error;
+        showToast('Asiento ' + (maxN + 1) + ' guardado');
+        cmEcoCerrarModalAsiento();
+        cmEcoCargarDiario();
+    } catch (e) {
+        console.error('cmEcoGuardarAsiento:', e);
+        showToast('Error al guardar: ' + (e.message || e), 'error');
+    }
+}
+
+// ---- Datos compartidos por Mayor y Balance ----
+var cmEcoApuntesCache = [];
+
+async function cmEcoCargarDatosConta() {
+    if (cmEcoCuentasConta.length === 0) {
+        var rac = await supabaseClient.from('cm_eco_accounts')
+            .select('id,code,name,account_type').eq('club_id', clubId).eq('is_active', true).order('code');
+        cmEcoCuentasConta = rac.data || [];
+    }
+    var rj = await supabaseClient.from('cm_eco_journal')
+        .select('*, cm_eco_journal_lines(*)')
+        .eq('club_id', clubId).eq('fiscal_year_id', cmEcoEjercicio.id)
+        .order('entry_number', { ascending: true }).range(0, 9999);
+    cmEcoAsientos = rj.data || [];
+}
+
+// Devuelve todos los apuntes "planos", ordenados por numero de asiento
+function cmEcoApuntesPlanos() {
+    var ctaById = {};
+    cmEcoCuentasConta.forEach(function(c) { ctaById[c.id] = c; });
+    var arr = [];
+    cmEcoAsientos.forEach(function(a) {
+        (a.cm_eco_journal_lines || []).forEach(function(l) {
+            var c = ctaById[l.account_id] || {};
+            arr.push({
+                account_id: l.account_id, code: c.code || '?', name: c.name || '', type: c.account_type || '',
+                entry_number: a.entry_number, entry_date: a.entry_date, description: a.description,
+                debit: l.debit_cents || 0, credit: l.credit_cents || 0, line_order: l.line_order || 0
+            });
+        });
+    });
+    arr.sort(function(x, y) { return (x.entry_number - y.entry_number) || (x.line_order - y.line_order); });
+    return arr;
+}
+
+// ---- LIBRO MAYOR: una cuenta, todos sus movimientos y saldo acumulado ----
+async function cmEcoMayor(c) {
+    c.innerHTML = '<div class="cmeco-empty"><div class="icon">&#8987;</div><p>Cargando...</p></div>';
+    await cmEcoCargarDatosConta();
+    cmEcoApuntesCache = cmEcoApuntesPlanos();
+    if (!cmEcoApuntesCache.length) {
+        c.innerHTML = '<div class="cmeco-empty"><div class="icon">&#128214;</div><h3>Sin movimientos</h3><p>Cuando haya asientos, aqui veras cada cuenta con su detalle.</p></div>';
+        return;
+    }
+    var conMov = {};
+    cmEcoApuntesCache.forEach(function(p) { conMov[p.account_id] = p.code + ' ' + p.name; });
+    var arrCtas = Object.keys(conMov).map(function(id) { return { id: id, label: conMov[id] }; });
+    arrCtas.sort(function(a, b) { return a.label < b.label ? -1 : 1; });
+    var opts = arrCtas.map(function(o) { return '<option value="' + o.id + '">' + cmEcoEsc(o.label) + '</option>'; }).join('');
+    c.innerHTML =
+        '<div class="cmeco-fg" style="max-width:440px"><label>Cuenta</label>' +
+            '<select id="cmeco-mayor-cta" onchange="cmEcoMayorRender()">' + opts + '</select></div>' +
+        '<div id="cmeco-mayor-mov"></div>';
+    cmEcoMayorRender();
+}
+
+function cmEcoMayorRender() {
+    var sel = document.getElementById('cmeco-mayor-cta');
+    var cont = document.getElementById('cmeco-mayor-mov');
+    if (!sel || !cont) return;
+    var id = sel.value;
+    var movs = cmEcoApuntesCache.filter(function(p) { return p.account_id === id; });
+    var saldo = 0, totD = 0, totH = 0;
+    var filas = movs.map(function(p) {
+        saldo += p.debit - p.credit;
+        totD += p.debit; totH += p.credit;
+        var signo = saldo >= 0 ? ' D' : ' H';
+        return '<tr><td>' + cmEcoFechaCorta(p.entry_date) + '</td>' +
+            '<td>' + (p.entry_number || '-') + '</td>' +
+            '<td>' + cmEcoEsc(p.description || '') + '</td>' +
+            '<td class="num">' + (p.debit ? cmEcoCentsToEur(p.debit) : '') + '</td>' +
+            '<td class="num">' + (p.credit ? cmEcoCentsToEur(p.credit) : '') + '</td>' +
+            '<td class="num">' + cmEcoCentsToEur(Math.abs(saldo)) + signo + '</td></tr>';
+    }).join('');
+    var saldoFinal = cmEcoCentsToEur(Math.abs(saldo)) + (saldo >= 0 ? ' deudor' : ' acreedor');
+    cont.innerHTML =
+        '<div class="cmeco-table-wrap"><table class="cmeco-table"><thead><tr>' +
+            '<th>Fecha</th><th>Asiento</th><th>Concepto</th><th class="num">Debe</th><th class="num">Haber</th><th class="num">Saldo</th>' +
+        '</tr></thead><tbody>' + filas +
+            '<tr style="border-top:2px solid #334155"><td colspan="3" style="font-weight:700;color:#f1f5f9">Totales</td>' +
+            '<td class="num" style="font-weight:700;color:#f1f5f9">' + cmEcoCentsToEur(totD) + '</td>' +
+            '<td class="num" style="font-weight:700;color:#f1f5f9">' + cmEcoCentsToEur(totH) + '</td>' +
+            '<td class="num" style="font-weight:700;color:#5eead4">' + saldoFinal + '</td></tr>' +
+        '</tbody></table></div>';
+}
+
+// ---- BALANCE DE SUMAS Y SALDOS: todas las cuentas, comprobacion de cuadre ----
+async function cmEcoBalance(c) {
+    c.innerHTML = '<div class="cmeco-empty"><div class="icon">&#8987;</div><p>Cargando...</p></div>';
+    await cmEcoCargarDatosConta();
+    var apuntes = cmEcoApuntesPlanos();
+    if (!apuntes.length) {
+        c.innerHTML = '<div class="cmeco-empty"><div class="icon">&#9878;</div><h3>Sin movimientos</h3><p>El balance de sumas y saldos se calcula a partir de los asientos.</p></div>';
+        return;
+    }
+    var acc = {};
+    apuntes.forEach(function(p) {
+        if (!acc[p.account_id]) acc[p.account_id] = { code: p.code, name: p.name, debe: 0, haber: 0 };
+        acc[p.account_id].debe += p.debit;
+        acc[p.account_id].haber += p.credit;
+    });
+    var filas = Object.keys(acc).map(function(id) { return acc[id]; });
+    filas.sort(function(a, b) { return a.code < b.code ? -1 : 1; });
+    var totD = 0, totH = 0, totSD = 0, totSH = 0;
+    var rows = filas.map(function(f) {
+        var saldo = f.debe - f.haber;
+        var sd = saldo > 0 ? saldo : 0;
+        var sh = saldo < 0 ? -saldo : 0;
+        totD += f.debe; totH += f.haber; totSD += sd; totSH += sh;
+        return '<tr><td>' + cmEcoEsc(f.code + ' ' + f.name) + '</td>' +
+            '<td class="num">' + cmEcoCentsToEur(f.debe) + '</td>' +
+            '<td class="num">' + cmEcoCentsToEur(f.haber) + '</td>' +
+            '<td class="num">' + (sd ? cmEcoCentsToEur(sd) : '') + '</td>' +
+            '<td class="num">' + (sh ? cmEcoCentsToEur(sh) : '') + '</td></tr>';
+    }).join('');
+    var cuadra = (totD === totH && totSD === totSH);
+    var aviso = cuadra
+        ? '<span style="color:#22c55e;font-weight:700">&#10003; El balance cuadra</span>'
+        : '<span style="color:#ef4444;font-weight:700">&#9888; Descuadre: revisa los asientos</span>';
+    c.innerHTML =
+        '<div style="margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">' + aviso +
+            '<button class="cmeco-btn cmeco-btn-secondary cmeco-btn-sm" onclick="cmEcoExportarSumasCSV()">Exportar CSV</button></div>' +
+        '<div class="cmeco-table-wrap"><table class="cmeco-table"><thead><tr>' +
+            '<th>Cuenta</th><th class="num">Sumas Debe</th><th class="num">Sumas Haber</th><th class="num">Saldo Deudor</th><th class="num">Saldo Acreedor</th>' +
+        '</tr></thead><tbody>' + rows +
+            '<tr style="border-top:2px solid #334155">' +
+            '<td style="font-weight:700;color:#f1f5f9">TOTALES</td>' +
+            '<td class="num" style="font-weight:700;color:#f1f5f9">' + cmEcoCentsToEur(totD) + '</td>' +
+            '<td class="num" style="font-weight:700;color:#f1f5f9">' + cmEcoCentsToEur(totH) + '</td>' +
+            '<td class="num" style="font-weight:700;color:#f1f5f9">' + cmEcoCentsToEur(totSD) + '</td>' +
+            '<td class="num" style="font-weight:700;color:#f1f5f9">' + cmEcoCentsToEur(totSH) + '</td></tr>' +
+        '</tbody></table></div>';
+}
+
+// Saldos acumulados por cuenta (con su tipo), a partir de los asientos
+function cmEcoSaldosPorCuenta() {
+    var apuntes = cmEcoApuntesPlanos();
+    var acc = {};
+    apuntes.forEach(function(p) {
+        if (!acc[p.account_id]) acc[p.account_id] = { code: p.code, name: p.name, type: p.type, debe: 0, haber: 0 };
+        acc[p.account_id].debe += p.debit;
+        acc[p.account_id].haber += p.credit;
+    });
+    return acc;
+}
+
+// ---- CUENTA DE PERDIDAS Y GANANCIAS (resultado del ejercicio) ----
+async function cmEcoResultadoConta(c) {
+    c.innerHTML = '<div class="cmeco-empty"><div class="icon">&#8987;</div><p>Cargando...</p></div>';
+    await cmEcoCargarDatosConta();
+    var acc = cmEcoSaldosPorCuenta();
+    var ingresos = [], gastos = [], totI = 0, totG = 0;
+    Object.keys(acc).forEach(function(id) {
+        var a = acc[id];
+        if (a.type === 'ingreso') { var si = a.haber - a.debe; if (si !== 0) { ingresos.push({ n: a.code + ' ' + a.name, v: si }); totI += si; } }
+        else if (a.type === 'gasto') { var sg = a.debe - a.haber; if (sg !== 0) { gastos.push({ n: a.code + ' ' + a.name, v: sg }); totG += sg; } }
+    });
+    if (!ingresos.length && !gastos.length) {
+        c.innerHTML = '<div class="cmeco-empty"><div class="icon">&#128200;</div><h3>Sin datos</h3><p>El resultado se calcula con los asientos de ingresos y gastos.</p></div>';
+        return;
+    }
+    var resultado = totI - totG;
+    function bloque(titulo, filas, total, color) {
+        var rows = filas.map(function(f) {
+            return '<tr><td>' + cmEcoEsc(f.n) + '</td><td class="num">' + cmEcoCentsToEur(f.v) + '</td></tr>';
+        }).join('');
+        return '<table class="cmeco-table" style="margin-bottom:18px"><thead><tr><th>' + titulo + '</th><th class="num"></th></tr></thead><tbody>' +
+            rows + '<tr style="border-top:2px solid #334155"><td style="font-weight:700;color:' + color + '">Total ' + titulo.toLowerCase() + '</td>' +
+            '<td class="num" style="font-weight:700;color:' + color + '">' + cmEcoCentsToEur(total) + '</td></tr></tbody></table>';
+    }
+    var etiqueta = resultado >= 0 ? 'Beneficio del ejercicio' : 'Perdidas del ejercicio';
+    var colorRes = resultado >= 0 ? '#22c55e' : '#ef4444';
+    c.innerHTML =
+        bloque('Ingresos', ingresos, totI, '#5eead4') +
+        bloque('Gastos', gastos, totG, '#fca5a5') +
+        '<div style="background:#1e293b;border:1px solid #334155;border-radius:10px;padding:16px 18px;display:flex;justify-content:space-between;align-items:center">' +
+            '<span style="color:#f1f5f9;font-weight:700;font-size:15px">' + etiqueta + '</span>' +
+            '<span style="font-weight:800;font-size:20px;color:' + colorRes + '">' + cmEcoCentsToEur(Math.abs(resultado)) + ' EUR</span>' +
+        '</div>';
+}
+
+// ---- BALANCE DE SITUACION (Activo = Patrimonio neto + Pasivo) ----
+async function cmEcoBalanceSituacion(c) {
+    c.innerHTML = '<div class="cmeco-empty"><div class="icon">&#8987;</div><p>Cargando...</p></div>';
+    await cmEcoCargarDatosConta();
+    var acc = cmEcoSaldosPorCuenta();
+    var activo = [], pasivo = [], pneto = [], totA = 0, totP = 0, totPN = 0, totI = 0, totG = 0;
+    Object.keys(acc).forEach(function(id) {
+        var a = acc[id];
+        if (a.type === 'activo') { var sa = a.debe - a.haber; if (sa !== 0) { activo.push({ n: a.code + ' ' + a.name, v: sa }); totA += sa; } }
+        else if (a.type === 'pasivo') { var sp = a.haber - a.debe; if (sp !== 0) { pasivo.push({ n: a.code + ' ' + a.name, v: sp }); totP += sp; } }
+        else if (a.type === 'patrimonio_neto') { var sn = a.haber - a.debe; if (sn !== 0) { pneto.push({ n: a.code + ' ' + a.name, v: sn }); totPN += sn; } }
+        else if (a.type === 'ingreso') { totI += a.haber - a.debe; }
+        else if (a.type === 'gasto') { totG += a.debe - a.haber; }
+    });
+    if (!activo.length && !pasivo.length && !pneto.length) {
+        c.innerHTML = '<div class="cmeco-empty"><div class="icon">&#9878;</div><h3>Sin datos</h3><p>El balance se construye a partir de los asientos.</p></div>';
+        return;
+    }
+    var resultado = totI - totG;
+    var totPNconRes = totPN + resultado;
+    var totPasivoPN = totPNconRes + totP;
+    var cuadra = (totA === totPasivoPN);
+
+    function lista(filas) {
+        return filas.map(function(f) {
+            return '<tr><td>' + cmEcoEsc(f.n) + '</td><td class="num">' + cmEcoCentsToEur(f.v) + '</td></tr>';
+        }).join('');
+    }
+    var colA =
+        '<table class="cmeco-table"><thead><tr><th>ACTIVO</th><th class="num"></th></tr></thead><tbody>' +
+            lista(activo) +
+            '<tr style="border-top:2px solid #334155"><td style="font-weight:700;color:#f1f5f9">Total Activo</td>' +
+            '<td class="num" style="font-weight:700;color:#f1f5f9">' + cmEcoCentsToEur(totA) + '</td></tr>' +
+        '</tbody></table>';
+    var etiqRes = resultado >= 0 ? 'Resultado del ejercicio (beneficio)' : 'Resultado del ejercicio (perdidas)';
+    var colP =
+        '<table class="cmeco-table"><thead><tr><th>PATRIMONIO NETO Y PASIVO</th><th class="num"></th></tr></thead><tbody>' +
+            lista(pneto) +
+            '<tr><td style="color:' + (resultado >= 0 ? '#5eead4' : '#fca5a5') + '">' + etiqRes + '</td>' +
+            '<td class="num" style="color:' + (resultado >= 0 ? '#5eead4' : '#fca5a5') + '">' + cmEcoCentsToEur(resultado) + '</td></tr>' +
+            '<tr style="border-top:1px solid #334155"><td style="font-weight:600;color:#cbd5e1">Total Patrimonio neto</td>' +
+            '<td class="num" style="font-weight:600;color:#cbd5e1">' + cmEcoCentsToEur(totPNconRes) + '</td></tr>' +
+            lista(pasivo) +
+            '<tr style="border-top:1px solid #334155"><td style="color:#cbd5e1">Total Pasivo</td>' +
+            '<td class="num" style="color:#cbd5e1">' + cmEcoCentsToEur(totP) + '</td></tr>' +
+            '<tr style="border-top:2px solid #334155"><td style="font-weight:700;color:#f1f5f9">Total Patrimonio neto y Pasivo</td>' +
+            '<td class="num" style="font-weight:700;color:#f1f5f9">' + cmEcoCentsToEur(totPasivoPN) + '</td></tr>' +
+        '</tbody></table>';
+    var aviso = cuadra
+        ? '<span style="color:#22c55e;font-weight:700">&#10003; El balance cuadra (Activo = Patrimonio neto + Pasivo)</span>'
+        : '<span style="color:#ef4444;font-weight:700">&#9888; Descuadre de ' + cmEcoCentsToEur(Math.abs(totA - totPasivoPN)) + ' EUR</span>';
+    c.innerHTML =
+        '<div style="margin-bottom:12px">' + aviso + '</div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">' +
+            '<div>' + colA + '</div><div>' + colP + '</div>' +
+        '</div>' +
+        '<div style="margin-top:16px;padding:12px 14px;background:#0b1220;border:1px solid #334155;border-radius:8px;color:#94a3b8;font-size:12px">' +
+            'El <b style="color:#cbd5e1">Patrimonio neto</b> (' + cmEcoCentsToEur(totPNconRes) + ' EUR) es el dato que pide el Control RFEF.' +
+        '</div>';
+    cmEcoBalancePatrimonio = totPNconRes;
+}
+var cmEcoBalancePatrimonio = 0;
+
+// ---- EXPORTACION DE LIBROS A CSV (Excel espanol: separador ; y coma decimal) ----
+function cmEcoCentsToNum(c) { return ((c || 0) / 100).toFixed(2).replace('.', ','); }
+function cmEcoCsvCampo(v) { v = (v == null ? '' : String(v)); return '"' + v.replace(/"/g, '""') + '"'; }
+function cmEcoDescargarCSV(nombre, contenido) {
+    var blob = new Blob(['\ufeff' + contenido], { type: 'text/csv;charset=utf-8;' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = nombre;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+
+async function cmEcoExportarDiarioCSV() {
+    await cmEcoCargarDatosConta();
+    var ctaById = {};
+    cmEcoCuentasConta.forEach(function(c) { ctaById[c.id] = c.code + ' ' + c.name; });
+    var filas = ['Asiento;Fecha;Tipo;Cuenta;Concepto;Debe;Haber'];
+    cmEcoAsientos.forEach(function(a) {
+        (a.cm_eco_journal_lines || []).slice().sort(function(x, y) { return (x.line_order || 0) - (y.line_order || 0); }).forEach(function(l) {
+            filas.push([
+                cmEcoCsvCampo(a.entry_number), cmEcoCsvCampo(a.entry_date), cmEcoCsvCampo(a.entry_type),
+                cmEcoCsvCampo(ctaById[l.account_id] || ''), cmEcoCsvCampo(l.line_description || a.description || ''),
+                cmEcoCsvCampo(cmEcoCentsToNum(l.debit_cents)), cmEcoCsvCampo(cmEcoCentsToNum(l.credit_cents))
+            ].join(';'));
+        });
+    });
+    var nom = 'libro-diario-' + String(cmEcoEjercicio.name || '').replace(/\W+/g, '_') + '.csv';
+    cmEcoDescargarCSV(nom, filas.join('\r\n'));
+    showToast('Libro Diario exportado');
+}
+
+async function cmEcoExportarSumasCSV() {
+    await cmEcoCargarDatosConta();
+    var acc = cmEcoSaldosPorCuenta();
+    var arr = Object.keys(acc).map(function(id) { return acc[id]; }).sort(function(a, b) { return a.code < b.code ? -1 : 1; });
+    var filas = ['Codigo;Cuenta;Sumas Debe;Sumas Haber;Saldo Deudor;Saldo Acreedor'];
+    arr.forEach(function(f) {
+        var saldo = f.debe - f.haber, sd = saldo > 0 ? saldo : 0, sh = saldo < 0 ? -saldo : 0;
+        filas.push([
+            cmEcoCsvCampo(f.code), cmEcoCsvCampo(f.name),
+            cmEcoCsvCampo(cmEcoCentsToNum(f.debe)), cmEcoCsvCampo(cmEcoCentsToNum(f.haber)),
+            cmEcoCsvCampo(cmEcoCentsToNum(sd)), cmEcoCsvCampo(cmEcoCentsToNum(sh))
+        ].join(';'));
+    });
+    cmEcoDescargarCSV('balance-sumas-saldos.csv', filas.join('\r\n'));
+    showToast('Balance exportado');
+}
 
 function cmEcoTabCumplimiento(cont) {
     cont.innerHTML = '<div class="cmeco-empty"><div class="icon">&#128737;</div><h3>Control Economico RFEF</h3>' +
