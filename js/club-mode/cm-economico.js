@@ -33,6 +33,13 @@ var cmEcoSeleccion    = {};         // { sheet_id: total_cents } para pago en lo
 var cmEcoMiembros     = [];         // club_members (id, display_name)
 var cmEcoBancos       = {};         // { member_id: {iban, holder_name} }
 var cmEcoReembData    = [];         // hojas con paid_by_member (para la pestana Reembolsos)
+var cmEcoCatIngreso   = [];         // categorias de ingreso
+var cmEcoIngresos     = [];         // ingresos del ejercicio
+var cmEcoCuotasPagos  = 0;          // total cuotas cobradas (modulo Pagos) en el ejercicio
+var cmEcoBudgetMap    = {};         // { category_id: amount_cents } presupuestado
+var cmEcoRealGasto    = {};         // { category_id: cents } gastado real
+var cmEcoRealIngreso  = {};         // { category_id: cents } ingresado real
+var cmEcoTesoreria    = null;       // { cobrado, pagado, cuotas }
 
 var CMECO_NIVEL_LABEL = {
     ninguno:'Sin control economico', elemental:'Control Elemental',
@@ -241,23 +248,47 @@ function cmEcoTabResumen(cont) {
             cmEcoFechaCorta(cmEcoEjercicio.start_date) + ' &rarr; ' + cmEcoFechaCorta(cmEcoEjercicio.end_date) + '</div>';
     cmEcoCargarResumen();
 }
+// Suma las cuotas cobradas en el modulo de Pagos dentro del ejercicio actual.
+// Lee cm_pay_transactions (pagos completados); los reembolsos (refund) restan.
+async function cmEcoSumaCuotasPagos() {
+    if (!cmEcoEjercicio) return 0;
+    try {
+        var desde = cmEcoEjercicio.start_date;
+        var hasta = cmEcoEjercicio.end_date + 'T23:59:59';
+        var r = await supabaseClient.from('cm_pay_transactions')
+            .select('amount_cents,transaction_type')
+            .eq('club_id', clubId).eq('status', 'completed').eq('archived', false)
+            .gte('paid_at', desde).lte('paid_at', hasta).range(0, 9999);
+        if (r.error) { console.warn('cmEcoSumaCuotasPagos:', r.error.message); return 0; }
+        return (r.data || []).reduce(function(s, t) {
+            return s + (t.transaction_type === 'refund' ? -1 : 1) * (t.amount_cents || 0);
+        }, 0);
+    } catch (e) { console.warn('cmEcoSumaCuotasPagos:', e); return 0; }
+}
+
 async function cmEcoCargarResumen() {
     var cont = document.getElementById('cmeco-resumen-kpis');
     if (!cont) return;
     try {
         var fy = cmEcoEjercicio.id;
         var ri = await supabaseClient.from('cm_eco_incomes').select('total_cents').eq('club_id', clubId).eq('fiscal_year_id', fy).range(0, 9999);
-        var ingresos = (ri.data || []).reduce(function(s, x) { return s + (x.total_cents || 0); }, 0);
+        var ingresosManual = (ri.data || []).reduce(function(s, x) { return s + (x.total_cents || 0); }, 0);
+        var cuotas = await cmEcoSumaCuotasPagos();
+        cmEcoCuotasPagos = cuotas;
+        var ingresos = ingresosManual + cuotas;
         var rg = await supabaseClient.from('cm_eco_expense_sheets').select('total_cents,status').eq('club_id', clubId).eq('fiscal_year_id', fy).range(0, 9999);
         var gastos = (rg.data || []).reduce(function(s, x) { return s + (x.status === 'rechazada' ? 0 : (x.total_cents || 0)); }, 0);
         var resultado = ingresos - gastos;
         var resClase = resultado < 0 ? 'res-neg' : 'res-pos';
+        var nota = cuotas > 0
+            ? '<div style="color:#64748b;font-size:12px;margin-top:8px">Los ingresos incluyen <b style="color:#22c55e">' + cmEcoCentsToEur(cuotas) + ' EUR</b> de cuotas cobradas en el modulo de Pagos' + (ingresosManual > 0 ? ' y ' + cmEcoCentsToEur(ingresosManual) + ' EUR registrados aqui.' : '.') + '</div>'
+            : '';
         cont.innerHTML =
             '<div class="cmeco-kpis">' +
                 '<div class="cmeco-kpi ing"><div class="kpi-val">' + cmEcoCentsToEur(ingresos) + ' <span class="kpi-cur">EUR</span></div><div class="kpi-lbl">Ingresos</div></div>' +
                 '<div class="cmeco-kpi gas"><div class="kpi-val">' + cmEcoCentsToEur(gastos) + ' <span class="kpi-cur">EUR</span></div><div class="kpi-lbl">Gastos</div></div>' +
                 '<div class="cmeco-kpi ' + resClase + '"><div class="kpi-val">' + cmEcoCentsToEur(resultado) + ' <span class="kpi-cur">EUR</span></div><div class="kpi-lbl">Resultado</div></div>' +
-            '</div>';
+            '</div>' + nota;
     } catch (e) {
         console.error('cmEcoCargarResumen:', e);
         cont.innerHTML = '<div class="cmeco-empty"><div class="icon">&#9888;</div><p>Error al calcular el resumen</p></div>';
@@ -773,15 +804,272 @@ async function cmEcoReembolsar(mid) {
 }
 
 
+// ============================================================
+// INGRESOS
+// Alta manual + listado. Sin foto/OCR (los ingresos no llevan ticket).
+// ============================================================
 function cmEcoTabIngresos(cont) {
-    cont.innerHTML = '<div class="cmeco-empty"><div class="icon">&#128181;</div><h3>Ingresos</h3>' +
-        '<p>Subvenciones, patrocinios, donaciones, eventos y tienda.<br>Las cuotas llegan agregadas desde Pagos.</p>' +
-        '<div class="cmeco-soon">Planificado</div></div>';
+    if (!cmEcoEjercicio) {
+        cont.innerHTML = '<div class="cmeco-empty"><div class="icon">&#128197;</div><h3>Sin ejercicio activo</h3></div>';
+        return;
+    }
+    cont.innerHTML =
+        '<div class="cmeco-toolbar">' +
+            '<div style="color:#94a3b8;font-size:13px">Ingresos del ejercicio ' + cmEcoEsc(cmEcoEjercicio.name) + '</div>' +
+            (cmEcoPuedeEditar() ? '<button class="cmeco-btn cmeco-btn-primary" onclick="cmEcoAbrirModalIngreso()">+ Nuevo ingreso</button>' : '') +
+        '</div>' +
+        '<div id="cmeco-ingresos-tabla"><div class="cmeco-empty"><div class="icon">&#8987;</div><p>Cargando...</p></div></div>';
+    cmEcoCargarIngresos();
 }
+
+async function cmEcoCargarIngresos() {
+    var cont = document.getElementById('cmeco-ingresos-tabla');
+    if (!cont) return;
+    try {
+        if (cmEcoCatIngreso.length === 0) {
+            var rc = await supabaseClient.from('cm_eco_categories').select('id,name').eq('club_id', clubId).eq('kind', 'ingreso').eq('is_active', true).order('name');
+            cmEcoCatIngreso = rc.data || [];
+        }
+        var ri = await supabaseClient.from('cm_eco_incomes').select('*')
+            .eq('club_id', clubId).eq('fiscal_year_id', cmEcoEjercicio.id)
+            .order('income_date', { ascending: false }).range(0, 9999);
+        if (ri.error) throw ri.error;
+        cmEcoIngresos = ri.data || [];
+        cmEcoCuotasPagos = await cmEcoSumaCuotasPagos();
+        cmEcoRenderIngresos();
+    } catch (e) {
+        console.error('cmEcoCargarIngresos:', e);
+        cont.innerHTML = '<div class="cmeco-empty"><div class="icon">&#9888;</div><p>Error al cargar los ingresos</p></div>';
+    }
+}
+
+function cmEcoRenderIngresos() {
+    var cont = document.getElementById('cmeco-ingresos-tabla');
+    if (!cont) return;
+
+    var cuotasBox = cmEcoCuotasPagos > 0
+        ? '<div style="background:#11271c;border:1px solid #1e4f2e;border-radius:10px;padding:14px 16px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">' +
+            '<div><div style="color:#86efac;font-weight:600;font-size:14px">Cuotas cobradas en el modulo de Pagos</div>' +
+            '<div style="color:#94a3b8;font-size:12px;margin-top:2px">Se suman a los ingresos del club. Se gestionan en la pestana Pagos (no se teclean aqui).</div></div>' +
+            '<div style="color:#22c55e;font-size:20px;font-weight:700;white-space:nowrap">' + cmEcoCentsToEur(cmEcoCuotasPagos) + ' EUR</div>' +
+          '</div>'
+        : '';
+
+    if (cmEcoIngresos.length === 0) {
+        cont.innerHTML = cuotasBox +
+            '<div class="cmeco-empty"><div class="icon">&#128176;</div><h3>Sin ingresos manuales</h3>' +
+            '<p>Las cuotas vienen solas desde Pagos. Aqui registras el resto:<br>subvenciones, patrocinios, donaciones, eventos o ventas, con "+ Nuevo ingreso".</p></div>';
+        return;
+    }
+    var catById = {}; cmEcoCatIngreso.forEach(function(c) { catById[c.id] = c.name; });
+    var filas = '';
+    cmEcoIngresos.forEach(function(g) {
+        filas += '<tr>' +
+            '<td>' + (g.income_date ? cmEcoFechaCorta(g.income_date) : '-') + '</td>' +
+            '<td>' + cmEcoEsc(g.source_name || g.description || 'Ingreso') + '</td>' +
+            '<td>' + cmEcoEsc(catById[g.category_id] || '-') + '</td>' +
+            '<td>' + (g.payment_method ? cmEcoEsc(CMECO_METODO[g.payment_method] || g.payment_method) : '-') + '</td>' +
+            '<td class="num">' + cmEcoCentsToEur(g.total_cents) + '</td>' +
+        '</tr>';
+    });
+    var total = cmEcoIngresos.reduce(function(s, g) { return s + (g.total_cents || 0); }, 0);
+    cont.innerHTML = cuotasBox +
+        '<div style="color:#64748b;font-size:12px;margin-bottom:8px">' + cmEcoIngresos.length + ' ingresos manuales &middot; total ' + cmEcoCentsToEur(total) + ' EUR</div>' +
+        '<div class="cmeco-table-wrap"><table class="cmeco-table"><thead><tr>' +
+            '<th>Fecha</th><th>Origen</th><th>Categoria</th><th>Metodo</th><th class="num">Total</th>' +
+        '</tr></thead><tbody>' + filas + '</tbody></table></div>';
+}
+
+function cmEcoAbrirModalIngreso() {
+    var catOpts = '<option value="">(sin categoria)</option>' + cmEcoCatIngreso.map(function(c) { return '<option value="' + c.id + '">' + cmEcoEsc(c.name) + '</option>'; }).join('');
+    var metOpts = '<option value="">(sin metodo)</option>' + Object.keys(CMECO_METODO).map(function(k) { return '<option value="' + k + '">' + CMECO_METODO[k] + '</option>'; }).join('');
+    var hoy = new Date();
+    var hoyStr = hoy.getFullYear() + '-' + String(hoy.getMonth() + 1).padStart(2, '0') + '-' + String(hoy.getDate()).padStart(2, '0');
+    var overlay = document.createElement('div');
+    overlay.className = 'cmeco-modal-overlay';
+    overlay.id = 'cmeco-modal-ingreso';
+    overlay.onclick = function(e) { if (e.target === overlay) cmEcoCerrarModalIngreso(); };
+    overlay.innerHTML =
+        '<div class="cmeco-modal">' +
+            '<div class="cmeco-modal-header"><h3>Nuevo ingreso</h3><button class="cmeco-modal-close" onclick="cmEcoCerrarModalIngreso()">&times;</button></div>' +
+            '<div class="cmeco-modal-body">' +
+                '<div class="cmeco-row">' +
+                    '<div class="cmeco-fg"><label>Fecha *</label><input type="date" id="cmeco-i-fecha" value="' + hoyStr + '"></div>' +
+                    '<div class="cmeco-fg"><label>Categoria</label><select id="cmeco-i-cat">' + catOpts + '</select></div></div>' +
+                '<div class="cmeco-fg"><label>Origen / quien paga</label><input type="text" id="cmeco-i-origen" placeholder="Ej: Ayuntamiento, patrocinador, socio..."></div>' +
+                '<div class="cmeco-row3">' +
+                    '<div class="cmeco-fg"><label>Base (EUR)</label><input type="text" inputmode="decimal" id="cmeco-i-base" placeholder="0,00"></div>' +
+                    '<div class="cmeco-fg"><label>IVA %</label><input type="text" inputmode="decimal" id="cmeco-i-iva" placeholder="0"></div>' +
+                    '<div class="cmeco-fg"><label>Total (EUR) *</label><input type="text" inputmode="decimal" id="cmeco-i-total" placeholder="0,00"></div></div>' +
+                '<div class="cmeco-row">' +
+                    '<div class="cmeco-fg"><label>Metodo de cobro</label><select id="cmeco-i-metodo">' + metOpts + '</select></div>' +
+                    '<div class="cmeco-fg"><label>Referencia (opcional)</label><input type="text" id="cmeco-i-ref" placeholder="N. de transferencia, recibo..."></div></div>' +
+                '<div class="cmeco-fg"><label>Descripcion (opcional)</label><textarea id="cmeco-i-desc"></textarea></div>' +
+            '</div>' +
+            '<div class="cmeco-modal-footer">' +
+                '<button class="cmeco-btn cmeco-btn-secondary" onclick="cmEcoCerrarModalIngreso()">Cancelar</button>' +
+                '<button class="cmeco-btn cmeco-btn-primary" id="cmeco-i-guardar" onclick="cmEcoGuardarIngreso()">Guardar ingreso</button>' +
+            '</div>' +
+        '</div>';
+    document.body.appendChild(overlay);
+}
+function cmEcoCerrarModalIngreso() {
+    var o = document.getElementById('cmeco-modal-ingreso');
+    if (o) o.remove();
+}
+async function cmEcoGuardarIngreso() {
+    var totalCents = cmEcoEurToCents(document.getElementById('cmeco-i-total').value);
+    if (totalCents === null || totalCents <= 0) { showToast('Indica un total valido', 'error'); return; }
+    var baseCents = cmEcoEurToCents(document.getElementById('cmeco-i-base').value);
+    if (baseCents === null) baseCents = totalCents;     // si no hay desglose, todo es base
+    var ivaRate = parseFloat(String(document.getElementById('cmeco-i-iva').value).replace(',', '.'));
+    if (isNaN(ivaRate)) ivaRate = 0;
+    var vatCents = totalCents - baseCents;
+    if (vatCents < 0) vatCents = 0;
+    var fecha  = document.getElementById('cmeco-i-fecha').value || null;
+    var catId  = document.getElementById('cmeco-i-cat').value || null;
+    var origen = document.getElementById('cmeco-i-origen').value.trim() || null;
+    var metodo = document.getElementById('cmeco-i-metodo').value || null;
+    var ref    = document.getElementById('cmeco-i-ref').value.trim() || null;
+    var desc   = document.getElementById('cmeco-i-desc').value.trim() || null;
+    var btn = document.getElementById('cmeco-i-guardar');
+    if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
+    try {
+        var fila = {
+            club_id: clubId, fiscal_year_id: cmEcoEjercicio.id, category_id: catId,
+            income_date: fecha, source_name: origen, description: desc,
+            base_cents: baseCents, vat_rate: ivaRate, vat_cents: vatCents, total_cents: totalCents,
+            status: 'cobrado', payment_method: metodo, source_ref: ref,
+            created_by: cmEcoMiembroId(), created_at: new Date().toISOString()
+        };
+        var res = await supabaseClient.from('cm_eco_incomes').insert(fila);
+        if (res.error) throw res.error;
+        showToast('Ingreso registrado');
+        cmEcoCerrarModalIngreso();
+        cmEcoCargarIngresos();
+    } catch (e) {
+        console.error('cmEcoGuardarIngreso:', e);
+        showToast('Error al guardar: ' + (e.message || e), 'error');
+        if (btn) { btn.disabled = false; btn.textContent = 'Guardar ingreso'; }
+    }
+}
+// ============================================================
+// PRESUPUESTO Y TESORERIA
+// Tesoreria: posicion de caja (cobrado - pagado).
+// Presupuesto: por categoria, presupuestado vs real vs desviacion.
+// ============================================================
 function cmEcoTabPresupuesto(cont) {
-    cont.innerHTML = '<div class="cmeco-empty"><div class="icon">&#128202;</div><h3>Presupuesto y tesoreria</h3>' +
-        '<p>Presupuesto anual por area, posicion de caja y prevision de flujo de caja.</p>' +
-        '<div class="cmeco-soon">Planificado</div></div>';
+    if (!cmEcoEjercicio) {
+        cont.innerHTML = '<div class="cmeco-empty"><div class="icon">&#128197;</div><h3>Sin ejercicio activo</h3></div>';
+        return;
+    }
+    cont.innerHTML = '<div id="cmeco-presu"><div class="cmeco-empty"><div class="icon">&#8987;</div><p>Calculando...</p></div></div>';
+    cmEcoCargarPresupuesto();
+}
+
+async function cmEcoCargarPresupuesto() {
+    var cont = document.getElementById('cmeco-presu');
+    if (!cont) return;
+    try {
+        var fy = cmEcoEjercicio.id;
+        // Categorias (gasto e ingreso)
+        if (cmEcoCatGasto.length === 0) {
+            var rcg = await supabaseClient.from('cm_eco_categories').select('id,name').eq('club_id', clubId).eq('kind', 'gasto').eq('is_active', true).order('name');
+            cmEcoCatGasto = rcg.data || [];
+        }
+        if (cmEcoCatIngreso.length === 0) {
+            var rci = await supabaseClient.from('cm_eco_categories').select('id,name').eq('club_id', clubId).eq('kind', 'ingreso').eq('is_active', true).order('name');
+            cmEcoCatIngreso = rci.data || [];
+        }
+        // Presupuesto guardado
+        var rb = await supabaseClient.from('cm_eco_budget').select('category_id,amount_cents').eq('club_id', clubId).eq('fiscal_year_id', fy).range(0, 9999);
+        cmEcoBudgetMap = {};
+        (rb.data || []).forEach(function(b) { cmEcoBudgetMap[b.category_id] = b.amount_cents; });
+        // Gasto real por categoria + total pagado (para tesoreria)
+        var rg = await supabaseClient.from('cm_eco_expense_items')
+            .select('category_id,total_cents, cm_eco_expense_sheets(status,fiscal_year_id)')
+            .eq('club_id', clubId).range(0, 9999);
+        cmEcoRealGasto = {};
+        var pagado = 0;
+        (rg.data || []).forEach(function(it) {
+            var sh = it.cm_eco_expense_sheets;
+            if (!sh || sh.fiscal_year_id !== fy || sh.status === 'rechazada') return;
+            if (it.category_id) cmEcoRealGasto[it.category_id] = (cmEcoRealGasto[it.category_id] || 0) + (it.total_cents || 0);
+            if (sh.status === 'pagada') pagado += (it.total_cents || 0);
+        });
+        // Ingreso real por categoria + cobrado manual
+        var ri = await supabaseClient.from('cm_eco_incomes').select('category_id,total_cents,status').eq('club_id', clubId).eq('fiscal_year_id', fy).range(0, 9999);
+        cmEcoRealIngreso = {};
+        var cobradoManual = 0;
+        (ri.data || []).forEach(function(x) {
+            if (x.category_id) cmEcoRealIngreso[x.category_id] = (cmEcoRealIngreso[x.category_id] || 0) + (x.total_cents || 0);
+            if (x.status === 'cobrado') cobradoManual += (x.total_cents || 0);
+        });
+        var cuotas = await cmEcoSumaCuotasPagos();
+        cmEcoTesoreria = { cobrado: cobradoManual + cuotas, pagado: pagado, cuotas: cuotas };
+        cmEcoRenderPresupuesto();
+    } catch (e) {
+        console.error('cmEcoCargarPresupuesto:', e);
+        cont.innerHTML = '<div class="cmeco-empty"><div class="icon">&#9888;</div><p>Error al cargar el presupuesto</p></div>';
+    }
+}
+
+function cmEcoRenderPresupuesto() {
+    var cont = document.getElementById('cmeco-presu');
+    if (!cont) return;
+    var editable = cmEcoPuedeEditar();
+    var t = cmEcoTesoreria || { cobrado: 0, pagado: 0 };
+    var saldo = (t.cobrado || 0) - (t.pagado || 0);
+    var saldoColor = saldo < 0 ? '#ef4444' : '#60a5fa';
+
+    var teso =
+        '<div class="cmeco-kpis">' +
+            '<div class="cmeco-kpi"><div class="kpi-val" style="color:#22c55e">' + cmEcoCentsToEur(t.cobrado) + ' <span class="kpi-cur">EUR</span></div><div class="kpi-lbl">Cobrado</div></div>' +
+            '<div class="cmeco-kpi"><div class="kpi-val" style="color:#f59e0b">' + cmEcoCentsToEur(t.pagado) + ' <span class="kpi-cur">EUR</span></div><div class="kpi-lbl">Pagado</div></div>' +
+            '<div class="cmeco-kpi"><div class="kpi-val" style="color:' + saldoColor + '">' + cmEcoCentsToEur(saldo) + ' <span class="kpi-cur">EUR</span></div><div class="kpi-lbl">Posicion de caja</div></div>' +
+        '</div>' +
+        '<div style="color:#64748b;font-size:12px;margin:-6px 0 22px">Tesoreria: dinero realmente cobrado menos dinero realmente pagado en el ejercicio.</div>';
+
+    function filaCat(c, tipo) {
+        var pres = cmEcoBudgetMap[c.id] || 0;
+        var real = ((tipo === 'gasto') ? cmEcoRealGasto[c.id] : cmEcoRealIngreso[c.id]) || 0;
+        var dif = (tipo === 'gasto') ? (pres - real) : (real - pres);
+        var difColor = dif < 0 ? '#ef4444' : '#86efac';
+        var inp = editable
+            ? '<input type="text" inputmode="decimal" value="' + (pres ? cmEcoCentsToEur(pres) : '') + '" placeholder="0,00" onchange="cmEcoGuardarPresupuesto(\'' + c.id + '\',this.value)" style="max-width:130px;text-align:right">'
+            : cmEcoCentsToEur(pres);
+        return '<tr><td>' + cmEcoEsc(c.name) + '</td>' +
+            '<td class="num">' + inp + '</td>' +
+            '<td class="num">' + cmEcoCentsToEur(real) + '</td>' +
+            '<td class="num" style="color:' + difColor + ';font-weight:600">' + cmEcoCentsToEur(dif) + '</td></tr>';
+    }
+
+    function tablaSeccion(titulo, difLabel, filas) {
+        return '<div style="color:#f1f5f9;font-weight:600;font-size:15px;margin:22px 0 10px">' + titulo + '</div>' +
+            '<div class="cmeco-table-wrap"><table class="cmeco-table"><thead><tr>' +
+                '<th>Categoria</th><th class="num">Presupuesto</th><th class="num">Real</th><th class="num">' + difLabel + '</th>' +
+            '</tr></thead><tbody>' + filas + '</tbody></table></div>';
+    }
+
+    var filasG = cmEcoCatGasto.map(function(c) { return filaCat(c, 'gasto'); }).join('');
+    var filasI = cmEcoCatIngreso.map(function(c) { return filaCat(c, 'ingreso'); }).join('');
+
+    cont.innerHTML = teso +
+        tablaSeccion('Gastos', 'Disponible', filasG) +
+        tablaSeccion('Ingresos', 'Sobre meta', filasI) +
+        '<div style="color:#64748b;font-size:12px;margin-top:10px">En gastos, "Disponible" es lo que queda de presupuesto (rojo = te has pasado). En ingresos, "Sobre meta" es lo que superas el objetivo (rojo = te falta).</div>';
+}
+
+async function cmEcoGuardarPresupuesto(catId, valor) {
+    var cents = cmEcoEurToCents(valor);
+    if (cents === null) cents = 0;
+    var res = await supabaseClient.from('cm_eco_budget').upsert(
+        { club_id: clubId, fiscal_year_id: cmEcoEjercicio.id, category_id: catId, amount_cents: cents, updated_at: new Date().toISOString() },
+        { onConflict: 'fiscal_year_id,category_id' });
+    if (res.error) { showToast('Error al guardar: ' + res.error.message, 'error'); return; }
+    cmEcoBudgetMap[catId] = cents;
+    cmEcoRenderPresupuesto();
+    showToast('Presupuesto guardado');
 }
 function cmEcoTabCumplimiento(cont) {
     cont.innerHTML = '<div class="cmeco-empty"><div class="icon">&#128737;</div><h3>Control Economico RFEF</h3>' +
