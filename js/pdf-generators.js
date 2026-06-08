@@ -214,8 +214,8 @@ async function generarPDFConvocatoria() {
     day: '2-digit', month: 'short', year: 'numeric' 
 }) : '';
     
-    const colorPrimario = [5, 150, 105];
-    const colorSecundario = [16, 185, 129];
+    const colorPrimario = [0, 0, 0];
+    const colorSecundario = [38, 38, 38];
     
     // ===== HEADER (compacto) =====
     doc.setFillColor(...colorPrimario);
@@ -658,9 +658,8 @@ async function dibujarJugadorCardCompacta(doc, jugador, x, y, ancho, alto, color
             const fecha = new Date(p.match_date + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
             
             // Header
-            doc.setFillColor(5, 150, 105);
-            doc.rect(0, 0, 210, 50, 'F');
-            doc.setTextColor(255, 255, 255);
+            doc.setFillColor(0, 0, 0);
+            doc.rect(0, 0, 210, 50, 'F');            doc.setTextColor(255, 255, 255);
             doc.setFontSize(24);
             doc.setFont('helvetica', 'bold');
             doc.text('ACTA DEL PARTIDO', 105, 20, { align: 'center' });
@@ -708,10 +707,10 @@ async function dibujarJugadorCardCompacta(doc, jugador, x, y, ancho, alto, color
                 
                 doc.autoTable({
                     startY: y,
-                    head: [['Jugador', 'Pos', 'Min', 'Goles', 'Asist', 'TA', 'TR']],
+                       head: [['Jugador', 'Pos', 'Min', 'Goles', 'Asist', 'TA', 'TR']],
                     body: tableData,
                     theme: 'striped',
-                    headStyles: { fillColor: [5, 150, 105] },
+                    headStyles: { fillColor: [0, 0, 0] },
                     styles: { fontSize: 9 }
                 });
             }
