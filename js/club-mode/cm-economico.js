@@ -192,6 +192,7 @@ function cmEcoRenderPanel(container) {
             '<button class="cmeco-tab" id="cmeco-tab-reembolsos" onclick="cmEcoCambiarTab(\'reembolsos\',this)">Reembolsos</button>' +
             '<button class="cmeco-tab" id="cmeco-tab-ingresos" onclick="cmEcoCambiarTab(\'ingresos\',this)">Ingresos</button>' +
             '<button class="cmeco-tab" id="cmeco-tab-presupuesto" onclick="cmEcoCambiarTab(\'presupuesto\',this)">Presupuesto</button>' +
+            '<button class="cmeco-tab" id="cmeco-tab-resultados" onclick="cmEcoCambiarTab(\'resultados\',this)">Resultados</button>' +
             '<button class="cmeco-tab" id="cmeco-tab-cumplimiento" onclick="cmEcoCambiarTab(\'cumplimiento\',this)">Control RFEF</button>' +
             '<button class="cmeco-tab" id="cmeco-tab-config" onclick="cmEcoCambiarTab(\'config\',this)">Configuracion</button>' +
         '</div>' +
@@ -228,6 +229,7 @@ function cmEcoCambiarTab(tab, btn) {
     if (tab === 'reembolsos')   cmEcoTabReembolsos(cont);
     if (tab === 'ingresos')     cmEcoTabIngresos(cont);
     if (tab === 'presupuesto')  cmEcoTabPresupuesto(cont);
+    if (tab === 'resultados')   cmEcoTabResultados(cont);
     if (tab === 'cumplimiento') cmEcoTabCumplimiento(cont);
     if (tab === 'config')       cmEcoTabConfig(cont);
 }
@@ -1071,6 +1073,101 @@ async function cmEcoGuardarPresupuesto(catId, valor) {
     cmEcoRenderPresupuesto();
     showToast('Presupuesto guardado');
 }
+// ============================================================
+// CUENTA DE RESULTADOS (Perdidas y Ganancias)
+// Ingresos y gastos del ejercicio agrupados por cuenta contable.
+// ============================================================
+function cmEcoTabResultados(cont) {
+    if (!cmEcoEjercicio) {
+        cont.innerHTML = '<div class="cmeco-empty"><div class="icon">&#128197;</div><h3>Sin ejercicio activo</h3></div>';
+        return;
+    }
+    cont.innerHTML = '<div id="cmeco-pyg"><div class="cmeco-empty"><div class="icon">&#8987;</div><p>Calculando...</p></div></div>';
+    cmEcoCargarResultados();
+}
+
+async function cmEcoCargarResultados() {
+    var cont = document.getElementById('cmeco-pyg');
+    if (!cont) return;
+    try {
+        var fy = cmEcoEjercicio.id;
+        var rac = await supabaseClient.from('cm_eco_accounts').select('id,code,name,account_type').eq('club_id', clubId).range(0, 9999);
+        var ctaById = {};
+        (rac.data || []).forEach(function(c) { ctaById[c.id] = { code: c.code, name: c.name, type: c.account_type }; });
+        var rcat = await supabaseClient.from('cm_eco_categories').select('id,account_id').eq('club_id', clubId).range(0, 9999);
+        var catCta = {};
+        (rcat.data || []).forEach(function(c) { catCta[c.id] = c.account_id; });
+
+        var rg = await supabaseClient.from('cm_eco_expense_items')
+            .select('category_id,total_cents, cm_eco_expense_sheets(status,fiscal_year_id)')
+            .eq('club_id', clubId).range(0, 9999);
+        var gastoCta = {};
+        (rg.data || []).forEach(function(it) {
+            var sh = it.cm_eco_expense_sheets;
+            if (!sh || sh.fiscal_year_id !== fy || sh.status === 'rechazada') return;
+            var cta = catCta[it.category_id] || '__sin__';
+            gastoCta[cta] = (gastoCta[cta] || 0) + (it.total_cents || 0);
+        });
+
+        var ri = await supabaseClient.from('cm_eco_incomes').select('category_id,total_cents').eq('club_id', clubId).eq('fiscal_year_id', fy).range(0, 9999);
+        var ingCta = {};
+        (ri.data || []).forEach(function(x) {
+            var cta = catCta[x.category_id] || '__sin__';
+            ingCta[cta] = (ingCta[cta] || 0) + (x.total_cents || 0);
+        });
+
+        var cuotas = await cmEcoSumaCuotasPagos();
+        cmEcoRenderResultados(ctaById, ingCta, gastoCta, cuotas);
+    } catch (e) {
+        console.error('cmEcoCargarResultados:', e);
+        cont.innerHTML = '<div class="cmeco-empty"><div class="icon">&#9888;</div><p>Error al calcular la cuenta de resultados</p></div>';
+    }
+}
+
+function cmEcoRenderResultados(ctaById, ingCta, gastoCta, cuotas) {
+    var cont = document.getElementById('cmeco-pyg');
+    if (!cont) return;
+
+    function filasDe(map) {
+        var keys = Object.keys(map).filter(function(k) { return map[k] !== 0; });
+        keys.sort(function(a, b) {
+            var ca = ctaById[a] ? ctaById[a].code : 'zzz';
+            var cb = ctaById[b] ? ctaById[b].code : 'zzz';
+            return String(ca).localeCompare(String(cb));
+        });
+        return keys.map(function(k) {
+            var c = ctaById[k];
+            var label = c ? (c.code + ' ' + c.name) : 'Sin cuenta asignada';
+            return '<tr><td>' + cmEcoEsc(label) + '</td><td class="num">' + cmEcoCentsToEur(map[k]) + '</td></tr>';
+        }).join('');
+    }
+
+    var filasIng = filasDe(ingCta);
+    var cuotaRow = cuotas > 0 ? '<tr><td>Cuotas cobradas (modulo Pagos)</td><td class="num">' + cmEcoCentsToEur(cuotas) + '</td></tr>' : '';
+    var totalIng = Object.keys(ingCta).reduce(function(s, k) { return s + ingCta[k]; }, 0) + cuotas;
+    var filasGas = filasDe(gastoCta);
+    var totalGas = Object.keys(gastoCta).reduce(function(s, k) { return s + gastoCta[k]; }, 0);
+    var resultado = totalIng - totalGas;
+    var resColor = resultado < 0 ? '#ef4444' : '#22c55e';
+    var resTxt = resultado < 0 ? 'PERDIDAS' : 'BENEFICIO / EXCEDENTE';
+
+    cont.innerHTML =
+        '<div style="color:#94a3b8;font-size:13px;margin-bottom:16px">Cuenta de resultados del ejercicio ' + cmEcoEsc(cmEcoEjercicio.name) + ', con ingresos y gastos agrupados por cuenta contable.</div>' +
+        '<div class="cmeco-table-wrap" style="margin-bottom:18px"><table class="cmeco-table"><thead><tr><th>INGRESOS</th><th class="num">EUR</th></tr></thead><tbody>' +
+            ((filasIng + cuotaRow) || '<tr><td colspan="2" style="color:#64748b">Sin ingresos</td></tr>') +
+            '<tr style="border-top:2px solid #334155"><td style="font-weight:700;color:#22c55e">TOTAL INGRESOS</td><td class="num" style="font-weight:700;color:#22c55e">' + cmEcoCentsToEur(totalIng) + '</td></tr>' +
+        '</tbody></table></div>' +
+        '<div class="cmeco-table-wrap" style="margin-bottom:18px"><table class="cmeco-table"><thead><tr><th>GASTOS</th><th class="num">EUR</th></tr></thead><tbody>' +
+            (filasGas || '<tr><td colspan="2" style="color:#64748b">Sin gastos</td></tr>') +
+            '<tr style="border-top:2px solid #334155"><td style="font-weight:700;color:#f59e0b">TOTAL GASTOS</td><td class="num" style="font-weight:700;color:#f59e0b">' + cmEcoCentsToEur(totalGas) + '</td></tr>' +
+        '</tbody></table></div>' +
+        '<div style="background:#1e293b;border:1px solid #334155;border-radius:10px;padding:16px 18px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">' +
+            '<span style="color:#f1f5f9;font-weight:700;font-size:15px">RESULTADO DEL EJERCICIO <span style="color:#64748b;font-weight:500;font-size:12px">(' + resTxt + ')</span></span>' +
+            '<span style="color:' + resColor + ';font-weight:700;font-size:20px">' + cmEcoCentsToEur(resultado) + ' EUR</span>' +
+        '</div>';
+}
+
+
 function cmEcoTabCumplimiento(cont) {
     cont.innerHTML = '<div class="cmeco-empty"><div class="icon">&#128737;</div><h3>Control Economico RFEF</h3>' +
         '<p>Panel de cumplimiento por categoria y temporada, certificados, plan de ajuste, formacion y transparencia.</p>' +
