@@ -36,6 +36,7 @@ var cmEcoReembData    = [];         // hojas con paid_by_member (para la pestana
 var cmEcoCatIngreso   = [];         // categorias de ingreso
 var cmEcoIngresos     = [];         // ingresos del ejercicio
 var cmEcoCuotasPagos  = 0;          // total cuotas cobradas (modulo Pagos) en el ejercicio
+var cmEcoPatrocinios  = 0;          // total cobros de patrocinio (modulo Patrocinadores) en el ejercicio
 var cmEcoBudgetMap    = {};         // { category_id: amount_cents } presupuestado
 var cmEcoRealGasto    = {};         // { category_id: cents } gastado real
 var cmEcoRealIngreso  = {};         // { category_id: cents } ingresado real
@@ -277,6 +278,21 @@ async function cmEcoSumaCuotasPagos() {
         }, 0);
     } catch (e) { console.warn('cmEcoSumaCuotasPagos:', e); return 0; }
 }
+// Suma los cobros de patrocinio (modulo Patrocinadores) del ejercicio actual.
+// Lee cm_spon_payments con status 'cobrado' dentro del periodo.
+async function cmEcoSumaCobrosPatrocinio() {
+    if (!cmEcoEjercicio) return 0;
+    try {
+        var desde = cmEcoEjercicio.start_date;
+        var hasta = cmEcoEjercicio.end_date;
+        var r = await supabaseClient.from('cm_spon_payments')
+            .select('amount_cents')
+            .eq('club_id', clubId).eq('status', 'cobrado')
+            .gte('paid_at', desde).lte('paid_at', hasta).range(0, 9999);
+        if (r.error) { console.warn('cmEcoSumaCobrosPatrocinio:', r.error.message); return 0; }
+        return (r.data || []).reduce(function(s, t) { return s + (t.amount_cents || 0); }, 0);
+    } catch (e) { console.warn('cmEcoSumaCobrosPatrocinio:', e); return 0; }
+}
 
 async function cmEcoCargarResumen() {
     var cont = document.getElementById('cmeco-resumen-kpis');
@@ -287,13 +303,19 @@ async function cmEcoCargarResumen() {
         var ingresosManual = (ri.data || []).reduce(function(s, x) { return s + (x.total_cents || 0); }, 0);
         var cuotas = await cmEcoSumaCuotasPagos();
         cmEcoCuotasPagos = cuotas;
-        var ingresos = ingresosManual + cuotas;
+        var patro = await cmEcoSumaCobrosPatrocinio();
+        cmEcoPatrocinios = patro;
+        var ingresos = ingresosManual + cuotas + patro;
         var rg = await supabaseClient.from('cm_eco_expense_sheets').select('total_cents,status').eq('club_id', clubId).eq('fiscal_year_id', fy).range(0, 9999);
         var gastos = (rg.data || []).reduce(function(s, x) { return s + (x.status === 'rechazada' ? 0 : (x.total_cents || 0)); }, 0);
         var resultado = ingresos - gastos;
         var resClase = resultado < 0 ? 'res-neg' : 'res-pos';
-        var nota = cuotas > 0
-            ? '<div style="color:#64748b;font-size:12px;margin-top:8px">Los ingresos incluyen <b style="color:#22c55e">' + cmEcoCentsToEur(cuotas) + ' EUR</b> de cuotas cobradas en el modulo de Pagos' + (ingresosManual > 0 ? ' y ' + cmEcoCentsToEur(ingresosManual) + ' EUR registrados aqui.' : '.') + '</div>'
+        var partes = [];
+        if (cuotas > 0) partes.push('<b style="color:#22c55e">' + cmEcoCentsToEur(cuotas) + ' EUR</b> de cuotas (Pagos)');
+        if (patro > 0)  partes.push('<b style="color:#60a5fa">' + cmEcoCentsToEur(patro) + ' EUR</b> de patrocinios (Patrocinadores)');
+        if (ingresosManual > 0) partes.push(cmEcoCentsToEur(ingresosManual) + ' EUR registrados aqui');
+        var nota = partes.length
+            ? '<div style="color:#64748b;font-size:12px;margin-top:8px">Los ingresos incluyen ' + partes.join(', ') + '.</div>'
             : '';
         cont.innerHTML =
             '<div class="cmeco-kpis">' +
@@ -863,6 +885,7 @@ async function cmEcoCargarIngresos() {
         if (ri.error) throw ri.error;
         cmEcoIngresos = ri.data || [];
         cmEcoCuotasPagos = await cmEcoSumaCuotasPagos();
+        cmEcoPatrocinios = await cmEcoSumaCobrosPatrocinio();
         cmEcoRenderIngresos();
     } catch (e) {
         console.error('cmEcoCargarIngresos:', e);
@@ -882,8 +905,16 @@ function cmEcoRenderIngresos() {
           '</div>'
         : '';
 
+    var patroBox = cmEcoPatrocinios > 0
+        ? '<div style="background:#13243f;border:1px solid #2b4a73;border-radius:10px;padding:14px 16px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">' +
+            '<div><div style="color:#93c5fd;font-weight:600;font-size:14px">Patrocinios cobrados en el modulo de Patrocinadores</div>' +
+            '<div style="color:#94a3b8;font-size:12px;margin-top:2px">Se suman a los ingresos del club. Se gestionan en la pestana Patrocinadores (no se teclean aqui).</div></div>' +
+            '<div style="color:#60a5fa;font-size:20px;font-weight:700;white-space:nowrap">' + cmEcoCentsToEur(cmEcoPatrocinios) + ' EUR</div>' +
+          '</div>'
+        : '';
+
     if (cmEcoIngresos.length === 0) {
-        cont.innerHTML = cuotasBox +
+        cont.innerHTML = cuotasBox + patroBox +
             '<div class="cmeco-empty"><div class="icon">&#128176;</div><h3>Sin ingresos manuales</h3>' +
             '<p>Las cuotas vienen solas desde Pagos. Aqui registras el resto:<br>subvenciones, patrocinios, donaciones, eventos o ventas, con "+ Nuevo ingreso".</p></div>';
         return;
@@ -900,7 +931,7 @@ function cmEcoRenderIngresos() {
         '</tr>';
     });
     var total = cmEcoIngresos.reduce(function(s, g) { return s + (g.total_cents || 0); }, 0);
-    cont.innerHTML = cuotasBox +
+    cont.innerHTML = cuotasBox + patroBox +
         '<div style="color:#64748b;font-size:12px;margin-bottom:8px">' + cmEcoIngresos.length + ' ingresos manuales &middot; total ' + cmEcoCentsToEur(total) + ' EUR</div>' +
         '<div class="cmeco-table-wrap"><table class="cmeco-table"><thead><tr>' +
             '<th>Fecha</th><th>Origen</th><th>Categoria</th><th>Metodo</th><th class="num">Total</th>' +
@@ -1036,7 +1067,8 @@ async function cmEcoCargarPresupuesto() {
             if (x.status === 'cobrado') cobradoManual += (x.total_cents || 0);
         });
         var cuotas = await cmEcoSumaCuotasPagos();
-        cmEcoTesoreria = { cobrado: cobradoManual + cuotas, pagado: pagado, cuotas: cuotas };
+        var patro = await cmEcoSumaCobrosPatrocinio();
+        cmEcoTesoreria = { cobrado: cobradoManual + cuotas + patro, pagado: pagado, cuotas: cuotas, patrocinios: patro };
         cmEcoRenderPresupuesto();
     } catch (e) {
         console.error('cmEcoCargarPresupuesto:', e);
@@ -1145,14 +1177,16 @@ async function cmEcoCargarResultados() {
         });
 
         var cuotas = await cmEcoSumaCuotasPagos();
-        cmEcoRenderResultados(ctaById, ingCta, gastoCta, cuotas);
+        var patro = await cmEcoSumaCobrosPatrocinio();
+        cmEcoRenderResultados(ctaById, ingCta, gastoCta, cuotas, patro);
     } catch (e) {
         console.error('cmEcoCargarResultados:', e);
         cont.innerHTML = '<div class="cmeco-empty"><div class="icon">&#9888;</div><p>Error al calcular la cuenta de resultados</p></div>';
     }
 }
 
-function cmEcoRenderResultados(ctaById, ingCta, gastoCta, cuotas) {
+function cmEcoRenderResultados(ctaById, ingCta, gastoCta, cuotas, patrocinios) {
+    patrocinios = patrocinios || 0;
     var cont = document.getElementById('cmeco-pyg');
     if (!cont) return;
 
@@ -1172,7 +1206,8 @@ function cmEcoRenderResultados(ctaById, ingCta, gastoCta, cuotas) {
 
     var filasIng = filasDe(ingCta);
     var cuotaRow = cuotas > 0 ? '<tr><td>Cuotas cobradas (modulo Pagos)</td><td class="num">' + cmEcoCentsToEur(cuotas) + '</td></tr>' : '';
-    var totalIng = Object.keys(ingCta).reduce(function(s, k) { return s + ingCta[k]; }, 0) + cuotas;
+    var patroRow = patrocinios > 0 ? '<tr><td>Patrocinios cobrados (modulo Patrocinadores)</td><td class="num">' + cmEcoCentsToEur(patrocinios) + '</td></tr>' : '';
+    var totalIng = Object.keys(ingCta).reduce(function(s, k) { return s + ingCta[k]; }, 0) + cuotas + patrocinios;
     var filasGas = filasDe(gastoCta);
     var totalGas = Object.keys(gastoCta).reduce(function(s, k) { return s + gastoCta[k]; }, 0);
     var resultado = totalIng - totalGas;
@@ -1182,7 +1217,7 @@ function cmEcoRenderResultados(ctaById, ingCta, gastoCta, cuotas) {
     cont.innerHTML =
         '<div style="color:#94a3b8;font-size:13px;margin-bottom:16px">Cuenta de resultados del ejercicio ' + cmEcoEsc(cmEcoEjercicio.name) + ', con ingresos y gastos agrupados por cuenta contable.</div>' +
         '<div class="cmeco-table-wrap" style="margin-bottom:18px"><table class="cmeco-table"><thead><tr><th>INGRESOS</th><th class="num">EUR</th></tr></thead><tbody>' +
-            ((filasIng + cuotaRow) || '<tr><td colspan="2" style="color:#64748b">Sin ingresos</td></tr>') +
+            ((filasIng + cuotaRow + patroRow) || '<tr><td colspan="2" style="color:#64748b">Sin ingresos</td></tr>') +
             '<tr style="border-top:2px solid #334155"><td style="font-weight:700;color:#22c55e">TOTAL INGRESOS</td><td class="num" style="font-weight:700;color:#22c55e">' + cmEcoCentsToEur(totalIng) + '</td></tr>' +
         '</tbody></table></div>' +
         '<div class="cmeco-table-wrap" style="margin-bottom:18px"><table class="cmeco-table"><thead><tr><th>GASTOS</th><th class="num">EUR</th></tr></thead><tbody>' +
