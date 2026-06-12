@@ -20,7 +20,7 @@ var CMSC_API_KEY = '0bc5ef5776a4f9f1d0eb225b901874ed';
 var CMSC_API_BASE = 'https://v3.football.api-sports.io';
 var CMSC_API_PLAN = 'free'; // 'free' = temporadas 2022-2024, sin parametro last | 'paid' = temporada actual, todos los parametros
 
-var CMSC_FORMACIONES = ['1-4-3-3','1-4-4-2','1-3-5-2','1-4-2-3-1','1-3-4-3','1-4-1-4-1','1-5-3-2','1-4-3-2-1'];
+var CMSC_FORMACIONES = ['1-4-3-3','1-4-4-2','1-3-5-2','1-4-2-3-1','1-3-4-3','1-4-1-4-1','1-5-3-2','1-4-3-2-1','1-3-1-5-1'];
 var CMSC_POSICIONES_MAP = {
     '1-4-3-3':   ['POR','LD','DCD','DCI','LI','MC','ID','II','ED','DC','EI'],
     '1-4-4-2':   ['POR','LD','DCD','DCI','LI','MD','MCD','MCI','MI','DC1','DC2'],
@@ -29,7 +29,8 @@ var CMSC_POSICIONES_MAP = {
     '1-3-4-3':   ['POR','DCD','DCC','DCI','CAD','MCD','MCI','CAI','ED','DC','EI'],
     '1-4-1-4-1': ['POR','LD','DCD','DCI','LI','PIV','MD','MCD','MCI','MI','DC'],
     '1-5-3-2':   ['POR','CAD','DCD','DCC','DCI','CAI','MCD','MC','MCI','DC1','DC2'],
-    '1-4-3-2-1': ['POR','LD','DCD','DCI','LI','MCD','MC','MCI','MP1','MP2','DC']
+    '1-4-3-2-1': ['POR','LD','DCD','DCI','LI','MCD','MC','MCI','MP1','MP2','DC'],
+    '1-3-1-5-1': ['POR','DCI','DCC','DCD','PIV','CAI','MPI','MPC','MPD','CAD','DC']
 };
 var CMSC_POS_NOMBRES = {
     POR:'Portero', LD:'Lateral Derecho', LI:'Lateral Izquierdo',
@@ -39,7 +40,7 @@ var CMSC_POS_NOMBRES = {
     MD:'Medio Derecho', MI:'Medio Izquierdo',
     ED:'Extremo Derecho', EI:'Extremo Izquierdo',
     DC:'Delantero Centro', DC1:'Delantero 1', DC2:'Delantero 2',
-    MP:'Mediapunta', MP1:'Mediapunta Der.', MP2:'Mediapunta Izq.',
+    MP:'Mediapunta', MPI:'Mediapunta Izquierda', MPC:'Mediapunta Central', MPD:'Mediapunta Derecha', MP1:'Mediapunta Der.', MP2:'Mediapunta Izq.',
     PIV:'Pivote', PIV1:'Pivote 1', PIV2:'Pivote 2',
     CAD:'Carrilero Derecho', CAI:'Carrilero Izquierdo'
 };
@@ -844,6 +845,7 @@ function cmScRenderModalHighlight(hl) {
                         '<option value="1-3-5-2">1-3-5-2</option><option value="1-4-2-3-1">1-4-2-3-1</option>' +
                         '<option value="1-3-4-3">1-3-4-3</option><option value="1-4-1-4-1">1-4-1-4-1</option>' +
                         '<option value="1-5-3-2">1-5-3-2</option><option value="1-4-3-2-1">1-4-3-2-1</option>' +
+                        '<option value="1-3-1-5-1">1-3-1-5-1</option>' +
                     '</select>' +
                 '</div>' +
                 '<div class="cmsc-form-group"><label>Posicion en el sistema *</label>' +
@@ -1630,7 +1632,8 @@ var CMSC_POS_COORDS = {
     '1-3-4-3':   {POR:[50,5], DCD:[65,22], DCC:[50,22], DCI:[35,22], CAD:[88,42], MCD:[62,48], MCI:[38,48], CAI:[12,42], ED:[82,78], DC:[50,78], EI:[18,78]},
     '1-4-1-4-1': {POR:[50,5], LD:[85,22], DCD:[62,22], DCI:[38,22], LI:[15,22], PIV:[50,36], MD:[85,52], MCD:[62,52], MCI:[38,52], MI:[15,52], DC:[50,82]},
     '1-5-3-2':   {POR:[50,5], CAD:[88,25], DCD:[65,22], DCC:[50,22], DCI:[35,22], CAI:[12,25], MCD:[65,52], MC:[50,52], MCI:[35,52], DC1:[62,78], DC2:[38,78]},
-    '1-4-3-2-1': {POR:[50,5], LD:[85,22], DCD:[62,22], DCI:[38,22], LI:[15,22], MCD:[65,42], MC:[50,42], MCI:[35,42], MP1:[62,62], MP2:[38,62], DC:[50,82]}
+    '1-4-3-2-1': {POR:[50,5], LD:[85,22], DCD:[62,22], DCI:[38,22], LI:[15,22], MCD:[65,42], MC:[50,42], MCI:[35,42], MP1:[62,62], MP2:[38,62], DC:[50,82]},
+    '1-3-1-5-1': {POR:[50,5], DCI:[28,22], DCC:[50,20], DCD:[72,22], PIV:[50,36], CAI:[12,58], MPI:[34,52], MPC:[50,62], MPD:[66,52], CAD:[88,58], DC:[50,82]}
 };
 
 async function cmScTabShortlists(cont) {

@@ -176,6 +176,7 @@ function cmDdRenderPanel(container) {
             '<div class="cmdd-tabs">' +
                 '<button class="cmdd-tab active" id="cmdd-tab-dashboard" onclick="cmDdCambiarTab(\'dashboard\',this)">Dashboard</button>' +
                 '<button class="cmdd-tab" id="cmdd-tab-plantilla" onclick="cmDdCambiarTab(\'plantilla\',this)">Plantilla</button>' +
+                '<button class="cmdd-tab" id="cmdd-tab-planificacion" onclick="cmDdCambiarTab(\'planificacion\',this)">Planificacion</button>' +
                 '<button class="cmdd-tab" id="cmdd-tab-ideal" onclick="cmDdCambiarTab(\'ideal\',this)">11 Ideal</button>' +
                 '<button class="cmdd-tab" id="cmdd-tab-jugadores" onclick="cmDdCambiarTab(\'jugadores\',this)">Jugadores</button>' +
                 '<button class="cmdd-tab" id="cmdd-tab-agentes" onclick="cmDdCambiarTab(\'agentes\',this)">Agentes</button>' +
@@ -201,6 +202,7 @@ function cmDdCambiarTab(tab, btn) {
 
     if (tab === 'dashboard')  { cmDdTabDashboard(cont); return; }
     if (tab === 'plantilla')  { cmDdTabPlantilla(cont); return; }
+    if (tab === 'planificacion') { cmDdTabPlanificacion(cont); return; }
     if (tab === 'ideal')      { cmDdTabIdeal(cont); return; }
     if (tab === 'jugadores')  { cmDdTabJugadores(cont); return; }
     if (tab === 'agentes')    { cmDdTabAgentes(cont); return; }
@@ -528,19 +530,75 @@ async function cmDdEnsureJugadoresCargados() {
     } catch (e) { cmDdJugadores = []; }
 }
 
+// Normaliza posiciones duplicadas del sistema (DC1/DC2 -> DC, MP1/MP2 -> MP, PIV1/PIV2 -> PIV)
+function cmDdNormalizarPos(pos) {
+    return String(pos || '').replace(/[12]$/, '');
+}
+
+// Familia de posicion: agrupa por rol para decidir si un jugador encaja en un slot.
+// Centrales (DCD/DCC/DCI), mediocentros (MCD/MC/MCI), laterales+carrileros por lado, interiores+medios por lado.
+var CMDD_POS_FAMILIA = {
+    POR:'por',
+    LD:'latd', CAD:'latd', LI:'lati', CAI:'lati',
+    DCD:'cen', DCC:'cen', DCI:'cen',
+    PIV:'piv',
+    MCD:'mc', MC:'mc', MCI:'mc',
+    ID:'intd', MD:'intd', II:'inti', MI:'inti',
+    MP:'mp', MPC:'mp', MPI:'mpi', MPD:'mpd', ED:'extd', EI:'exti', DC:'dc'
+};
+function cmDdPosFamilia(code) {
+    var c = cmDdNormalizarPos(code);
+    return CMDD_POS_FAMILIA[c] || c;
+}
+
+// Nota media + recomendaciones de fichar de un jugador (de todos sus avistamientos)
+function cmDdNotaDeJugador(playerId) {
+    var ds = cmDdSlDatos.filter(function(d) { return d.player_id === playerId; });
+    var ratings = [];
+    var signs = 0;
+    ds.forEach(function(d) {
+        if (d.rating_quick != null) ratings.push(Number(d.rating_quick));
+        if (d.tag === 'sign') signs++;
+    });
+    var avg = ratings.length ? ratings.reduce(function(a, b) { return a + b; }, 0) / ratings.length : 0;
+    return { avg: Math.round(avg * 10) / 10, signs: signs, sightings: ds.length };
+}
+
+// Jugadores cuya ficha (principal o secundaria) encaja en un hueco del sistema
+function cmDdJugadoresEnPosicion(slot, jugadores) {
+    var fam = cmDdPosFamilia(slot);
+    var lista = [];
+    jugadores.forEach(function(j) {
+        var f1 = cmDdPosFamilia(j.position_primary);
+        var f2 = j.position_secondary ? cmDdPosFamilia(j.position_secondary) : '';
+        var coincide = false, esSecundaria = false;
+        if (f1 && f1 === fam) { coincide = true; esSecundaria = false; }
+        else if (f2 && f2 === fam) { coincide = true; esSecundaria = true; }
+        if (!coincide) return;
+        var nota = cmDdNotaDeJugador(j.id);
+        lista.push({
+            id: j.id, name: j.name || '?', club: j.current_club || '',
+            secundaria: esSecundaria, avg: nota.avg, signs: nota.signs, sightings: nota.sightings
+        });
+    });
+    lista.sort(function(a, b) {
+        if (a.secundaria !== b.secundaria) return a.secundaria ? 1 : -1;
+        if (b.avg !== a.avg) return b.avg - a.avg;
+        return a.name.localeCompare(b.name);
+    });
+    return lista;
+}
+
 async function cmDdTabIdeal(cont) {
     cont.innerHTML = '<div class="cmdd-empty"><div class="icon">&#8987;</div><p>Cargando 11 ideal...</p></div>';
     await cmDdEnsureJugadoresCargados();
-
-    // Cargar avistamientos con posicion/formacion
+    // Avistamientos: SOLO para calcular la nota media de cada jugador (ya NO colocan al jugador)
     try {
         var res = await supabaseClient.from('cm_sc_player_sightings')
-            .select('player_id, observed_position, observed_formation, rating_quick, tag, scout_id')
-            .eq('club_id', clubId).eq('archived', false)
-            .not('observed_position', 'is', null);
+            .select('player_id, rating_quick, tag')
+            .eq('club_id', clubId).eq('archived', false);
         cmDdSlDatos = res.data || [];
     } catch (e) { cmDdSlDatos = []; }
-
     cmDdRenderIdeal();
 }
 
@@ -548,7 +606,7 @@ function cmDdRenderIdeal() {
     var cont = document.getElementById('cmdd-tab-content');
     if (!cont) return;
 
-    // Selector de formacion + categoria
+    // Selector de categoria + formacion
     var h = '<div class="cmdd-toolbar">' +
         '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">' +
             cmDdSelectorCategoria("cmDdFiltroCat=this.value;cmDdRenderIdeal()") +
@@ -560,173 +618,137 @@ function cmDdRenderIdeal() {
     });
     h += '</div>';
 
-    // Filtrar jugadores por categoria, luego filtrar datos por esos jugadores
-    var jugadoresFiltrados = cmDdJugadores;
+    var jugadores = cmDdJugadores;
     if (cmDdFiltroCat) {
-        jugadoresFiltrados = cmDdJugadores.filter(function(j) { return j.target_category === cmDdFiltroCat; });
+        jugadores = cmDdJugadores.filter(function(j) { return j.target_category === cmDdFiltroCat; });
     }
-    var idsValidos = jugadoresFiltrados.map(function(j) { return j.id; });
-    var datosFormacion = cmDdSlDatos.filter(function(d) {
-        return d.observed_formation === cmDdSlFormacion && (!cmDdFiltroCat || idsValidos.indexOf(d.player_id) >= 0);
-    });
-    h += '<span class="cmdd-contador"><strong>' + datosFormacion.length + '</strong> observaciones en ' + cmDdSlFormacion + (cmDdFiltroCat ? ' (' + cmDdFiltroCat.replace('_', ' ') + ')' : '') + '</span>';
-    h += '</div>';
 
-    // Calcular top jugadores por posicion (usando datos filtrados)
     var positions = CMSC_POSICIONES_MAP[cmDdSlFormacion] || [];
     var coords = CMSC_POS_COORDS[cmDdSlFormacion] || {};
-    var topPorPosicion = {};
 
-    positions.forEach(function(pos) {
-        var sightingsPos = datosFormacion.filter(function(d) {
-            return d.observed_position === pos;
-        });
+    var listaPorPos = {};
+    positions.forEach(function(pos) { listaPorPos[pos] = cmDdJugadoresEnPosicion(pos, jugadores); });
 
-        var playerMap = {};
-        sightingsPos.forEach(function(s) {
-            if (!playerMap[s.player_id]) playerMap[s.player_id] = { ratings: [], tags: [], scouts: [] };
-            if (s.rating_quick) playerMap[s.player_id].ratings.push(s.rating_quick);
-            playerMap[s.player_id].tags.push(s.tag);
-            if (playerMap[s.player_id].scouts.indexOf(s.scout_id) === -1) playerMap[s.player_id].scouts.push(s.scout_id);
-        });
+    var distintos = {};
+    positions.forEach(function(pos) { listaPorPos[pos].forEach(function(x) { distintos[x.id] = true; }); });
+    h += '<span class="cmdd-contador"><strong>' + Object.keys(distintos).length + '</strong> jugadores encajan en ' + cmDdSlFormacion +
+        (cmDdFiltroCat ? ' (' + cmDdFiltroCat.replace('_', ' ') + ')' : '') + '</span>';
+    h += '</div>';
 
-        var ranked = Object.keys(playerMap).map(function(pid) {
-            var data = playerMap[pid];
-            var avgRating = data.ratings.length > 0 ? data.ratings.reduce(function(a, b) { return a + b; }, 0) / data.ratings.length : 0;
-            var player = cmDdJugadores.find(function(j) { return j.id === pid; }) || {};
-            return {
-                id: pid, name: player.name || '?', club: player.current_club || '',
-                rating: Math.round(avgRating * 10) / 10,
-                sightings: data.ratings.length, scouts: data.scouts.length,
-                signCount: data.tags.filter(function(t) { return t === 'sign'; }).length
-            };
-        });
-        ranked.sort(function(a, b) { return b.rating - a.rating; });
-        topPorPosicion[pos] = ranked.slice(0, 5);
-    });
-
-    // === Campo de futbol visual ===
-    h += '<div style="position:relative;background:linear-gradient(to bottom,#0c4a1e,#166534,#0c4a1e);border-radius:12px;border:2px solid #22c55e;width:100%;max-width:700px;margin:20px auto;aspect-ratio:68/100;overflow:hidden">';
-
-    // Lineas del campo
+    // === Campo de futbol (paneles con lista por posicion) ===
+    h += '<div style="position:relative;background:linear-gradient(to bottom,#0c4a1e,#166534,#0c4a1e);border-radius:12px;border:2px solid #22c55e;width:100%;max-width:860px;margin:20px auto;aspect-ratio:68/100;overflow:hidden">';
     h += '<div style="position:absolute;top:50%;left:5%;right:5%;height:1px;background:rgba(255,255,255,.2)"></div>';
     h += '<div style="position:absolute;top:50%;left:50%;width:60px;height:60px;border:1px solid rgba(255,255,255,.2);border-radius:50%;transform:translate(-50%,-50%)"></div>';
     h += '<div style="position:absolute;top:0;left:25%;right:25%;height:12%;border:1px solid rgba(255,255,255,.15);border-top:none"></div>';
     h += '<div style="position:absolute;bottom:0;left:25%;right:25%;height:12%;border:1px solid rgba(255,255,255,.15);border-bottom:none"></div>';
-
-    // Posiciones con jugadores
     positions.forEach(function(pos) {
         var coord = coords[pos];
         if (!coord) return;
-        var x = coord[0]; var y = 100 - coord[1];
-        var top5 = topPorPosicion[pos] || [];
-        var best = top5[0];
-
-        var bgColor = best ? '#f59e0b' : '#334155';
-        var nameStr = best ? best.name.split(' ').pop() : '-';
-        var ratingStr = best ? best.rating.toFixed(1) : '';
-        var textColor = best ? '#0f172a' : '#fff';
-
-        h += '<div style="position:absolute;left:' + x + '%;top:' + y + '%;transform:translate(-50%,-50%);text-align:center;cursor:pointer;z-index:2" ' +
-            'onclick="cmDdSlMostrarPosicion(\x27' + pos + '\x27)">' +
-            '<div style="width:46px;height:46px;border-radius:50%;background:' + bgColor + ';margin:0 auto;display:flex;align-items:center;justify-content:center;' +
-                'border:2px solid rgba(255,255,255,.3);box-shadow:0 2px 8px rgba(0,0,0,.4)">' +
-                '<span style="color:' + textColor + ';font-size:11px;font-weight:700">' + (ratingStr || pos) + '</span>' +
-            '</div>' +
-            '<div style="color:#fff;font-size:9px;font-weight:600;margin-top:2px;text-shadow:0 1px 3px rgba(0,0,0,.8)">' + cmDdEsc(nameStr) + '</div>' +
-            '<div style="color:rgba(255,255,255,.6);font-size:8px">' + (CMSC_POS_NOMBRES[pos] || pos) + '</div>' +
-        '</div>';
+        var x = coord[0], y = 100 - coord[1];
+        var lista = listaPorPos[pos] || [];
+        h += '<div style="position:absolute;left:' + x + '%;top:' + y + '%;transform:translate(-50%,-50%);width:122px;z-index:2">';
+        h += '<div style="background:rgba(15,23,42,.92);border:1px solid rgba(255,255,255,.25);border-radius:8px;padding:5px 6px;box-shadow:0 2px 8px rgba(0,0,0,.4)">';
+        h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">';
+        h += '<span style="color:#f59e0b;font-size:11px;font-weight:700">' + pos + ' <span style="color:#64748b;font-weight:400">' + lista.length + '</span></span>';
+        h += '</div>';
+        if (lista.length === 0) {
+            h += '<div style="color:#475569;font-size:9px;text-align:center;padding:2px 0">-</div>';
+        } else {
+            lista.forEach(function(p) {
+                var ratingColor = p.avg >= 8 ? '#4ade80' : (p.avg >= 6 ? '#f59e0b' : '#94a3b8');
+                h += '<div style="display:flex;align-items:center;gap:3px;border-left:2px solid ' + (p.secundaria ? '#a855f7' : '#22c55e') + ';padding:1px 0 1px 4px;margin-bottom:2px;cursor:pointer" onclick="cmDdCambiarTab(\x27jugadores\x27);setTimeout(function(){cmDdAbrirJugador(\x27' + p.id + '\x27)},300)">';
+                h += '<div style="flex:1;min-width:0">';
+                h += '<div style="color:#f1f5f9;font-size:10px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + cmDdEsc(p.name) + '</div>';
+                if (p.club) h += '<div style="color:#94a3b8;font-size:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + cmDdEsc(p.club) + '</div>';
+                h += '</div>';
+                if (p.avg > 0) h += '<span style="color:' + ratingColor + ';font-size:10px;font-weight:700;flex-shrink:0">' + p.avg.toFixed(1) + '</span>';
+                h += '</div>';
+            });
+        }
+        h += '</div></div>';
     });
     h += '</div>';
 
-    // Panel de detalle de posicion
-    h += '<div id="cmdd-sl-pos-detail"></div>';
-
-    // Info si no hay datos
-    if (datosFormacion.length === 0) {
+    if (Object.keys(distintos).length === 0) {
         h += '<div style="text-align:center;margin-top:16px;padding:20px;background:#1e293b;border-radius:10px;color:#94a3b8;font-size:13px">' +
-            'Sin datos para ' + cmDdSlFormacion + '. Los jugadores apareceran cuando los scouts registren posicion y formacion en los avistamientos.' +
+            'Ningun jugador encaja en ' + cmDdSlFormacion + '. Asigna posicion principal/secundaria a los jugadores desde Scouting.' +
         '</div>';
     }
+
+    h += '<div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:12px;font-size:11px;color:#94a3b8">';
+    h += '<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:50%;background:#22c55e"></span>Posicion principal</span>';
+    h += '<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:50%;background:#a855f7"></span>Posicion secundaria</span>';
+    h += '</div>';
 
     cont.innerHTML = h;
 }
 
-
-// Detalle de posicion: top 5 jugadores
-function cmDdSlMostrarPosicion(pos) {
-    var cont = document.getElementById('cmdd-sl-pos-detail');
+// Detalle de UNA posicion con la ficha ampliada de cada jugador
+function cmDdIdealMostrarPosicion(pos) {
+    var cont = document.getElementById('cmdd-ideal-detail');
     if (!cont) return;
 
-    var sightingsPos = cmDdSlDatos.filter(function(d) {
-        return d.observed_formation === cmDdSlFormacion && d.observed_position === pos;
-    });
+    var jugadores = cmDdJugadores;
+    if (cmDdFiltroCat) {
+        jugadores = cmDdJugadores.filter(function(j) { return j.target_category === cmDdFiltroCat; });
+    }
+    var lista = cmDdJugadoresEnPosicion(pos, jugadores);
+    var posLabel = CMSC_POS_NOMBRES[pos] || pos;
 
-    var playerMap = {};
-    sightingsPos.forEach(function(s) {
-        if (!playerMap[s.player_id]) playerMap[s.player_id] = { ratings: [], tags: [], scouts: [] };
-        if (s.rating_quick) playerMap[s.player_id].ratings.push(s.rating_quick);
-        playerMap[s.player_id].tags.push(s.tag);
-        if (playerMap[s.player_id].scouts.indexOf(s.scout_id) === -1) playerMap[s.player_id].scouts.push(s.scout_id);
-    });
+    var h = '<div class="cmdd-section">';
+    h += '<h3 style="display:flex;justify-content:space-between;align-items:center">' +
+        '<span>' + pos + ' <span style="color:#94a3b8;font-size:13px;font-weight:400">' + cmDdEsc(posLabel) + '</span></span>' +
+        '<span class="cmdd-tab-badge">' + lista.length + ' jugadores</span>' +
+    '</h3>';
 
-    var ranked = Object.keys(playerMap).map(function(pid) {
-        var data = playerMap[pid];
-        var avgRating = data.ratings.length > 0 ? data.ratings.reduce(function(a, b) { return a + b; }, 0) / data.ratings.length : 0;
-        var player = cmDdJugadores.find(function(j) { return j.id === pid; }) || {};
-        return {
-            id: pid, name: player.name || '?', club: player.current_club || '', nationality: player.nationality || '',
-            rating: Math.round(avgRating * 10) / 10, estimated_cost: player.estimated_cost || '',
-            sightings: data.ratings.length, scouts: data.scouts.length,
-            signCount: data.tags.filter(function(t) { return t === 'sign'; }).length,
-            pipeline: player.pipeline_status || 'identified'
-        };
-    });
-    ranked.sort(function(a, b) { return b.rating - a.rating; });
-    var top5 = ranked.slice(0, 5);
-
-    var posLabel = (CMSC_POS_NOMBRES[pos] || pos);
-    var pipeLabels = { identified:'Identificado', observed:'Observado', tracking:'Seguimiento', contacted:'Contactado', signed:'Fichado', discarded:'Descartado' };
-
-    var h = '<div class="cmdd-section" style="margin-top:16px">' +
-        '<h3>' + pos + ' \u2014 ' + posLabel + ' <span class="cmdd-tab-badge">' + ranked.length + ' jugadores</span></h3>';
-
-    if (top5.length === 0) {
-        h += '<div style="color:#64748b;font-size:13px;padding:16px 0;text-align:center">Sin jugadores observados en esta posicion para ' + cmDdSlFormacion + '</div>';
+    if (lista.length === 0) {
+        h += '<div style="color:#64748b;font-size:13px;text-align:center;padding:16px 0">Sin jugadores para esta posicion en ' + cmDdSlFormacion + '.</div>';
     } else {
-        h += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px">' +
-            '<thead><tr style="border-bottom:1px solid #334155">' +
-                '<th style="text-align:center;padding:6px;color:#94a3b8;width:30px">#</th>' +
-                '<th style="text-align:left;padding:6px;color:#94a3b8">Jugador</th>' +
-                '<th style="text-align:left;padding:6px;color:#94a3b8">Club</th>' +
-                '<th style="text-align:center;padding:6px;color:#94a3b8">Nota</th>' +
-                '<th style="text-align:center;padding:6px;color:#94a3b8">Visto</th>' +
-                '<th style="text-align:center;padding:6px;color:#94a3b8">Scouts</th>' +
-                '<th style="text-align:center;padding:6px;color:#94a3b8">Fichar</th>' +
-                '<th style="text-align:left;padding:6px;color:#94a3b8">Coste est.</th>' +
-                '<th style="text-align:left;padding:6px;color:#94a3b8">Pipeline</th>' +
-            '</tr></thead><tbody>';
-        top5.forEach(function(p, idx) {
-            var ratingColor = p.rating >= 8 ? '#4ade80' : (p.rating >= 6 ? '#f59e0b' : '#94a3b8');
-            h += '<tr style="border-bottom:1px solid #1e293b">' +
-                '<td style="padding:8px;text-align:center;color:#f59e0b;font-weight:700">' + (idx + 1) + '</td>' +
-                '<td style="padding:8px;color:#f1f5f9;font-weight:600">' + cmDdEsc(p.name) + '</td>' +
-                '<td style="padding:8px;color:#94a3b8">' + cmDdEsc(p.club) + '</td>' +
-                '<td style="padding:8px;text-align:center;color:' + ratingColor + ';font-weight:700;font-size:15px">' + p.rating.toFixed(1) + '</td>' +
-                '<td style="padding:8px;text-align:center;color:#e2e8f0">' + p.sightings + 'x</td>' +
-                '<td style="padding:8px;text-align:center;color:#e2e8f0">' + p.scouts + '</td>' +
-                '<td style="padding:8px;text-align:center;color:#4ade80;font-weight:600">' + (p.signCount > 0 ? p.signCount : '-') + '</td>' +
-                '<td style="padding:8px;color:#94a3b8;font-size:12px">' + cmDdEsc(p.estimated_cost) + '</td>' +
-                '<td style="padding:8px"><span class="cmdd-badge" style="background:#1e293b;color:#94a3b8">' + (pipeLabels[p.pipeline] || p.pipeline) + '</span></td>' +
-            '</tr>';
+        lista.forEach(function(p) {
+            var jug = cmDdJugadores.find(function(j) { return j.id === p.id; }) || {};
+            var edad = cmDdCalcEdad(jug.birth_date);
+            var esSub23 = (edad !== '' && edad <= 23);
+            var ratingColor = p.avg >= 8 ? '#4ade80' : (p.avg >= 6 ? '#f59e0b' : '#94a3b8');
+
+            h += '<div class="cmdd-list-item" style="cursor:pointer;align-items:flex-start" onclick="cmDdCambiarTab(\x27jugadores\x27);setTimeout(function(){cmDdAbrirJugador(\x27' + p.id + '\x27)},300)">';
+            h += '<div style="flex:1;min-width:0">';
+            // Nombre + etiquetas
+            h += '<div class="cmdd-list-name" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">';
+            h += '<span>' + cmDdEsc(p.name) + '</span>';
+            h += p.secundaria
+                ? '<span style="color:#a855f7;font-size:9px;font-weight:700;border:1px solid #a855f7;border-radius:4px;padding:0 5px">2&ordf; pos.</span>'
+                : '<span style="color:#22c55e;font-size:9px;font-weight:700;border:1px solid #22c55e;border-radius:4px;padding:0 5px">1&ordf; pos.</span>';
+            if (esSub23) h += '<span style="color:#0f172a;background:#38bdf8;font-size:9px;font-weight:700;border-radius:4px;padding:1px 5px">SUB-23</span>';
+            h += '</div>';
+            // Datos: equipo · edad · coste · fichar
+            var datos = [];
+            if (jug.current_club) datos.push(cmDdEsc(jug.current_club));
+            if (edad !== '') datos.push(edad + ' anos');
+            if (jug.estimated_cost) datos.push('Coste: ' + cmDdEsc(jug.estimated_cost));
+            if (p.signs > 0) datos.push(p.signs + ' fichar');
+            h += '<div class="cmdd-list-sub">' + datos.join(' \u00B7 ') + '</div>';
+            h += '</div>';
+            if (p.avg > 0) h += '<span style="color:' + ratingColor + ';font-weight:700;font-size:16px;flex-shrink:0">' + p.avg.toFixed(1) + '</span>';
+            h += '</div>';
         });
-        h += '</tbody></table></div>';
     }
     h += '</div>';
+
     cont.innerHTML = h;
+    cont.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
-
+// Edad a partir de la fecha de nacimiento
+function cmDdCalcEdad(birthDate) {
+    if (!birthDate) return '';
+    var bd = new Date(birthDate + 'T12:00:00');
+    if (isNaN(bd.getTime())) return '';
+    var hoy = new Date();
+    var edad = hoy.getFullYear() - bd.getFullYear();
+    var m = hoy.getMonth() - bd.getMonth();
+    if (m < 0 || (m === 0 && hoy.getDate() < bd.getDate())) edad--;
+    return edad;
+}
 // ============================================================
 // TAB 3: JUGADORES (vista global DD)
 // ============================================================
@@ -2172,7 +2194,7 @@ async function cmDdTabPlantilla(cont) {
 
     var [resP, resE, resT, resPS] = await Promise.all([
         supabaseClient.from('club_players')
-            .select('id, name, first_name, last_name, nickname, photo_url, birth_date, nationality, positions_main, positions_alt, dominant_foot, height_cm, weight_kg, status, active, end_rights_date, continues_next_season, agent_name')
+            .select('id, name, first_name, last_name, nickname, photo_url, birth_date, nationality, positions_main, positions_alt, position_detail, position_secondary, dominant_foot, height_cm, weight_kg, status, active, end_rights_date, continues_next_season, agent_name')
             .eq('club_id', clubId).eq('active', true)
             .order('name'),
         supabaseClient.from('cm_dd_player_economics')
@@ -2216,7 +2238,9 @@ function cmDdRenderPlantilla() {
             edad = Math.floor((new Date() - bd) / (365.25 * 24 * 60 * 60 * 1000));
         }
         return Object.assign({}, p, {
-            econ: econ, edad: edad, posDD: cmDdMapPos(p.positions_main),
+            econ: econ, edad: edad,
+            posDD: p.position_detail || cmDdMapPos(p.positions_main),
+            posSec: p.position_secondary || null,
             dorsal: ps.shirt_number || '',
             salary: econ.salary_annual_cents || 0,
             marketVal: econ.market_value_cents || 0,
@@ -2309,25 +2333,38 @@ function cmDdRenderPlantilla() {
 
     h += '</tbody></table></div>';
 
-    // 11 IDEAL de la plantilla actual
+    // ===== 11 IDEAL de la plantilla actual (estilo campograma: lista por posicion) =====
     h += '<div style="margin-top:20px">';
     h += '<div class="cmdd-section">';
-    h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">';
+    h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">';
     var equipoNombre = cmDdFiltroEquipo ? (cmDdEquipos.find(function(t) { return t.id === cmDdFiltroEquipo; }) || {}).name || '' : 'Todos';
     h += '<h3 style="margin:0">11 Ideal - ' + cmDdEsc(equipoNombre) + '</h3>';
-    h += '<div style="display:flex;gap:4px">';
+    h += '<div style="display:flex;gap:4px;flex-wrap:wrap">';
     CMSC_FORMACIONES.forEach(function(f) {
         var isActive = cmDdPlantillaFormacion === f;
         h += '<button class="cmdd-btn cmdd-btn-sm" onclick="cmDdPlantillaFormacion=\x27' + f + '\x27;cmDdRenderPlantilla()" style="' +
             (isActive ? 'background:#f59e0b;color:#0f172a' : 'background:#0f172a;color:#64748b;border:1px solid #334155') + ';font-size:10px;padding:3px 8px">' + f + '</button>';
     });
     h += '</div></div>';
+    h += '<div style="color:#64748b;font-size:12px;margin-bottom:10px">Cada posicion muestra todos los jugadores de la plantilla que pueden jugar ahi en este sistema.</div>';
 
-    // Campo de futbol
     var positions = CMSC_POSICIONES_MAP[cmDdPlantillaFormacion] || [];
     var coords = CMSC_POS_COORDS[cmDdPlantillaFormacion] || {};
 
-    h += '<div style="position:relative;background:linear-gradient(to bottom,#0c4a1e,#166534,#0c4a1e);border-radius:12px;border:2px solid #22c55e;width:100%;max-width:700px;margin:0 auto;aspect-ratio:68/100;overflow:hidden">';
+    var idealPorSlot = {};
+    positions.forEach(function(pos) {
+        var fam = cmDdPosFamilia(pos);
+        idealPorSlot[pos] = jugadores.filter(function(j) {
+            return cmDdPosFamilia(j.posDD) === fam || (j.posSec && cmDdPosFamilia(j.posSec) === fam);
+        }).map(function(j) {
+            return { j: j, sec: cmDdPosFamilia(j.posDD) !== fam };
+        }).sort(function(a, b) {
+            if (a.sec !== b.sec) return a.sec ? 1 : -1;
+            return (b.j.salary || 0) - (a.j.salary || 0);
+        });
+    });
+
+    h += '<div style="position:relative;background:linear-gradient(to bottom,#0c4a1e,#166534,#0c4a1e);border-radius:12px;border:2px solid #22c55e;width:100%;max-width:860px;margin:0 auto;aspect-ratio:68/100;overflow:hidden">';
     h += '<div style="position:absolute;top:50%;left:5%;right:5%;height:1px;background:rgba(255,255,255,.2)"></div>';
     h += '<div style="position:absolute;top:50%;left:50%;width:60px;height:60px;border:1px solid rgba(255,255,255,.2);border-radius:50%;transform:translate(-50%,-50%)"></div>';
     h += '<div style="position:absolute;top:0;left:25%;right:25%;height:12%;border:1px solid rgba(255,255,255,.15);border-top:none"></div>';
@@ -2337,22 +2374,33 @@ function cmDdRenderPlantilla() {
         var coord = coords[pos];
         if (!coord) return;
         var x = coord[0], yy = 100 - coord[1];
-
-        // Buscar jugador para esta posicion
-        var match = jugadores.find(function(j) { return j.posDD === pos; });
-        var bgColor = match ? '#22c55e' : '#334155';
-        var nameStr = match ? (match.nickname || match.name.split(' ')[0]) : '-';
-        var salarioStr = match && match.salary > 0 ? cmDdFormatEuros(match.salary) : '';
-
-        h += '<div style="position:absolute;left:' + x + '%;top:' + yy + '%;transform:translate(-50%,-50%);text-align:center;z-index:2">';
-        h += '<div style="width:42px;height:42px;border-radius:50%;background:' + bgColor + ';margin:0 auto;display:flex;align-items:center;justify-content:center;border:2px solid rgba(255,255,255,.3);box-shadow:0 2px 8px rgba(0,0,0,.4)">';
-        h += '<span style="color:#fff;font-size:9px;font-weight:700">' + pos + '</span>';
+        var lista = idealPorSlot[pos] || [];
+        h += '<div style="position:absolute;left:' + x + '%;top:' + yy + '%;transform:translate(-50%,-50%);width:120px;z-index:2">';
+        h += '<div style="background:rgba(15,23,42,.92);border:1px solid rgba(255,255,255,.25);border-radius:8px;padding:5px 6px;box-shadow:0 2px 8px rgba(0,0,0,.4)">';
+        h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">';
+        h += '<span style="color:#f59e0b;font-size:11px;font-weight:700">' + pos + ' <span style="color:#64748b;font-weight:400">' + lista.length + '</span></span>';
         h += '</div>';
-        h += '<div style="color:#fff;font-size:8px;font-weight:600;margin-top:2px;text-shadow:0 1px 3px rgba(0,0,0,.8);max-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + cmDdEsc(nameStr) + '</div>';
-        if (salarioStr) h += '<div style="color:#f59e0b;font-size:7px;font-weight:600">' + salarioStr + '</div>';
-        h += '</div>';
+        if (lista.length === 0) {
+            h += '<div style="color:#475569;font-size:9px;text-align:center;padding:2px 0">-</div>';
+        } else {
+            lista.forEach(function(item) {
+                var j = item.j;
+                var nm = j.nickname || j.name;
+                h += '<div style="display:flex;align-items:center;gap:3px;border-left:2px solid ' + (item.sec ? '#a855f7' : '#22c55e') + ';padding:1px 0 1px 4px;margin-bottom:2px;cursor:pointer" onclick="cmDdModalEconomia(\x27' + j.id + '\x27)">';
+                if (j.dorsal) h += '<span style="color:#f59e0b;font-size:9px;font-weight:700;flex-shrink:0;width:14px;text-align:center">' + j.dorsal + '</span>';
+                h += '<span style="color:#f1f5f9;font-size:10px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0">' + cmDdEsc(nm) + '</span>';
+                h += '</div>';
+            });
+        }
+        h += '</div></div>';
     });
     h += '</div>';
+
+    h += '<div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:12px;font-size:11px;color:#94a3b8">';
+    h += '<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:50%;background:#22c55e"></span>Posicion principal</span>';
+    h += '<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:50%;background:#a855f7"></span>Posicion secundaria</span>';
+    h += '</div>';
+
     h += '</div></div>';
 
     cont.innerHTML = h;
@@ -3211,7 +3259,1121 @@ async function cmDdExportarPDF(playerId, tipo) {
     doc.save('Informe_Completo_' + (player.name || 'jugador').replace(/\s+/g, '_') + '.pdf');
 }
 
+// ============================================================
+// TAB: PLANIFICACION DE TEMPORADA
+// ============================================================
 
+var cmDdPlanSeasons = [];
+var cmDdPlanSeasonId = '';
+var cmDdPlanActual = null;
+var cmDdPlanPlantilla = [];
+var cmDdPlanEcon = [];
+var cmDdPlanEquipos = [];
+var cmDdPlanPlayerSeasons = [];
+var cmDdPlanSquad = [];
+var cmDdPlanFiltroDecision = '';
+var cmDdPlanFiltroEquipo = '';
+var cmDdPlanFiltroPos = '';
+
+var CMDD_PLAN_DECISIONES = [
+    { val: 'renueva',            label: 'Renueva',             color: '#22c55e' },
+    { val: 'dudoso',             label: 'Dudoso',              color: '#f59e0b' },
+    { val: 'baja',               label: 'Baja',                color: '#ef4444' },
+    { val: 'vuelve_cesion',      label: 'Vuelve de cesion',    color: '#3b82f6' },
+    { val: 'fin_contrato',       label: 'Fin de contrato',     color: '#a855f7' },
+    { val: 'nueva_incorporacion', label: 'Nueva incorporacion', color: '#06b6d4' },
+    { val: 'cantera',            label: 'Cantera',             color: '#ec4899' }
+];
+
+function cmDdPlanDecisionColor(val) {
+    var d = CMDD_PLAN_DECISIONES.find(function(x) { return x.val === val; });
+    return d ? d.color : '#f59e0b';
+}
+
+async function cmDdTabPlanificacion(cont) {
+    cont.innerHTML = '<div class="cmdd-empty"><div class="icon">&#8987;</div><p>Cargando planificacion...</p></div>';
+
+    // Temporadas del club
+    try {
+        var resS = await supabaseClient.from('seasons')
+            .select('id, name, start_date, end_date, is_active')
+            .eq('club_id', clubId).order('start_date', { ascending: false });
+        cmDdPlanSeasons = resS.data || [];
+    } catch (e) { cmDdPlanSeasons = []; }
+
+    // Temporada por defecto (la activa, o la mas reciente)
+    if (!cmDdPlanSeasonId || !cmDdPlanSeasons.find(function(s) { return s.id === cmDdPlanSeasonId; })) {
+        var activa = cmDdPlanSeasons.find(function(s) { return s.is_active; });
+        cmDdPlanSeasonId = activa ? activa.id : (cmDdPlanSeasons[0] ? cmDdPlanSeasons[0].id : '');
+    }
+
+    if (!cmDdPlanSeasonId) {
+        cont.innerHTML = '<div class="cmdd-section" style="text-align:center">' +
+            '<h3>Planificacion de temporada</h3>' +
+            '<p style="color:#94a3b8;font-size:13px">No hay temporadas creadas. Crea la primera para empezar a planificar.</p>' +
+            '<button class="cmdd-btn cmdd-btn-primary" onclick="cmDdPlanModalNuevaTemporada()">+ Nueva temporada</button>' +
+        '</div>';
+        return;
+    }
+
+    await cmDdPlanEnsurePlan();
+    if (!cmDdPlanActual) {
+        cont.innerHTML = '<div class="cmdd-empty"><div class="icon">&#9888;</div><p>No se pudo cargar el plan de la temporada.</p></div>';
+        return;
+    }
+
+    var [resP, resE, resT, resPS, resSquad] = await Promise.all([
+        supabaseClient.from('club_players')
+            .select('id, name, nickname, photo_url, birth_date, nationality, positions_main, status, active, end_rights_date')
+            .eq('club_id', clubId).eq('active', true).order('name'),
+        supabaseClient.from('cm_dd_player_economics').select('*').eq('club_id', clubId),
+        supabaseClient.from('club_teams').select('id, name, category').eq('club_id', clubId).order('name'),
+        supabaseClient.from('club_player_seasons').select('player_id, team_id, shirt_number, position, active').eq('club_id', clubId).eq('active', true),
+        supabaseClient.from('cm_dd_plan_squad').select('*').eq('plan_id', cmDdPlanActual.id)
+    ]);
+    cmDdPlanPlantilla = resP.data || [];
+    cmDdPlanEcon = resE.data || [];
+    cmDdPlanEquipos = resT.data || [];
+    cmDdPlanPlayerSeasons = resPS.data || [];
+    cmDdPlanSquad = resSquad.data || [];
+    await cmDdPlanEnsureSquadRows();
+
+    try {
+        var resTg = await supabaseClient.from('cm_dd_plan_targets')
+            .select('*').eq('plan_id', cmDdPlanActual.id).eq('archived', false)
+            .order('created_at', { ascending: false });
+        cmDdPlanTargets = resTg.data || [];
+    } catch (e) { cmDdPlanTargets = []; }
+
+    cmDdRenderPlanificacion();
+}
+
+async function cmDdPlanEnsurePlan() {
+    cmDdPlanActual = null;
+    if (!cmDdPlanSeasonId) return;
+    try {
+        var res = await supabaseClient.from('cm_dd_season_plans').select('*')
+            .eq('club_id', clubId).eq('season_id', cmDdPlanSeasonId).eq('archived', false).limit(1);
+        if (res.data && res.data[0]) { cmDdPlanActual = res.data[0]; return; }
+        var season = cmDdPlanSeasons.find(function(s) { return s.id === cmDdPlanSeasonId; });
+        var memberId = (typeof cmState !== 'undefined' && cmState.miembro) ? cmState.miembro.id : null;
+        var ins = await supabaseClient.from('cm_dd_season_plans').insert({
+            club_id: clubId,
+            season_id: cmDdPlanSeasonId,
+            season_label: season ? season.name : null,
+            formation: '1-4-3-3',
+            created_by: memberId
+        }).select().single();
+        if (ins.data) cmDdPlanActual = ins.data;
+    } catch (e) { console.error('cmDdPlanEnsurePlan:', e); }
+}
+
+// Asegura una fila por cada jugador de plantilla (decision 'dudoso' por defecto) para que todos sean candidatos
+async function cmDdPlanEnsureSquadRows() {
+    if (!cmDdPlanActual) return;
+    var existentes = {};
+    cmDdPlanSquad.forEach(function(s) { existentes[s.player_id] = true; });
+    var faltan = cmDdPlanPlantilla.filter(function(p) { return !existentes[p.id]; });
+    if (faltan.length === 0) return;
+    var rows = faltan.map(function(p) { return { club_id: clubId, plan_id: cmDdPlanActual.id, player_id: p.id, decision: 'dudoso' }; });
+    try {
+        var ins = await supabaseClient.from('cm_dd_plan_squad').insert(rows).select();
+        if (ins.data) cmDdPlanSquad = cmDdPlanSquad.concat(ins.data);
+    } catch (e) { console.error('cmDdPlanEnsureSquadRows:', e); }
+}
+
+function cmDdPlanCambiarSeason(seasonId) {
+    cmDdPlanSeasonId = seasonId;
+    cmDdTabPlanificacion(document.getElementById('cmdd-tab-content'));
+}
+
+async function cmDdPlanSetFormacion(f) {
+    if (!cmDdPlanActual) return;
+    cmDdPlanActual.formation = f;
+    try {
+        await supabaseClient.from('cm_dd_season_plans')
+            .update({ formation: f, updated_at: new Date().toISOString() })
+            .eq('id', cmDdPlanActual.id);
+    } catch (e) { console.error(e); }
+    cmDdRenderPlanificacion();
+}
+
+async function cmDdPlanSetDecision(playerId, decision) {
+    if (!cmDdPlanActual || !decision) return;
+    var existing = cmDdPlanSquad.find(function(s) { return s.player_id === playerId; });
+    try {
+        if (existing) {
+            await supabaseClient.from('cm_dd_plan_squad')
+                .update({ decision: decision, updated_at: new Date().toISOString() }).eq('id', existing.id);
+            existing.decision = decision;
+        } else {
+            var ins = await supabaseClient.from('cm_dd_plan_squad').insert({
+                club_id: clubId, plan_id: cmDdPlanActual.id, player_id: playerId, decision: decision
+            }).select().single();
+            if (ins.data) cmDdPlanSquad.push(ins.data);
+        }
+        cmDdRenderPlanificacion();
+    } catch (e) { alert('Error: ' + e.message); }
+}
+
+function cmDdRenderPlanificacion() {
+    var cont = document.getElementById('cmdd-tab-content');
+    if (!cont || !cmDdPlanActual) return;
+
+    // ===== CABECERA =====
+    var h = '<div class="cmdd-section">';
+    h += '<div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap">';
+    // Temporada
+    h += '<div><div style="color:#64748b;font-size:11px;font-weight:600;text-transform:uppercase;margin-bottom:4px">Temporada que planificas</div>';
+    h += '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">';
+    h += '<select onchange="cmDdPlanCambiarSeason(this.value)" style="background:#1e293b;border:1px solid #f59e0b66;color:#f59e0b;padding:8px 14px;border-radius:6px;font-size:15px;font-weight:700">';
+    cmDdPlanSeasons.forEach(function(s) {
+        h += '<option value="' + s.id + '"' + (cmDdPlanSeasonId === s.id ? ' selected' : '') + '>' + cmDdEsc(s.name) + (s.is_active ? ' (actual)' : '') + '</option>';
+    });
+    h += '</select>';
+    h += '<button class="cmdd-btn cmdd-btn-sm cmdd-btn-secondary" onclick="cmDdPlanModalNuevaTemporada()">+ Nueva temporada</button>';
+    h += '</div></div>';
+    // Sistema
+    h += '<div><div style="color:#64748b;font-size:11px;font-weight:600;text-transform:uppercase;margin-bottom:4px">Sistema del proyecto</div>';
+    h += '<select onchange="cmDdPlanSetFormacion(this.value)" style="background:#1e293b;border:1px solid #334155;color:#e2e8f0;padding:8px 14px;border-radius:6px;font-size:14px;font-weight:600">';
+    CMSC_FORMACIONES.forEach(function(f) {
+        h += '<option value="' + f + '"' + (cmDdPlanActual.formation === f ? ' selected' : '') + '>' + f + '</option>';
+    });
+    h += '</select></div>';
+    h += '</div></div>';
+
+    // ===== Mapear plantilla =====
+    var jugadores = cmDdPlanPlantilla.map(function(p) {
+        var ps = cmDdPlanPlayerSeasons.find(function(s) { return s.player_id === p.id; }) || {};
+        var econ = cmDdPlanEcon.find(function(e) { return e.player_id === p.id; }) || {};
+        var sq = cmDdPlanSquad.find(function(s) { return s.player_id === p.id; });
+        return {
+            id: p.id, name: p.name, photo_url: p.photo_url,
+            posDD: cmDdMapPos(p.positions_main), edad: cmDdCalcEdad(p.birth_date),
+            dorsal: ps.shirt_number || '', team_id: ps.team_id || null,
+            salary: econ.salary_annual_cents || 0,
+            contractEnd: econ.contract_end || p.end_rights_date || null,
+            decision: sq ? sq.decision : 'dudoso'
+        };
+    });
+
+    var filtrados = jugadores.filter(function(j) {
+        if (cmDdPlanFiltroDecision && j.decision !== cmDdPlanFiltroDecision) return false;
+        if (cmDdPlanFiltroEquipo && j.team_id !== cmDdPlanFiltroEquipo) return false;
+        if (cmDdPlanFiltroPos && j.posDD !== cmDdPlanFiltroPos) return false;
+        return true;
+    });
+
+    // ===== KPIs =====
+    var nRenueva = jugadores.filter(function(j) { return j.decision === 'renueva'; }).length;
+    var nDudoso = jugadores.filter(function(j) { return j.decision === 'dudoso'; }).length;
+    var nBaja = jugadores.filter(function(j) { return j.decision === 'baja'; }).length;
+    var nNueva = jugadores.filter(function(j) { return j.decision === 'nueva_incorporacion'; }).length;
+    var nCantera = jugadores.filter(function(j) { return j.decision === 'cantera'; }).length;
+    var masaRenovados = jugadores.filter(function(j) { return j.decision === 'renueva'; }).reduce(function(s, j) { return s + j.salary; }, 0);
+
+    h += '<div class="cmdd-kpi-grid" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">';
+    h += '<div class="cmdd-kpi"><div class="value">' + jugadores.length + '</div><div class="label">Plantilla actual</div></div>';
+    h += '<div class="cmdd-kpi"><div class="value" style="color:#22c55e">' + nRenueva + '</div><div class="label">Renuevan</div></div>';
+    h += '<div class="cmdd-kpi"><div class="value" style="color:#f59e0b">' + nDudoso + '</div><div class="label">Dudosos</div></div>';
+    h += '<div class="cmdd-kpi"><div class="value" style="color:#ef4444">' + nBaja + '</div><div class="label">Bajas</div></div>';
+    h += '<div class="cmdd-kpi"><div class="value" style="color:#06b6d4">' + nNueva + '</div><div class="label">Nueva incorporacion</div></div>';
+    h += '<div class="cmdd-kpi"><div class="value" style="color:#ec4899">' + nCantera + '</div><div class="label">Cantera</div></div>';
+    h += '<div class="cmdd-kpi"><div class="value">' + cmDdFormatEuros(masaRenovados) + '</div><div class="label">Masa salarial renovados</div></div>';
+    h += '</div>';
+
+    // ===== Filtros =====
+    h += '<div class="cmdd-toolbar"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">';
+    h += '<select onchange="cmDdPlanFiltroDecision=this.value;cmDdRenderPlanificacion()" style="background:#1e293b;border:1px solid #334155;color:#e2e8f0;padding:6px 12px;border-radius:6px;font-size:13px">';
+    h += '<option value="">Todas las decisiones</option>';
+    CMDD_PLAN_DECISIONES.forEach(function(d) {
+        h += '<option value="' + d.val + '"' + (cmDdPlanFiltroDecision === d.val ? ' selected' : '') + '>' + d.label + '</option>';
+    });
+    h += '</select>';
+    if (cmDdPlanEquipos.length > 0) {
+        h += '<select onchange="cmDdPlanFiltroEquipo=this.value;cmDdRenderPlanificacion()" style="background:#1e293b;border:1px solid #334155;color:#e2e8f0;padding:6px 12px;border-radius:6px;font-size:13px">';
+        h += '<option value="">Todos los equipos</option>';
+        cmDdPlanEquipos.forEach(function(t) {
+            h += '<option value="' + t.id + '"' + (cmDdPlanFiltroEquipo === t.id ? ' selected' : '') + '>' + cmDdEsc(t.name) + '</option>';
+        });
+        h += '</select>';
+    }
+    var posiciones = [];
+    jugadores.forEach(function(j) { if (j.posDD && posiciones.indexOf(j.posDD) === -1) posiciones.push(j.posDD); });
+    posiciones.sort();
+    if (posiciones.length > 0) {
+        h += '<select onchange="cmDdPlanFiltroPos=this.value;cmDdRenderPlanificacion()" style="background:#1e293b;border:1px solid #334155;color:#e2e8f0;padding:6px 12px;border-radius:6px;font-size:13px">';
+        h += '<option value="">Todas las posiciones</option>';
+        posiciones.forEach(function(pos) {
+            h += '<option value="' + pos + '"' + (cmDdPlanFiltroPos === pos ? ' selected' : '') + '>' + (CMSC_POS_NOMBRES[pos] || pos) + '</option>';
+        });
+        h += '</select>';
+    }
+    h += '</div><span class="cmdd-contador"><strong>' + filtrados.length + '</strong> de ' + jugadores.length + ' jugadores</span></div>';
+
+    // ===== Tabla =====
+    if (filtrados.length === 0) {
+        h += '<div class="cmdd-empty"><div class="icon">&#128100;</div><h3>Sin jugadores</h3><p>No hay jugadores con esos filtros, o la plantilla actual esta vacia.</p></div>';
+    } else {
+        h += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px">';
+        h += '<thead><tr style="border-bottom:1px solid #334155">' +
+            '<th style="text-align:left;padding:8px;color:#94a3b8">Jugador</th>' +
+            '<th style="text-align:center;padding:8px;color:#94a3b8">#</th>' +
+            '<th style="text-align:center;padding:8px;color:#94a3b8">Pos</th>' +
+            '<th style="text-align:center;padding:8px;color:#94a3b8">Edad</th>' +
+            '<th style="text-align:right;padding:8px;color:#94a3b8">Sueldo</th>' +
+            '<th style="text-align:center;padding:8px;color:#94a3b8">Fin contrato</th>' +
+            '<th style="text-align:left;padding:8px;color:#94a3b8">Decision proxima temporada</th>' +
+        '</tr></thead><tbody>';
+        filtrados.forEach(function(j) {
+            var col = cmDdPlanDecisionColor(j.decision);
+            var contractColor = '#94a3b8';
+            if (j.contractEnd) {
+                var fin = new Date(j.contractEnd + 'T12:00:00');
+                var en6m = new Date(); en6m.setMonth(en6m.getMonth() + 6);
+                if (fin <= en6m) contractColor = '#ef4444';
+            }
+            h += '<tr style="border-bottom:1px solid #1e293b;border-left:3px solid ' + col + '">';
+            h += '<td style="padding:8px">';
+            if (j.photo_url) h += '<img src="' + cmDdEsc(j.photo_url) + '" style="width:24px;height:24px;border-radius:50%;vertical-align:middle;margin-right:6px;object-fit:cover" onerror="this.style.display=\'none\'">';
+            h += '<span style="color:#f1f5f9;font-weight:600">' + cmDdEsc(j.name) + '</span></td>';
+            h += '<td style="padding:8px;text-align:center;color:#f59e0b;font-weight:700">' + (j.dorsal || '-') + '</td>';
+            h += '<td style="padding:8px;text-align:center;color:#94a3b8">' + cmDdEsc(j.posDD || '-') + '</td>';
+            h += '<td style="padding:8px;text-align:center;color:#e2e8f0">' + (j.edad !== '' ? j.edad : '-') + '</td>';
+            h += '<td style="padding:8px;text-align:right;color:#f59e0b;font-weight:600">' + cmDdFormatEuros(j.salary) + '</td>';
+            h += '<td style="padding:8px;text-align:center;color:' + contractColor + ';font-weight:600">' + (j.contractEnd ? cmDdFechaCorta(j.contractEnd) : '-') + '</td>';
+            h += '<td style="padding:8px"><select onchange="cmDdPlanSetDecision(\x27' + j.id + '\x27,this.value)" style="background:#0f172a;border:1px solid ' + col + ';color:' + col + ';padding:5px 10px;border-radius:6px;font-size:12px;font-weight:600">';
+            CMDD_PLAN_DECISIONES.forEach(function(d) {
+                h += '<option value="' + d.val + '"' + (j.decision === d.val ? ' selected' : '') + '>' + d.label + '</option>';
+            });
+            h += '</select></td>';
+            h += '</tr>';
+        });
+        h += '</tbody></table></div>';
+    }
+
+    // ===== BLOQUE 2: OBJETIVOS =====
+    h += cmDdPlanObjetivosHTML();
+
+    // ===== BLOQUE 3: CAMPOGRAMA DEL PROYECTO =====
+    h += cmDdPlanCampogramaHTML();
+
+    // ===== BLOQUE 4: RESUMEN ECONOMICO =====
+    h += cmDdPlanResumenHTML();
+
+    cont.innerHTML = h;
+}
+
+// --- Modal nueva temporada ---
+function cmDdPlanModalNuevaTemporada() {
+    var y = new Date().getFullYear();
+    var nombre = y + '/' + (y + 1);
+    var inicio = y + '-07-01';
+    var fin = (y + 1) + '-06-30';
+
+    var h = '<div class="cmdd-modal-overlay" id="cmdd-modal-temporada" onclick="if(event.target===this)this.remove()">';
+    h += '<div class="cmdd-modal" style="max-width:460px">';
+    h += '<div class="cmdd-modal-header"><h3>Nueva temporada</h3><button class="cmdd-modal-close" onclick="document.getElementById(\'cmdd-modal-temporada\').remove()">&times;</button></div>';
+    h += '<div class="cmdd-modal-body">';
+    h += '<div class="cmdd-form-group"><label>Nombre *</label><input id="cmdd-temp-name" value="' + nombre + '" placeholder="2026/2027"></div>';
+    h += '<div class="cmdd-form-row">';
+    h += '<div class="cmdd-form-group"><label>Inicio</label><input type="date" id="cmdd-temp-from" value="' + inicio + '"></div>';
+    h += '<div class="cmdd-form-group"><label>Fin</label><input type="date" id="cmdd-temp-to" value="' + fin + '"></div>';
+    h += '</div>';
+    h += '<div style="color:#64748b;font-size:11px">Se crea solo para planificar; no cambia la temporada activa del club.</div>';
+    h += '</div>';
+    h += '<div class="cmdd-modal-footer">';
+    h += '<button class="cmdd-btn cmdd-btn-secondary" onclick="document.getElementById(\'cmdd-modal-temporada\').remove()">Cancelar</button>';
+    h += '<button class="cmdd-btn cmdd-btn-primary" onclick="cmDdPlanCrearTemporada()">Crear temporada</button>';
+    h += '</div></div></div>';
+
+    var div = document.createElement('div'); div.innerHTML = h;
+    document.body.appendChild(div.firstElementChild);
+}
+
+async function cmDdPlanCrearTemporada() {
+    var name = (document.getElementById('cmdd-temp-name').value || '').trim();
+    if (!name) { alert('El nombre es obligatorio'); return; }
+    var from = document.getElementById('cmdd-temp-from').value || null;
+    var to = document.getElementById('cmdd-temp-to').value || null;
+    try {
+        var ins = await supabaseClient.from('seasons').insert({
+            club_id: clubId, name: name, start_date: from, end_date: to, is_active: false
+        }).select().single();
+        if (ins.error) throw ins.error;
+        var el = document.getElementById('cmdd-modal-temporada');
+        if (el) el.remove();
+        if (ins.data) cmDdPlanSeasonId = ins.data.id;
+        cmDdTabPlanificacion(document.getElementById('cmdd-tab-content'));
+    } catch (e) { alert('Error al crear temporada: ' + e.message); }
+}
+// ============================================================
+// PLANIFICACION - BLOQUE 2: OBJETIVOS (entradas)
+// ============================================================
+
+var cmDdPlanTargets = [];
+
+function cmDdPlanTargetTotal(t) {
+    var total = (t.transfer_cost_cents || 0) + (t.salary_estimate_cents || 0);
+    var bonuses = Array.isArray(t.bonuses) ? t.bonuses : [];
+    bonuses.forEach(function(b) { total += (b.amount_cents || 0); });
+    return total;
+}
+
+function cmDdPlanObjetivosHTML() {
+    var sourceLabels = { scout: 'Scouting', manual: 'A mano', agent_offer: 'Ofrec. agente' };
+    var sourceColors = { scout: '#3b82f6', manual: '#94a3b8', agent_offer: '#a855f7' };
+    var statusLabels = { idea: 'Idea', contactado: 'Contactado', negociando: 'Negociando', cerrado: 'Cerrado', descartado: 'Descartado' };
+    var statusColors = { idea: '#94a3b8', contactado: '#3b82f6', negociando: '#f59e0b', cerrado: '#22c55e', descartado: '#ef4444' };
+    var prioLabels = { alta: 'Alta', media: 'Media', baja: 'Baja' };
+
+    var h = '<div class="cmdd-section" style="margin-top:16px">';
+    h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">';
+    h += '<h3 style="margin:0">Objetivos (entradas) <span class="cmdd-tab-badge">' + cmDdPlanTargets.length + '</span></h3>';
+    h += '<button class="cmdd-btn cmdd-btn-sm cmdd-btn-primary" onclick="cmDdPlanModalObjetivo()">+ Anadir objetivo</button>';
+    h += '</div>';
+
+    if (cmDdPlanTargets.length === 0) {
+        h += '<div style="color:#64748b;font-size:13px;text-align:center;padding:16px 0">Sin objetivos todavia. Anade jugadores desde Scouting, a mano, o como ofrecimiento de agente.</div>';
+    } else {
+        cmDdPlanTargets.forEach(function(t) {
+            var total = cmDdPlanTargetTotal(t);
+            var sc = sourceColors[t.source] || '#94a3b8';
+            var stc = statusColors[t.status] || '#94a3b8';
+            var bonuses = Array.isArray(t.bonuses) ? t.bonuses : [];
+            h += '<div class="cmdd-list-item" style="cursor:pointer;align-items:flex-start" onclick="cmDdPlanModalObjetivo(\x27' + t.id + '\x27)">';
+            h += '<div style="flex:1;min-width:0">';
+            h += '<div class="cmdd-list-name" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">';
+            h += '<span>' + cmDdEsc(t.name || '(sin nombre)') + '</span>';
+            h += '<span class="cmdd-badge" style="background:' + sc + '22;color:' + sc + '">' + (sourceLabels[t.source] || t.source) + '</span>';
+            if (t.position_primary) h += '<span style="color:#64748b;font-size:11px">' + cmDdEsc(t.position_primary) + (t.position_secondary ? '/' + cmDdEsc(t.position_secondary) : '') + '</span>';
+            h += '</div>';
+            h += '<div class="cmdd-list-sub">' +
+                (t.current_club ? cmDdEsc(t.current_club) + ' \u00B7 ' : '') +
+                'Prioridad ' + (prioLabels[t.priority] || t.priority) +
+                (bonuses.length ? ' \u00B7 ' + bonuses.length + ' extra' + (bonuses.length !== 1 ? 's' : '') : '') +
+                '</div>';
+            h += '</div>';
+            h += '<div style="text-align:right;flex-shrink:0">';
+            h += '<div style="color:#f59e0b;font-weight:700;font-size:15px">' + cmDdFormatEuros(total) + '</div>';
+            h += '<span class="cmdd-badge" style="background:' + stc + '22;color:' + stc + '">' + (statusLabels[t.status] || t.status) + '</span>';
+            h += '</div>';
+            h += '</div>';
+        });
+        var totalObjetivos = cmDdPlanTargets.reduce(function(s, t) { return s + cmDdPlanTargetTotal(t); }, 0);
+        h += '<div style="text-align:right;margin-top:10px;padding-top:10px;border-top:1px solid #334155;color:#94a3b8;font-size:13px">Coste total objetivos: <strong style="color:#f59e0b;font-size:15px">' + cmDdFormatEuros(totalObjetivos) + '</strong></div>';
+    }
+    h += '</div>';
+    return h;
+}
+
+async function cmDdPlanEnsureAgentes() {
+    if (cmDdAgentes && cmDdAgentes.length > 0) return;
+    try {
+        var res = await supabaseClient.from('cm_dd_agents')
+            .select('id, name, agency').eq('club_id', clubId).eq('archived', false).order('name');
+        cmDdAgentes = res.data || [];
+    } catch (e) { cmDdAgentes = []; }
+}
+
+function cmDdPlanObjSourceChanged() {
+    var src = document.getElementById('cmdd-obj-source').value;
+    var sw = document.getElementById('cmdd-obj-scout-wrap');
+    var aw = document.getElementById('cmdd-obj-agent-wrap');
+    if (sw) sw.style.display = src === 'scout' ? '' : 'none';
+    if (aw) aw.style.display = src === 'agent_offer' ? '' : 'none';
+}
+
+function cmDdPlanObjPickScout() {
+    var id = document.getElementById('cmdd-obj-scout').value;
+    var j = cmDdJugadores.find(function(x) { return x.id === id; });
+    if (!j) return;
+    document.getElementById('cmdd-obj-name').value = j.name || '';
+    document.getElementById('cmdd-obj-club').value = j.current_club || '';
+    if (j.position_primary) document.getElementById('cmdd-obj-pos1').value = j.position_primary;
+    if (j.position_secondary) document.getElementById('cmdd-obj-pos2').value = j.position_secondary;
+}
+
+function cmDdPlanObjAddBonus(label, amountEur, kind) {
+    var cont = document.getElementById('cmdd-obj-bonuses');
+    if (!cont) return;
+    var row = document.createElement('div');
+    row.className = 'cmdd-obj-bonus-row';
+    row.style.cssText = 'display:flex;gap:6px;align-items:center;margin-bottom:6px';
+    row.innerHTML =
+        '<input class="cmdd-ob-label" list="cmdd-bonus-tipos" placeholder="Tipo (Piso, Gasolina...)" value="' + cmDdEsc(label || '') + '" style="flex:2;padding:6px 10px;background:#1e293b;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-size:12px">' +
+        '<input class="cmdd-ob-amount" type="number" step="0.01" min="0" placeholder="\u20AC" value="' + (amountEur != null && amountEur !== '' ? amountEur : '') + '" style="flex:1;padding:6px 10px;background:#1e293b;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-size:12px">' +
+        '<select class="cmdd-ob-kind" style="padding:6px;background:#1e293b;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-size:12px">' +
+            '<option value="fijo"' + (kind === 'fijo' ? ' selected' : '') + '>Fijo</option>' +
+            '<option value="variable"' + (kind === 'variable' ? ' selected' : '') + '>Variable</option>' +
+        '</select>' +
+        '<button type="button" onclick="this.parentNode.remove()" style="background:#dc2626;color:#fff;border:none;border-radius:6px;width:28px;height:28px;cursor:pointer;flex-shrink:0">&times;</button>';
+    cont.appendChild(row);
+}
+
+async function cmDdPlanModalObjetivo(targetId) {
+    var t = targetId ? cmDdPlanTargets.find(function(x) { return x.id === targetId; }) : null;
+    await cmDdEnsureJugadoresCargados();
+    await cmDdPlanEnsureAgentes();
+
+    var source = t ? t.source : 'scout';
+    function posOpts(sel) {
+        return '<option value="">--</option>' + Object.keys(CMSC_POS_NOMBRES).map(function(k) {
+            return '<option value="' + k + '"' + (sel === k ? ' selected' : '') + '>' + k + ' - ' + CMSC_POS_NOMBRES[k] + '</option>';
+        }).join('');
+    }
+    function c2e(c) { return c ? (c / 100) : ''; }
+
+    var scoutOpts = '<option value="">-- Elegir jugador del scout --</option>';
+    cmDdJugadores.forEach(function(j) {
+        scoutOpts += '<option value="' + j.id + '"' + (t && t.sc_player_id === j.id ? ' selected' : '') + '>' + cmDdEsc(j.name) + (j.current_club ? ' (' + cmDdEsc(j.current_club) + ')' : '') + '</option>';
+    });
+    var agentOpts = '<option value="">-- Sin agente --</option>';
+    cmDdAgentes.forEach(function(a) {
+        agentOpts += '<option value="' + a.id + '"' + (t && t.agent_id === a.id ? ' selected' : '') + '>' + cmDdEsc(a.name) + (a.agency ? ' (' + cmDdEsc(a.agency) + ')' : '') + '</option>';
+    });
+
+    var h = '<div class="cmdd-modal-overlay" id="cmdd-modal-objetivo" onclick="if(event.target===this)this.remove()">';
+    h += '<datalist id="cmdd-bonus-tipos"><option value="Piso"><option value="Coche / Gasolina"><option value="Prima por goles"><option value="Prima por asistencias"><option value="Prima por ascenso"><option value="Prima por permanencia"><option value="Ficha / prima de fichaje"><option value="Comision agente"></datalist>';
+    h += '<div class="cmdd-modal" style="max-width:640px">';
+    h += '<div class="cmdd-modal-header"><h3>' + (t ? 'Editar objetivo' : 'Nuevo objetivo') + '</h3><button class="cmdd-modal-close" onclick="document.getElementById(\'cmdd-modal-objetivo\').remove()">&times;</button></div>';
+    h += '<div class="cmdd-modal-body">';
+
+    h += '<div class="cmdd-form-group"><label>Origen *</label><select id="cmdd-obj-source" onchange="cmDdPlanObjSourceChanged()">';
+    h += '<option value="scout"' + (source === 'scout' ? ' selected' : '') + '>Desde Scouting</option>';
+    h += '<option value="manual"' + (source === 'manual' ? ' selected' : '') + '>A mano</option>';
+    h += '<option value="agent_offer"' + (source === 'agent_offer' ? ' selected' : '') + '>Ofrecimiento de agente</option>';
+    h += '</select></div>';
+
+    h += '<div class="cmdd-form-group" id="cmdd-obj-scout-wrap" style="' + (source === 'scout' ? '' : 'display:none') + '"><label>Jugador del scout (rellena los datos)</label>';
+    h += '<select id="cmdd-obj-scout" onchange="cmDdPlanObjPickScout()">' + scoutOpts + '</select></div>';
+
+    h += '<div class="cmdd-form-group" id="cmdd-obj-agent-wrap" style="' + (source === 'agent_offer' ? '' : 'display:none') + '"><label>Agente que lo ofrece</label>';
+    h += '<select id="cmdd-obj-agent">' + agentOpts + '</select></div>';
+
+    h += '<div class="cmdd-form-row">';
+    h += '<div class="cmdd-form-group"><label>Nombre *</label><input id="cmdd-obj-name" value="' + cmDdEsc(t ? t.name : '') + '"></div>';
+    h += '<div class="cmdd-form-group"><label>Club actual</label><input id="cmdd-obj-club" value="' + cmDdEsc(t ? t.current_club : '') + '"></div>';
+    h += '</div>';
+    h += '<div class="cmdd-form-row">';
+    h += '<div class="cmdd-form-group"><label>Posicion principal</label><select id="cmdd-obj-pos1">' + posOpts(t ? t.position_primary : '') + '</select></div>';
+    h += '<div class="cmdd-form-group"><label>Posicion secundaria</label><select id="cmdd-obj-pos2">' + posOpts(t ? t.position_secondary : '') + '</select></div>';
+    h += '</div>';
+
+    h += '<div class="cmdd-form-row">';
+    h += '<div class="cmdd-form-group"><label>Prioridad</label><select id="cmdd-obj-prio">';
+    [['alta', 'Alta'], ['media', 'Media'], ['baja', 'Baja']].forEach(function(o) { h += '<option value="' + o[0] + '"' + ((t ? t.priority : 'media') === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; });
+    h += '</select></div>';
+    h += '<div class="cmdd-form-group"><label>Estado</label><select id="cmdd-obj-status">';
+    [['idea', 'Idea'], ['contactado', 'Contactado'], ['negociando', 'Negociando'], ['cerrado', 'Cerrado'], ['descartado', 'Descartado']].forEach(function(o) { h += '<option value="' + o[0] + '"' + ((t ? t.status : 'idea') === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; });
+    h += '</select></div>';
+    h += '</div>';
+
+    h += '<div class="cmdd-form-row">';
+    h += '<div class="cmdd-form-group"><label>Coste de fichaje (\u20AC)</label><input type="number" step="0.01" min="0" id="cmdd-obj-transfer" value="' + c2e(t ? t.transfer_cost_cents : 0) + '" placeholder="0"></div>';
+    h += '<div class="cmdd-form-group"><label>Sueldo anual estimado (\u20AC)</label><input type="number" step="0.01" min="0" id="cmdd-obj-salary" value="' + c2e(t ? t.salary_estimate_cents : 0) + '" placeholder="0"></div>';
+    h += '</div>';
+
+    h += '<div class="cmdd-form-group"><label>Extras / bonus (piso, coche, primas por goles, ascenso...)</label>';
+    h += '<div id="cmdd-obj-bonuses"></div>';
+    h += '<button type="button" class="cmdd-btn cmdd-btn-sm cmdd-btn-secondary" onclick="cmDdPlanObjAddBonus()">+ Anadir extra</button>';
+    h += '</div>';
+
+    h += '<div class="cmdd-form-group"><label>Notas</label><textarea id="cmdd-obj-notes">' + cmDdEsc(t ? t.notes : '') + '</textarea></div>';
+
+    h += '</div>';
+    h += '<div class="cmdd-modal-footer">';
+    if (t) h += '<button class="cmdd-btn cmdd-btn-danger cmdd-btn-sm" onclick="cmDdPlanArchivarObjetivo(\x27' + t.id + '\x27)">Eliminar</button>';
+    h += '<button class="cmdd-btn cmdd-btn-secondary" onclick="document.getElementById(\'cmdd-modal-objetivo\').remove()">Cancelar</button>';
+    h += '<button class="cmdd-btn cmdd-btn-primary" onclick="cmDdPlanGuardarObjetivo(\x27' + (t ? t.id : '') + '\x27)">Guardar</button>';
+    h += '</div></div></div>';
+
+    var div = document.createElement('div'); div.innerHTML = h;
+    document.body.appendChild(div.firstElementChild);
+
+    // Cargar extras existentes
+    if (t && Array.isArray(t.bonuses)) {
+        t.bonuses.forEach(function(b) {
+            cmDdPlanObjAddBonus(b.label, b.amount_cents != null ? (b.amount_cents / 100) : '', b.kind);
+        });
+    }
+}
+
+async function cmDdPlanGuardarObjetivo(targetId) {
+    var source = document.getElementById('cmdd-obj-source').value;
+    var name = (document.getElementById('cmdd-obj-name').value || '').trim();
+    if (!name) { alert('El nombre es obligatorio'); return; }
+
+    var bonuses = [];
+    document.querySelectorAll('#cmdd-obj-bonuses .cmdd-obj-bonus-row').forEach(function(row) {
+        var label = (row.querySelector('.cmdd-ob-label').value || '').trim();
+        var amt = parseFloat(row.querySelector('.cmdd-ob-amount').value);
+        var kind = row.querySelector('.cmdd-ob-kind').value;
+        if (label && !isNaN(amt) && amt > 0) {
+            bonuses.push({ label: label, amount_cents: Math.round(amt * 100), kind: kind });
+        }
+    });
+
+    function eurToCents(id) { var v = parseFloat(document.getElementById(id).value); return isNaN(v) ? 0 : Math.round(v * 100); }
+
+    var memberId = (typeof cmState !== 'undefined' && cmState.miembro) ? cmState.miembro.id : null;
+    var scoutId = source === 'scout' ? (document.getElementById('cmdd-obj-scout').value || null) : null;
+    var agentId = source === 'agent_offer' ? (document.getElementById('cmdd-obj-agent').value || null) : null;
+
+    var data = {
+        club_id: clubId,
+        plan_id: cmDdPlanActual.id,
+        source: source,
+        sc_player_id: scoutId,
+        agent_id: agentId,
+        name: name,
+        current_club: (document.getElementById('cmdd-obj-club').value || '').trim() || null,
+        position_primary: document.getElementById('cmdd-obj-pos1').value || null,
+        position_secondary: document.getElementById('cmdd-obj-pos2').value || null,
+        priority: document.getElementById('cmdd-obj-prio').value,
+        status: document.getElementById('cmdd-obj-status').value,
+        transfer_cost_cents: eurToCents('cmdd-obj-transfer'),
+        salary_estimate_cents: eurToCents('cmdd-obj-salary'),
+        bonuses: bonuses,
+        notes: (document.getElementById('cmdd-obj-notes').value || '').trim() || null,
+        updated_at: new Date().toISOString()
+    };
+
+    try {
+        if (targetId) {
+            await supabaseClient.from('cm_dd_plan_targets').update(data).eq('id', targetId);
+        } else {
+            data.created_by = memberId;
+            await supabaseClient.from('cm_dd_plan_targets').insert(data);
+        }
+        var el = document.getElementById('cmdd-modal-objetivo'); if (el) el.remove();
+        cmDdTabPlanificacion(document.getElementById('cmdd-tab-content'));
+    } catch (e) { alert('Error: ' + e.message); }
+}
+
+async function cmDdPlanArchivarObjetivo(targetId) {
+    if (!confirm('Eliminar este objetivo?')) return;
+    await supabaseClient.from('cm_dd_plan_targets').update({ archived: true, archived_at: new Date().toISOString() }).eq('id', targetId);
+    var el = document.getElementById('cmdd-modal-objetivo'); if (el) el.remove();
+    cmDdTabPlanificacion(document.getElementById('cmdd-tab-content'));
+}
+// ============================================================
+// PLANIFICACION - BLOQUE 3: CAMPOGRAMA DEL PROYECTO
+// ============================================================
+
+function cmDdPlanEntColor(e) {
+    if (e.kind === 'target') return '#a855f7';
+    return { renueva: '#22c55e', vuelve_cesion: '#3b82f6', dudoso: '#f59e0b', nueva_incorporacion: '#06b6d4', cantera: '#ec4899' }[e.decision] || '#64748b';
+}
+
+// Candidatos al proyecto: plantilla que sigue (renueva/vuelve/dudoso) + objetivos no descartados
+function cmDdPlanCandidatos() {
+    var out = [];
+    var formacionActual = cmDdPlanActual ? (cmDdPlanActual.formation || '1-4-3-3') : '1-4-3-3';
+    var huecosValidos = CMSC_POSICIONES_MAP[formacionActual] || [];
+    function slotValido(s) { return (s && huecosValidos.indexOf(s) !== -1) ? s : null; }
+    var allowSquad = ['renueva', 'vuelve_cesion', 'dudoso', 'nueva_incorporacion', 'cantera'];
+    cmDdPlanSquad.forEach(function(s) {
+        if (allowSquad.indexOf(s.decision) === -1) return;
+        var pl = cmDdPlanPlantilla.find(function(p) { return p.id === s.player_id; });
+        if (!pl) return;
+        var ps = cmDdPlanPlayerSeasons.find(function(x) { return x.player_id === pl.id; });
+        var teamName = '';
+        if (ps && ps.team_id) { var tm = cmDdPlanEquipos.find(function(t) { return t.id === ps.team_id; }); teamName = tm ? tm.name : ''; }
+        out.push({
+            kind: 'squad', rowId: s.id, name: pl.name,
+            posDD: cmDdMapPos(pl.positions_main), posSec: null,
+            decision: s.decision, slot: slotValido(s.target_position), club: teamName,
+            order: s.slot_order || 0
+        });
+    });
+    cmDdPlanTargets.forEach(function(t) {
+        if (t.status === 'descartado') return;
+        out.push({
+            kind: 'target', rowId: t.id, name: t.name || '(sin nombre)',
+            posDD: t.position_primary || null, posSec: t.position_secondary || null,
+            source: t.source, slot: slotValido(t.target_position), club: t.current_club || '',
+            order: t.slot_order || 0
+        });
+    });
+    return out;
+}
+
+function cmDdPlanCampogramaHTML() {
+    if (!cmDdPlanActual) return '';
+    var formation = cmDdPlanActual.formation || '1-4-3-3';
+    var positions = CMSC_POSICIONES_MAP[formation] || [];
+    var coords = CMSC_POS_COORDS[formation] || {};
+    var cands = cmDdPlanCandidatos();
+
+    var porSlot = {};
+    positions.forEach(function(p) { porSlot[p] = []; });
+    cands.forEach(function(e) { if (e.slot && porSlot[e.slot]) porSlot[e.slot].push(e); });
+    Object.keys(porSlot).forEach(function(p) {
+        porSlot[p].sort(function(a, b) { return (a.order - b.order) || (a.name || '').localeCompare(b.name || ''); });
+    });
+
+    var h = '<div class="cmdd-section" style="margin-top:16px">';
+    h += '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">';
+    h += '<h3 style="margin:0">Campograma del proyecto <span style="color:#94a3b8;font-size:12px;font-weight:400">(' + formation + ')</span></h3>';
+    h += '<button class="cmdd-btn cmdd-btn-sm cmdd-btn-secondary" onclick="cmDdPlanExportarPDF()">Exportar PDF</button>';
+    h += '</div>';
+    h += '<div style="color:#64748b;font-size:12px;margin-bottom:10px">Pulsa "+" en cada posicion para anadir jugadores (puedes poner varios). La "x" los quita.</div>';
+
+    h += '<div style="position:relative;background:linear-gradient(to bottom,#0c4a1e,#166534,#0c4a1e);border-radius:12px;border:2px solid #22c55e;width:100%;max-width:860px;margin:0 auto;aspect-ratio:68/100;overflow:hidden">';
+    h += '<div style="position:absolute;top:50%;left:5%;right:5%;height:1px;background:rgba(255,255,255,.2)"></div>';
+    h += '<div style="position:absolute;top:50%;left:50%;width:60px;height:60px;border:1px solid rgba(255,255,255,.2);border-radius:50%;transform:translate(-50%,-50%)"></div>';
+    h += '<div style="position:absolute;top:0;left:25%;right:25%;height:12%;border:1px solid rgba(255,255,255,.15);border-top:none"></div>';
+    h += '<div style="position:absolute;bottom:0;left:25%;right:25%;height:12%;border:1px solid rgba(255,255,255,.15);border-bottom:none"></div>';
+
+    positions.forEach(function(pos) {
+        var coord = coords[pos];
+        if (!coord) return;
+        var x = coord[0], y = 100 - coord[1];
+        var jugs = porSlot[pos] || [];
+        h += '<div style="position:absolute;left:' + x + '%;top:' + y + '%;transform:translate(-50%,-50%);width:128px;z-index:2">';
+        h += '<div style="background:rgba(15,23,42,.9);border:1px solid rgba(255,255,255,.25);border-radius:8px;padding:5px 6px;box-shadow:0 2px 8px rgba(0,0,0,.4)">';
+        h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">';
+        h += '<span style="color:#f59e0b;font-size:11px;font-weight:700">' + pos + ' <span style="color:#64748b;font-weight:400">' + jugs.length + '</span></span>';
+        h += '<button onclick="cmDdPlanModalSlot(\x27' + pos + '\x27)" style="background:#3b82f6;color:#fff;border:none;border-radius:5px;width:20px;height:20px;font-size:13px;line-height:1;cursor:pointer">+</button>';
+        h += '</div>';
+        if (jugs.length === 0) {
+            h += '<div style="color:#475569;font-size:9px;text-align:center;padding:2px 0">vacio</div>';
+        } else {
+            jugs.forEach(function(e, idx) {
+                var col = cmDdPlanEntColor(e);
+                h += '<div style="display:flex;align-items:center;gap:2px;border-left:2px solid ' + col + ';padding:1px 0 1px 4px;margin-bottom:2px">';
+                h += '<div style="flex:1;min-width:0">';
+                h += '<div style="color:#f1f5f9;font-size:10px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + cmDdEsc(e.name) + '</div>';
+                if (e.club) h += '<div style="color:#94a3b8;font-size:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + cmDdEsc(e.club) + '</div>';
+                h += '</div>';
+                if (jugs.length > 1) {
+                    h += '<div style="display:flex;flex-direction:column;line-height:1;flex-shrink:0">';
+                    h += '<button onclick="cmDdPlanMoverEnSlot(\x27' + e.kind + '\x27,\x27' + e.rowId + '\x27,-1)"' + (idx === 0 ? ' disabled' : '') + ' style="background:none;border:none;color:' + (idx === 0 ? '#334155' : '#94a3b8') + ';font-size:9px;cursor:' + (idx === 0 ? 'default' : 'pointer') + ';padding:0;height:9px">\u25B2</button>';
+                    h += '<button onclick="cmDdPlanMoverEnSlot(\x27' + e.kind + '\x27,\x27' + e.rowId + '\x27,1)"' + (idx === jugs.length - 1 ? ' disabled' : '') + ' style="background:none;border:none;color:' + (idx === jugs.length - 1 ? '#334155' : '#94a3b8') + ';font-size:9px;cursor:' + (idx === jugs.length - 1 ? 'default' : 'pointer') + ';padding:0;height:9px">\u25BC</button>';
+                    h += '</div>';
+                }
+                h += '<button onclick="cmDdPlanQuitarDeSlot(\x27' + e.kind + '\x27,\x27' + e.rowId + '\x27)" style="background:none;border:none;color:#ef4444;font-size:11px;cursor:pointer;line-height:1;flex-shrink:0">\u00D7</button>';
+                h += '</div>';
+            });
+        }
+        h += '</div></div>';
+    });
+    h += '</div>';
+
+    // Disponibles sin colocar
+    var disponibles = cands.filter(function(e) { return !e.slot; });
+    h += '<div style="margin-top:14px">';
+    h += '<div style="color:#94a3b8;font-size:12px;font-weight:600;margin-bottom:6px">Disponibles sin colocar (' + disponibles.length + ')</div>';
+    if (disponibles.length === 0) {
+        h += '<div style="color:#64748b;font-size:12px">No hay candidatos sin colocar. Marca jugadores como Renueva arriba o anade objetivos.</div>';
+    } else {
+        h += '<div style="display:flex;flex-wrap:wrap;gap:6px">';
+        disponibles.forEach(function(e) {
+            var col = cmDdPlanEntColor(e);
+            h += '<span style="display:inline-flex;align-items:center;gap:5px;background:#0f172a;border:1px solid ' + col + '55;border-radius:14px;padding:4px 10px;font-size:12px;color:#e2e8f0">';
+            h += '<span style="width:8px;height:8px;border-radius:50%;background:' + col + '"></span>';
+            h += cmDdEsc(e.name);
+            if (e.posDD) h += '<span style="color:#64748b;font-size:10px">' + cmDdEsc(e.posDD) + '</span>';
+            h += '</span>';
+        });
+        h += '</div>';
+    }
+    h += '</div>';
+
+    // Leyenda
+    h += '<div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:12px;font-size:11px;color:#94a3b8">';
+    [['#22c55e', 'Renueva'], ['#3b82f6', 'Vuelve cesion'], ['#f59e0b', 'Dudoso'], ['#06b6d4', 'Nueva incorp.'], ['#ec4899', 'Cantera'], ['#a855f7', 'Objetivo']].forEach(function(l) {
+        h += '<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:50%;background:' + l[0] + '"></span>' + l[1] + '</span>';
+    });
+    h += '</div>';
+
+    h += '</div>';
+    return h;
+}
+
+function cmDdPlanModalSlotFila(slot, e, enSlot, encaja) {
+    var col = cmDdPlanEntColor(e);
+    var enOtro = e.slot && e.slot !== slot;
+    var accion = enSlot
+        ? ('cmDdPlanQuitarDeSlot(\x27' + e.kind + '\x27,\x27' + e.rowId + '\x27)')
+        : ('cmDdPlanAnadirASlot(\x27' + slot + '\x27,\x27' + e.kind + '\x27,\x27' + e.rowId + '\x27)');
+    var h = '<div onclick="' + accion + '" style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;cursor:pointer;border:1px solid ' + (enSlot ? col : '#334155') + ';background:' + (enSlot ? col + '22' : 'transparent') + '">';
+    h += '<span style="width:9px;height:9px;border-radius:50%;background:' + col + ';flex-shrink:0"></span>';
+    h += '<div style="flex:1;min-width:0"><div style="color:#f1f5f9;font-size:13px;font-weight:600">' + cmDdEsc(e.name) + (!enSlot && !encaja ? ' <span style="color:#64748b;font-size:10px">(otra pos.)</span>' : '') + '</div>';
+    h += '<div style="color:#64748b;font-size:11px">' + (e.kind === 'target' ? 'Objetivo' : 'Plantilla') + (e.club ? ' \u00B7 ' + cmDdEsc(e.club) : '') + (enOtro ? ' \u00B7 ahora en ' + cmDdEsc(e.slot) : '') + '</div></div>';
+    h += '<span style="color:' + col + ';font-size:11px;font-weight:700;flex-shrink:0">' + (enSlot ? 'QUITAR' : (enOtro ? 'MOVER' : 'ANADIR')) + '</span>';
+    h += '</div>';
+    return h;
+}
+
+async function cmDdPlanModalSlot(slot) {
+    await cmDdEnsureJugadoresCargados();
+    var posLabel = CMSC_POS_NOMBRES[slot] || slot;
+    var cands = cmDdPlanCandidatos();
+    var fam = cmDdPosFamilia(slot);
+    function encaja(e) { return cmDdPosFamilia(e.posDD) === fam || (e.posSec && cmDdPosFamilia(e.posSec) === fam); }
+
+    var enSlot = cands.filter(function(e) { return e.slot === slot; });
+    // Solo jugadores libres (sin colocar en ningun hueco); los que encajan por posicion salen primero
+    var resto = cands.filter(function(e) { return !e.slot; }).sort(function(a, b) {
+        var ea = encaja(a), eb = encaja(b);
+        if (ea !== eb) return ea ? -1 : 1;
+        return (a.name || '').localeCompare(b.name || '');
+    });
+
+    // Base de scouting: jugadores cuya posicion (familia) encaja y aun no son objetivo
+    var yaObjetivo = {};
+    cmDdPlanTargets.forEach(function(t) { if (t.sc_player_id) yaObjetivo[t.sc_player_id] = true; });
+    var scoutList = cmDdJugadores.filter(function(j) {
+        if (yaObjetivo[j.id]) return false;
+        return cmDdPosFamilia(j.position_primary) === fam || (j.position_secondary && cmDdPosFamilia(j.position_secondary) === fam);
+    }).sort(function(a, b) { return (a.name || '').localeCompare(b.name || ''); });
+
+    var h = '<div class="cmdd-modal-overlay" id="cmdd-modal-slot" onclick="if(event.target===this)this.remove()">';
+    h += '<div class="cmdd-modal" style="max-width:480px">';
+    h += '<div class="cmdd-modal-header"><h3>' + slot + ' <span style="color:#94a3b8;font-size:13px;font-weight:400">' + cmDdEsc(posLabel) + '</span></h3>';
+    h += '<button class="cmdd-modal-close" onclick="document.getElementById(\'cmdd-modal-slot\').remove()">&times;</button></div>';
+    h += '<div class="cmdd-modal-body" style="max-height:70vh;overflow-y:auto">';
+
+    h += '<div style="color:#94a3b8;font-size:11px;font-weight:600;margin-bottom:6px">En esta posicion (' + enSlot.length + ')</div>';
+    if (enSlot.length === 0) {
+        h += '<div style="color:#64748b;font-size:12px;margin-bottom:10px">Nadie colocado aqui todavia.</div>';
+    } else {
+        h += '<div style="display:flex;flex-direction:column;gap:4px;margin-bottom:12px">';
+        enSlot.forEach(function(e) { h += cmDdPlanModalSlotFila(slot, e, true, encaja(e)); });
+        h += '</div>';
+    }
+
+    h += '<div style="color:#94a3b8;font-size:11px;font-weight:600;margin-bottom:6px;border-top:1px solid #334155;padding-top:10px">Disponibles sin colocar (' + resto.length + ')</div>';
+    if (resto.length === 0) {
+        h += '<div style="color:#64748b;font-size:12px;margin-bottom:10px">No quedan jugadores libres. Quita a alguien de su posicion para volver a colocarlo.</div>';
+    } else {
+        h += '<div style="display:flex;flex-direction:column;gap:4px;margin-bottom:12px">';
+        resto.forEach(function(e) { h += cmDdPlanModalSlotFila(slot, e, false, encaja(e)); });
+        h += '</div>';
+    }
+
+    h += '<div style="color:#94a3b8;font-size:11px;font-weight:600;margin-bottom:6px;border-top:1px solid #334155;padding-top:10px">Desde la base de scouting (' + scoutList.length + ')</div>';
+    if (scoutList.length === 0) {
+        h += '<div style="color:#64748b;font-size:12px">Ningun jugador de scouting con esta posicion.</div>';
+    } else {
+        h += '<div style="display:flex;flex-direction:column;gap:4px">';
+        scoutList.forEach(function(j) { h += cmDdPlanScoutFila(slot, j); });
+        h += '</div>';
+    }
+
+    h += '</div></div></div>';
+    var div = document.createElement('div'); div.innerHTML = h;
+    document.body.appendChild(div.firstElementChild);
+}
+
+function cmDdPlanScoutFila(slot, j) {
+    var col = '#38bdf8';
+    var h = '<div onclick="cmDdPlanAnadirScout(\x27' + slot + '\x27,\x27' + j.id + '\x27)" style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;cursor:pointer;border:1px solid #334155;background:transparent">';
+    h += '<span style="width:9px;height:9px;border-radius:50%;background:' + col + ';flex-shrink:0"></span>';
+    h += '<div style="flex:1;min-width:0"><div style="color:#f1f5f9;font-size:13px;font-weight:600">' + cmDdEsc(j.name) + '</div>';
+    h += '<div style="color:#64748b;font-size:11px">Scouting' + (j.current_club ? ' \u00B7 ' + cmDdEsc(j.current_club) : '') + (j.position_primary ? ' \u00B7 ' + cmDdEsc(j.position_primary) : '') + '</div></div>';
+    h += '<span style="color:' + col + ';font-size:11px;font-weight:700;flex-shrink:0">ANADIR</span>';
+    h += '</div>';
+    return h;
+}
+
+async function cmDdPlanAnadirScout(slot, scId) {
+    try {
+        var existente = cmDdPlanTargets.find(function(t) { return t.sc_player_id === scId; });
+        if (existente) {
+            await cmDdPlanSetSlotRow('target', existente.id, slot);
+        } else {
+            var j = cmDdJugadores.find(function(x) { return x.id === scId; });
+            var memberId = (typeof cmState !== 'undefined' && cmState.miembro) ? cmState.miembro.id : null;
+            var ins = await supabaseClient.from('cm_dd_plan_targets').insert({
+                club_id: clubId, plan_id: cmDdPlanActual.id, source: 'scout',
+                sc_player_id: scId,
+                name: j ? j.name : null,
+                current_club: j ? (j.current_club || null) : null,
+                position_primary: j ? (j.position_primary || null) : null,
+                position_secondary: j ? (j.position_secondary || null) : null,
+                priority: 'media', status: 'idea',
+                transfer_cost_cents: 0, salary_estimate_cents: 0, bonuses: [],
+                target_position: slot, created_by: memberId
+            }).select().single();
+            if (ins.data) cmDdPlanTargets.push(ins.data);
+        }
+        cmDdRenderPlanificacion();
+        cmDdPlanRefrescarModalSlot(slot);
+    } catch (e) { alert('Error: ' + e.message); }
+}
+
+async function cmDdPlanSetSlotRow(kind, rowId, slot) {
+    var tabla = kind === 'target' ? 'cm_dd_plan_targets' : 'cm_dd_plan_squad';
+    var orden = slot ? cmDdPlanCandidatos().filter(function(e) { return e.slot === slot; }).length : 0;
+    await supabaseClient.from(tabla).update({ target_position: slot, slot_order: orden, updated_at: new Date().toISOString() }).eq('id', rowId);
+    if (kind === 'target') { var t = cmDdPlanTargets.find(function(x) { return x.id === rowId; }); if (t) { t.target_position = slot; t.slot_order = orden; } }
+    else { var s = cmDdPlanSquad.find(function(x) { return x.id === rowId; }); if (s) { s.target_position = slot; s.slot_order = orden; } }
+}
+
+async function cmDdPlanSetOrder(kind, rowId, orden) {
+    var tabla = kind === 'target' ? 'cm_dd_plan_targets' : 'cm_dd_plan_squad';
+    await supabaseClient.from(tabla).update({ slot_order: orden }).eq('id', rowId);
+    if (kind === 'target') { var t = cmDdPlanTargets.find(function(x) { return x.id === rowId; }); if (t) t.slot_order = orden; }
+    else { var s = cmDdPlanSquad.find(function(x) { return x.id === rowId; }); if (s) s.slot_order = orden; }
+}
+
+async function cmDdPlanMoverEnSlot(kind, rowId, dir) {
+    var cands = cmDdPlanCandidatos();
+    var self = cands.find(function(e) { return e.kind === kind && e.rowId === rowId; });
+    if (!self || !self.slot) return;
+    var grupo = cands.filter(function(e) { return e.slot === self.slot; })
+        .sort(function(a, b) { return (a.order - b.order) || (a.name || '').localeCompare(b.name || ''); });
+    var idx = grupo.findIndex(function(e) { return e.kind === kind && e.rowId === rowId; });
+    var swapIdx = dir < 0 ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= grupo.length) return;
+    var tmp = grupo[idx]; grupo[idx] = grupo[swapIdx]; grupo[swapIdx] = tmp;
+    for (var i = 0; i < grupo.length; i++) { await cmDdPlanSetOrder(grupo[i].kind, grupo[i].rowId, i); }
+    cmDdRenderPlanificacion();
+}
+
+function cmDdPlanRefrescarModalSlot(slot) {
+    var el = document.getElementById('cmdd-modal-slot'); if (el) el.remove();
+    cmDdPlanModalSlot(slot);
+}
+
+async function cmDdPlanAnadirASlot(slot, kind, rowId) {
+    try {
+        await cmDdPlanSetSlotRow(kind, rowId, slot);
+        cmDdRenderPlanificacion();
+        cmDdPlanRefrescarModalSlot(slot);
+    } catch (e) { alert('Error: ' + e.message); }
+}
+
+async function cmDdPlanQuitarDeSlot(kind, rowId) {
+    try {
+        var slotPrev = null;
+        if (kind === 'target') { var t = cmDdPlanTargets.find(function(x) { return x.id === rowId; }); slotPrev = t ? t.target_position : null; }
+        else { var s = cmDdPlanSquad.find(function(x) { return x.id === rowId; }); slotPrev = s ? s.target_position : null; }
+        await cmDdPlanSetSlotRow(kind, rowId, null);
+        cmDdRenderPlanificacion();
+        if (document.getElementById('cmdd-modal-slot') && slotPrev) cmDdPlanRefrescarModalSlot(slotPrev);
+    } catch (e) { alert('Error: ' + e.message); }
+}
+// ============================================================
+// PLANIFICACION - BLOQUE 4: RESUMEN ECONOMICO
+// ============================================================
+
+function cmDdPlanResumenHTML() {
+    var sigue = 0, sigueN = 0, dudoso = 0, dudosoN = 0;
+    cmDdPlanSquad.forEach(function(s) {
+        var econ = cmDdPlanEcon.find(function(e) { return e.player_id === s.player_id; }) || {};
+        var sal = econ.salary_annual_cents || 0;
+        if (s.decision === 'renueva' || s.decision === 'vuelve_cesion') { sigue += sal; sigueN++; }
+        else if (s.decision === 'dudoso') { dudoso += sal; dudosoN++; }
+    });
+
+    var salObj = 0, fichajes = 0, extrasFijos = 0, extrasVar = 0, objN = 0;
+    cmDdPlanTargets.forEach(function(t) {
+        if (t.status === 'descartado') return;
+        objN++;
+        salObj += t.salary_estimate_cents || 0;
+        fichajes += t.transfer_cost_cents || 0;
+        var bonuses = Array.isArray(t.bonuses) ? t.bonuses : [];
+        bonuses.forEach(function(b) {
+            if (b.kind === 'variable') extrasVar += (b.amount_cents || 0);
+            else extrasFijos += (b.amount_cents || 0);
+        });
+    });
+
+    var costeFijoAnual = sigue + salObj + extrasFijos;
+
+    var h = '<div class="cmdd-section" style="margin-top:16px">';
+    h += '<h3>Resumen economico del proyecto</h3>';
+
+    h += '<div class="cmdd-kpi-grid" style="grid-template-columns:repeat(auto-fill,minmax(180px,1fr))">';
+    h += '<div class="cmdd-kpi"><div class="value">' + cmDdFormatEuros(costeFijoAnual) + '</div><div class="label">Coste fijo anual</div></div>';
+    h += '<div class="cmdd-kpi"><div class="value">' + cmDdFormatEuros(fichajes) + '</div><div class="label">Inversion en fichajes</div></div>';
+    h += '<div class="cmdd-kpi"><div class="value">' + cmDdFormatEuros(extrasVar) + '</div><div class="label">Primas variables (max)</div></div>';
+    if (dudoso > 0) h += '<div class="cmdd-kpi"><div class="value" style="color:#f59e0b">' + cmDdFormatEuros(dudoso) + '</div><div class="label">Salarios dudosos (sin confirmar)</div></div>';
+    h += '</div>';
+
+    function fila(label, valor, fuerte, color) {
+        return '<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #1e293b">' +
+            '<span style="color:' + (fuerte ? '#f1f5f9' : '#94a3b8') + ';font-size:13px;font-weight:' + (fuerte ? '700' : '400') + '">' + label + '</span>' +
+            '<span style="color:' + (color || (fuerte ? '#f59e0b' : '#e2e8f0')) + ';font-size:13px;font-weight:' + (fuerte ? '700' : '600') + '">' + cmDdFormatEuros(valor) + '</span>' +
+        '</div>';
+    }
+
+    h += '<div style="margin-top:6px">';
+    h += fila('Salarios plantilla que sigue (' + sigueN + ')', sigue, false);
+    h += fila('Salarios estimados objetivos (' + objN + ')', salObj, false);
+    h += fila('Extras fijos (piso, coche...)', extrasFijos, false);
+    h += fila('Coste fijo anual proyectado', costeFijoAnual, true);
+    h += '<div style="height:10px"></div>';
+    h += fila('Inversion en fichajes (traspasos, pago unico)', fichajes, false);
+    h += fila('Primas variables (potencial maximo)', extrasVar, false);
+    if (dudoso > 0) h += fila('Salarios dudosos (no confirmados, informativo)', dudoso, false, '#f59e0b');
+    h += '</div>';
+
+    h += '<div style="margin-top:10px;color:#64748b;font-size:11px">Coste fijo anual = salarios de los que siguen + salarios de objetivos + extras fijos. Los fichajes (pago unico) y las primas variables van aparte. Los dudosos no se suman porque no estan confirmados.</div>';
+
+    h += '</div>';
+    return h;
+}
+// ============================================================
+// PLANIFICACION - EXPORTAR PDF DEL CAMPOGRAMA
+// ============================================================
+
+function cmDdPlanExportarPDF() {
+    if (typeof jspdf === 'undefined') { alert('jsPDF no disponible'); return; }
+    if (!cmDdPlanActual) return;
+
+    var formation = cmDdPlanActual.formation || '1-4-3-3';
+    var positions = CMSC_POSICIONES_MAP[formation] || [];
+    var coords = CMSC_POS_COORDS[formation] || {};
+    var cands = cmDdPlanCandidatos();
+    var s = cmDdPlanSeasons.find(function(x) { return x.id === cmDdPlanSeasonId; });
+    var seasonName = s ? s.name : '';
+
+    var porSlot = {};
+    positions.forEach(function(p) { porSlot[p] = []; });
+    cands.forEach(function(e) { if (e.slot && porSlot[e.slot]) porSlot[e.slot].push(e); });
+    Object.keys(porSlot).forEach(function(p) {
+        porSlot[p].sort(function(a, b) { return (a.order - b.order) || (a.name || '').localeCompare(b.name || ''); });
+    });
+
+    var doc = new jspdf.jsPDF('p', 'mm', 'a4');
+    var W = 210, H = 297, M = 12;
+
+    function pdfEuro(c) { return (Math.round((c || 0) / 100)).toLocaleString('es-ES') + ' EUR'; }
+
+    // ===== CABECERA =====
+    doc.setFontSize(15); doc.setFont('helvetica', 'bold'); doc.setTextColor(0, 0, 0);
+    doc.text('Proyecto de plantilla', M, 16);
+    doc.setFontSize(10); doc.setFont('helvetica', 'normal'); doc.setTextColor(80, 80, 80);
+    doc.text((seasonName ? 'Temporada ' + seasonName + '   ' : '') + 'Sistema ' + formation, M, 22);
+    doc.text(new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }), W - M, 16, { align: 'right' });
+
+    // ===== CAMPO (blanco con lineas grises) =====
+    var pitchX = 20.5, pitchY = 30, pitchW = 169, pitchH = 252;
+    doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.4);
+    doc.rect(pitchX, pitchY, pitchW, pitchH);
+    doc.setDrawColor(175, 175, 175); doc.setLineWidth(0.2);
+    doc.line(pitchX, pitchY + pitchH / 2, pitchX + pitchW, pitchY + pitchH / 2);
+    doc.circle(pitchX + pitchW / 2, pitchY + pitchH / 2, 14);
+    var aw = pitchW * 0.5, ax = pitchX + pitchW * 0.25, ah = pitchH * 0.12;
+    doc.rect(ax, pitchY, aw, ah);
+    doc.rect(ax, pitchY + pitchH - ah, aw, ah);
+
+    // ===== POSICIONES (apellidos en negro) =====
+    positions.forEach(function(pos) {
+        var coord = coords[pos];
+        if (!coord) return;
+        var px = pitchX + (coord[0] / 100) * pitchW;
+        var py = pitchY + ((100 - coord[1]) / 100) * pitchH;
+        var jugs = porSlot[pos] || [];
+        var maxShow = 6;
+        var shown = jugs.slice(0, maxShow);
+        var extra = jugs.length - shown.length;
+
+        var boxW = 26, lineH = 3.3, headH = 4.5;
+        var nLines = Math.max(shown.length, 1) + (extra > 0 ? 1 : 0);
+        var boxH = headH + nLines * lineH + 1.5;
+        var bx = px - boxW / 2, by = py - boxH / 2;
+        if (bx < pitchX + 1) bx = pitchX + 1;
+        if (bx + boxW > pitchX + pitchW - 1) bx = pitchX + pitchW - 1 - boxW;
+        if (by < pitchY + 1) by = pitchY + 1;
+        if (by + boxH > pitchY + pitchH - 1) by = pitchY + pitchH - 1 - boxH;
+
+        doc.setFillColor(255, 255, 255); doc.setDrawColor(120, 120, 120); doc.setLineWidth(0.2);
+        doc.roundedRect(bx, by, boxW, boxH, 1.2, 1.2, 'FD');
+
+        doc.setFontSize(7); doc.setFont('helvetica', 'bold'); doc.setTextColor(0, 0, 0);
+        doc.text(pos, bx + 1.5, by + 3.2);
+        doc.setFont('helvetica', 'normal'); doc.setTextColor(120, 120, 120);
+        doc.text('(' + jugs.length + ')', bx + boxW - 1.5, by + 3.2, { align: 'right' });
+
+        var yy = by + headH + 1.5;
+        doc.setFontSize(6.8);
+        if (shown.length === 0) {
+            doc.setTextColor(150, 150, 150); doc.setFont('helvetica', 'italic');
+            doc.text('vacio', bx + 1.5, yy);
+        } else {
+            shown.forEach(function(e) {
+                doc.setTextColor(0, 0, 0); doc.setFont('helvetica', 'normal');
+                var nm = (e.name || '').split(' ').pop();
+                var maxName = boxW - 3;
+                while (doc.getTextWidth(nm) > maxName && nm.length > 1) nm = nm.slice(0, -1);
+                doc.text(nm, bx + 1.5, yy);
+                yy += lineH;
+            });
+            if (extra > 0) {
+                doc.setTextColor(120, 120, 120); doc.setFont('helvetica', 'italic');
+                doc.text('+' + extra + ' mas', bx + 1.5, yy);
+            }
+        }
+    });
+
+    doc.setFontSize(7); doc.setTextColor(160, 160, 160); doc.setFont('helvetica', 'normal');
+    doc.text('TopLiderCoach - Proyecto de plantilla', W / 2, H - 8, { align: 'center' });
+
+    // ===== PAGINA 2: DETALLE + RESUMEN =====
+    doc.addPage();
+    var y = M + 2;
+    doc.setFontSize(13); doc.setFont('helvetica', 'bold'); doc.setTextColor(0, 0, 0);
+    doc.text('Detalle por posicion (' + formation + ')', M, y); y += 8;
+
+    positions.forEach(function(pos) {
+        var jugs = porSlot[pos] || [];
+        var need = 6 + Math.max(jugs.length, 1) * 4.5 + 3;
+        if (y + need > H - 20) { doc.addPage(); y = M + 2; }
+        doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(0, 0, 0);
+        doc.text(pos + ' - ' + (CMSC_POS_NOMBRES[pos] || pos), M, y); y += 5;
+        if (jugs.length === 0) {
+            doc.setFontSize(9); doc.setFont('helvetica', 'italic'); doc.setTextColor(150, 150, 150);
+            doc.text('(vacio)', M + 2, y); y += 5;
+        } else {
+            jugs.forEach(function(e) {
+                doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(0, 0, 0);
+                var line = '- ' + (e.name || '') + (e.club ? '  (' + e.club + ')' : '') + (e.kind === 'target' ? '  [Objetivo]' : '');
+                doc.text(line, M + 2, y); y += 4.5;
+            });
+        }
+        y += 2;
+    });
+
+    // Resumen economico
+    var sigue = 0, salObj = 0, fichajes = 0, extrasFijos = 0, extrasVar = 0;
+    cmDdPlanSquad.forEach(function(sq) {
+        var ec = cmDdPlanEcon.find(function(x) { return x.player_id === sq.player_id; }) || {};
+        if (sq.decision === 'renueva' || sq.decision === 'vuelve_cesion') sigue += ec.salary_annual_cents || 0;
+    });
+    cmDdPlanTargets.forEach(function(t) {
+        if (t.status === 'descartado') return;
+        salObj += t.salary_estimate_cents || 0;
+        fichajes += t.transfer_cost_cents || 0;
+        (Array.isArray(t.bonuses) ? t.bonuses : []).forEach(function(b) {
+            if (b.kind === 'variable') extrasVar += b.amount_cents || 0; else extrasFijos += b.amount_cents || 0;
+        });
+    });
+    var costeFijo = sigue + salObj + extrasFijos;
+
+    if (y + 45 > H - 15) { doc.addPage(); y = M + 2; }
+    y += 4;
+    doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.setTextColor(0, 0, 0);
+    doc.text('Resumen economico', M, y); y += 6;
+    function rowPdf(l, v, bold) {
+        doc.setFontSize(bold ? 10 : 9); doc.setFont('helvetica', bold ? 'bold' : 'normal'); doc.setTextColor(0, 0, 0);
+        doc.text(l, M, y); doc.text(pdfEuro(v), W - M, y, { align: 'right' }); y += 5.2;
+    }
+    rowPdf('Salarios plantilla que sigue', sigue);
+    rowPdf('Salarios estimados objetivos', salObj);
+    rowPdf('Extras fijos', extrasFijos);
+    rowPdf('Coste fijo anual', costeFijo, true);
+    y += 2;
+    rowPdf('Inversion en fichajes (pago unico)', fichajes);
+    rowPdf('Primas variables (maximo)', extrasVar);
+
+    doc.save('Proyecto_plantilla_' + (seasonName || formation).replace(/[^\w]/g, '_') + '.pdf');
+}
 // ============================================================
 // AUTO-MONTAJE DEL MODULO
 // ============================================================
