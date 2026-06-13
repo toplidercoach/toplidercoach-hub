@@ -473,7 +473,7 @@ function cmRfefFormCoste() {
     var lim = (q.ratio_limit_pct != null ? q.ratio_limit_pct : 70);
     var aplica = (q.applies === false) ? '' : 'checked';
     return '<div class="cmrf-detail">' +
-        '<div class="cmrf-fg"><label class="cmrf-flabel">Coste de plantilla deportiva (EUR)</label><input class="cmrf-input" id="cmrf-coste" inputmode="decimal" value="' + coste + '" placeholder="Ej: 350000"></div>' +
+        '<div class="cmrf-fg"><label class="cmrf-flabel">Coste de plantilla deportiva (EUR)</label><input class="cmrf-input" id="cmrf-coste" inputmode="decimal" value="' + coste + '" placeholder="Ej: 350000"><div class="cmrf-actions"><button class="cmrf-btn" onclick="cmRfefTraerCostePlantilla()">Traer de Dir. Deportiva</button></div><div style="color:#94a3b8;font-size:11px;margin-top:4px">Trae los salarios base de los jugadores. Anade a mano el cuerpo tecnico y las cargas sociales si procede.</div></div>' +
         '<div class="cmrf-fg"><label class="cmrf-flabel">Ingresos previstos (EUR)</label><input class="cmrf-input" id="cmrf-ing" inputmode="decimal" value="' + ing + '" placeholder="Ej: 600000"><div class="cmrf-actions"><button class="cmrf-btn" onclick="cmRfefTraerPresupuesto()">Traer del presupuesto</button></div></div>' +
         '<div class="cmrf-fg"><label class="cmrf-flabel">Limite permitido (% sobre ingresos)</label><input class="cmrf-input" id="cmrf-lim" inputmode="decimal" value="' + lim + '"></div>' +
         '<div class="cmrf-fg"><label class="cmrf-flabel"><input type="checkbox" id="cmrf-aplica" ' + aplica + '> Este control aplica al club (segun su nivel)</label></div>' +
@@ -791,6 +791,20 @@ window.cmRfefTraerPresupuesto = async function () {
         if (el) el.value = (tot / 100).toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
         if (typeof showToast === 'function') showToast('Ingresos traidos del presupuesto');
     } catch (e) { console.error('cmRfefTraerPresupuesto:', e); cmRfefToast('Error al traer el presupuesto', 'error'); }
+};
+
+// Trae el coste de plantilla sumando los salarios base de Dir. Deportiva
+window.cmRfefTraerCostePlantilla = async function () {
+    try {
+        var r = await supabaseClient.from('cm_dd_player_economics')
+            .select('salary_annual_cents').eq('club_id', clubId).range(0, 9999);
+        if (r.error) throw r.error;
+        var rows = r.data || [];
+        var tot = rows.reduce(function (s, x) { return s + (x.salary_annual_cents || 0); }, 0);
+        var el = document.getElementById('cmrf-coste');
+        if (el) el.value = (tot / 100).toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+        if (typeof showToast === 'function') showToast('Salarios de ' + rows.length + ' jugadores traidos');
+    } catch (e) { console.error('cmRfefTraerCostePlantilla:', e); cmRfefToast('Error al traer el coste de plantilla', 'error'); }
 };
 
 window.cmRfefGuardarCoste = async function () {

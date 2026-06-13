@@ -127,6 +127,13 @@ async function cmInit() {
 
         console.log('[Club Mode] ACTIVO -- Rol: ' + (cmState.rol ? cmState.rol.name : '?'));
 
+        // 2b. Sincronizar plantilla del HUB hacia Club Mode (idempotente)
+        try {
+            await supabaseClient.rpc('sync_club_plantilla', { p_club_id: clubId });
+        } catch (e) {
+            console.warn('[Club Mode] sync_club_plantilla no disponible:', e.message);
+        }
+
         // 3. Cargar equipos del club
         await cmCargarEquipos();
 

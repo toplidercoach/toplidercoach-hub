@@ -3345,6 +3345,12 @@ async function cmDdTabPlanificacion(cont) {
         cmDdPlanTargets = resTg.data || [];
     } catch (e) { cmDdPlanTargets = []; }
 
+    try {
+        var resPf = await supabaseClient.from('cm_dd_plan_profiles')
+            .select('*').eq('plan_id', cmDdPlanActual.id);
+        cmDdPlanProfiles = resPf.data || [];
+    } catch (e) { cmDdPlanProfiles = []; }
+
     cmDdRenderPlanificacion();
 }
 
@@ -3555,6 +3561,9 @@ function cmDdRenderPlanificacion() {
     // ===== BLOQUE 2: OBJETIVOS =====
     h += cmDdPlanObjetivosHTML();
 
+    // ===== BLOQUE 2b: DUDOSOS =====
+    h += cmDdPlanDudososHTML();
+
     // ===== BLOQUE 3: CAMPOGRAMA DEL PROYECTO =====
     h += cmDdPlanCampogramaHTML();
 
@@ -3612,6 +3621,13 @@ async function cmDdPlanCrearTemporada() {
 // ============================================================
 
 var cmDdPlanTargets = [];
+var cmDdPlanProfiles = [];
+
+function cmDdPlanPerfilDe(pos) {
+    var f = cmDdPlanActual ? (cmDdPlanActual.formation || '') : '';
+    var p = cmDdPlanProfiles.find(function(x) { return x.position === pos && x.formation === f; });
+    return p && p.profile_text ? p.profile_text : '';
+}
 
 function cmDdPlanTargetTotal(t) {
     var total = (t.transfer_cost_cents || 0) + (t.salary_estimate_cents || 0);
@@ -3932,11 +3948,18 @@ function cmDdPlanCampogramaHTML() {
         var x = coord[0], y = 100 - coord[1];
         var jugs = porSlot[pos] || [];
         h += '<div style="position:absolute;left:' + x + '%;top:' + y + '%;transform:translate(-50%,-50%);width:128px;z-index:2">';
-        h += '<div style="background:rgba(15,23,42,.9);border:1px solid rgba(255,255,255,.25);border-radius:8px;padding:5px 6px;box-shadow:0 2px 8px rgba(0,0,0,.4)">';
+        var perfilTxt = cmDdPlanPerfilDe(pos);
+        h += '<div style="background:rgba(15,23,42,.92);border:1px solid rgba(255,255,255,.25);border-radius:8px;padding:5px 6px;box-shadow:0 2px 8px rgba(0,0,0,.4)">';
         h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">';
         h += '<span style="color:#f59e0b;font-size:11px;font-weight:700">' + pos + ' <span style="color:#64748b;font-weight:400">' + jugs.length + '</span></span>';
+        h += '<div style="display:flex;gap:3px">';
+        h += '<button onclick="cmDdPlanModalPerfil(\x27' + pos + '\x27)" title="Perfil buscado" style="background:' + (perfilTxt ? '#f59e0b' : '#334155') + ';color:' + (perfilTxt ? '#0f172a' : '#cbd5e1') + ';border:none;border-radius:5px;width:20px;height:20px;font-size:11px;line-height:1;cursor:pointer">&#9998;</button>';
         h += '<button onclick="cmDdPlanModalSlot(\x27' + pos + '\x27)" style="background:#3b82f6;color:#fff;border:none;border-radius:5px;width:20px;height:20px;font-size:13px;line-height:1;cursor:pointer">+</button>';
         h += '</div>';
+        h += '</div>';
+        if (perfilTxt) {
+            h += '<div onclick="cmDdPlanModalPerfil(\x27' + pos + '\x27)" style="background:#f59e0b18;border-left:2px solid #f59e0b;border-radius:3px;padding:2px 4px;margin-bottom:4px;cursor:pointer"><div style="color:#fbbf24;font-size:8px;line-height:1.25;max-height:26px;overflow:hidden">' + cmDdEsc(perfilTxt) + '</div></div>';
+        }
         if (jugs.length === 0) {
             h += '<div style="color:#475569;font-size:9px;text-align:center;padding:2px 0">vacio</div>';
         } else {
@@ -4157,6 +4180,111 @@ async function cmDdPlanQuitarDeSlot(kind, rowId) {
         if (document.getElementById('cmdd-modal-slot') && slotPrev) cmDdPlanRefrescarModalSlot(slotPrev);
     } catch (e) { alert('Error: ' + e.message); }
 }
+
+// ============================================================
+// PLANIFICACION - PERFILES POR POSICION
+// ============================================================
+
+function cmDdPlanModalPerfil(pos) {
+    var posLabel = CMSC_POS_NOMBRES[pos] || pos;
+    var actual = cmDdPlanPerfilDe(pos);
+    var h = '<div class="cmdd-modal-overlay" id="cmdd-modal-perfil" onclick="if(event.target===this)this.remove()">';
+    h += '<div class="cmdd-modal" style="max-width:520px">';
+    h += '<div class="cmdd-modal-header"><h3>Perfil buscado \u2014 ' + pos + ' <span style="color:#94a3b8;font-size:13px;font-weight:400">' + cmDdEsc(posLabel) + '</span></h3>';
+    h += '<button class="cmdd-modal-close" onclick="document.getElementById(\'cmdd-modal-perfil\').remove()">&times;</button></div>';
+    h += '<div class="cmdd-modal-body">';
+    h += '<div class="cmdd-form-group"><label>Que perfil de jugador necesitamos en esta posicion</label>';
+    h += '<textarea id="cmdd-perfil-text" style="min-height:160px" placeholder="Ej: Carrilero zurdo sub-23, mucho recorrido y llegada, buen centro, solvente en el 1v1. Polivalente para jugar tambien de interior.">' + cmDdEsc(actual) + '</textarea></div>';
+    h += '<div style="color:#64748b;font-size:11px">Perfil para el sistema <strong style="color:#94a3b8">' + (cmDdPlanActual ? cmDdPlanActual.formation : '') + '</strong>. En otro sistema esta misma posicion puede pedir otro perfil. Lo vera el resto de departamentos y sale en el PDF.</div>';
+    h += '</div>';
+    h += '<div class="cmdd-modal-footer">';
+    if (actual) h += '<button class="cmdd-btn cmdd-btn-danger cmdd-btn-sm" onclick="cmDdPlanBorrarPerfil(\x27' + pos + '\x27)">Borrar</button>';
+    h += '<button class="cmdd-btn cmdd-btn-secondary" onclick="document.getElementById(\'cmdd-modal-perfil\').remove()">Cancelar</button>';
+    h += '<button class="cmdd-btn cmdd-btn-primary" onclick="cmDdPlanGuardarPerfil(\x27' + pos + '\x27)">Guardar</button>';
+    h += '</div></div></div>';
+    var div = document.createElement('div'); div.innerHTML = h;
+    document.body.appendChild(div.firstElementChild);
+}
+
+async function cmDdPlanGuardarPerfil(pos) {
+    if (!cmDdPlanActual) return;
+    var txt = (document.getElementById('cmdd-perfil-text').value || '').trim();
+    var formacion = cmDdPlanActual.formation || '';
+    var memberId = (typeof cmState !== 'undefined' && cmState.miembro) ? cmState.miembro.id : null;
+    try {
+        await supabaseClient.from('cm_dd_plan_profiles').upsert({
+            club_id: clubId, plan_id: cmDdPlanActual.id, formation: formacion, position: pos,
+            profile_text: txt || null, created_by: memberId, updated_at: new Date().toISOString()
+        }, { onConflict: 'plan_id,formation,position' });
+        var ex = cmDdPlanProfiles.find(function(x) { return x.position === pos && x.formation === formacion; });
+        if (ex) ex.profile_text = txt; else cmDdPlanProfiles.push({ plan_id: cmDdPlanActual.id, formation: formacion, position: pos, profile_text: txt });
+        var el = document.getElementById('cmdd-modal-perfil'); if (el) el.remove();
+        cmDdRenderPlanificacion();
+    } catch (e) { alert('Error: ' + e.message); }
+}
+
+async function cmDdPlanBorrarPerfil(pos) {
+    if (!cmDdPlanActual) return;
+    var formacion = cmDdPlanActual.formation || '';
+    try {
+        await supabaseClient.from('cm_dd_plan_profiles').delete().eq('plan_id', cmDdPlanActual.id).eq('formation', formacion).eq('position', pos);
+        cmDdPlanProfiles = cmDdPlanProfiles.filter(function(x) { return !(x.position === pos && x.formation === formacion); });
+        var el = document.getElementById('cmdd-modal-perfil'); if (el) el.remove();
+        cmDdRenderPlanificacion();
+    } catch (e) { alert('Error: ' + e.message); }
+}
+// ============================================================
+// PLANIFICACION - BLOQUE 2b: DUDOSOS
+// ============================================================
+
+function cmDdPlanDudososHTML() {
+    var dudosos = [];
+    cmDdPlanSquad.forEach(function(s) {
+        if (s.decision !== 'dudoso') return;
+        var pl = cmDdPlanPlantilla.find(function(p) { return p.id === s.player_id; });
+        if (!pl) return;
+        var econ = cmDdPlanEcon.find(function(e) { return e.player_id === pl.id; }) || {};
+        dudosos.push({
+            id: pl.id, name: pl.name,
+            posDD: cmDdMapPos(pl.positions_main),
+            edad: cmDdCalcEdad(pl.birth_date),
+            salary: econ.salary_annual_cents || 0,
+            contractEnd: econ.contract_end || pl.end_rights_date || null
+        });
+    });
+    dudosos.sort(function(a, b) { return (a.name || '').localeCompare(b.name || ''); });
+
+    var h = '<div class="cmdd-section" style="margin-top:16px;border-left:3px solid #f59e0b">';
+    h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">';
+    h += '<h3 style="margin:0">Dudosos <span class="cmdd-tab-badge">' + dudosos.length + '</span></h3>';
+    h += '<span style="color:#94a3b8;font-size:11px">Renovacion en el aire. Pruebalos en el campograma (color ambar); si renuevan, pasalos a Renueva.</span>';
+    h += '</div>';
+    if (dudosos.length === 0) {
+        h += '<div style="color:#64748b;font-size:13px;text-align:center;padding:12px 0">Ningun jugador marcado como dudoso. Marca a alguien como "Dudoso" en la tabla de arriba.</div>';
+    } else {
+        dudosos.forEach(function(d) {
+            h += '<div class="cmdd-list-item" style="align-items:center">';
+            h += '<div style="flex:1;min-width:0">';
+            h += '<div class="cmdd-list-name" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span>' + cmDdEsc(d.name) + '</span>';
+            if (d.posDD) h += '<span style="color:#f59e0b;font-size:10px;font-weight:700;border:1px solid #f59e0b;border-radius:4px;padding:0 5px">' + cmDdEsc(d.posDD) + '</span>';
+            h += '</div>';
+            var sub = [];
+            if (d.edad !== '') sub.push(d.edad + ' anos');
+            if (d.salary) sub.push(cmDdFormatEuros(d.salary));
+            if (d.contractEnd) sub.push('fin ' + cmDdFechaCorta(d.contractEnd));
+            h += '<div class="cmdd-list-sub">' + sub.join(' \u00B7 ') + '</div>';
+            h += '</div>';
+            h += '<div style="display:flex;gap:6px;flex-shrink:0">';
+            h += '<button class="cmdd-btn cmdd-btn-sm cmdd-btn-success" onclick="cmDdPlanSetDecision(\x27' + d.id + '\x27,\x27renueva\x27)">Renueva</button>';
+            h += '<button class="cmdd-btn cmdd-btn-sm cmdd-btn-danger" onclick="cmDdPlanSetDecision(\x27' + d.id + '\x27,\x27baja\x27)">Baja</button>';
+            h += '</div>';
+            h += '</div>';
+        });
+    }
+    h += '</div>';
+    return h;
+}
+
 // ============================================================
 // PLANIFICACION - BLOQUE 4: RESUMEN ECONOMICO
 // ============================================================
@@ -4222,7 +4350,7 @@ function cmDdPlanResumenHTML() {
 // PLANIFICACION - EXPORTAR PDF DEL CAMPOGRAMA
 // ============================================================
 
-function cmDdPlanExportarPDF() {
+async function cmDdPlanExportarPDF() {
     if (typeof jspdf === 'undefined') { alert('jsPDF no disponible'); return; }
     if (!cmDdPlanActual) return;
 
@@ -4232,6 +4360,24 @@ function cmDdPlanExportarPDF() {
     var cands = cmDdPlanCandidatos();
     var s = cmDdPlanSeasons.find(function(x) { return x.id === cmDdPlanSeasonId; });
     var seasonName = s ? s.name : '';
+
+    // Datos del club (nombre + escudo)
+    var club = {};
+    try {
+        var rc = await supabaseClient.from('clubs').select('name, logo_url').eq('id', clubId).single();
+        club = rc.data || {};
+    } catch (e) { club = {}; }
+    var logoImg = null;
+    if (club.logo_url) {
+        try {
+            logoImg = await new Promise(function(resolve, reject) {
+                var im = new Image(); im.crossOrigin = 'anonymous';
+                im.onload = function() { resolve(im); };
+                im.onerror = function() { reject(); };
+                im.src = club.logo_url;
+            });
+        } catch (e) { logoImg = null; }
+    }
 
     var porSlot = {};
     positions.forEach(function(p) { porSlot[p] = []; });
@@ -4245,12 +4391,39 @@ function cmDdPlanExportarPDF() {
 
     function pdfEuro(c) { return (Math.round((c || 0) / 100)).toLocaleString('es-ES') + ' EUR'; }
 
+    function pdfCabecera(titulo) {
+        doc.setFillColor(15, 23, 42);
+        doc.rect(0, 0, W, 26, 'F');
+        doc.setFillColor(245, 158, 11);
+        doc.rect(0, 26, W, 1.2, 'F');
+        var tx = M;
+        if (logoImg) { try { doc.addImage(logoImg, 'PNG', M, 4, 18, 18); tx = M + 22; } catch (e) {} }
+        doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(15);
+        doc.text(club.name || 'Mi Club', tx, 12);
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(203, 213, 225);
+        doc.text(titulo + (seasonName ? '  \u00B7  ' + seasonName : '') + '  \u00B7  ' + formation, tx, 19);
+        doc.setTextColor(148, 163, 184); doc.setFontSize(8);
+        doc.text(new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }), W - M, 11, { align: 'right' });
+    }
+
+    function pdfPie() {
+        var total = doc.internal.getNumberOfPages();
+        for (var i = 1; i <= total; i++) {
+            doc.setPage(i);
+            doc.setDrawColor(225, 225, 225); doc.setLineWidth(0.2);
+            doc.line(M, H - 12, W - M, H - 12);
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(245, 158, 11);
+            doc.text('TopLiderCoach', M, H - 7.5);
+            var wTLC = doc.getTextWidth('TopLiderCoach');
+            doc.setFont('helvetica', 'normal'); doc.setTextColor(140, 140, 140);
+            doc.text(' \u00B7 Software deportivo profesional', M + wTLC, H - 7.5);
+            if (club.name) doc.text(club.name, W / 2, H - 7.5, { align: 'center' });
+            doc.text('Pag. ' + i + ' / ' + total, W - M, H - 7.5, { align: 'right' });
+        }
+    }
+
     // ===== CABECERA =====
-    doc.setFontSize(15); doc.setFont('helvetica', 'bold'); doc.setTextColor(0, 0, 0);
-    doc.text('Proyecto de plantilla', M, 16);
-    doc.setFontSize(10); doc.setFont('helvetica', 'normal'); doc.setTextColor(80, 80, 80);
-    doc.text((seasonName ? 'Temporada ' + seasonName + '   ' : '') + 'Sistema ' + formation, M, 22);
-    doc.text(new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }), W - M, 16, { align: 'right' });
+    pdfCabecera('Proyecto de plantilla');
 
     // ===== CAMPO (blanco con lineas grises) =====
     var pitchX = 20.5, pitchY = 30, pitchW = 169, pitchH = 252;
@@ -4312,21 +4485,27 @@ function cmDdPlanExportarPDF() {
         }
     });
 
-    doc.setFontSize(7); doc.setTextColor(160, 160, 160); doc.setFont('helvetica', 'normal');
-    doc.text('TopLiderCoach - Proyecto de plantilla', W / 2, H - 8, { align: 'center' });
-
     // ===== PAGINA 2: DETALLE + RESUMEN =====
     doc.addPage();
-    var y = M + 2;
+    pdfCabecera('Detalle del proyecto');
+    var y = 34;
     doc.setFontSize(13); doc.setFont('helvetica', 'bold'); doc.setTextColor(0, 0, 0);
     doc.text('Detalle por posicion (' + formation + ')', M, y); y += 8;
 
     positions.forEach(function(pos) {
         var jugs = porSlot[pos] || [];
-        var need = 6 + Math.max(jugs.length, 1) * 4.5 + 3;
+        var perfil = cmDdPlanPerfilDe(pos);
+        var perfilLines = perfil ? doc.splitTextToSize(perfil, W - 2 * M - 4) : [];
+        var need = 6 + (perfilLines.length * 3.6) + (perfilLines.length ? 4 : 0) + Math.max(jugs.length, 1) * 4.5 + 3;
         if (y + need > H - 20) { doc.addPage(); y = M + 2; }
         doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(0, 0, 0);
         doc.text(pos + ' - ' + (CMSC_POS_NOMBRES[pos] || pos), M, y); y += 5;
+        if (perfilLines.length) {
+            doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(180, 120, 0);
+            doc.text('Perfil buscado:', M + 2, y); y += 3.6;
+            doc.setFont('helvetica', 'normal'); doc.setTextColor(60, 60, 60);
+            doc.text(perfilLines, M + 2, y); y += perfilLines.length * 3.6 + 1.5;
+        }
         if (jugs.length === 0) {
             doc.setFontSize(9); doc.setFont('helvetica', 'italic'); doc.setTextColor(150, 150, 150);
             doc.text('(vacio)', M + 2, y); y += 5;
@@ -4372,8 +4551,9 @@ function cmDdPlanExportarPDF() {
     rowPdf('Inversion en fichajes (pago unico)', fichajes);
     rowPdf('Primas variables (maximo)', extrasVar);
 
+    pdfPie();
     doc.save('Proyecto_plantilla_' + (seasonName || formation).replace(/[^\w]/g, '_') + '.pdf');
-}
+};
 // ============================================================
 // AUTO-MONTAJE DEL MODULO
 // ============================================================

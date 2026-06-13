@@ -883,6 +883,7 @@ function cmScRenderModalHighlight(hl) {
 
 // Abrir la ficha completa de jugador (misma que Tab Jugadores) desde el highlight
 var cmScHlCallbackPendiente = false;
+var cmScJgForzarDuplicado = false;
 
 function cmScHlCrearFichaCompleta() {
     // Recoger nombre y club del highlight para pre-rellenar
@@ -1126,6 +1127,7 @@ async function cmScArchivarHighlight(hlId) {
 var cmScJugadores = [];
 var cmScJugadorActual = null;
 var cmScJugadorSightings = [];
+var cmScJugadorReports = [];
 var cmScFiltroJugPipeline = 'all';
 var cmScFiltroJugPosition = 'all';
 
@@ -1244,6 +1246,7 @@ function cmScCalcEdad(birthDate) {
 
 // --- Modal crear/editar jugador ---
 function cmScModalJugador(jugadorId) {
+    cmScJgForzarDuplicado = false;
     var j = null;
     if (jugadorId) { j = cmScJugadores.find(function(x) { return x.id === jugadorId; }); if (!j) return; }
     var titulo = j ? 'Editar jugador' : 'Nuevo jugador scouted';
@@ -1350,6 +1353,57 @@ function cmScJgBuscarDuplicado() {
     cont.innerHTML = h;
 }
 
+function cmScJgMostrarConflicto(existentes) {
+    var cont = document.getElementById('cmsc-jg-dup-warning');
+    if (!cont) {
+        if (confirm('Ya existe una ficha con ese nombre. Crear otra de todas formas?')) { cmScJgForzarDuplicado = true; cmScGuardarJugador(''); }
+        return;
+    }
+    var h = '<div style="background:#450a0a;border:1px solid #b91c1c;border-radius:8px;padding:10px 12px;font-size:12px">' +
+        '<div style="color:#fca5a5;font-weight:700;margin-bottom:6px">Ya existe una ficha con este nombre</div>' +
+        '<div style="color:#e2e8f0;margin-bottom:8px">Para no duplicar, usa la ficha que ya existe:</div>';
+    existentes.forEach(function(j) {
+        h += '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:4px 0">' +
+            '<span style="color:#e2e8f0">' + cmScEsc(j.name) + (j.current_club ? ' <span style="color:#94a3b8">(' + cmScEsc(j.current_club) + ')</span>' : '') + '</span>' +
+            '<button class="cmsc-btn cmsc-btn-primary cmsc-btn-sm" onclick="cmScJgUsarExistente(\x27' + j.id + '\x27)">Usar esta</button>' +
+        '</div>';
+    });
+    h += '<div style="border-top:1px solid #7f1d1d;margin-top:8px;padding-top:8px">' +
+        '<button class="cmsc-btn cmsc-btn-secondary cmsc-btn-sm" onclick="cmScJgCrearDeTodasFormas()">Crear otra de todas formas</button>' +
+        '</div></div>';
+    cont.innerHTML = h;
+    try { cont.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {}
+}
+
+function cmScJgCrearDeTodasFormas() {
+    cmScJgForzarDuplicado = true;
+    cmScGuardarJugador('');
+}
+
+function cmScJgUsarExistente(playerId) {
+    var existente = cmScJugadores.find(function(x) { return x.id === playerId; });
+    var modal = document.getElementById('cmsc-modal-jugador');
+    if (modal) modal.remove();
+    cmScJgForzarDuplicado = false;
+
+    if (cmScHlCallbackPendiente) {
+        cmScHlCallbackPendiente = false;
+        cmScHlJugadorSeleccionado = playerId;
+        var info = document.getElementById('cmsc-hl-selected-info');
+        if (info && existente) info.innerHTML = '\u2705 Vinculado a ficha existente: <strong>' + cmScEsc(existente.name) + '</strong>';
+        var btnCrear = document.getElementById('cmsc-hl-btn-crear');
+        if (btnCrear) btnCrear.style.display = 'none';
+        if (existente) {
+            var hlName = document.getElementById('cmsc-hl-name');
+            if (hlName) hlName.value = existente.name;
+            var hlClub = document.getElementById('cmsc-hl-club');
+            if (hlClub) hlClub.value = existente.current_club || '';
+        }
+    } else {
+        cmScAbrirJugador(playerId);
+    }
+}
+
 async function cmScGuardarJugador(jugadorId) {
     var name = (document.getElementById('cmsc-jg-name').value || '').trim();
     var nat = (document.getElementById('cmsc-jg-nat').value || '').trim();
@@ -1364,6 +1418,14 @@ async function cmScGuardarJugador(jugadorId) {
     if (!birth) { showToast('La fecha de nacimiento es obligatoria'); return; }
     if (!club) { showToast('El club actual es obligatorio'); return; }
     if (!league) { showToast('La liga actual es obligatoria'); return; }
+
+    // Anti-duplicado: solo al crear ficha nueva
+    if (!jugadorId && !cmScJgForzarDuplicado) {
+        var cmScNorm = function(s) { return (s || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); };
+        var nname = cmScNorm(name);
+        var existentes = cmScJugadores.filter(function(x) { return cmScNorm(x.name) === nname; });
+        if (existentes.length > 0) { cmScJgMostrarConflicto(existentes); return; }
+    }
 
     var datos = {
         club_id: clubId,
@@ -1415,6 +1477,7 @@ async function cmScGuardarJugador(jugadorId) {
         }
         var modal = document.getElementById('cmsc-modal-jugador');
         if (modal) modal.remove();
+        cmScJgForzarDuplicado = false;
         if (!cmScHlCallbackPendiente) await cmScCargarJugadores();
     } catch (e) {
         console.error('cmScGuardarJugador:', e);
@@ -1443,6 +1506,18 @@ async function cmScAbrirJugador(jugadorId) {
         var res = await query;
         cmScJugadorSightings = res.data || [];
     } catch (e) { cmScJugadorSightings = []; console.error('sightings:', e); }
+
+    // Cargar evaluaciones (26 sub-aspectos). El scout ve solo las suyas; el DD ve todas.
+    try {
+        var miIdEv = cmScGetMiMiembroId();
+        var esDDEv = typeof cmPuedeVer === 'function' && cmPuedeVer('director_deportivo');
+        var qEv = supabaseClient.from('cm_sc_player_reports')
+            .select('*').eq('player_id', jugadorId).eq('archived', false)
+            .order('report_date', { ascending: false });
+        if (!esDDEv && miIdEv) qEv = qEv.eq('scout_id', miIdEv);
+        var resEv = await qEv;
+        cmScJugadorReports = resEv.data || [];
+    } catch (e) { cmScJugadorReports = []; console.error('reports:', e); }
 
     cmScRenderJugadorDetalle();
 }
@@ -1516,6 +1591,9 @@ function cmScRenderJugadorDetalle() {
         });
         h += '</div></div>';
     }
+
+    // Mis evaluaciones (26 sub-aspectos)
+    h += cmScEvaluacionesHTML(j, puedeEditar);
 
     // Avistamientos
     h += '<div class="cmsc-detail-card">' +
@@ -1610,6 +1688,256 @@ async function cmScCrearJugadorDesdeHighlight(hlId) {
     } catch (e) {
         showToast('Error: ' + (e.message || e));
     }
+}
+
+
+// ============================================================
+// EVALUACIONES DEL JUGADOR (26 sub-aspectos) -> cm_sc_player_reports
+// El scout rellena su evaluacion; medias y nota global automaticas.
+// ============================================================
+
+var CMSC_EVAL_AREAS = [
+    { key: 'tec', label: 'Tecnica', color: '#3b82f6', aspects: [
+        ['control', 'Control'], ['pase_corto', 'Pase corto'], ['pase_largo', 'Pase largo'], ['conduccion', 'Conduccion'],
+        ['regate', 'Regate'], ['finalizacion', 'Finalizacion'], ['juego_aereo', 'Juego aereo'], ['primer_toque', 'Primer toque'] ] },
+    { key: 'tac', label: 'Tactica', color: '#a855f7', aspects: [
+        ['posicionamiento', 'Posicionamiento'], ['lectura', 'Lectura'], ['decisiones', 'Decisiones'],
+        ['comprension', 'Comprension'], ['transiciones', 'Transiciones'], ['espacios', 'Espacios'] ] },
+    { key: 'fis', label: 'Fisica', color: '#f59e0b', aspects: [
+        ['velocidad', 'Velocidad'], ['aceleracion', 'Aceleracion'], ['resistencia', 'Resistencia'],
+        ['fuerza', 'Fuerza'], ['agilidad', 'Agilidad'], ['potencia', 'Potencia'] ] },
+    { key: 'men', label: 'Mental', color: '#22c55e', aspects: [
+        ['actitud', 'Actitud'], ['liderazgo', 'Liderazgo'], ['concentracion', 'Concentracion'],
+        ['competitividad', 'Competitividad'], ['disciplina', 'Disciplina'], ['trabajo_equipo', 'Trabajo equipo'] ] }
+];
+
+function cmScEvaluacionesHTML(j, puedeEditar) {
+    var esDD = typeof cmPuedeVer === 'function' && cmPuedeVer('director_deportivo');
+    var miId = cmScGetMiMiembroId();
+    var titulo = esDD ? 'Evaluaciones de scouts' : 'Mis evaluaciones';
+    var recLabels = { sign: 'Fichar', watch: 'Seguir viendo', discard: 'Descartar' };
+    var potLabels = { high: 'Alto', medium: 'Medio', low: 'Bajo' };
+
+    var h = '<div class="cmsc-detail-card">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">' +
+            '<h4 style="margin:0;color:#f1f5f9;font-size:14px">' + titulo + ' <span class="cmsc-tab-badge">' + cmScJugadorReports.length + '</span></h4>';
+    if (puedeEditar) {
+        h += '<button class="cmsc-btn cmsc-btn-success cmsc-btn-sm" onclick="cmScModalEvaluacion()">+ Nueva evaluacion</button>';
+    }
+    h += '</div>';
+
+    if (cmScJugadorReports.length === 0) {
+        h += '<div style="color:#64748b;font-size:13px;padding:16px 0;text-align:center">Sin evaluaciones. Observa al jugador varios partidos y rellena la evaluacion de 26 puntos.</div>';
+    } else {
+        h += '<div class="cmsc-hl-list">';
+        cmScJugadorReports.forEach(function(r) {
+            var propio = miId && r.scout_id === miId;
+            var ov = r.rating_overall != null ? Number(r.rating_overall).toFixed(1) : '\u2014';
+            var ovColor = r.rating_overall >= 8 ? '#4ade80' : (r.rating_overall >= 6 ? '#f59e0b' : '#94a3b8');
+            h += '<div class="cmsc-hl-item" style="flex-direction:column;align-items:stretch;gap:10px">';
+            h += '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">' +
+                '<div>' +
+                    '<div class="cmsc-hl-name">' + cmScFechaCorta(r.report_date) +
+                        (r.match_context ? ' <span style="color:#94a3b8;font-weight:400">\u00B7 ' + cmScEsc(r.match_context) + '</span>' : '') + '</div>' +
+                    '<div class="cmsc-hl-meta">Scout: ' + cmScEsc(cmScGetMiembroNombre(r.scout_id)) +
+                        (r.recommendation ? ' \u00B7 ' + (recLabels[r.recommendation] || r.recommendation) : '') +
+                        (r.potential ? ' \u00B7 Potencial ' + (potLabels[r.potential] || r.potential) : '') + '</div>' +
+                '</div>' +
+                '<div style="text-align:right;flex-shrink:0">' +
+                    '<div style="color:' + ovColor + ';font-weight:700;font-size:22px;line-height:1">' + ov + '</div>' +
+                    '<div style="color:#64748b;font-size:10px">global</div>' +
+                '</div>' +
+            '</div>';
+            h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px">';
+            CMSC_EVAL_AREAS.forEach(function(area) {
+                var v = r['avg_' + (area.key === 'tec' ? 'tecnica' : area.key === 'tac' ? 'tactica' : area.key === 'fis' ? 'fisica' : 'mental')];
+                var pct = v != null ? Math.round((Number(v) / 10) * 100) : 0;
+                h += '<div>' +
+                    '<div style="display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;margin-bottom:2px"><span>' + area.label + '</span><span style="color:#e2e8f0;font-weight:600">' + (v != null ? Number(v).toFixed(1) : '\u2014') + '</span></div>' +
+                    '<div style="height:6px;background:#334155;border-radius:3px;overflow:hidden"><div style="height:100%;width:' + pct + '%;background:' + area.color + ';border-radius:3px"></div></div>' +
+                '</div>';
+            });
+            h += '</div>';
+            if (r.strengths) h += '<div style="font-size:12px;color:#cbd5e1"><span style="color:#4ade80;font-weight:600">Fortalezas:</span> ' + cmScEsc(r.strengths) + '</div>';
+            if (r.weaknesses) h += '<div style="font-size:12px;color:#cbd5e1"><span style="color:#f87171;font-weight:600">Debilidades:</span> ' + cmScEsc(r.weaknesses) + '</div>';
+            if (r.summary) h += '<div style="font-size:12px;color:#cbd5e1"><span style="color:#94a3b8;font-weight:600">Resumen:</span> ' + cmScEsc(r.summary) + '</div>';
+            if (propio && puedeEditar) {
+                h += '<div style="display:flex;gap:6px;justify-content:flex-end">' +
+                    '<button class="cmsc-btn cmsc-btn-secondary cmsc-btn-sm" onclick="cmScModalEvaluacion(\x27' + r.id + '\x27)">Editar</button>' +
+                    '<button class="cmsc-btn cmsc-btn-danger cmsc-btn-sm" onclick="cmScArchivarEvaluacion(\x27' + r.id + '\x27)">\u2715</button>' +
+                '</div>';
+            }
+            h += '</div>';
+        });
+        h += '</div>';
+    }
+    h += '</div>';
+    return h;
+}
+
+function cmScModalEvaluacion(reportId) {
+    if (!cmScJugadorActual) return;
+    var r = null;
+    if (reportId) { r = cmScJugadorReports.find(function(x) { return x.id === reportId; }); if (!r) return; }
+    var titulo = r ? 'Editar evaluacion' : 'Nueva evaluacion';
+    var hoy = new Date().toISOString().split('T')[0];
+
+    var aspectosHtml = '';
+    CMSC_EVAL_AREAS.forEach(function(area) {
+        aspectosHtml += '<div style="margin-bottom:14px">' +
+            '<div style="color:' + area.color + ';font-size:12px;font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">' + area.label + '</div>' +
+            '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+        area.aspects.forEach(function(a) {
+            var val = r && r['rating_' + area.key + '_' + a[0]] != null ? r['rating_' + area.key + '_' + a[0]] : '';
+            aspectosHtml += '<div style="display:flex;align-items:center;justify-content:space-between;gap:6px;background:#0f172a;border:1px solid #1e293b;border-radius:6px;padding:5px 8px">' +
+                '<label style="font-size:11px;color:#cbd5e1;margin:0;flex:1">' + a[1] + '</label>' +
+                '<input type="number" id="cmsc-ev-' + area.key + '-' + a[0] + '" min="1" max="10" step="0.5" value="' + val + '" ' +
+                    'style="width:54px;padding:4px 6px;background:#1e293b;border:1px solid #334155;border-radius:5px;color:#e2e8f0;font-size:13px;text-align:center;font-family:inherit">' +
+            '</div>';
+        });
+        aspectosHtml += '</div></div>';
+    });
+
+    var overlay = document.createElement('div');
+    overlay.className = 'cmsc-modal-overlay';
+    overlay.id = 'cmsc-modal-eval';
+    overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+    overlay.innerHTML =
+    '<div class="cmsc-modal" style="max-width:680px">' +
+        '<div class="cmsc-modal-header">' +
+            '<h3>' + titulo + ' \u2014 ' + cmScEsc(cmScJugadorActual.name) + '</h3>' +
+            '<button class="cmsc-modal-close" onclick="document.getElementById(\x27cmsc-modal-eval\x27).remove()">\u2715</button>' +
+        '</div>' +
+        '<div class="cmsc-modal-body">' +
+            '<div class="cmsc-form-row-3">' +
+                '<div class="cmsc-form-group"><label>Fecha *</label><input type="date" id="cmsc-ev-date" value="' + (r ? (r.report_date || hoy) : hoy) + '"></div>' +
+                '<div class="cmsc-form-group"><label>Contexto</label><input id="cmsc-ev-context" value="' + cmScEsc(r ? r.match_context : '') + '" placeholder="Ej: 4 partidos oct-nov"></div>' +
+                '<div class="cmsc-form-group"><label>Metodo</label><select id="cmsc-ev-method">' +
+                    '<option value="live"' + (r && r.viewing_method === 'live' ? ' selected' : '') + '>En directo</option>' +
+                    '<option value="tv"' + (r && r.viewing_method === 'tv' ? ' selected' : '') + '>TV</option>' +
+                    '<option value="video"' + (r && r.viewing_method === 'video' ? ' selected' : '') + '>Video</option>' +
+                '</select></div>' +
+            '</div>' +
+            '<div style="color:#64748b;font-size:11px;margin:4px 0 12px">Puntua de 1 a 10 los aspectos que hayas podido valorar (minimo 10). Los que dejes en blanco no cuentan en la media.</div>' +
+            aspectosHtml +
+            '<div class="cmsc-form-group"><label>Fortalezas</label><textarea id="cmsc-ev-strengths" placeholder="Lo mejor de su juego...">' + cmScEsc(r ? r.strengths : '') + '</textarea></div>' +
+            '<div class="cmsc-form-group"><label>Debilidades</label><textarea id="cmsc-ev-weaknesses" placeholder="Aspectos a mejorar...">' + cmScEsc(r ? r.weaknesses : '') + '</textarea></div>' +
+            '<div class="cmsc-form-group"><label>Resumen / conclusion</label><textarea id="cmsc-ev-summary" placeholder="Valoracion global...">' + cmScEsc(r ? r.summary : '') + '</textarea></div>' +
+            '<div class="cmsc-form-row">' +
+                '<div class="cmsc-form-group"><label>Recomendacion</label><select id="cmsc-ev-rec">' +
+                    '<option value="">--</option>' +
+                    '<option value="sign"' + (r && r.recommendation === 'sign' ? ' selected' : '') + '>Fichar</option>' +
+                    '<option value="watch"' + (r && r.recommendation === 'watch' ? ' selected' : '') + '>Seguir viendo</option>' +
+                    '<option value="discard"' + (r && r.recommendation === 'discard' ? ' selected' : '') + '>Descartar</option>' +
+                '</select></div>' +
+                '<div class="cmsc-form-group"><label>Potencial</label><select id="cmsc-ev-pot">' +
+                    '<option value="">--</option>' +
+                    '<option value="high"' + (r && r.potential === 'high' ? ' selected' : '') + '>Alto</option>' +
+                    '<option value="medium"' + (r && r.potential === 'medium' ? ' selected' : '') + '>Medio</option>' +
+                    '<option value="low"' + (r && r.potential === 'low' ? ' selected' : '') + '>Bajo</option>' +
+                '</select></div>' +
+            '</div>' +
+        '</div>' +
+        '<div class="cmsc-modal-footer">' +
+            '<button class="cmsc-btn cmsc-btn-secondary" onclick="document.getElementById(\x27cmsc-modal-eval\x27).remove()">Cancelar</button>' +
+            '<button class="cmsc-btn cmsc-btn-primary" onclick="cmScGuardarEvaluacion(\x27' + (reportId || '') + '\x27)">Guardar evaluacion</button>' +
+        '</div>' +
+    '</div>';
+    document.body.appendChild(overlay);
+}
+
+async function cmScGuardarEvaluacion(reportId) {
+    if (!cmScJugadorActual) return;
+    var scoutId = cmScGetMiMiembroId();
+    if (!scoutId) { showToast('No se pudo identificar tu perfil de scout'); return; }
+    var fecha = document.getElementById('cmsc-ev-date').value;
+    if (!fecha) { showToast('La fecha es obligatoria'); return; }
+
+    var datos = {
+        club_id: clubId,
+        player_id: cmScJugadorActual.id,
+        scout_id: scoutId,
+        report_date: fecha,
+        match_context: document.getElementById('cmsc-ev-context').value || null,
+        viewing_method: document.getElementById('cmsc-ev-method').value || null,
+        strengths: document.getElementById('cmsc-ev-strengths').value || null,
+        weaknesses: document.getElementById('cmsc-ev-weaknesses').value || null,
+        summary: document.getElementById('cmsc-ev-summary').value || null,
+        recommendation: document.getElementById('cmsc-ev-rec').value || null,
+        potential: document.getElementById('cmsc-ev-pot').value || null,
+        updated_at: new Date().toISOString()
+    };
+
+    var totalRellenos = 0;
+    CMSC_EVAL_AREAS.forEach(function(area) {
+        var suma = 0, n = 0;
+        area.aspects.forEach(function(a) {
+            var el = document.getElementById('cmsc-ev-' + area.key + '-' + a[0]);
+            var v = el && el.value !== '' ? parseFloat(el.value) : null;
+            if (v != null && !isNaN(v)) {
+                if (v < 1) v = 1;
+                if (v > 10) v = 10;
+                datos['rating_' + area.key + '_' + a[0]] = v;
+                suma += v; n++; totalRellenos++;
+            } else {
+                datos['rating_' + area.key + '_' + a[0]] = null;
+            }
+        });
+        var avgKey = area.key === 'tec' ? 'avg_tecnica' : area.key === 'tac' ? 'avg_tactica' : area.key === 'fis' ? 'avg_fisica' : 'avg_mental';
+        datos[avgKey] = n > 0 ? Math.round((suma / n) * 10) / 10 : null;
+    });
+
+    if (totalRellenos < 10) { showToast('Rellena al menos 10 aspectos para guardar'); return; }
+
+    var areaAvgs = [datos.avg_tecnica, datos.avg_tactica, datos.avg_fisica, datos.avg_mental].filter(function(x) { return x != null; });
+    datos.rating_overall = areaAvgs.length > 0 ? Math.round((areaAvgs.reduce(function(a, b) { return a + b; }, 0) / areaAvgs.length) * 10) / 10 : null;
+
+    try {
+        if (reportId) {
+            var res = await supabaseClient.from('cm_sc_player_reports').update(datos).eq('id', reportId);
+            if (res.error) throw res.error;
+            showToast('Evaluacion actualizada');
+        } else {
+            var res = await supabaseClient.from('cm_sc_player_reports').insert(datos).select().single();
+            if (res.error) throw res.error;
+            showToast('Evaluacion guardada');
+        }
+        await cmScRecalcularRating(cmScJugadorActual.id);
+        var modal = document.getElementById('cmsc-modal-eval');
+        if (modal) modal.remove();
+        await cmScAbrirJugador(cmScJugadorActual.id);
+    } catch (e) {
+        console.error('cmScGuardarEvaluacion:', e);
+        showToast('Error: ' + (e.message || e));
+    }
+}
+
+async function cmScRecalcularRating(playerId) {
+    try {
+        var res = await supabaseClient.from('cm_sc_player_reports')
+            .select('rating_overall').eq('player_id', playerId).eq('archived', false);
+        var rows = (res.data || []).filter(function(x) { return x.rating_overall != null; });
+        var avg = rows.length > 0 ? rows.reduce(function(a, b) { return a + Number(b.rating_overall); }, 0) / rows.length : null;
+        var avgR = avg != null ? Math.round(avg * 10) / 10 : null;
+        var levelAuto = avgR == null ? null : (avgR >= 8 ? 'differential' : (avgR >= 6 ? 'good' : 'developing'));
+        await supabaseClient.from('cm_sc_players').update({
+            rating_overall: avgR, level_auto: levelAuto, updated_at: new Date().toISOString()
+        }).eq('id', playerId);
+        var j = cmScJugadores.find(function(x) { return x.id === playerId; });
+        if (j) { j.rating_overall = avgR; j.level_auto = levelAuto; }
+        if (cmScJugadorActual && cmScJugadorActual.id === playerId) { cmScJugadorActual.rating_overall = avgR; cmScJugadorActual.level_auto = levelAuto; }
+    } catch (e) { console.error('cmScRecalcularRating:', e); }
+}
+
+async function cmScArchivarEvaluacion(reportId) {
+    if (!confirm('Eliminar esta evaluacion?')) return;
+    try {
+        var res = await supabaseClient.from('cm_sc_player_reports')
+            .update({ archived: true, archived_at: new Date().toISOString() }).eq('id', reportId);
+        if (res.error) throw res.error;
+        showToast('Evaluacion eliminada');
+        if (cmScJugadorActual) { await cmScRecalcularRating(cmScJugadorActual.id); await cmScAbrirJugador(cmScJugadorActual.id); }
+    } catch (e) { showToast('Error: ' + (e.message || e)); }
 }
 
 
