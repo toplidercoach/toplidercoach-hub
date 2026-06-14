@@ -3729,6 +3729,7 @@ function cmDdPlanObjAddBonus(label, amountEur, kind) {
 
 async function cmDdPlanModalObjetivo(targetId) {
     var t = targetId ? cmDdPlanTargets.find(function(x) { return x.id === targetId; }) : null;
+    cmDdJugadores = [];
     await cmDdEnsureJugadoresCargados();
     await cmDdPlanEnsureAgentes();
 

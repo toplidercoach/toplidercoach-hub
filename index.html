@@ -1392,18 +1392,88 @@
                         <label>Posicion *</label>
                         <select id="jugador-posicion">
                             <option value="">Seleccionar...</option>
-                            <option value="Portero">Portero</option>
-                            <option value="Defensa Central">Defensa Central</option>
-                            <option value="Lateral Derecho">Lateral Derecho</option>
-                            <option value="Lateral Izquierdo">Lateral Izquierdo</option>
-                            <option value="Mediocentro Defensivo">Mediocentro Defensivo</option>
-                            <option value="Mediocentro">Mediocentro</option>
-                            <option value="Mediapunta">Mediapunta</option>
-                            <option value="Extremo Derecho">Extremo Derecho</option>
-                            <option value="Extremo Izquierdo">Extremo Izquierdo</option>
-                            <option value="Delantero Centro">Delantero Centro</option>
+                            <optgroup label="Portería">
+                                <option value="POR">POR · Portero</option>
+                            </optgroup>
+                            <optgroup label="Defensa">
+                                <option value="LD">LD · Lateral Derecho</option>
+                                <option value="LI">LI · Lateral Izquierdo</option>
+                                <option value="CAD">CAD · Carrilero Derecho</option>
+                                <option value="CAI">CAI · Carrilero Izquierdo</option>
+                                <option value="DCD">DCD · Central Derecho</option>
+                                <option value="DCC">DCC · Central</option>
+                                <option value="DCI">DCI · Central Izquierdo</option>
+                            </optgroup>
+                            <optgroup label="Centro del campo">
+                                <option value="PIV">PIV · Pivote</option>
+                                <option value="MCD">MCD · Mediocentro Derecho</option>
+                                <option value="MC">MC · Mediocentro</option>
+                                <option value="MCI">MCI · Mediocentro Izquierdo</option>
+                                <option value="MD">MD · Medio Derecho</option>
+                                <option value="MI">MI · Medio Izquierdo</option>
+                                <option value="ID">ID · Interior Derecho</option>
+                                <option value="II">II · Interior Izquierdo</option>
+                                <option value="MP">MP · Mediapunta</option>
+                            </optgroup>
+                            <optgroup label="Ataque">
+                                <option value="ED">ED · Extremo Derecho</option>
+                                <option value="EI">EI · Extremo Izquierdo</option>
+                                <option value="DC">DC · Delantero Centro</option>
+                            </optgroup>
                         </select>
                     </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Posición secundaria</label>
+                        <select id="jugador-posicion-sec">
+                            <option value="">— Ninguna —</option>
+                            <optgroup label="Portería">
+                                <option value="POR">POR · Portero</option>
+                            </optgroup>
+                            <optgroup label="Defensa">
+                                <option value="LD">LD · Lateral Derecho</option>
+                                <option value="LI">LI · Lateral Izquierdo</option>
+                                <option value="CAD">CAD · Carrilero Derecho</option>
+                                <option value="CAI">CAI · Carrilero Izquierdo</option>
+                                <option value="DCD">DCD · Central Derecho</option>
+                                <option value="DCC">DCC · Central</option>
+                                <option value="DCI">DCI · Central Izquierdo</option>
+                            </optgroup>
+                            <optgroup label="Centro del campo">
+                                <option value="PIV">PIV · Pivote</option>
+                                <option value="MCD">MCD · Mediocentro Derecho</option>
+                                <option value="MC">MC · Mediocentro</option>
+                                <option value="MCI">MCI · Mediocentro Izquierdo</option>
+                                <option value="MD">MD · Medio Derecho</option>
+                                <option value="MI">MI · Medio Izquierdo</option>
+                                <option value="ID">ID · Interior Derecho</option>
+                                <option value="II">II · Interior Izquierdo</option>
+                                <option value="MP">MP · Mediapunta</option>
+                            </optgroup>
+                            <optgroup label="Ataque">
+                                <option value="ED">ED · Extremo Derecho</option>
+                                <option value="EI">EI · Extremo Izquierdo</option>
+                                <option value="DC">DC · Delantero Centro</option>
+                            </optgroup>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Origen</label>
+                        <select id="jugador-origen">
+                            <option value="">—</option>
+                            <option value="nueva_incorporacion">Nueva incorporación</option>
+                            <option value="cantera">Cantera</option>
+                            <option value="propiedad">En propiedad</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+                        <input type="checkbox" id="jugador-sub23" style="width:auto;margin:0"> Sub-23
+                    </label>
                 </div>
                 
                 <div class="form-row">
