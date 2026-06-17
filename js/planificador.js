@@ -444,11 +444,6 @@ sesion = { nombre: '', fecha: fechaHoy, calentamiento: [], principal: [], enfria
                 return;
             }
             
-            if (sesion.calentamiento.length === 0 && sesion.principal.length === 0 && sesion.enfriamiento.length === 0) {
-                showToast('Anade al menos un ejercicio a la sesion');
-                return;
-            }
-            
             try {
                 const datosGuardar = {
                     club_id: clubId,
