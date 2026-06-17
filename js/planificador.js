@@ -1183,6 +1183,289 @@ if (s.players && s.players.length > 0) {
             if (calendarioMes > 11) { calendarioMes = 0; calendarioAnio++; }
             cargarCalendarioUnificado();
         }
+        // ========== PDF DEL CALENDARIO (mes en cuadricula / rangos en lista) ==========
+
+function calPdfMenu(btn) {
+    let menu = document.getElementById('cal-pdf-menu');
+    if (menu) { menu.remove(); return; }
+    menu = document.createElement('div');
+    menu.id = 'cal-pdf-menu';
+    menu.style.cssText = 'position:absolute;background:#1e293b;border:1px solid #334155;border-radius:8px;padding:6px;z-index:9999;box-shadow:0 6px 18px rgba(0,0,0,0.4);min-width:180px;';
+    const opciones = [
+        { l: 'Este mes', r: 'mes' },
+        { l: 'Trimestre (3 meses)', r: 'trimestre' },
+        { l: 'Semestre (6 meses)', r: 'semestre' },
+        { l: 'Temporada completa', r: 'temporada' }
+    ];
+    let h = '';
+    opciones.forEach(function(o) {
+        h += '<div onclick="calGenerarPDF(\'' + o.r + '\')" style="padding:8px 12px;color:#e2e8f0;font-size:13px;cursor:pointer;border-radius:6px" onmouseenter="this.style.background=\'#334155\'" onmouseleave="this.style.background=\'transparent\'">' + o.l + '</div>';
+    });
+    menu.innerHTML = h;
+    const rect = btn.getBoundingClientRect();
+    menu.style.top = (window.scrollY + rect.bottom + 4) + 'px';
+    menu.style.left = (window.scrollX + rect.left) + 'px';
+    document.body.appendChild(menu);
+    setTimeout(function() {
+        document.addEventListener('click', function cerrar(e) {
+            if (!menu.contains(e.target) && e.target !== btn) {
+                menu.remove();
+                document.removeEventListener('click', cerrar);
+            }
+        });
+    }, 50);
+}
+
+async function calCargarRango(inicioISO, finISO) {
+    let qSes = supabaseClient
+        .from('training_sessions')
+        .select('id, name, session_date, session_time')
+        .eq('club_id', clubId)
+        .gte('session_date', inicioISO)
+        .lte('session_date', finISO)
+        .order('session_date');
+    const { data: sesiones } = await qSes;
+
+    let qPar = supabaseClient
+        .from('matches')
+        .select('*')
+        .eq('club_id', clubId)
+        .gte('match_date', inicioISO)
+        .lte('match_date', finISO)
+        .order('match_date');
+    if (seasonId) qPar = qPar.eq('season_id', seasonId);
+    const { data: partidos } = await qPar;
+
+    return { sesiones: sesiones || [], partidos: partidos || [] };
+}
+
+async function calGenerarPDF(rango) {
+    const menu = document.getElementById('cal-pdf-menu');
+    if (menu) menu.remove();
+
+    // Calcular fechas de inicio y fin segun rango
+    let inicio, fin, titulo;
+    const base = new Date(calendarioAnio, calendarioMes, 1);
+
+    if (rango === 'mes') {
+        inicio = new Date(calendarioAnio, calendarioMes, 1);
+        fin = new Date(calendarioAnio, calendarioMes + 1, 0);
+        titulo = MESES[calendarioMes] + ' ' + calendarioAnio;
+    } else if (rango === 'trimestre') {
+        inicio = new Date(calendarioAnio, calendarioMes, 1);
+        fin = new Date(calendarioAnio, calendarioMes + 3, 0);
+        titulo = 'Trimestre: ' + MESES[inicio.getMonth()] + ' - ' + MESES[fin.getMonth()] + ' ' + fin.getFullYear();
+    } else if (rango === 'semestre') {
+        inicio = new Date(calendarioAnio, calendarioMes, 1);
+        fin = new Date(calendarioAnio, calendarioMes + 6, 0);
+        titulo = 'Semestre: ' + MESES[inicio.getMonth()] + ' - ' + MESES[fin.getMonth()] + ' ' + fin.getFullYear();
+    } else { // temporada: julio a junio
+        const anioTemp = calendarioMes >= 6 ? calendarioAnio : calendarioAnio - 1;
+        inicio = new Date(anioTemp, 6, 1);
+        fin = new Date(anioTemp + 1, 5, 30);
+        titulo = 'Temporada ' + anioTemp + '/' + (anioTemp + 1);
+    }
+
+    const toISO = function(d) {
+        return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    };
+
+    showToast('Generando PDF...');
+    const datos = await calCargarRango(toISO(inicio), toISO(fin));
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    const nombreClub = (clubData && clubData.name) ? clubData.name : 'Club';
+
+    if (rango === 'mes') {
+        calPdfCuadricula(doc, calendarioMes, calendarioAnio, datos, nombreClub);
+    } else {
+        calPdfLista(doc, inicio, fin, datos, nombreClub, titulo);
+    }
+
+    const nombreArchivo = 'Calendario_' + titulo.replace(/[^a-zA-Z0-9]/g, '_') + '.pdf';
+    doc.save(nombreArchivo);
+    showToast('PDF generado');
+}
+
+function calPdfCuadricula(doc, mes, anio, datos, nombreClub) {
+    const W = doc.internal.pageSize.getWidth();
+
+    doc.setFontSize(16);
+    doc.setTextColor(40, 40, 40);
+    doc.text(nombreClub, W / 2, 18, { align: 'center' });
+    doc.setFontSize(13);
+    doc.setTextColor(90, 90, 90);
+    doc.text(MESES[mes] + ' ' + anio, W / 2, 26, { align: 'center' });
+
+    // Agrupar eventos por dia
+    const porDia = {};
+    datos.sesiones.forEach(function(s) {
+        const d = new Date(s.session_date + 'T12:00:00').getDate();
+        if (!porDia[d]) porDia[d] = [];
+        const hora = s.session_time ? s.session_time.slice(0, 5) + ' ' : '';
+        porDia[d].push({ t: 'S', txt: hora + s.name });
+    });
+    datos.partidos.forEach(function(p) {
+        const d = new Date(p.match_date + 'T12:00:00').getDate();
+        if (!porDia[d]) porDia[d] = [];
+        const hora = p.kick_off_time ? p.kick_off_time.slice(0, 5) + ' ' : '';
+        porDia[d].push({ t: 'P', txt: hora + 'vs ' + p.opponent });
+    });
+
+    // Cuadricula 7 columnas
+    const dows = ['Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab', 'Dom'];
+    const margenX = 10;
+    const anchoCol = (W - margenX * 2) / 7;
+    let y = 34;
+    const altoFila = 24;
+
+    doc.setFontSize(9);
+    doc.setTextColor(255, 255, 255);
+    doc.setFillColor(38, 33, 92);
+    for (let i = 0; i < 7; i++) {
+        doc.rect(margenX + i * anchoCol, y, anchoCol, 7, 'F');
+        doc.text(dows[i], margenX + i * anchoCol + anchoCol / 2, y + 5, { align: 'center' });
+    }
+    y += 7;
+
+    const primerDia = new Date(anio, mes, 1);
+    const ultimoDia = new Date(anio, mes + 1, 0).getDate();
+    let diaInicio = primerDia.getDay() || 7;
+    let col = diaInicio - 1;
+
+    doc.setDrawColor(200, 200, 200);
+
+    for (let i = 0; i < col; i++) {
+        doc.rect(margenX + i * anchoCol, y, anchoCol, altoFila);
+    }
+
+    for (let dia = 1; dia <= ultimoDia; dia++) {
+        const x = margenX + col * anchoCol;
+        doc.rect(x, y, anchoCol, altoFila);
+        doc.setFontSize(8);
+        doc.setTextColor(60, 60, 60);
+        doc.text(String(dia), x + 2, y + 4);
+
+        const eventos = porDia[dia] || [];
+        let ey = y + 8;
+        doc.setFontSize(6);
+        eventos.slice(0, 3).forEach(function(ev) {
+            if (ev.t === 'P') doc.setTextColor(163, 45, 45);
+            else doc.setTextColor(83, 74, 183);
+            const linea = doc.splitTextToSize(ev.txt, anchoCol - 3)[0] || '';
+            doc.text(linea, x + 2, ey);
+            ey += 3.5;
+        });
+        if (eventos.length > 3) {
+            doc.setTextColor(120, 120, 120);
+            doc.text('+' + (eventos.length - 3), x + 2, ey);
+        }
+
+        col++;
+        if (col > 6) { col = 0; y += altoFila; }
+    }
+    if (col > 0) {
+        for (let i = col; i < 7; i++) {
+            doc.rect(margenX + i * anchoCol, y, anchoCol, altoFila);
+        }
+    }
+
+    // Leyenda
+    y += altoFila + 8;
+    doc.setFontSize(8);
+    doc.setTextColor(83, 74, 183);
+    doc.text('Sesion', margenX, y);
+    doc.setTextColor(163, 45, 45);
+    doc.text('Partido', margenX + 25, y);
+}
+
+function calPdfLista(doc, inicio, fin, datos, nombreClub, titulo) {
+    const W = doc.internal.pageSize.getWidth();
+    const H = doc.internal.pageSize.getHeight();
+
+    doc.setFontSize(16);
+    doc.setTextColor(40, 40, 40);
+    doc.text(nombreClub, W / 2, 18, { align: 'center' });
+    doc.setFontSize(12);
+    doc.setTextColor(90, 90, 90);
+    doc.text(titulo, W / 2, 26, { align: 'center' });
+
+    // Unir y ordenar todos los eventos por fecha
+    const eventos = [];
+    datos.sesiones.forEach(function(s) {
+        eventos.push({
+            fecha: s.session_date,
+            hora: s.session_time ? s.session_time.slice(0, 5) : '',
+            tipo: 'Sesion',
+            texto: s.name,
+            esPartido: false
+        });
+    });
+    datos.partidos.forEach(function(p) {
+        eventos.push({
+            fecha: p.match_date,
+            hora: p.kick_off_time ? p.kick_off_time.slice(0, 5) : '',
+            tipo: 'Partido',
+            texto: 'vs ' + p.opponent + (p.home_away === 'home' ? ' (Local)' : ' (Visitante)'),
+            esPartido: true
+        });
+    });
+    eventos.sort(function(a, b) {
+        if (a.fecha === b.fecha) return a.hora.localeCompare(b.hora);
+        return a.fecha.localeCompare(b.fecha);
+    });
+
+    const dias = ['Domingo', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado'];
+    let y = 36;
+    let mesActualImpreso = '';
+
+    if (eventos.length === 0) {
+        doc.setFontSize(11);
+        doc.setTextColor(120, 120, 120);
+        doc.text('No hay sesiones ni partidos en este periodo.', W / 2, y + 10, { align: 'center' });
+        return;
+    }
+
+    eventos.forEach(function(ev) {
+        if (y > H - 20) {
+            doc.addPage();
+            y = 20;
+        }
+
+        const fechaObj = new Date(ev.fecha + 'T12:00:00');
+        const mesEv = MESES[fechaObj.getMonth()] + ' ' + fechaObj.getFullYear();
+        if (mesEv !== mesActualImpreso) {
+            mesActualImpreso = mesEv;
+            y += 4;
+            doc.setFontSize(11);
+            doc.setTextColor(38, 33, 92);
+            doc.text(mesEv, 12, y);
+            doc.setDrawColor(200, 200, 200);
+            doc.line(12, y + 1.5, W - 12, y + 1.5);
+            y += 7;
+        }
+
+        const diaSemana = dias[fechaObj.getDay()];
+        const fechaTxt = diaSemana + ' ' + fechaObj.getDate();
+
+        doc.setFontSize(9);
+        doc.setTextColor(60, 60, 60);
+        doc.text(fechaTxt, 14, y);
+
+        if (ev.esPartido) doc.setTextColor(163, 45, 45);
+        else doc.setTextColor(83, 74, 183);
+        doc.setFontSize(8);
+        doc.text(ev.tipo, 50, y);
+
+        doc.setTextColor(40, 40, 40);
+        doc.setFontSize(9);
+        const linea = (ev.hora ? ev.hora + ' · ' : '') + ev.texto;
+        doc.text(doc.splitTextToSize(linea, W - 75), 72, y);
+
+        y += 6;
+    });
+}
         // ========== BIBLIOTECA: FUENTE DE EJERCICIOS ==========
 let bibliotecaFuente = 'tlc';
 
