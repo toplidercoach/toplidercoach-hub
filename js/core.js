@@ -396,6 +396,15 @@ function cambiarModulo(modulo, tab) {
     }
 }
 
+function irAAnalista(tab) {
+    var btnMatchstats = document.querySelector('.main-tab.matchstats');
+    cambiarModulo('matchstats', btnMatchstats);
+    document.querySelectorAll('.main-tab').forEach(function(t) { t.classList.remove('active'); });
+    tab.classList.add('active');
+    var btnPlan = document.querySelector('#modulo-matchstats .sub-tab[onclick*="planpartido"]');
+    if (btnPlan) cambiarSubTab('matchstats', 'planpartido', btnPlan);
+}
+
 function cambiarSubTab(modulo, subtab, btn) {
     var container = document.getElementById('modulo-' + modulo);
     container.querySelectorAll('.sub-tab').forEach(function(t) { t.classList.remove('active'); });
