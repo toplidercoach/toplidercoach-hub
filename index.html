@@ -256,6 +256,7 @@
                 <button class="sub-tab" onclick="cambiarSubTab('planificador', 'calendario', this)">Calendario</button>
                 <button class="sub-tab" onclick="cambiarSubTab('planificador', 'asistencia', this)">📊 Asistencia</button>
                 <button class="sub-tab" onclick="cambiarSubTab('planificador', 'periodizacion', this)">📅 Periodización</button>
+                <button class="sub-tab" onclick="cambiarSubTab('planificador', 'enlaces-wellness', this)">🔗 Enlaces wellness</button>
             </div>
             
             <!-- Sub: Crear Sesión -->
@@ -548,6 +549,11 @@
                     <div class="loading">Cargando periodización...</div>
                 </div>
             </div>
+            <!-- Sub: Enlaces Wellness -->
+            <div id="planificador-enlaces-wellness" class="vista-contenido">
+                <div id="enlaces-wellness-contenido"></div>
+            </div>
+
             <!-- Sub: Calendario Unificado -->
             <div id="planificador-calendario" class="vista-contenido">
                 <div class="calendario-container">
@@ -1863,6 +1869,8 @@ document.getElementById('modal-tacticlip').addEventListener('click', function(e)
     <script src="js/staff.js"></script>
     <script src="js/miclub.js"></script>
     <script src="js/asistencia.js"></script>
+    <script src="js/wellness-enlaces.js"></script>
+    <script src="js/wellness-enlaces.js"></script>
     <script src="js/dashboard.js"></script>
     <script src="js/periodizacion.js"></script>
     <script src="js/ej-images.js"></script>
