@@ -27,6 +27,19 @@
     document.head.appendChild(st);
 })();
 
+// Calcula el indice de bienestar de un registro (media de sueno, fatiga, estres).
+// Si no hay ninguno de los tres nuevos, intenta usar el campo viejo wellness (compatibilidad).
+function wIndiceBienestar(a) {
+    const vals = [a.sueno, a.fatiga, a.estres].filter(v => v !== null && v !== undefined && v !== '');
+    if (vals.length > 0) {
+        return vals.reduce((s, v) => s + Number(v), 0) / vals.length;
+    }
+    if (a.wellness !== null && a.wellness !== undefined && a.wellness !== '') {
+        return Number(a.wellness);
+    }
+    return null;
+}
+
 function togglePanelAsistencia() {
     var tabPlanificador = document.querySelector('.main-tab.planificador');
     if (tabPlanificador) cambiarModulo('planificador', tabPlanificador);
@@ -255,11 +268,11 @@ async function cargarAsistenciaRango() {
             totalPorcentaje += porcentaje;
             
             const conPeso = asistJugador.filter(a => a.peso);
-            const conWellness = asistJugador.filter(a => a.wellness);
-            const conMuscular = asistJugador.filter(a => a.estado_muscular);
+            const conWellness = asistJugador.map(a => wIndiceBienestar(a)).filter(v => v !== null);
+            const conMuscular = asistJugador.filter(a => a.estado_muscular !== null && a.estado_muscular !== undefined);
             
             const promPeso = conPeso.length > 0 ? (conPeso.reduce((s, a) => s + parseFloat(a.peso), 0) / conPeso.length).toFixed(1) : '-';
-            const promWellness = conWellness.length > 0 ? (conWellness.reduce((s, a) => s + a.wellness, 0) / conWellness.length).toFixed(1) : '-';
+            const promWellness = conWellness.length > 0 ? (conWellness.reduce((s, v) => s + v, 0) / conWellness.length).toFixed(1) : '-';
             const promMuscular = conMuscular.length > 0 ? (conMuscular.reduce((s, a) => s + a.estado_muscular, 0) / conMuscular.length).toFixed(1) : '-';
             
             const clasePorc = porcentaje >= 80 ? 'porcentaje-alto' : porcentaje >= 50 ? 'porcentaje-medio' : 'porcentaje-bajo';
@@ -568,7 +581,8 @@ async function verDetalleJugador(jugadorId, nombreJugador) {
             const fechaFormato = new Date(sesion.session_date + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' });
             
             if (asist && asist.asistio === true) {
-                htmlHistorial += `<div class="historial-sesion-row asistio"><div><span class="historial-fecha">${fechaFormato}</span> - ${sesion.name}</div><div class="historial-datos"><span>✅ Asistió</span>${asist.peso ? `<span>⚖️ ${asist.peso}kg</span>` : ''}${asist.wellness ? `<span>💚 ${asist.wellness}/10</span>` : ''}${asist.estado_muscular ? `<span>💪 ${asist.estado_muscular}/10</span>` : ''}</div></div>`;
+                const ibHist = wIndiceBienestar(asist);
+                htmlHistorial += `<div class="historial-sesion-row asistio"><div><span class="historial-fecha">${fechaFormato}</span> - ${sesion.name}</div><div class="historial-datos"><span>✅ Asistió</span>${asist.peso ? `<span>⚖️ ${asist.peso}kg</span>` : ''}${ibHist !== null ? `<span>💚 ${ibHist.toFixed(1)}/10</span>` : ''}${(asist.estado_muscular !== null && asist.estado_muscular !== undefined) ? `<span>💪 ${asist.estado_muscular}/10</span>` : ''}</div></div>`;
             } else if (asist && asist.asistio === false) {
                 htmlHistorial += `<div class="historial-sesion-row no-asistio"><div><span class="historial-fecha">${fechaFormato}</span> - ${sesion.name}</div><div><span class="historial-motivo">${asist.motivo_ausencia || 'Sin motivo'}</span></div></div>`;
             } else {
@@ -628,10 +642,10 @@ async function generarPDFJugador(jugadorId) {
         const porcentaje = totalSesiones > 0 ? Math.round((asistio / totalSesiones) * 100) : 0;
         
         const conPeso = asistencias ? asistencias.filter(a => a.peso) : [];
-        const conWellness = asistencias ? asistencias.filter(a => a.wellness) : [];
-        const conMuscular = asistencias ? asistencias.filter(a => a.estado_muscular) : [];
+        const conWellness = asistencias ? asistencias.map(a => wIndiceBienestar(a)).filter(v => v !== null) : [];
+        const conMuscular = asistencias ? asistencias.filter(a => a.estado_muscular !== null && a.estado_muscular !== undefined) : [];
         const promPeso = conPeso.length > 0 ? (conPeso.reduce((s, a) => s + parseFloat(a.peso), 0) / conPeso.length).toFixed(1) : '-';
-        const promWellness = conWellness.length > 0 ? (conWellness.reduce((s, a) => s + a.wellness, 0) / conWellness.length).toFixed(1) : '-';
+        const promWellness = conWellness.length > 0 ? (conWellness.reduce((s, v) => s + v, 0) / conWellness.length).toFixed(1) : '-';
         const promMuscular = conMuscular.length > 0 ? (conMuscular.reduce((s, a) => s + a.estado_muscular, 0) / conMuscular.length).toFixed(1) : '-';
         
         const motivos = {};
@@ -744,7 +758,7 @@ async function generarPDFJugador(jugadorId) {
             doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(15,23,42);
             doc.text(fechaF, 18, y+3); doc.text(sesion.name.substring(0,30), 50, y+3);
             if (asist) {
-                if (asist.asistio) { doc.setTextColor(22,163,74); doc.text('Asistio',115,y+3); doc.setTextColor(15,23,42); doc.text(asist.peso?`${asist.peso}`:'-',145,y+3); doc.text(asist.wellness?`${asist.wellness}`:'-',165,y+3); doc.text(asist.estado_muscular?`${asist.estado_muscular}`:'-',182,y+3); }
+                if (asist.asistio) { const ibPdf = wIndiceBienestar(asist); doc.setTextColor(22,163,74); doc.text('Asistio',115,y+3); doc.setTextColor(15,23,42); doc.text(asist.peso?`${asist.peso}`:'-',145,y+3); doc.text(ibPdf!==null?`${ibPdf.toFixed(1)}`:'-',165,y+3); doc.text((asist.estado_muscular!==null&&asist.estado_muscular!==undefined)?`${asist.estado_muscular}`:'-',182,y+3); }
                 else { doc.setTextColor(220,38,38); doc.text(asist.motivo_ausencia||'Falta',115,y+3); doc.setTextColor(156,163,175); doc.text('-',145,y+3); doc.text('-',165,y+3); doc.text('-',182,y+3); }
             } else { doc.setTextColor(156,163,175); doc.text('Sin registrar',115,y+3); doc.text('-',145,y+3); doc.text('-',165,y+3); doc.text('-',182,y+3); }
             y += 9;
@@ -824,10 +838,10 @@ async function generarPDFPlantillaGeneral() {
             const si = asistJ.filter(a => a.asistio === true).length;
             const no = asistJ.filter(a => a.asistio === false).length;
             const pct = totalSesiones > 0 ? Math.round((si / totalSesiones) * 100) : 0;
-            const cW = asistJ.filter(a => a.wellness); const cM = asistJ.filter(a => a.estado_muscular); const cP = asistJ.filter(a => a.peso);
+            const cW = asistJ.map(a => wIndiceBienestar(a)).filter(v => v !== null); const cM = asistJ.filter(a => a.estado_muscular !== null && a.estado_muscular !== undefined); const cP = asistJ.filter(a => a.peso);
             return {
                 ...j, asistencias: si, ausencias: no, porcentaje: pct,
-                promWellness: cW.length > 0 ? (cW.reduce((s,a) => s+a.wellness, 0)/cW.length).toFixed(1) : '-',
+                promWellness: cW.length > 0 ? (cW.reduce((s,v) => s+v, 0)/cW.length).toFixed(1) : '-',
                 promMuscular: cM.length > 0 ? (cM.reduce((s,a) => s+a.estado_muscular, 0)/cM.length).toFixed(1) : '-',
                 promPeso: cP.length > 0 ? (cP.reduce((s,a) => s+parseFloat(a.peso), 0)/cP.length).toFixed(1) : '-'
             };
