@@ -108,7 +108,7 @@ async function init() {
 
     // Buscar jugador por token
     const { data: jugador, error: errJ } = await sb
-        .from('club_players')
+        .from('players')
         .select('id, name, club_id')
         .eq('wellness_token', token)
         .maybeSingle();
