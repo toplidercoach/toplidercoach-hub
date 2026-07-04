@@ -22,6 +22,14 @@
     <link rel="stylesheet" href="css/miclub.css">
     <link rel="stylesheet" href="css/asistencia.css">
     <link rel="stylesheet" href="css/ejercicios.css">
+    <link rel="stylesheet" href="css/cm-club-mode.css">
+<style>
+  .main-tabs{overflow-x:auto;flex-wrap:nowrap!important;scrollbar-width:thin;scrollbar-color:#334155 transparent;-webkit-overflow-scrolling:touch;scroll-behavior:smooth}
+  .main-tabs::-webkit-scrollbar{height:4px}
+  .main-tabs::-webkit-scrollbar-track{background:transparent}
+  .main-tabs::-webkit-scrollbar-thumb{background:#334155;border-radius:4px}
+  .main-tab{white-space:nowrap;flex-shrink:0}
+</style>
 </head>
 <body>
     <!-- ==================== LOGIN ==================== -->
@@ -72,12 +80,18 @@
     <button class="main-tab matchstats" onclick="cambiarModulo('matchstats', this)">
         Gestion de Competición
     </button>
+    <button class="main-tab analista" onclick="irAAnalista(this)">
+        🔍 Analista
+    </button>
     <button class="main-tab staff" onclick="cambiarModulo('staff', this)">
         Tu Cuerpo Técnico
     </button>
 <button class="main-tab config" onclick="cambiarModulo('config', this)">
         Mi Club
     </button>
+    
+  
+    <button class="main-tab club" id="cm-tab-club" style="display:none !important" onclick="cambiarModulo('club', this)">🏛️ Club</button>
     <button class="main-tab tacticlip" onclick="abrirPromoTactiClip()" style="display:flex;align-items:center;gap:6px;">
         <img src="https://toplidercoach.com/wp-content/uploads/2026/03/tacticlip-logo.png" alt="TactiClip" style="width:18px;height:18px;object-fit:contain;border-radius:3px;">
         TactiClip
@@ -242,6 +256,8 @@
                 <button class="sub-tab" onclick="cambiarSubTab('planificador', 'calendario', this)">Calendario</button>
                 <button class="sub-tab" onclick="cambiarSubTab('planificador', 'asistencia', this)">📊 Asistencia</button>
                 <button class="sub-tab" onclick="cambiarSubTab('planificador', 'periodizacion', this)">📅 Periodización</button>
+                <button class="sub-tab" onclick="cambiarSubTab('planificador', 'enlaces-wellness', this)">🔗 Enlaces wellness</button>
+                <button class="sub-tab" onclick="cambiarSubTab('planificador', 'modelo-juego', this)">📋 Modelo de juego</button>
             </div>
             
             <!-- Sub: Crear Sesión -->
@@ -319,6 +335,19 @@
                             <div class="campo-grupo full-width">
                                 <label>Notas Generales</label>
                                 <textarea id="sesion-notas" placeholder="Observaciones, condiciones climaticas, etc."></textarea>
+                            </div>
+                        </div>
+                        <!-- Bloque Conceptos Tacticos (Modelo de Juego) -->
+                        <div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;margin-top:16px;">
+                            <div style="background:#7c3aed;color:#fff;padding:10px 16px;font-weight:600;font-size:14px;">🎯 Conceptos tácticos del modelo de juego</div>
+                            <div style="padding:14px 16px;">
+                                <div class="sc-fase-row">
+                                    <label>Fase:</label>
+                                    <button type="button" class="sc-fase-btn" data-fase="Pretemporada" onclick="scSetFase('Pretemporada')">Pretemporada</button>
+                                    <button type="button" class="sc-fase-btn" data-fase="Temporada" onclick="scSetFase('Temporada')">Temporada</button>
+                                </div>
+                                <div class="sc-lista" id="sc-lista-conceptos"></div>
+                                <button type="button" class="sc-add-btn" onclick="scAbrirSelector()">➕ Añadir concepto</button>
                             </div>
                         </div>
                         <!-- Selector de Jugadores -->
@@ -534,6 +563,16 @@
                     <div class="loading">Cargando periodización...</div>
                 </div>
             </div>
+            <!-- Sub: Enlaces Wellness -->
+            <div id="planificador-enlaces-wellness" class="vista-contenido">
+                <div id="enlaces-wellness-contenido"></div>
+            </div>
+
+            <!-- Sub: Modelo de Juego -->
+            <div id="planificador-modelo-juego" class="vista-contenido">
+                <div id="modelo-juego-contenido"></div>
+            </div>
+
             <!-- Sub: Calendario Unificado -->
             <div id="planificador-calendario" class="vista-contenido">
                 <div class="calendario-container">
@@ -543,6 +582,7 @@
                             <button onclick="mesAnteriorCalendario()">◀</button>
                             <span class="mes-actual" id="mes-actual-calendario">Febrero 2026</span>
                             <button onclick="mesSiguienteCalendario()">▶</button>
+                            <button onclick="calPdfMenu(this)" style="margin-left:12px;background:#7c3aed;color:#fff;border:none;border-radius:6px;padding:6px 14px;cursor:pointer;font-weight:600;font-size:13px">📄 PDF</button>
                         </div>
                     </div>
                     <div class="calendario-leyenda-unificada">
@@ -1381,18 +1421,88 @@
                         <label>Posicion *</label>
                         <select id="jugador-posicion">
                             <option value="">Seleccionar...</option>
-                            <option value="Portero">Portero</option>
-                            <option value="Defensa Central">Defensa Central</option>
-                            <option value="Lateral Derecho">Lateral Derecho</option>
-                            <option value="Lateral Izquierdo">Lateral Izquierdo</option>
-                            <option value="Mediocentro Defensivo">Mediocentro Defensivo</option>
-                            <option value="Mediocentro">Mediocentro</option>
-                            <option value="Mediapunta">Mediapunta</option>
-                            <option value="Extremo Derecho">Extremo Derecho</option>
-                            <option value="Extremo Izquierdo">Extremo Izquierdo</option>
-                            <option value="Delantero Centro">Delantero Centro</option>
+                            <optgroup label="Portería">
+                                <option value="POR">POR · Portero</option>
+                            </optgroup>
+                            <optgroup label="Defensa">
+                                <option value="LD">LD · Lateral Derecho</option>
+                                <option value="LI">LI · Lateral Izquierdo</option>
+                                <option value="CAD">CAD · Carrilero Derecho</option>
+                                <option value="CAI">CAI · Carrilero Izquierdo</option>
+                                <option value="DCD">DCD · Central Derecho</option>
+                                <option value="DCC">DCC · Central</option>
+                                <option value="DCI">DCI · Central Izquierdo</option>
+                            </optgroup>
+                            <optgroup label="Centro del campo">
+                                <option value="PIV">PIV · Pivote</option>
+                                <option value="MCD">MCD · Mediocentro Derecho</option>
+                                <option value="MC">MC · Mediocentro</option>
+                                <option value="MCI">MCI · Mediocentro Izquierdo</option>
+                                <option value="MD">MD · Medio Derecho</option>
+                                <option value="MI">MI · Medio Izquierdo</option>
+                                <option value="ID">ID · Interior Derecho</option>
+                                <option value="II">II · Interior Izquierdo</option>
+                                <option value="MP">MP · Mediapunta</option>
+                            </optgroup>
+                            <optgroup label="Ataque">
+                                <option value="ED">ED · Extremo Derecho</option>
+                                <option value="EI">EI · Extremo Izquierdo</option>
+                                <option value="DC">DC · Delantero Centro</option>
+                            </optgroup>
                         </select>
                     </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Posición secundaria</label>
+                        <select id="jugador-posicion-sec">
+                            <option value="">— Ninguna —</option>
+                            <optgroup label="Portería">
+                                <option value="POR">POR · Portero</option>
+                            </optgroup>
+                            <optgroup label="Defensa">
+                                <option value="LD">LD · Lateral Derecho</option>
+                                <option value="LI">LI · Lateral Izquierdo</option>
+                                <option value="CAD">CAD · Carrilero Derecho</option>
+                                <option value="CAI">CAI · Carrilero Izquierdo</option>
+                                <option value="DCD">DCD · Central Derecho</option>
+                                <option value="DCC">DCC · Central</option>
+                                <option value="DCI">DCI · Central Izquierdo</option>
+                            </optgroup>
+                            <optgroup label="Centro del campo">
+                                <option value="PIV">PIV · Pivote</option>
+                                <option value="MCD">MCD · Mediocentro Derecho</option>
+                                <option value="MC">MC · Mediocentro</option>
+                                <option value="MCI">MCI · Mediocentro Izquierdo</option>
+                                <option value="MD">MD · Medio Derecho</option>
+                                <option value="MI">MI · Medio Izquierdo</option>
+                                <option value="ID">ID · Interior Derecho</option>
+                                <option value="II">II · Interior Izquierdo</option>
+                                <option value="MP">MP · Mediapunta</option>
+                            </optgroup>
+                            <optgroup label="Ataque">
+                                <option value="ED">ED · Extremo Derecho</option>
+                                <option value="EI">EI · Extremo Izquierdo</option>
+                                <option value="DC">DC · Delantero Centro</option>
+                            </optgroup>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Origen</label>
+                        <select id="jugador-origen">
+                            <option value="">—</option>
+                            <option value="nueva_incorporacion">Nueva incorporación</option>
+                            <option value="cantera">Cantera</option>
+                            <option value="propiedad">En propiedad</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+                        <input type="checkbox" id="jugador-sub23" style="width:auto;margin:0"> Sub-23
+                    </label>
                 </div>
                 
                 <div class="form-row">
@@ -1563,6 +1673,9 @@
         </div>
         <div class="modal-body" style="text-align: center;">
             <p style="margin-bottom: 20px; color: #6b7280;">¿Cómo quieres el PDF?</p>
+            <label style="display:flex;align-items:center;gap:8px;justify-content:center;margin-bottom:16px;font-size:14px;color:#374151;cursor:pointer;">
+                <input type="checkbox" id="pdf-hoja-por-ejercicio"> 🗂 Una hoja por ejercicio (más espacio para equipos)
+            </label>
             <div style="display: flex; flex-direction: column; gap: 10px;">
                 <button class="btn-primary purple" onclick="descargarPDFSesion(true)">📄 PDF con títulos de ejercicios</button>
                 <button class="btn-primary" style="background: linear-gradient(135deg, #059669 0%, #047857 100%);" onclick="descargarPDFSesion(false)">📄 PDF sin títulos (limpio)</button>
@@ -1628,6 +1741,21 @@
         </div>
     </div>
 </div>
+<!-- ===================<!-- ==================== MODULO: MEDICO ==================== -->
+<div id="modulo-medico" class="vista-modulo">
+    <div id="medico-container"></div>
+</div>
+
+<!-- ==================== MODULO: FISIO ==================== -->
+<div id="modulo-fisio" class="vista-modulo">
+    <div id="fisio-container"></div>
+</div>
+
+<!-- ==================== MODULO: PAGOS ==================== -->
+<div id="modulo-pagos" class="vista-modulo">
+    <div id="pagos-container"></div>
+</div>
+
 <!-- ==================== MODAL: CHAT STAFF ==================== -->
 <div id="modal-chat-staff" class="modal-overlay" style="display: none;" onclick="cerrarChatStaff(event)">
     <div class="modal-content" style="max-width: 600px;" onclick="event.stopPropagation()">
@@ -1683,6 +1811,11 @@
         </div>
     </div>
 </div>
+
+    <!-- ==================== MODULO: CLUB ==================== -->
+    <div id="modulo-club" class="vista-modulo">
+        <div id="club-miembros" class="vista-contenido active"></div>
+    </div>
 
     <!-- ==================== MODAL: PROMO TACTICLIP ==================== -->
 <div id="modal-tacticlip" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.75);align-items:center;justify-content:center;">
@@ -1758,10 +1891,37 @@ document.getElementById('modal-tacticlip').addEventListener('click', function(e)
     <script src="js/staff.js"></script>
     <script src="js/miclub.js"></script>
     <script src="js/asistencia.js"></script>
+    <script src="js/wellness-enlaces.js"></script>
+    <script src="js/modelo-juego.js"></script>
+    <script src="js/sesion-conceptos.js"></script>
+    <script src="js/equipos-ejercicio.js"></script>
+    <script src="js/modo-club-promo.js"></script>
     <script src="js/dashboard.js"></script>
     <script src="js/periodizacion.js"></script>
     <script src="js/ej-images.js"></script>
     <script src="js/planpartido.js"></script>
     <script src="js/ejercicios.js"></script>
+
+    <!-- Club Mode -->
+     <script src="https://unpkg.com/body-muscles/dist/umd/body-muscles.umd.min.js"></script>
+    <script src="js/club-mode/cm-core.js"></script>
+    <script src="js/club-mode/cm-miembros.js"></script>
+    <script src="js/club-mode/cm-medico.js"></script>
+    <script src="js/club-mode/cm-fisio.js"></script>
+    <script src="js/club-mode/cm-fisio-extras.js"></script>
+    <script src="js/club-mode/cm-fisio-calendario.js"></script>
+    <script src="js/club-mode/cm-fisio-material.js"></script>
+    <script src="js/club-mode/cm-notifications.js"></script>
+    <script src="js/club-mode/cm-presence.js"></script>
+    <script src="js/club-mode/cm-chat.js"></script>
+    <script src="js/club-mode/cm-pagos.js"></script>
+    <script src="js/club-mode/cm-familias.js"></script>
+    <script src="js/club-mode/cm-prepfisica.js"></script>
+    <script src="js/club-mode/cm-scouting.js"></script>
+    <script src="js/club-mode/cm-dd.js"></script>
+    <script src="js/club-mode/cm-economico.js"></script>
+    <script src="js/club-mode/cm-misgastos.js"></script>
+    <script src="js/club-mode/cm-rfef.js"></script>
+    <script src="js/club-mode/cm-patrocinadores.js"></script>
 </body>
 </html>

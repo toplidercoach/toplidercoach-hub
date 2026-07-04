@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Mi Wellness — TopLiderCoach</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:#0f172a; color:#e2e8f0; min-height:100vh; padding:16px; }
+  .wrap { max-width:520px; margin:0 auto; }
+  .cab { text-align:center; padding:20px 0 16px; }
+  .cab .logo { font-size:20px; font-weight:800; color:#f59e0b; }
+  .cab .sub { font-size:13px; color:#94a3b8; margin-top:2px; }
+  .card { background:#1e293b; border:1px solid #334155; border-radius:16px; padding:20px; margin-bottom:14px; }
+  .saludo { font-size:18px; font-weight:700; color:#fff; }
+  .sesion-info { font-size:14px; color:#94a3b8; margin-top:4px; }
+  .estado-msg { text-align:center; padding:40px 20px; }
+  .estado-msg .ico { font-size:48px; margin-bottom:12px; }
+  .estado-msg .txt { font-size:16px; color:#cbd5e1; line-height:1.5; }
+  .item { margin-bottom:22px; }
+  .item-label { display:flex; justify-content:space-between; align-items:center; font-size:15px; color:#e2e8f0; margin-bottom:8px; font-weight:600; }
+  .item-val { font-size:22px; font-weight:800; color:#fff; min-width:34px; text-align:right; }
+  input[type=range] { width:100%; height:36px; -webkit-appearance:none; background:transparent; }
+  input[type=range]::-webkit-slider-runnable-track { height:8px; background:#475569; border-radius:4px; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:28px; height:28px; background:#f59e0b; border-radius:50%; margin-top:-10px; cursor:pointer; }
+  input[type=range]::-moz-range-track { height:8px; background:#475569; border-radius:4px; }
+  input[type=range]::-moz-range-thumb { width:28px; height:28px; background:#f59e0b; border:none; border-radius:50%; cursor:pointer; }
+  .extremos { display:flex; justify-content:space-between; font-size:11px; color:#64748b; margin-top:4px; }
+  .num-field { width:100%; padding:12px; font-size:16px; background:#0f172a; border:1px solid #475569; border-radius:10px; color:#fff; }
+  .grupo-box { background:#0f172a; border-radius:12px; padding:14px; margin-bottom:22px; display:none; }
+  .grupo-box label { display:block; font-size:14px; color:#cbd5e1; margin-bottom:8px; }
+  .grupo-box select { width:100%; padding:12px; font-size:16px; background:#1e293b; border:1px solid #475569; border-radius:10px; color:#fff; }
+  .guia-btn { background:transparent; border:1px solid #475569; color:#94a3b8; border-radius:8px; padding:6px 12px; font-size:13px; cursor:pointer; }
+  .btn-enviar { width:100%; padding:16px; font-size:17px; font-weight:700; background:#10b981; color:#fff; border:none; border-radius:12px; cursor:pointer; margin-top:8px; }
+  .btn-enviar:disabled { background:#475569; cursor:not-allowed; }
+  .plazo { text-align:center; font-size:13px; color:#94a3b8; margin-top:12px; }
+  .ok-box { text-align:center; padding:50px 20px; }
+  .ok-box .ico { font-size:64px; }
+  .ok-box .txt { font-size:20px; font-weight:700; color:#10b981; margin-top:12px; }
+  .ok-box .sub { font-size:14px; color:#94a3b8; margin-top:8px; }
+  .modal-ov { position:fixed; inset:0; background:rgba(0,0,0,0.7); display:none; align-items:center; justify-content:center; padding:20px; z-index:100; }
+  .modal-c { background:#1e293b; border-radius:16px; padding:20px; max-width:420px; width:100%; }
+  .modal-c h3 { color:#fff; margin-bottom:14px; font-size:17px; }
+  .modal-c table { width:100%; border-collapse:collapse; font-size:13px; }
+  .modal-c td { padding:8px; border:1px solid #334155; }
+  .modal-c .cerrar { width:100%; margin-top:14px; padding:12px; background:#475569; color:#fff; border:none; border-radius:10px; font-size:15px; cursor:pointer; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="cab">
+    <div class="logo">TopLiderCoach</div>
+    <div class="sub">Registro diario de bienestar</div>
+  </div>
+  <div id="contenido">
+    <div class="card"><div class="estado-msg"><div class="ico">⏳</div><div class="txt">Cargando...</div></div></div>
+  </div>
+</div>
+
+<div class="modal-ov" id="modal-guia">
+  <div class="modal-c">
+    <h3>💪 ¿Cómo notas tus músculos hoy?</h3>
+    <p style="color:#cbd5e1;font-size:14px;margin-bottom:14px;line-height:1.5;">Piensa en cómo sientes las piernas y el cuerpo. Si están perfectos, pon <b>0</b>. Cuanto más cargado, con agujetas o molestias, más sube el número.</p>
+    <table>
+      <tr style="background:#064e3b;"><td style="font-weight:bold;width:50px;text-align:center;">0-3</td><td>Sin daño / leve. Me noto bien.</td></tr>
+      <tr style="background:#713f12;"><td style="font-weight:bold;text-align:center;">4-5</td><td>Moderado. Algo cargado.</td></tr>
+      <tr style="background:#7c2d12;"><td style="font-weight:bold;text-align:center;">6-7</td><td>Alto. Bastante molestia.</td></tr>
+      <tr style="background:#7f1d1d;"><td style="font-weight:bold;text-align:center;">8-9</td><td>Muy alto. Casi no puedo.</td></tr>
+      <tr style="background:#991b1b;"><td style="font-weight:bold;text-align:center;">10</td><td>Lesión. Dolor que me frena.</td></tr>
+    </table>
+    <p style="color:#94a3b8;font-size:13px;margin-top:12px;">A partir de 4 te pediremos en qué zona lo notas.</p>
+    <button class="cerrar" onclick="document.getElementById('modal-guia').style.display='none'">Entendido</button>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://cqteodxyvavyroxeshoz.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNxdGVvZHh5dmF2eXJveGVzaG96Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUyNzc2OTksImV4cCI6MjA4MDg1MzY5OX0.8sJC6twae2pnrf8NDVlOV2KnSOhBC1RrqWC0IiuE614';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const GRUPOS = ['Cuádriceps','Isquiotibiales','Gemelo/Sóleo','Aductor','Glúteo','Psoas/Flexor','Lumbar','Tobillo','Rodilla','Otro'];
+
+function getToken() {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('j');
+}
+
+function hoyISO() {
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+function pintar(html) {
+    document.getElementById('contenido').innerHTML = html;
+}
+
+function mensajeEstado(ico, txt) {
+    pintar(`<div class="card"><div class="estado-msg"><div class="ico">${ico}</div><div class="txt">${txt}</div></div></div>`);
+}
+
+async function init() {
+    const token = getToken();
+    if (!token) {
+        mensajeEstado('🔒', 'Enlace no válido. Pide a tu club el enlace correcto.');
+        return;
+    }
+
+    // Buscar jugador por token
+    const { data: jugador, error: errJ } = await sb
+        .from('players')
+        .select('id, name, club_id')
+        .eq('wellness_token', token)
+        .maybeSingle();
+
+    if (errJ || !jugador) {
+        mensajeEstado('🔒', 'Enlace no válido. Pide a tu club el enlace correcto.');
+        return;
+    }
+
+    // Buscar sesión de hoy de su club
+    const hoy = hoyISO();
+    const { data: sesiones } = await sb
+        .from('training_sessions')
+        .select('id, name, session_date, session_time')
+        .eq('club_id', jugador.club_id)
+        .eq('session_date', hoy)
+        .order('session_time', { nullsFirst: false });
+
+    if (!sesiones || sesiones.length === 0) {
+        pintar(`
+            <div class="card">
+                <div class="saludo">Hola, ${jugador.name} 👋</div>
+            </div>
+            <div class="card"><div class="estado-msg"><div class="ico">📅</div><div class="txt">Hoy no hay sesión programada.<br>No tienes que rellenar nada.</div></div></div>
+        `);
+        return;
+    }
+
+    const sesion = sesiones[0];
+
+    // Comprobar plazo (30 min antes de la hora, si hay hora)
+    if (sesion.session_time) {
+        const [hh, mm] = sesion.session_time.split(':');
+        const horaSesion = new Date();
+        horaSesion.setHours(parseInt(hh), parseInt(mm), 0, 0);
+        const limite = new Date(horaSesion.getTime() - 30*60000);
+        if (new Date() > limite) {
+            pintar(`
+                <div class="card"><div class="saludo">Hola, ${jugador.name} 👋</div>
+                <div class="sesion-info">${sesion.name} · ${sesion.session_time.slice(0,5)}h</div></div>
+                <div class="card"><div class="estado-msg"><div class="ico">⏰</div><div class="txt">El plazo para rellenar se ha cerrado.<br><small>Había que enviarlo antes de las ${formatoHora(limite)}.</small></div></div></div>
+            `);
+            return;
+        }
+    }
+
+    // Comprobar si ya envió hoy
+    const { data: yaReg } = await sb
+        .from('asistencia_sesiones')
+        .select('id, registrado_por, sueno')
+        .eq('sesion_id', sesion.id)
+        .eq('jugador_id', jugador.id)
+        .maybeSingle();
+
+    if (yaReg && yaReg.registrado_por === 'jugador' && yaReg.sueno !== null) {
+        pintar(`
+            <div class="card"><div class="saludo">Hola, ${jugador.name} 👋</div>
+            <div class="sesion-info">${sesion.name}</div></div>
+            <div class="card"><div class="ok-box"><div class="ico">✅</div><div class="txt">Ya enviaste tu registro de hoy</div><div class="sub">Gracias. Nos vemos en el entrenamiento.</div></div></div>
+        `);
+        return;
+    }
+
+    mostrarFormulario(jugador, sesion);
+}
+
+function formatoHora(d) {
+    return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+}
+
+function mostrarFormulario(jugador, sesion) {
+    const horaTxt = sesion.session_time ? ' · ' + sesion.session_time.slice(0,5) + 'h' : '';
+    let opcionesGrupo = '<option value="">Selecciona el grupo...</option>';
+    GRUPOS.forEach(g => { opcionesGrupo += `<option value="${g}">${g}</option>`; });
+
+    pintar(`
+        <div class="card">
+            <div class="saludo">Hola, ${jugador.name} 👋</div>
+            <div class="sesion-info">${sesion.name}${horaTxt}</div>
+        </div>
+        <div class="card">
+            <div class="item">
+                <div class="item-label">😴 Sueño <span class="item-val" id="v-sueno">5</span></div>
+                <input type="range" id="r-sueno" min="1" max="10" value="5" oninput="document.getElementById('v-sueno').textContent=this.value">
+                <div class="extremos"><span>1 · Pésimo</span><span>Excelente · 10</span></div>
+            </div>
+            <div class="item">
+                <div class="item-label">🔋 Fatiga <span class="item-val" id="v-fatiga">5</span></div>
+                <input type="range" id="r-fatiga" min="1" max="10" value="5" oninput="document.getElementById('v-fatiga').textContent=this.value">
+                <div class="extremos"><span>1 · Agotado</span><span>Pleno · 10</span></div>
+            </div>
+            <div class="item">
+                <div class="item-label">🧠 Estrés <span class="item-val" id="v-estres">5</span></div>
+                <input type="range" id="r-estres" min="1" max="10" value="5" oninput="document.getElementById('v-estres').textContent=this.value">
+                <div class="extremos"><span>1 · Muy estresado</span><span>Relajado · 10</span></div>
+            </div>
+            <div class="item">
+                <div class="item-label">💪 Daño muscular <span class="item-val" id="v-musc">0</span> <button class="guia-btn" style="margin-left:6px;padding:3px 8px;font-size:12px;" onclick="document.getElementById('modal-guia').style.display='flex'">ℹ️</button></div>
+                <input type="range" id="r-musc" min="0" max="10" value="0" oninput="cambioMusc(this.value)" onpointerdown="abrirGuiaUnaVez()">
+                <div class="extremos"><span>0 · Sin daño</span><span>Lesión · 10</span></div>
+            </div>
+            <div class="grupo-box" id="grupo-box">
+                <label>🩹 ¿Qué grupo muscular?</label>
+                <select id="s-grupo">${opcionesGrupo}</select>
+            </div>
+            <div class="item">
+                <div class="item-label">⏱️ Horas de sueño</div>
+                <input type="number" class="num-field" id="n-horas" placeholder="Ej: 8" step="0.5" min="0" max="16">
+            </div>
+            <button class="btn-enviar" id="btn-enviar" onclick="enviar('${jugador.id}','${sesion.id}')">Enviar mi registro</button>
+            <div class="plazo">Tu hora de envío queda registrada automáticamente</div>
+        </div>
+    `);
+}
+
+let guiaMostrada = false;
+function abrirGuiaUnaVez() {
+    if (!guiaMostrada) {
+        document.getElementById('modal-guia').style.display = 'flex';
+        guiaMostrada = true;
+    }
+}
+
+function cambioMusc(val) {
+    document.getElementById('v-musc').textContent = val;
+    document.getElementById('grupo-box').style.display = (Number(val) >= 4) ? 'block' : 'none';
+}
+
+let enviando = false;
+async function enviar(jugadorId, sesionId) {
+    if (enviando) return;
+    const muscVal = parseInt(document.getElementById('r-musc').value);
+    const horas = parseFloat(document.getElementById('n-horas').value);
+
+    if (muscVal >= 4 && !document.getElementById('s-grupo').value) {
+        alert('Por favor, indica qué grupo muscular tienes afectado.');
+        return;
+    }
+
+    enviando = true;
+    const btn = document.getElementById('btn-enviar');
+    btn.disabled = true;
+    btn.textContent = 'Enviando...';
+
+    const registro = {
+        sesion_id: sesionId,
+        jugador_id: jugadorId,
+        asistio: true,
+        sueno: parseInt(document.getElementById('r-sueno').value),
+        fatiga: parseInt(document.getElementById('r-fatiga').value),
+        estres: parseInt(document.getElementById('r-estres').value),
+        estado_muscular: muscVal,
+        grupo_muscular: muscVal >= 4 ? document.getElementById('s-grupo').value : null,
+        horas_sueno: isNaN(horas) ? null : horas,
+        registrado_por: 'jugador'
+    };
+
+    // Si ya existe una fila (del staff), actualizar; si no, insertar
+    const { data: existe } = await sb
+        .from('asistencia_sesiones')
+        .select('id')
+        .eq('sesion_id', sesionId)
+        .eq('jugador_id', jugadorId)
+        .maybeSingle();
+
+    let error;
+    if (existe) {
+        const r = await sb.from('asistencia_sesiones').update(registro).eq('id', existe.id);
+        error = r.error;
+    } else {
+        const r = await sb.from('asistencia_sesiones').insert(registro);
+        error = r.error;
+    }
+
+    if (error) {
+        enviando = false;
+        btn.disabled = false;
+        btn.textContent = 'Enviar mi registro';
+        alert('Error al enviar: ' + error.message);
+        return;
+    }
+
+    pintar(`<div class="card"><div class="ok-box"><div class="ico">✅</div><div class="txt">¡Registro enviado!</div><div class="sub">Gracias. Que tengas buen entrenamiento.</div></div></div>`);
+}
+
+init();
+</script>
+</body>
+</html>

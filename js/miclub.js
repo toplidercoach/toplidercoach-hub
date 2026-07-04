@@ -238,7 +238,7 @@ registrarSubTab('config', 'datos', cargarDatosClub);
             try {
                 const { data, error } = await supabaseClient
                     .from('season_players')
-                    .select('id, player_id, shirt_number, players(id, name, status, position, photo_url, birth_date, height_cm, weight_kg, dominant_foot)')
+                    .select('id, player_id, shirt_number, players(id, name, status, position, position_detail, position_secondary, is_sub23, acquisition, photo_url, birth_date, height_cm, weight_kg, dominant_foot)')
                     .eq('season_id', tempId)
                     .order('shirt_number');
                 
@@ -328,7 +328,8 @@ registrarSubTab('config', 'datos', cargarDatosClub);
                     const nombre = j.name ? j.name.split(' ').slice(0, -1).join(' ') : '';
 
 return `
-    <div class="pcard" onclick="abrirFichaJugador('${j.id}')" style="--pos-color:${col};">
+    <div class="pcard" onclick="abrirFichaJugador('${j.id}')" style="--pos-color:${col};position:relative;overflow:hidden" data-pos="${j.position_detail||''}" data-sub23="${j.is_sub23?'1':'0'}" data-origen="${j.acquisition||''}">
+        ${j.is_sub23 ? '<div style="position:absolute;top:0;right:0;width:74px;height:74px;overflow:hidden;pointer-events:none;z-index:5"><div style="position:absolute;transform:rotate(45deg);background:#7c3aed;color:#fff;font-size:10px;font-weight:800;letter-spacing:.5px;text-align:center;width:100px;top:16px;right:-26px;padding:3px 0;box-shadow:0 1px 4px rgba(0,0,0,.35)">U23</div></div>' : ''}
         <div class="pcard-top">
             <div class="pcard-dorsal">${sp.shirt_number || '-'}</div>
             <div class="pcard-pos-badge">${posAb}</div>
@@ -369,6 +370,8 @@ return `
                 }
                 
                 lista.innerHTML = html;
+                cmMiClubInyectarFiltros();
+                cmMiClubFiltrar();
                 
             } catch (err) {
                 console.error('Error cargando plantilla:', err);
@@ -376,7 +379,102 @@ return `
             }
         }
         
+        function cmMiClubInyectarFiltros() {
+            if (document.getElementById('mc-plantilla-filtros')) return;
+            var lista = document.getElementById('lista-jugadores');
+            if (!lista) return;
+            var grupos = [
+                ['Portería', [['POR','Portero']]],
+                ['Defensa', [['LD','Lateral Derecho'],['LI','Lateral Izquierdo'],['CAD','Carrilero Derecho'],['CAI','Carrilero Izquierdo'],['DCD','Central Derecho'],['DCC','Central'],['DCI','Central Izquierdo']]],
+                ['Centro del campo', [['PIV','Pivote'],['MCD','Mediocentro Derecho'],['MC','Mediocentro'],['MCI','Mediocentro Izquierdo'],['MD','Medio Derecho'],['MI','Medio Izquierdo'],['ID','Interior Derecho'],['II','Interior Izquierdo'],['MP','Mediapunta'],['MPI','Mediapunta Izquierda'],['MPC','Mediapunta Central'],['MPD','Mediapunta Derecha']]],
+                ['Ataque', [['ED','Extremo Derecho'],['EI','Extremo Izquierdo'],['DC','Delantero Centro']]]
+            ];
+            var posOpts = '<option value="">Todas las posiciones</option>';
+            grupos.forEach(function(g) {
+                posOpts += '<optgroup label="' + g[0] + '">';
+                g[1].forEach(function(o) { posOpts += '<option value="' + o[0] + '">' + o[0] + ' · ' + o[1] + '</option>'; });
+                posOpts += '</optgroup>';
+            });
+            var estilo = 'padding:8px 10px;border-radius:8px;border:1px solid #cbd5e1;font-size:13px;background:#fff';
+            var bar = document.createElement('div');
+            bar.id = 'mc-plantilla-filtros';
+            bar.style.cssText = 'display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:0 0 16px 0';
+            bar.innerHTML =
+                '<select id="mc-f-pos" onchange="cmMiClubFiltrar()" style="' + estilo + '">' + posOpts + '</select>' +
+                '<select id="mc-f-sub23" onchange="cmMiClubFiltrar()" style="' + estilo + '">' +
+                  '<option value="">Sub-23: todos</option><option value="1">Solo Sub-23</option><option value="0">Solo no Sub-23</option></select>' +
+                '<select id="mc-f-origen" onchange="cmMiClubFiltrar()" style="' + estilo + '">' +
+                  '<option value="">Todos los orígenes</option>' +
+                  '<option value="nueva_incorporacion">Nueva incorporación</option>' +
+                  '<option value="cantera">Cantera</option>' +
+                  '<option value="propiedad">En propiedad</option></select>' +
+                '<span id="mc-f-count" style="margin-left:auto;color:#64748b;font-size:13px"></span>';
+            lista.parentNode.insertBefore(bar, lista);
+        }
+
+        function cmMiClubFiltrar() {
+            var fp = (document.getElementById('mc-f-pos') || {}).value || '';
+            var fs = (document.getElementById('mc-f-sub23') || {}).value || '';
+            var fo = (document.getElementById('mc-f-origen') || {}).value || '';
+            var cards = document.querySelectorAll('#lista-jugadores .pcard');
+            var vis = 0;
+            cards.forEach(function(c) {
+                var ok = true;
+                if (fp && c.dataset.pos !== fp) ok = false;
+                if (fs && c.dataset.sub23 !== fs) ok = false;
+                if (fo && c.dataset.origen !== fo) ok = false;
+                c.style.display = ok ? '' : 'none';
+                if (ok) vis++;
+            });
+            var cnt = document.getElementById('mc-f-count');
+            if (cnt) cnt.textContent = vis + ' mostrados';
+        }
+
+        function cmMiClubMejorarFicha() {
+            var sel = document.getElementById('jugador-posicion');
+            if (!sel || sel.dataset.mejorada === '1') return;
+            sel.dataset.mejorada = '1';
+            var grupos = [
+                ['Portería', [['POR','Portero']]],
+                ['Defensa', [['LD','Lateral Derecho'],['LI','Lateral Izquierdo'],['CAD','Carrilero Derecho'],['CAI','Carrilero Izquierdo'],['DCD','Central Derecho'],['DCC','Central'],['DCI','Central Izquierdo']]],
+                ['Centro del campo', [['PIV','Pivote'],['MCD','Mediocentro Derecho'],['MC','Mediocentro'],['MCI','Mediocentro Izquierdo'],['MD','Medio Derecho'],['MI','Medio Izquierdo'],['ID','Interior Derecho'],['II','Interior Izquierdo'],['MP','Mediapunta'],['MPI','Mediapunta Izquierda'],['MPC','Mediapunta Central'],['MPD','Mediapunta Derecha']]],
+                ['Ataque', [['ED','Extremo Derecho'],['EI','Extremo Izquierdo'],['DC','Delantero Centro']]]
+            ];
+            function opts(vacioLabel) {
+                var h = '<option value="">' + vacioLabel + '</option>';
+                grupos.forEach(function(g) {
+                    h += '<optgroup label="' + g[0] + '">';
+                    g[1].forEach(function(o) { h += '<option value="' + o[0] + '">' + o[0] + ' · ' + o[1] + '</option>'; });
+                    h += '</optgroup>';
+                });
+                return h;
+            }
+            sel.innerHTML = opts('Seleccionar...');
+            if (!document.getElementById('jugador-posicion-sec')) {
+                var fila = sel.closest('.form-row') || sel.parentElement;
+                var wrap = document.createElement('div');
+                wrap.innerHTML =
+                    '<div class="form-row">' +
+                      '<div class="form-group"><label>Posición secundaria</label>' +
+                        '<select id="jugador-posicion-sec">' + opts('— Ninguna —') + '</select></div>' +
+                      '<div class="form-group"><label>Origen</label>' +
+                        '<select id="jugador-origen"><option value="">—</option>' +
+                        '<option value="nueva_incorporacion">Nueva incorporación</option>' +
+                        '<option value="cantera">Cantera</option>' +
+                        '<option value="propiedad">En propiedad</option></select></div>' +
+                    '</div>' +
+                    '<div class="form-group"><label style="display:flex;align-items:center;gap:8px;cursor:pointer">' +
+                      '<input type="checkbox" id="jugador-sub23" style="width:auto;margin:0"> Sub-23</label></div>';
+                var ref = fila;
+                Array.prototype.slice.call(wrap.children).forEach(function(node) {
+                    ref.parentNode.insertBefore(node, ref.nextSibling);
+                    ref = node;
+                });
+            }
+        }
+
         function abrirModalJugador() {
+            cmMiClubMejorarFicha();
             jugadorEditando = null;
             document.getElementById('modal-jugador-titulo').textContent = 'Nuevo Jugador';
             
@@ -385,6 +483,9 @@ return `
             document.getElementById('jugador-nombre').value = '';
             document.getElementById('jugador-dorsal').value = '';
             document.getElementById('jugador-posicion').value = '';
+            var _secN = document.getElementById('jugador-posicion-sec'); if (_secN) _secN.value = '';
+            var _oriN = document.getElementById('jugador-origen'); if (_oriN) _oriN.value = '';
+            var _s23N = document.getElementById('jugador-sub23'); if (_s23N) _s23N.checked = false;
             document.getElementById('jugador-nacimiento').value = '';
             document.getElementById('jugador-pie').value = 'Derecho';
             document.getElementById('jugador-altura').value = '';
@@ -401,6 +502,7 @@ return `
         }
         
         async function editarJugador(playerId, spId) {
+            cmMiClubMejorarFicha();
             jugadorEditando = { playerId, spId };
             document.getElementById('modal-jugador-titulo').textContent = 'Editar Jugador';
             
@@ -411,7 +513,10 @@ return `
             document.getElementById('jugador-sp-id').value = spId;
             document.getElementById('jugador-nombre').value = player.name || '';
             document.getElementById('jugador-dorsal').value = sp?.shirt_number || '';
-            document.getElementById('jugador-posicion').value = player.position || '';
+            document.getElementById('jugador-posicion').value = player.position_detail || '';
+            var _sec = document.getElementById('jugador-posicion-sec'); if (_sec) _sec.value = player.position_secondary || '';
+            var _ori = document.getElementById('jugador-origen'); if (_ori) _ori.value = player.acquisition || '';
+            var _s23 = document.getElementById('jugador-sub23'); if (_s23) _s23.checked = !!player.is_sub23;
             document.getElementById('jugador-nacimiento').value = player.birth_date || '';
             document.getElementById('jugador-pie').value = player.dominant_foot || 'Derecho';
             document.getElementById('jugador-altura').value = player.height_cm || '';
@@ -457,6 +562,9 @@ return `
             const nombre = document.getElementById('jugador-nombre').value.trim();
             const dorsal = document.getElementById('jugador-dorsal').value;
             const posicion = document.getElementById('jugador-posicion').value;
+            const _secG = document.getElementById('jugador-posicion-sec'); const posicionSec = _secG ? (_secG.value || null) : null;
+            const _s23G = document.getElementById('jugador-sub23'); const sub23 = _s23G ? _s23G.checked : false;
+            const _oriG = document.getElementById('jugador-origen'); const origen = _oriG ? (_oriG.value || null) : null;
             
             if (!nombre || !dorsal || !posicion) {
                 showToast('Nombre, dorsal y posicion son obligatorios');
@@ -477,10 +585,23 @@ return `
                 }
             }
             
+            // El 'position' antiguo (texto) se guarda en version gruesa para que MatchStats / Plan de Partido / Analisis sigan funcionando
+            const POS_GRUESA = {
+                POR:'Portero', LD:'Lateral Derecho', CAD:'Lateral Derecho',
+                LI:'Lateral Izquierdo', CAI:'Lateral Izquierdo',
+                DCD:'Defensa Central', DCC:'Defensa Central', DCI:'Defensa Central',
+                PIV:'Mediocentro Defensivo', MCD:'Mediocentro', MC:'Mediocentro', MCI:'Mediocentro',
+                MD:'Mediocentro', MI:'Mediocentro', ID:'Mediocentro', II:'Mediocentro',
+                MP:'Mediapunta', MPI:'Mediapunta', MPC:'Mediapunta', MPD:'Mediapunta', ED:'Extremo Derecho', EI:'Extremo Izquierdo', DC:'Delantero Centro'
+            };
             const playerData = {
                 club_id: clubId,
                 name: nombre,
-                position: posicion,
+                position: POS_GRUESA[posicion] || posicion,
+                position_detail: posicion,
+                position_secondary: posicionSec,
+                is_sub23: sub23,
+                acquisition: origen,
                 birth_date: document.getElementById('jugador-nacimiento').value || null,
                 dominant_foot: document.getElementById('jugador-pie').value,
                 height_cm: document.getElementById('jugador-altura').value || null,

@@ -1010,8 +1010,8 @@ function ejNuevaPizarra() {
     ejConfirm('¿Limpiar la pizarra y empezar desde cero?', () => {
     ejSaveHistory();
     ejP.players = []; ejP.lines = []; ejP.shapes = []; ejP.texts = []; ejP.equipment = []; ejP.connections = [];
-    ejP.selectedId = null; ejP.playerCounts = {};
-    ejFrameStop();
+    ejP.selectedId = null; ejP.playerCounts = {}; ejP.nextId = 1;
+    ejFrameStop();r
     ejP.animMode = false;
     ejP.frames = [];
     ejP.currentFrame = 0;
@@ -2712,6 +2712,8 @@ async function ejEditarDibujo() {
         ejP.fieldType = data.board_data.fieldType || 'full';
         ejP.selectedId = null;
         ejP._lastVideoUrl = data.animation_url || null;
+
+        ejP.nextId = [].concat(ejP.players, ejP.lines, ejP.shapes, ejP.texts, ejP.equipment, ejP.connections).reduce(function(max, e){ return (e.id > max ? e.id : max); }, 0) + 1;
         
         // Ocultar overlay y mostrar toolbar
         var overlay = document.getElementById('ej-modo-overlay');
@@ -2934,7 +2936,7 @@ async function ejBancoLoad() {
             
             .eq('coach_id', String(window.ejCoachId))
             .order('created_at', { ascending: false })
-            .limit(50);
+            .limit(200);
         if (error) throw error;
         ejEditandoId = null;
         ejBancoCache = data || [];
@@ -3120,6 +3122,8 @@ async function ejBancoCargar(id) {
             ejP.fieldType = data.board_data.fieldType || 'full';
             ejP.selectedId = null;
             ejP._lastVideoUrl = data.animation_url || null;
+
+            ejP.nextId = [].concat(ejP.players, ejP.lines, ejP.shapes, ejP.texts, ejP.equipment, ejP.connections).reduce(function(max, e){ return (e.id > max ? e.id : max); }, 0) + 1;
 
             // 3. Restaurar animación o resetearla
             if (data.board_data.animFrames && data.board_data.animFrames.length > 0) {

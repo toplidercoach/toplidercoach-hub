@@ -1,6 +1,45 @@
 // ========== ASISTENCIA.JS - TopLiderCoach HUB ==========
 // Asistencia por rango de fechas, filtro por temporada, bienestar, PDF individual y general
 
+(function() {
+    if (document.getElementById('wreg-styles')) return;
+    const st = document.createElement('style');
+    st.id = 'wreg-styles';
+    st.textContent = `
+        .wreg-card { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:14px 16px; margin-bottom:12px; }
+        .wreg-top { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:12px; }
+        .wreg-nombre { font-size:15px; font-weight:600; color:#1f2937; flex:1; min-width:120px; }
+        .wreg-peso { display:flex; flex-direction:column; gap:2px; }
+        .wreg-peso label { font-size:11px; color:#6b7280; }
+        .wreg-peso input { width:75px; padding:5px 8px; border:1px solid #d1d5db; border-radius:6px; }
+        .wreg-escalas { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:14px 18px; margin-bottom:10px; }
+        .wreg-item label { font-size:12px; color:#374151; display:flex; justify-content:space-between; margin-bottom:5px; }
+        .wreg-item input[type=range] { width:100%; }
+        .wreg-item input[type=number] { width:100%; padding:5px 8px; border:1px solid #d1d5db; border-radius:6px; }
+        .wreg-val { font-weight:700; color:#1f2937; }
+        .wreg-extremos { display:flex; justify-content:space-between; font-size:10px; color:#9ca3af; margin-top:2px; }
+        .wreg-grupo { background:#f9fafb; border-radius:8px; padding:10px 12px; margin-bottom:10px; }
+        .wreg-grupo label { font-size:12px; color:#374151; display:block; margin-bottom:5px; }
+        .wreg-grupo select { width:100%; padding:6px 8px; border:1px solid #d1d5db; border-radius:6px; }
+        .wreg-indices { display:flex; gap:20px; border-top:1px solid #e5e7eb; padding-top:10px; font-size:13px; color:#6b7280; }
+        .wreg-indices strong { font-size:15px; }
+    `;
+    document.head.appendChild(st);
+})();
+
+// Calcula el indice de bienestar de un registro (media de sueno, fatiga, estres).
+// Si no hay ninguno de los tres nuevos, intenta usar el campo viejo wellness (compatibilidad).
+function wIndiceBienestar(a) {
+    const vals = [a.sueno, a.fatiga, a.estres].filter(v => v !== null && v !== undefined && v !== '');
+    if (vals.length > 0) {
+        return vals.reduce((s, v) => s + Number(v), 0) / vals.length;
+    }
+    if (a.wellness !== null && a.wellness !== undefined && a.wellness !== '') {
+        return Number(a.wellness);
+    }
+    return null;
+}
+
 function togglePanelAsistencia() {
     var tabPlanificador = document.querySelector('.main-tab.planificador');
     if (tabPlanificador) cambiarModulo('planificador', tabPlanificador);
@@ -216,8 +255,7 @@ async function cargarAsistenciaRango() {
         const { data: asistencias } = await supabaseClient
             .from('asistencia_sesiones')
             .select('*')
-            .in('sesion_id', sesionIds)
-            .range(0, 9999);
+            .in('sesion_id', sesionIds);
         
         // Calcular stats por jugador
         let htmlRows = '';
@@ -230,11 +268,11 @@ async function cargarAsistenciaRango() {
             totalPorcentaje += porcentaje;
             
             const conPeso = asistJugador.filter(a => a.peso);
-            const conWellness = asistJugador.filter(a => a.wellness);
-            const conMuscular = asistJugador.filter(a => a.estado_muscular);
+            const conWellness = asistJugador.map(a => wIndiceBienestar(a)).filter(v => v !== null);
+            const conMuscular = asistJugador.filter(a => a.estado_muscular !== null && a.estado_muscular !== undefined);
             
             const promPeso = conPeso.length > 0 ? (conPeso.reduce((s, a) => s + parseFloat(a.peso), 0) / conPeso.length).toFixed(1) : '-';
-            const promWellness = conWellness.length > 0 ? (conWellness.reduce((s, a) => s + a.wellness, 0) / conWellness.length).toFixed(1) : '-';
+            const promWellness = conWellness.length > 0 ? (conWellness.reduce((s, v) => s + v, 0) / conWellness.length).toFixed(1) : '-';
             const promMuscular = conMuscular.length > 0 ? (conMuscular.reduce((s, a) => s + a.estado_muscular, 0) / conMuscular.length).toFixed(1) : '-';
             
             const clasePorc = porcentaje >= 80 ? 'porcentaje-alto' : porcentaje >= 50 ? 'porcentaje-medio' : 'porcentaje-bajo';
@@ -302,36 +340,85 @@ async function abrirModalAsistenciaSesion(sesionId) {
         const asistenciasMap = {};
         (asistencias || []).forEach(a => { asistenciasMap[a.jugador_id] = a; });
         
+        const GRUPOS = ['Cuádriceps','Isquiotibiales','Gemelo/Sóleo','Aductor','Glúteo','Psoas/Flexor','Lumbar','Tobillo','Rodilla','Otro'];
         let html = '';
         jugadoresSesion.forEach(j => {
             const asist = asistenciasMap[j.player_id] || {};
             const asistio = asist.asistio !== false;
             const motivo = asist.motivo_ausencia || '';
             const peso = asist.peso || '';
-            const wellness = asist.wellness || '';
-            const muscular = asist.estado_muscular || '';
-            
+            const sueno = asist.sueno || '';
+            const fatiga = asist.fatiga || '';
+            const estres = asist.estres || '';
+            const horasSueno = asist.horas_sueno || '';
+            const muscular = (asist.estado_muscular !== null && asist.estado_muscular !== undefined) ? asist.estado_muscular : '';
+            const grupoMuscular = asist.grupo_muscular || '';
+            const mostrarGrupo = (muscular !== '' && Number(muscular) >= 4);
+
+            let opcionesGrupo = '<option value="">Grupo afectado...</option>';
+            GRUPOS.forEach(g => {
+                opcionesGrupo += `<option value="${g}" ${grupoMuscular === g ? 'selected' : ''}>${g}</option>`;
+            });
+
             html += `
-                <div class="asistencia-jugador-row" data-player-id="${j.player_id}">
-                    <div class="nombre">${j.shirt_number || '?'}. ${j.name}</div>
-                    <button type="button" class="toggle-asistio ${asistio ? 'si' : 'no'}" onclick="toggleAsistencia(this)">
-                        ${asistio ? '✓ Asistió' : '✗ No'}
-                    </button>
-                    <select class="motivo-select ${asistio ? '' : 'visible'}">
-                        <option value="">Motivo...</option>
-                        <option value="enfermo" ${motivo === 'enfermo' ? 'selected' : ''}>Enfermo</option>
-                        <option value="lesionado" ${motivo === 'lesionado' ? 'selected' : ''}>Lesionado</option>
-                        <option value="ausente" ${motivo === 'ausente' ? 'selected' : ''}>Ausente</option>
-                        <option value="sancionado" ${motivo === 'sancionado' ? 'selected' : ''}>Sancionado</option>
-                    </select>
-                    <input type="number" class="peso-input" placeholder="Peso kg" step="0.1" min="30" max="150" value="${peso}">
-                    <input type="number" class="wellness-input" placeholder="Well 1-10" min="1" max="10" value="${wellness}">
-                    <input type="number" class="muscular-input" placeholder="Musc 0-10" min="0" max="10" value="${muscular}">
+                <div class="wreg-card" data-player-id="${j.player_id}">
+                    <div class="wreg-top">
+                        <div class="wreg-nombre">${j.shirt_number || '?'}. ${j.name}</div>
+                        <button type="button" class="toggle-asistio ${asistio ? 'si' : 'no'}" onclick="toggleAsistencia(this)">
+                            ${asistio ? '✓ Asistió' : '✗ No'}
+                        </button>
+                        <select class="motivo-select ${asistio ? '' : 'visible'}">
+                            <option value="">Motivo...</option>
+                            <option value="enfermo" ${motivo === 'enfermo' ? 'selected' : ''}>Enfermo</option>
+                            <option value="lesionado" ${motivo === 'lesionado' ? 'selected' : ''}>Lesionado</option>
+                            <option value="ausente" ${motivo === 'ausente' ? 'selected' : ''}>Ausente</option>
+                            <option value="sancionado" ${motivo === 'sancionado' ? 'selected' : ''}>Sancionado</option>
+                        </select>
+                        <div class="wreg-peso">
+                            <label>⚖️ Peso</label>
+                            <input type="number" class="peso-input" placeholder="kg" step="0.1" min="30" max="150" value="${peso}">
+                        </div>
+                    </div>
+                    <div class="wreg-escalas">
+                        <div class="wreg-item">
+                            <label>😴 Sueño <span class="wreg-val" data-for="sueno">${sueno || '-'}</span></label>
+                            <input type="range" class="w-sueno" min="1" max="10" value="${sueno || 5}" oninput="wActualizar(this,'sueno')">
+                            <div class="wreg-extremos"><span>1 · Pésimo</span><span>Excelente · 10</span></div>
+                        </div>
+                        <div class="wreg-item">
+                            <label>🔋 Fatiga <span class="wreg-val" data-for="fatiga">${fatiga || '-'}</span></label>
+                            <input type="range" class="w-fatiga" min="1" max="10" value="${fatiga || 5}" oninput="wActualizar(this,'fatiga')">
+                            <div class="wreg-extremos"><span>1 · Agotado</span><span>Pleno · 10</span></div>
+                        </div>
+                        <div class="wreg-item">
+                            <label>🧠 Estrés <span class="wreg-val" data-for="estres">${estres || '-'}</span></label>
+                            <input type="range" class="w-estres" min="1" max="10" value="${estres || 5}" oninput="wActualizar(this,'estres')">
+                            <div class="wreg-extremos"><span>1 · Muy estresado</span><span>Relajado · 10</span></div>
+                        </div>
+                        <div class="wreg-item">
+                            <label>💪 Daño muscular <span class="wreg-val wreg-musc" data-for="muscular">${muscular === '' ? '-' : muscular}</span></label>
+                            <input type="range" class="w-muscular" min="0" max="10" value="${muscular === '' ? 0 : muscular}" oninput="wActualizarMuscular(this)">
+                            <div class="wreg-extremos"><span>0 · Sin daño</span><span>Lesión · 10</span></div>
+                        </div>
+                        <div class="wreg-item wreg-horas">
+                            <label>⏱️ Horas de sueño</label>
+                            <input type="number" class="w-horas" placeholder="h" step="0.5" min="0" max="16" value="${horasSueno}">
+                        </div>
+                    </div>
+                    <div class="wreg-grupo" style="display:${mostrarGrupo ? 'block' : 'none'};">
+                        <label>🩹 ¿Qué grupo muscular?</label>
+                        <select class="w-grupo">${opcionesGrupo}</select>
+                    </div>
+                    <div class="wreg-indices">
+                        <span>Bienestar: <strong class="w-ib">-</strong></span>
+                        <span>Daño: <strong class="w-im">-</strong></span>
+                    </div>
                 </div>
             `;
         });
         
         document.getElementById('modal-asistencia-jugadores').innerHTML = html;
+        document.querySelectorAll('.wreg-card').forEach(c => wCalcularIndices(c));
     } catch (error) {
         console.error('Error cargando asistencia:', error);
         document.getElementById('modal-asistencia-jugadores').innerHTML = '<p style="color:red;">Error al cargar</p>';
@@ -353,33 +440,22 @@ function toggleAsistencia(btn) {
 function mostrarGuiaEscalas() {
     const modalHTML = `
         <div class="modal-overlay" onclick="if(event.target === this) this.remove()" style="z-index:1100;">
-            <div class="modal-content" style="max-width: 700px; max-height: 90vh; overflow-y: auto;">
-                <div class="modal-header" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
-                    <h3 style="color:white;">📊 Guía de Escalas - Wellness y Daño Muscular</h3>
+            <div class="modal-content" style="max-width: 600px; max-height: 90vh; overflow-y: auto;">
+                <div class="modal-header" style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);">
+                    <h3 style="color:white;">💪 Guía de Escala - Daño Muscular</h3>
                     <button class="modal-close" onclick="this.closest('.modal-overlay').remove()" style="color:white;">&times;</button>
                 </div>
                 <div class="modal-body">
-                    <div style="margin-bottom:25px;">
-                        <h4 style="background:#10b981;color:white;padding:10px 15px;border-radius:8px;margin-bottom:12px;">💚 ESCALA DE WELLNESS (1-10)</h4>
-                        <p style="font-size:12px;color:#6b7280;margin-bottom:10px;">¿Cómo te sientes hoy para entrenar?</p>
-                        <table style="width:100%;border-collapse:collapse;font-size:13px;">
-                            <tr style="background:#fee2e2;"><td style="padding:8px;border:1px solid #e5e7eb;font-weight:bold;width:50px;text-align:center;">1</td><td style="padding:8px;border:1px solid #e5e7eb;"><strong>KO total</strong></td></tr>
-                            <tr style="background:#fee2e2;"><td style="padding:8px;border:1px solid #e5e7eb;font-weight:bold;text-align:center;">2-3</td><td style="padding:8px;border:1px solid #e5e7eb;"><strong>Muy bajo / Bajo</strong></td></tr>
-                            <tr style="background:#fef3c7;"><td style="padding:8px;border:1px solid #e5e7eb;font-weight:bold;text-align:center;">4-5</td><td style="padding:8px;border:1px solid #e5e7eb;"><strong>Justo / Normal</strong></td></tr>
-                            <tr style="background:#d1fae5;"><td style="padding:8px;border:1px solid #e5e7eb;font-weight:bold;text-align:center;">6-7</td><td style="padding:8px;border:1px solid #e5e7eb;"><strong>Bien / Muy bien</strong></td></tr>
-                            <tr style="background:#bbf7d0;"><td style="padding:8px;border:1px solid #e5e7eb;font-weight:bold;text-align:center;">8-10</td><td style="padding:8px;border:1px solid #e5e7eb;"><strong>Excelente / Top / Prime</strong></td></tr>
-                        </table>
-                    </div>
                     <div>
-                        <h4 style="background:#ef4444;color:white;padding:10px 15px;border-radius:8px;margin-bottom:12px;">💪 ESCALA DE DAÑO MUSCULAR (0-10)</h4>
-                        <p style="font-size:12px;color:#6b7280;margin-bottom:10px;">0=sin daño, 10=lesión</p>
-                        <table style="width:100%;border-collapse:collapse;font-size:13px;">
-                            <tr style="background:#d1fae5;"><td style="padding:8px;border:1px solid #e5e7eb;font-weight:bold;width:50px;text-align:center;">0-3</td><td style="padding:8px;border:1px solid #e5e7eb;"><strong>Sin daño / Leve:</strong> Carga alta OK</td></tr>
-                            <tr style="background:#fef9c3;"><td style="padding:8px;border:1px solid #e5e7eb;font-weight:bold;text-align:center;">4-5</td><td style="padding:8px;border:1px solid #e5e7eb;"><strong>Moderado:</strong> Carga alta OK con cuidado</td></tr>
-                            <tr style="background:#fed7aa;"><td style="padding:8px;border:1px solid #e5e7eb;font-weight:bold;text-align:center;">6-7</td><td style="padding:8px;border:1px solid #e5e7eb;"><strong>Alto:</strong> Limitar intensidad</td></tr>
-                            <tr style="background:#fecaca;"><td style="padding:8px;border:1px solid #e5e7eb;font-weight:bold;text-align:center;">8-9</td><td style="padding:8px;border:1px solid #e5e7eb;"><strong>Muy alto:</strong> Riesgo de lesión</td></tr>
-                            <tr style="background:#ef4444;color:white;"><td style="padding:8px;border:1px solid #e5e7eb;font-weight:bold;text-align:center;">10</td><td style="padding:8px;border:1px solid #e5e7eb;"><strong>LESIÓN MUSCULAR</strong></td></tr>
+                        <p style="font-size:13px;color:#6b7280;margin-bottom:12px;">0 = sin daño · 10 = lesión</p>
+                        <table style="width:100%;border-collapse:collapse;font-size:14px;">
+                            <tr style="background:#d1fae5;"><td style="padding:10px;border:1px solid #e5e7eb;font-weight:bold;width:60px;text-align:center;">0-3</td><td style="padding:10px;border:1px solid #e5e7eb;"><strong>Sin daño / Leve:</strong> Carga alta OK</td></tr>
+                            <tr style="background:#fef9c3;"><td style="padding:10px;border:1px solid #e5e7eb;font-weight:bold;text-align:center;">4-5</td><td style="padding:10px;border:1px solid #e5e7eb;"><strong>Moderado:</strong> Carga alta OK con cuidado</td></tr>
+                            <tr style="background:#fed7aa;"><td style="padding:10px;border:1px solid #e5e7eb;font-weight:bold;text-align:center;">6-7</td><td style="padding:10px;border:1px solid #e5e7eb;"><strong>Alto:</strong> Limitar intensidad</td></tr>
+                            <tr style="background:#fecaca;"><td style="padding:10px;border:1px solid #e5e7eb;font-weight:bold;text-align:center;">8-9</td><td style="padding:10px;border:1px solid #e5e7eb;"><strong>Muy alto:</strong> Riesgo de lesión</td></tr>
+                            <tr style="background:#ef4444;color:white;"><td style="padding:10px;border:1px solid #e5e7eb;font-weight:bold;text-align:center;">10</td><td style="padding:10px;border:1px solid #e5e7eb;"><strong>LESIÓN MUSCULAR</strong></td></tr>
                         </table>
+                        <p style="font-size:13px;color:#6b7280;margin-top:14px;">A partir de <strong>4</strong> se debe indicar el grupo muscular afectado.</p>
                     </div>
                 </div>
             </div>
@@ -395,28 +471,83 @@ function cerrarModalAsistenciaSesion() {
 
 async function guardarAsistenciaSesion() {
     if (!sesionAsistenciaActual) return;
-    const rows = document.querySelectorAll('.asistencia-jugador-row');
+    const rows = document.querySelectorAll('.wreg-card');
     const registros = [];
     rows.forEach(row => {
+        const asistio = row.querySelector('.toggle-asistio').classList.contains('si');
+        const muscVal = parseInt(row.querySelector('.w-muscular').value);
         registros.push({
             sesion_id: sesionAsistenciaActual,
             jugador_id: row.dataset.playerId,
-            asistio: row.querySelector('.toggle-asistio').classList.contains('si'),
-            motivo_ausencia: row.querySelector('.toggle-asistio').classList.contains('si') ? null : (row.querySelector('.motivo-select').value || null),
+            asistio: asistio,
+            motivo_ausencia: asistio ? null : (row.querySelector('.motivo-select').value || null),
             peso: parseFloat(row.querySelector('.peso-input').value) || null,
-            wellness: parseInt(row.querySelector('.wellness-input').value) || null,
-            estado_muscular: parseInt(row.querySelector('.muscular-input').value) || null
+            sueno: parseInt(row.querySelector('.w-sueno').value) || null,
+            fatiga: parseInt(row.querySelector('.w-fatiga').value) || null,
+            estres: parseInt(row.querySelector('.w-estres').value) || null,
+            estado_muscular: isNaN(muscVal) ? null : muscVal,
+            grupo_muscular: (muscVal >= 4) ? (row.querySelector('.w-grupo').value || null) : null,
+            horas_sueno: parseFloat(row.querySelector('.w-horas').value) || null,
+            registrado_por: 'staff'
         });
     });
     try {
         await supabaseClient.from('asistencia_sesiones').delete().eq('sesion_id', sesionAsistenciaActual);
         const { error } = await supabaseClient.from('asistencia_sesiones').insert(registros);
         if (error) throw error;
-        showToast('Asistencia guardada correctamente');
+        showToast('Asistencia y wellness guardados correctamente');
         cerrarModalAsistenciaSesion();
     } catch (error) {
         console.error('Error guardando asistencia:', error);
         showToast('Error al guardar: ' + error.message);
+    }
+}
+
+function wActualizar(input, campo) {
+    const card = input.closest('.wreg-card');
+    const span = card.querySelector(`.wreg-val[data-for="${campo}"]`);
+    if (span) span.textContent = input.value;
+    wCalcularIndices(card);
+}
+
+function wActualizarMuscular(input) {
+    const card = input.closest('.wreg-card');
+    const val = Number(input.value);
+    const span = card.querySelector('.wreg-val[data-for="muscular"]');
+    if (span) {
+        span.textContent = val;
+        if (val <= 3) span.style.color = '#10b981';
+        else if (val <= 5) span.style.color = '#d97706';
+        else if (val <= 7) span.style.color = '#ea580c';
+        else span.style.color = '#dc2626';
+    }
+    const grupo = card.querySelector('.wreg-grupo');
+    if (grupo) grupo.style.display = (val >= 4) ? 'block' : 'none';
+    wCalcularIndices(card);
+}
+
+function wCalcularIndices(card) {
+    const sueno = Number(card.querySelector('.w-sueno').value);
+    const fatiga = Number(card.querySelector('.w-fatiga').value);
+    const estres = Number(card.querySelector('.w-estres').value);
+    const musc = Number(card.querySelector('.w-muscular').value);
+
+    const ib = ((sueno + fatiga + estres) / 3);
+    const ibSpan = card.querySelector('.w-ib');
+    if (ibSpan) {
+        ibSpan.textContent = ib.toFixed(1);
+        if (ib >= 7) ibSpan.style.color = '#10b981';
+        else if (ib >= 5) ibSpan.style.color = '#d97706';
+        else ibSpan.style.color = '#dc2626';
+    }
+
+    const imSpan = card.querySelector('.w-im');
+    if (imSpan) {
+        imSpan.textContent = musc;
+        if (musc <= 3) imSpan.style.color = '#10b981';
+        else if (musc <= 5) imSpan.style.color = '#d97706';
+        else if (musc <= 7) imSpan.style.color = '#ea580c';
+        else imSpan.style.color = '#dc2626';
     }
 }
 
@@ -450,7 +581,8 @@ async function verDetalleJugador(jugadorId, nombreJugador) {
             const fechaFormato = new Date(sesion.session_date + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' });
             
             if (asist && asist.asistio === true) {
-                htmlHistorial += `<div class="historial-sesion-row asistio"><div><span class="historial-fecha">${fechaFormato}</span> - ${sesion.name}</div><div class="historial-datos"><span>✅ Asistió</span>${asist.peso ? `<span>⚖️ ${asist.peso}kg</span>` : ''}${asist.wellness ? `<span>💚 ${asist.wellness}/10</span>` : ''}${asist.estado_muscular ? `<span>💪 ${asist.estado_muscular}/10</span>` : ''}</div></div>`;
+                const ibHist = wIndiceBienestar(asist);
+                htmlHistorial += `<div class="historial-sesion-row asistio"><div><span class="historial-fecha">${fechaFormato}</span> - ${sesion.name}</div><div class="historial-datos"><span>✅ Asistió</span>${asist.peso ? `<span>⚖️ ${asist.peso}kg</span>` : ''}${ibHist !== null ? `<span>💚 ${ibHist.toFixed(1)}/10</span>` : ''}${(asist.estado_muscular !== null && asist.estado_muscular !== undefined) ? `<span>💪 ${asist.estado_muscular}/10</span>` : ''}</div></div>`;
             } else if (asist && asist.asistio === false) {
                 htmlHistorial += `<div class="historial-sesion-row no-asistio"><div><span class="historial-fecha">${fechaFormato}</span> - ${sesion.name}</div><div><span class="historial-motivo">${asist.motivo_ausencia || 'Sin motivo'}</span></div></div>`;
             } else {
@@ -510,10 +642,10 @@ async function generarPDFJugador(jugadorId) {
         const porcentaje = totalSesiones > 0 ? Math.round((asistio / totalSesiones) * 100) : 0;
         
         const conPeso = asistencias ? asistencias.filter(a => a.peso) : [];
-        const conWellness = asistencias ? asistencias.filter(a => a.wellness) : [];
-        const conMuscular = asistencias ? asistencias.filter(a => a.estado_muscular) : [];
+        const conWellness = asistencias ? asistencias.map(a => wIndiceBienestar(a)).filter(v => v !== null) : [];
+        const conMuscular = asistencias ? asistencias.filter(a => a.estado_muscular !== null && a.estado_muscular !== undefined) : [];
         const promPeso = conPeso.length > 0 ? (conPeso.reduce((s, a) => s + parseFloat(a.peso), 0) / conPeso.length).toFixed(1) : '-';
-        const promWellness = conWellness.length > 0 ? (conWellness.reduce((s, a) => s + a.wellness, 0) / conWellness.length).toFixed(1) : '-';
+        const promWellness = conWellness.length > 0 ? (conWellness.reduce((s, v) => s + v, 0) / conWellness.length).toFixed(1) : '-';
         const promMuscular = conMuscular.length > 0 ? (conMuscular.reduce((s, a) => s + a.estado_muscular, 0) / conMuscular.length).toFixed(1) : '-';
         
         const motivos = {};
@@ -626,7 +758,7 @@ async function generarPDFJugador(jugadorId) {
             doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(15,23,42);
             doc.text(fechaF, 18, y+3); doc.text(sesion.name.substring(0,30), 50, y+3);
             if (asist) {
-                if (asist.asistio) { doc.setTextColor(22,163,74); doc.text('Asistio',115,y+3); doc.setTextColor(15,23,42); doc.text(asist.peso?`${asist.peso}`:'-',145,y+3); doc.text(asist.wellness?`${asist.wellness}`:'-',165,y+3); doc.text(asist.estado_muscular?`${asist.estado_muscular}`:'-',182,y+3); }
+                if (asist.asistio) { const ibPdf = wIndiceBienestar(asist); doc.setTextColor(22,163,74); doc.text('Asistio',115,y+3); doc.setTextColor(15,23,42); doc.text(asist.peso?`${asist.peso}`:'-',145,y+3); doc.text(ibPdf!==null?`${ibPdf.toFixed(1)}`:'-',165,y+3); doc.text((asist.estado_muscular!==null&&asist.estado_muscular!==undefined)?`${asist.estado_muscular}`:'-',182,y+3); }
                 else { doc.setTextColor(220,38,38); doc.text(asist.motivo_ausencia||'Falta',115,y+3); doc.setTextColor(156,163,175); doc.text('-',145,y+3); doc.text('-',165,y+3); doc.text('-',182,y+3); }
             } else { doc.setTextColor(156,163,175); doc.text('Sin registrar',115,y+3); doc.text('-',145,y+3); doc.text('-',165,y+3); doc.text('-',182,y+3); }
             y += 9;
@@ -698,7 +830,7 @@ async function generarPDFPlantillaGeneral() {
         // Asistencias
         const sesionIds = sesiones.map(s => s.id);
         const { data: asistencias } = await supabaseClient
-            .from('asistencia_sesiones').select('*').in('sesion_id', sesionIds).range(0, 9999);
+            .from('asistencia_sesiones').select('*').in('sesion_id', sesionIds);
         
         // Calcular stats por jugador
         const statsJugadores = jugadores.map(j => {
@@ -706,10 +838,10 @@ async function generarPDFPlantillaGeneral() {
             const si = asistJ.filter(a => a.asistio === true).length;
             const no = asistJ.filter(a => a.asistio === false).length;
             const pct = totalSesiones > 0 ? Math.round((si / totalSesiones) * 100) : 0;
-            const cW = asistJ.filter(a => a.wellness); const cM = asistJ.filter(a => a.estado_muscular); const cP = asistJ.filter(a => a.peso);
+            const cW = asistJ.map(a => wIndiceBienestar(a)).filter(v => v !== null); const cM = asistJ.filter(a => a.estado_muscular !== null && a.estado_muscular !== undefined); const cP = asistJ.filter(a => a.peso);
             return {
                 ...j, asistencias: si, ausencias: no, porcentaje: pct,
-                promWellness: cW.length > 0 ? (cW.reduce((s,a) => s+a.wellness, 0)/cW.length).toFixed(1) : '-',
+                promWellness: cW.length > 0 ? (cW.reduce((s,v) => s+v, 0)/cW.length).toFixed(1) : '-',
                 promMuscular: cM.length > 0 ? (cM.reduce((s,a) => s+a.estado_muscular, 0)/cM.length).toFixed(1) : '-',
                 promPeso: cP.length > 0 ? (cP.reduce((s,a) => s+parseFloat(a.peso), 0)/cP.length).toFixed(1) : '-'
             };
