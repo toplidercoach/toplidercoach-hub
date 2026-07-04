@@ -2936,7 +2936,7 @@ async function ejBancoLoad() {
             
             .eq('coach_id', String(window.ejCoachId))
             .order('created_at', { ascending: false })
-            .limit(50);
+            .limit(200);
         if (error) throw error;
         ejEditandoId = null;
         ejBancoCache = data || [];

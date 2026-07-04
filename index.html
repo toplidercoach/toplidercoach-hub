@@ -337,6 +337,19 @@
                                 <textarea id="sesion-notas" placeholder="Observaciones, condiciones climaticas, etc."></textarea>
                             </div>
                         </div>
+                        <!-- Bloque Conceptos Tacticos (Modelo de Juego) -->
+                        <div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;margin-top:16px;">
+                            <div style="background:#7c3aed;color:#fff;padding:10px 16px;font-weight:600;font-size:14px;">🎯 Conceptos tácticos del modelo de juego</div>
+                            <div style="padding:14px 16px;">
+                                <div class="sc-fase-row">
+                                    <label>Fase:</label>
+                                    <button type="button" class="sc-fase-btn" data-fase="Pretemporada" onclick="scSetFase('Pretemporada')">Pretemporada</button>
+                                    <button type="button" class="sc-fase-btn" data-fase="Temporada" onclick="scSetFase('Temporada')">Temporada</button>
+                                </div>
+                                <div class="sc-lista" id="sc-lista-conceptos"></div>
+                                <button type="button" class="sc-add-btn" onclick="scAbrirSelector()">➕ Añadir concepto</button>
+                            </div>
+                        </div>
                         <!-- Selector de Jugadores -->
                         <div class="jugadores-selector">
                             <div class="jugadores-selector-header">
@@ -1660,6 +1673,9 @@
         </div>
         <div class="modal-body" style="text-align: center;">
             <p style="margin-bottom: 20px; color: #6b7280;">¿Cómo quieres el PDF?</p>
+            <label style="display:flex;align-items:center;gap:8px;justify-content:center;margin-bottom:16px;font-size:14px;color:#374151;cursor:pointer;">
+                <input type="checkbox" id="pdf-hoja-por-ejercicio"> 🗂 Una hoja por ejercicio (más espacio para equipos)
+            </label>
             <div style="display: flex; flex-direction: column; gap: 10px;">
                 <button class="btn-primary purple" onclick="descargarPDFSesion(true)">📄 PDF con títulos de ejercicios</button>
                 <button class="btn-primary" style="background: linear-gradient(135deg, #059669 0%, #047857 100%);" onclick="descargarPDFSesion(false)">📄 PDF sin títulos (limpio)</button>
@@ -1877,6 +1893,9 @@ document.getElementById('modal-tacticlip').addEventListener('click', function(e)
     <script src="js/asistencia.js"></script>
     <script src="js/wellness-enlaces.js"></script>
     <script src="js/modelo-juego.js"></script>
+    <script src="js/sesion-conceptos.js"></script>
+    <script src="js/equipos-ejercicio.js"></script>
+    <script src="js/modo-club-promo.js"></script>
     <script src="js/dashboard.js"></script>
     <script src="js/periodizacion.js"></script>
     <script src="js/ej-images.js"></script>

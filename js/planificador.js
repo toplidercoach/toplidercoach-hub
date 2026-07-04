@@ -385,6 +385,7 @@ registrarSubTab('planificador', 'calendario', cargarCalendarioUnificado);
                             </div>
                             <button onclick="event.stopPropagation(); moverEjercicio('${seccion}', ${idx}, -1)" title="Subir" ${idx === 0 ? 'disabled' : ''} style="background:#e5e7eb; border:none; border-radius:4px; padding:4px 8px; cursor:${idx === 0 ? 'not-allowed' : 'pointer'}; opacity:${idx === 0 ? '0.3' : '1'}; font-size:11px; color:#374151; margin-right:2px;">▲</button>
                             <button onclick="event.stopPropagation(); moverEjercicio('${seccion}', ${idx}, 1)" title="Bajar" ${idx === totalEnSeccion - 1 ? 'disabled' : ''} style="background:#e5e7eb; border:none; border-radius:4px; padding:4px 8px; cursor:${idx === totalEnSeccion - 1 ? 'not-allowed' : 'pointer'}; opacity:${idx === totalEnSeccion - 1 ? '0.3' : '1'}; font-size:11px; color:#374151; margin-right:4px;">▼</button>
+                            <button onclick="event.stopPropagation(); eqAbrirModal('${seccion}', ${idx})" title="Montar equipos" style="background:#ede9fe;color:#7c3aed;border:1px solid #c4b5fd;border-radius:6px;margin-right:4px;">👥${ej.equipos && ej.equipos.series ? ' ' + ej.equipos.series.length : ''}</button>
                             <button onclick="event.stopPropagation(); quitarEjercicio('${seccion}', ${idx})">Quitar</button>
                         </div>
                     `).join('');
@@ -407,6 +408,8 @@ registrarSubTab('planificador', 'calendario', cargarCalendarioUnificado);
         }
         
        function limpiarSesion() {
+            if (typeof scCargarModelo === 'function') { scCargarModelo(); }
+            if (typeof scReset === 'function') { scReset(); }
             sesionEditandoId = null;
             const ahora = new Date();
 const fechaHoy = ahora.getFullYear() + '-' + String(ahora.getMonth() + 1).padStart(2, '0') + '-' + String(ahora.getDate()).padStart(2, '0');
@@ -462,7 +465,8 @@ sesion = { nombre: '', fecha: fechaHoy, calentamiento: [], principal: [], enfria
                     warm_up: sesion.calentamiento,
                     main_part: sesion.principal,
                     cool_down: sesion.enfriamiento,
-                    players: obtenerJugadoresParaGuardar()
+                    players: obtenerJugadoresParaGuardar(),
+                    fase: (typeof window._scFase !== 'undefined' ? window._scFase : null)
                 };
                 
                 let sesionId;
@@ -509,7 +513,8 @@ if (!sesionEditandoId) {
     }
 }
 
-showToast(sesionEditandoId ? 'Sesión actualizada correctamente' : 'Sesión guardada correctamente');
+if (typeof scGuardarConceptos === 'function') { await scGuardarConceptos(sesionId, !!sesionEditandoId); }
+                showToast(sesionEditandoId ? 'Sesión actualizada correctamente' : 'Sesión guardada correctamente');
                 limpiarSesion();
                 
             } catch (error) {
@@ -650,6 +655,9 @@ showToast(sesionEditandoId ? 'Sesión actualizada correctamente' : 'Sesión guar
                     .single();
                 
                 sesionEditandoId = id;
+                if (typeof scCargarModelo === 'function') { await scCargarModelo(); }
+                if (typeof scSetFase === 'function') { scSetFase(data.fase || null); }
+                if (typeof scCargarConceptosDeSesion === 'function') { await scCargarConceptosDeSesion(id); }
                 
                 sesion = {
                     nombre: data.name,
@@ -709,10 +717,11 @@ function cerrarModalPDFSesion(event) {
 }
 
 function descargarPDFSesion(conTitulos) {
+    const hojaPorEjercicio = document.getElementById('pdf-hoja-por-ejercicio') ? document.getElementById('pdf-hoja-por-ejercicio').checked : false;
     cerrarModalPDFSesion();
-    exportarSesionPDF(sesionPDFId, conTitulos);
+    exportarSesionPDF(sesionPDFId, conTitulos, hojaPorEjercicio);
 }
-async function exportarSesionPDF(id, conTitulos = true) {
+async function exportarSesionPDF(id, conTitulos = true, hojaPorEjercicio = false) {
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
             
@@ -874,8 +883,12 @@ if (s.players && s.players.length > 0) {
                 if (sec.datos.length > 0) {
                     const tiempoSeccion = sec.datos.reduce((sum, e) => sum + (e.duracion || 0), 0);
                     
-                    // Verificar espacio para header de seccion
-                    if (y > 260) {
+                    // En modo "hoja por ejercicio": la primera seccion con ejercicios va en la portada,
+                    // y cada seccion siguiente empieza en pagina nueva junto a su primer ejercicio
+                    if (hojaPorEjercicio && secciones.findIndex(x => x.datos.length > 0) !== secciones.indexOf(sec)) {
+                        doc.addPage();
+                        y = 20;
+                    } else if (y > 260) {
                         doc.addPage();
                         y = 20;
                     }
@@ -894,6 +907,15 @@ if (s.players && s.players.length > 0) {
                     for (let i = 0; i < sec.datos.length; i++) {
                         const ej = sec.datos[i];
                         const alturaEjercicio = 45;
+                        
+                        // Modo "una hoja por ejercicio": salto de pagina solo ENTRE ejercicios
+                        // (el primer ejercicio de cada seccion va pegado a su encabezado)
+                        if (hojaPorEjercicio && i > 0) {
+                            doc.addPage();
+                            y = 20;
+                        }
+                        
+                  
                         
                         // Verificar espacio, nueva pagina si necesario
                         if (y + alturaEjercicio > 280) {
@@ -979,6 +1001,11 @@ if (s.players && s.players.length > 0) {
                         }
                         
                         y = contenidoY + imgHeight + 5;
+                        
+                        // Dibujar los equipos del ejercicio (si los tiene)
+                        if (ej.equipos && typeof eqDibujarEquiposPDF === 'function') {
+                            y = eqDibujarEquiposPDF(doc, ej, s.players || [], y, hojaPorEjercicio);
+                        }
                     }
                     
                     y += 5;
