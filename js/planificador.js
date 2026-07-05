@@ -98,7 +98,7 @@ registrarSubTab('planificador', 'calendario', cargarCalendarioUnificado);
             try {
                const { data: jugadores, error } = await supabaseClient
                     .from('season_players')
-                    .select('id, player_id, shirt_number, players(id, name, photo_url)')
+                    .select('id, player_id, shirt_number, players(id, name, photo_url, position)')
                     .eq('season_id', seasonId)
                     .order('shirt_number');
                 
@@ -120,14 +120,82 @@ registrarSubTab('planificador', 'calendario', cargarCalendarioUnificado);
             }
         }
         
+      var PLAN_GRUPOS_POS = [
+            { nombre: 'PORTERIA', codigos: ['POR'] },
+            { nombre: 'DEFENSA', codigos: ['LD','LI','CAD','CAI','DCD','DCC','DCI'] },
+            { nombre: 'CENTRO DEL CAMPO', codigos: ['PIV','MCD','MC','MCI','MD','MI','ID','II','MP'] },
+            { nombre: 'ATAQUE', codigos: ['ED','EI','DC'] }
+        ];
+
+        // Traduce cualquier formato de posicion (codigo o texto completo) al codigo canonico
+        function planPosCodigo(pos) {
+            if (!pos) return null;
+            var up = String(pos).trim().toUpperCase();
+            var codigos = ['POR','LD','LI','CAD','CAI','DCD','DCC','DCI','PIV','MCD','MC','MCI','MD','MI','ID','II','MP','ED','EI','DC'];
+            if (codigos.indexOf(up) > -1) return up;
+            var t = String(pos).toLowerCase();
+            if (t.indexOf('portero') > -1) return 'POR';
+            if (t.indexOf('lateral derecho') > -1) return 'LD';
+            if (t.indexOf('lateral izquierdo') > -1) return 'LI';
+            if (t.indexOf('carrilero derecho') > -1) return 'CAD';
+            if (t.indexOf('carrilero izquierdo') > -1) return 'CAI';
+            if (t.indexOf('central derecho') > -1) return 'DCD';
+            if (t.indexOf('central izquierdo') > -1) return 'DCI';
+            if (t.indexOf('central') > -1 || t.indexOf('defens') > -1) return 'DCC';
+            if (t.indexOf('pivote') > -1 || t.indexOf('mediocentro defensivo') > -1) return 'PIV';
+            if (t.indexOf('mediocentro derecho') > -1) return 'MCD';
+            if (t.indexOf('mediocentro izquierdo') > -1) return 'MCI';
+            if (t.indexOf('medio derecho') > -1) return 'MD';
+            if (t.indexOf('medio izquierdo') > -1) return 'MI';
+            if (t.indexOf('interior derecho') > -1) return 'ID';
+            if (t.indexOf('interior izquierdo') > -1) return 'II';
+            if (t.indexOf('mediapunta') > -1 || t.indexOf('media punta') > -1) return 'MP';
+            if (t.indexOf('mediocentro') > -1 || t.indexOf('medio centro') > -1) return 'MC';
+            if (t.indexOf('extremo derecho') > -1) return 'ED';
+            if (t.indexOf('extremo izquierdo') > -1) return 'EI';
+            if (t.indexOf('delantero') > -1 || t.indexOf('punta') > -1 || t.indexOf('ariete') > -1) return 'DC';
+            return null;
+        }
+
+        function planAgruparPorPosicion(lista) {
+            var grupos = [];
+            var usados = {};
+            lista.forEach(function(sp) {
+                sp._posCode = planPosCodigo(sp.players ? sp.players.position : null);
+            });
+            PLAN_GRUPOS_POS.forEach(function(g) {
+                var jugs = lista.filter(function(sp) {
+                    return sp._posCode && g.codigos.indexOf(sp._posCode) > -1;
+                });
+                jugs.sort(function(a, b) {
+                    var pa = g.codigos.indexOf(a._posCode);
+                    var pb = g.codigos.indexOf(b._posCode);
+                    if (pa !== pb) return pa - pb;
+                    return (parseInt(a.shirt_number) || 999) - (parseInt(b.shirt_number) || 999);
+                });
+                jugs.forEach(function(sp) { usados[sp.id] = true; });
+                if (jugs.length > 0) grupos.push({ nombre: g.nombre, jugadores: jugs });
+            });
+            var sinPos = lista.filter(function(sp) { return !usados[sp.id]; });
+            if (sinPos.length > 0) grupos.push({ nombre: 'SIN POSICION', jugadores: sinPos });
+            return grupos;
+        }
+
       function renderizarJugadoresSesion() {
             const grid = document.getElementById('jugadores-sesion-grid');
+            grid.style.maxHeight = 'none';
+            grid.style.overflowY = 'visible';
             
-            grid.innerHTML = jugadoresPlantilla.map(sp => {
+            const grupos = planAgruparPorPosicion(jugadoresPlantilla);
+            
+            grid.innerHTML = grupos.map(grupo => {
+                const cabecera = `<div style="grid-column:1/-1;font-size:11px;font-weight:800;color:#7c3aed;letter-spacing:0.06em;border-bottom:2px solid #e9d5ff;padding:8px 2px 3px;">${grupo.nombre} (${grupo.jugadores.length})</div>`;
+                const fichas = grupo.jugadores.map(sp => {
                 const jugador = sp.players;
                 const seleccionado = jugadoresSeleccionados.some(id => String(id) === String(sp.id));
                 const foto = jugador?.photo_url;
                 const inicial = jugador?.name ? jugador.name.charAt(0).toUpperCase() : '?';
+                const posBadge = sp._posCode ? `<span style="font-size:9px;font-weight:700;color:#7c3aed;margin-left:auto;">${sp._posCode}</span>` : '';
                 return `
                     <div class="jugador-check ${seleccionado ? 'selected' : ''}" data-id="${sp.id}">
                         <div class="jugador-foto-mini">
@@ -136,8 +204,11 @@ registrarSubTab('planificador', 'calendario', cargarCalendarioUnificado);
                         </div>
                         <span class="dorsal">${sp.shirt_number || '?'}</span>
                         <span class="nombre">${jugador?.name || 'Sin nombre'}</span>
+                        ${posBadge}
                     </div>
                 `;
+                }).join('');
+                return cabecera + fichas;
             }).join('');
             
             // Añadir eventos de clic
@@ -182,7 +253,7 @@ registrarSubTab('planificador', 'calendario', cargarCalendarioUnificado);
                     player_id: sp.player_id,
                     name: sp.players?.name || '',
                     shirt_number: sp.shirt_number,
-                    position: sp.position
+                    position: sp.players?.position || null
                 }));
         }
       function toggleInfoSesion() {
@@ -803,27 +874,89 @@ async function exportarSesionPDF(id, conTitulos = true, hojaPorEjercicio = false
             // ===== Jugadores aptos para entrenar =====
          // ===== Jugadores aptos para entrenar =====
 if (s.players && s.players.length > 0) {
-    const nombresJugadores = s.players.map(j => `${j.shirt_number || '?'}.${j.name}`).join('  |  ');
-    const jugadoresLines = doc.splitTextToSize(nombresJugadores, 155);
-    const alturaBloque = 10 + (jugadoresLines.length * 4);
-    
-    doc.setFillColor(240, 240, 240);
-    doc.rect(10, y, 190, alturaBloque, 'F');
-    
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(0, 51, 102);
-    doc.text('CONVOCADOS:', 12, y + 5);
-    
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(50, 50, 50);
-    doc.setFontSize(7);
-    
-    jugadoresLines.forEach((linea, idx) => {
-        doc.text(linea, 38, y + 5 + (idx * 4));
-    });
-    
-    y += alturaBloque + 4;
+    s.players.forEach(j => { j._posCode = planPosCodigo(j.position); });
+    const hayPosiciones = s.players.some(j => j._posCode);
+
+    if (!hayPosiciones) {
+        // Sesiones antiguas sin posicion guardada: formato plano
+        const nombresJugadores = s.players.map(j => `${j.shirt_number || '?'}.${j.name}`).join('  |  ');
+        const jugadoresLines = doc.splitTextToSize(nombresJugadores, 155);
+        const alturaBloque = 10 + (jugadoresLines.length * 4);
+
+        doc.setFillColor(240, 240, 240);
+        doc.rect(10, y, 190, alturaBloque, 'F');
+
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(0, 51, 102);
+        doc.text('CONVOCADOS:', 12, y + 5);
+
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(50, 50, 50);
+        doc.setFontSize(7);
+
+        jugadoresLines.forEach((linea, idx) => {
+            doc.text(linea, 38, y + 5 + (idx * 4));
+        });
+
+        y += alturaBloque + 4;
+    } else {
+        // Agrupar convocados por linea (posicion general)
+        const gruposPDF = [
+            { nombre: 'PORTERIA', codigos: ['POR'] },
+            { nombre: 'DEFENSA', codigos: ['LD','LI','CAD','CAI','DCD','DCC','DCI'] },
+            { nombre: 'CENTRO CAMPO', codigos: ['PIV','MCD','MC','MCI','MD','MI','ID','II','MP'] },
+            { nombre: 'ATAQUE', codigos: ['ED','EI','DC'] }
+        ];
+        const filasPDF = [];
+        const usadosPDF = {};
+        gruposPDF.forEach(g => {
+            const jugs = s.players.filter(j => j._posCode && g.codigos.indexOf(j._posCode) > -1);
+            jugs.sort((a, b) => {
+                const pa = g.codigos.indexOf(a._posCode);
+                const pb = g.codigos.indexOf(b._posCode);
+                if (pa !== pb) return pa - pb;
+                return (parseInt(a.shirt_number) || 999) - (parseInt(b.shirt_number) || 999);
+            });
+            jugs.forEach(j => { usadosPDF[j.id] = true; });
+            if (jugs.length > 0) {
+                const texto = jugs.map(j => `${j.shirt_number || '?'}.${j.name}`).join('  |  ');
+                filasPDF.push({ titulo: g.nombre, lineas: doc.splitTextToSize(texto, 126) });
+            }
+        });
+        const sinPosPDF = s.players.filter(j => !usadosPDF[j.id]);
+        if (sinPosPDF.length > 0) {
+            const texto = sinPosPDF.map(j => `${j.shirt_number || '?'}.${j.name}`).join('  |  ');
+            filasPDF.push({ titulo: 'SIN POSICION', lineas: doc.splitTextToSize(texto, 126) });
+        }
+
+        const totalLineas = filasPDF.reduce((sum, f) => sum + f.lineas.length, 0);
+        const alturaBloque = 8 + (totalLineas * 4);
+
+        doc.setFillColor(240, 240, 240);
+        doc.rect(10, y, 190, alturaBloque, 'F');
+
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(0, 51, 102);
+        doc.text('CONVOCADOS:', 12, y + 5);
+
+        doc.setFontSize(7);
+        let yLinea = y + 5;
+        filasPDF.forEach(f => {
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(0, 51, 102);
+            doc.text(f.titulo + ':', 40, yLinea);
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(50, 50, 50);
+            f.lineas.forEach(linea => {
+                doc.text(linea, 68, yLinea);
+                yLinea += 4;
+            });
+        });
+
+        y += alturaBloque + 4;
+    }
 }
             
             y += 3;
