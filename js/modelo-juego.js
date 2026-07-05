@@ -14,8 +14,12 @@ const MJ_NIVELES = {
     subsubprincipio: { label: 'Sub-subprincipio', siguiente: null }
 };
 
+const MJ_SISTEMAS_CATALOGO = ['1-4-3-3','1-4-2-3-1','1-4-4-2','1-4-4-1-1','1-4-1-4-1','1-4-5-1','1-4-3-1-2','1-4-2-2-2','1-4-3-2-1','1-4-2-4','1-3-5-2','1-3-4-3','1-3-4-2-1','1-3-4-1-2','1-3-2-4-1','1-3-1-4-2','1-5-3-2','1-5-4-1'];
+
 let mjClubId = null;
 let mjConceptos = [];
+let mjSistemasClub = [];
+let mjSistemaFiltro = null; // null = todos los sistemas
 
 (function() {
     if (document.getElementById('mj-styles')) return;
@@ -56,6 +60,14 @@ let mjConceptos = [];
         .mj-modal-btns { display:flex; gap:8px; justify-content:flex-end; margin-top:18px; }
         .mj-btn-cancel { background:#f3f4f6; border:1px solid #d1d5db; color:#374151; border-radius:8px; padding:9px 16px; font-size:14px; cursor:pointer; }
         .mj-btn-ok { background:#7c3aed; border:none; color:#fff; border-radius:8px; padding:9px 16px; font-size:14px; font-weight:600; cursor:pointer; }
+        .mj-sist-bar { display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin:-6px 0 14px; }
+        .mj-sist-bar .lbl { font-size:12px; color:#6b7280; }
+        .mj-sist-btn { background:#f3f4f6; border:1px solid #d1d5db; color:#374151; border-radius:8px; padding:5px 12px; font-size:12px; cursor:pointer; }
+        .mj-sist-btn.activa { background:#26215C; color:#fff; border-color:#26215C; }
+        .mj-sist-gear { background:#ede9fe; border:1px dashed #7c3aed; color:#7c3aed; border-radius:8px; padding:5px 10px; font-size:12px; cursor:pointer; }
+        .mj-sist-tag { font-size:9px; background:#e0e7ff; color:#3730a3; border-radius:4px; padding:1px 5px; margin-left:4px; white-space:nowrap; font-weight:600; }
+        .mj-sist-checks { display:flex; flex-wrap:wrap; gap:8px; margin-top:4px; }
+        .mj-sist-checks label { display:flex; align-items:center; gap:4px; font-size:12px; margin:0; background:#f9fafb; border:1px solid #e5e7eb; border-radius:6px; padding:4px 8px; cursor:pointer; white-space:nowrap; }
     `;
     document.head.appendChild(st);
 })();
@@ -71,9 +83,10 @@ async function cargarModeloJuego() {
 
     try {
         const { data: clubInfo } = await supabaseClient
-            .from('clubs').select('id').eq('wp_user_id', usuario.id).single();
+            .from('clubs').select('id, sistemas_juego').eq('wp_user_id', usuario.id).single();
         if (!clubInfo) throw new Error('Club no encontrado');
         mjClubId = clubInfo.id;
+        mjSistemasClub = clubInfo.sistemas_juego || [];
 
         const { data, error } = await supabaseClient
             .from('modelo_conceptos')
@@ -116,10 +129,16 @@ function mjRender() {
             </div>
         </div>
         <div class="mj-info">Define tus principios, subprincipios y sub-subprincipios organizados por los 4 momentos del juego.</div>
+        <div class="mj-sist-bar">
+            <span class="lbl">Sistema:</span>
+            <button class="mj-sist-btn ${!mjSistemaFiltro ? 'activa' : ''}" onclick="mjFiltrarSistema(null)">Todos</button>
+            ${mjSistemasClub.map(s => `<button class="mj-sist-btn ${mjSistemaFiltro === s ? 'activa' : ''}" onclick="mjFiltrarSistema('${s}')">${s}</button>`).join('')}
+            <button class="mj-sist-gear" onclick="mjAbrirSistemas()" title="Elegir los sistemas del club">⚙️ Sistemas</button>
+        </div>
     `;
 
     MJ_MOMENTOS.forEach(m => {
-        const principios = mjPrincipios(m.key);
+        const principios = mjPrincipios(m.key).filter(mjVisible);
         html += `
             <div class="mj-momento">
                 <div class="mj-momento-cab" style="background:${m.bg};">
@@ -137,7 +156,7 @@ function mjRender() {
             html += `
                 <div class="mj-principio">
                     <div class="mj-fila">
-                        <span class="nombre" style="cursor:pointer;" onclick="mjAbrirFicha('${p.id}')" title="Ver ficha"><strong>${mjEscapar(p.nombre)}</strong></span>
+                        <span class="nombre" style="cursor:pointer;" onclick="mjAbrirFicha('${p.id}')" title="Ver ficha"><strong>${mjEscapar(p.nombre)}</strong>${mjTagsSistemas(p)}</span>
                         <span class="nivel-tag">PRINCIPIO</span>
                         <span class="acc">
                             <button onclick="mjAbrirModal('subprincipio','${p.id}','${m.key}')" title="Añadir subprincipio">➕</button>
@@ -146,12 +165,12 @@ function mjRender() {
                         </span>
                     </div>
             `;
-            const subs = mjHijos(p.id, 'subprincipio');
+            const subs = mjHijos(p.id, 'subprincipio').filter(mjVisible);
             subs.forEach(s => {
                 html += `
                     <div class="mj-sub">
                         <div class="mj-fila">
-                            <span class="nombre" style="cursor:pointer;" onclick="mjAbrirFicha('${s.id}')" title="Ver ficha">— ${mjEscapar(s.nombre)}</span>
+                            <span class="nombre" style="cursor:pointer;" onclick="mjAbrirFicha('${s.id}')" title="Ver ficha">— ${mjEscapar(s.nombre)}${mjTagsSistemas(s)}</span>
                             <span class="nivel-tag">SUBPRINCIPIO</span>
                             <span class="acc">
                                 <button onclick="mjAbrirModal('subsubprincipio','${s.id}','${m.key}')" title="Añadir sub-subprincipio">➕</button>
@@ -160,12 +179,12 @@ function mjRender() {
                             </span>
                         </div>
                 `;
-                const subsubs = mjHijos(s.id, 'subsubprincipio');
+                const subsubs = mjHijos(s.id, 'subsubprincipio').filter(mjVisible);
                 subsubs.forEach(ss => {
                     html += `
                         <div class="mj-subsub">
                             <div class="mj-fila">
-                                <span class="nombre" style="cursor:pointer;" onclick="mjAbrirFicha('${ss.id}')" title="Ver ficha">· ${mjEscapar(ss.nombre)}</span>
+                                <span class="nombre" style="cursor:pointer;" onclick="mjAbrirFicha('${ss.id}')" title="Ver ficha">· ${mjEscapar(ss.nombre)}${mjTagsSistemas(ss)}</span>
                                 <span class="nivel-tag">SUB-SUB</span>
                                 <span class="acc">
                                     <button onclick="mjEditar('${ss.id}')" title="Editar">✏️</button>
@@ -188,6 +207,74 @@ function mjRender() {
     });
 
     cont.innerHTML = html;
+}
+
+// ---- Sistemas de juego: filtro y gestion ----
+
+function mjCoincideSistema(c) {
+    if (!mjSistemaFiltro) return true;
+    if (!c.sistemas || c.sistemas.length === 0) return true; // sin etiquetas = general (vale para todos)
+    return c.sistemas.indexOf(mjSistemaFiltro) > -1;
+}
+
+function mjVisible(c) {
+    if (mjCoincideSistema(c)) return true;
+    // Se muestra tambien si algun descendiente coincide con el filtro
+    const hijos = mjConceptos.filter(x => x.parent_id === c.id);
+    return hijos.some(mjVisible);
+}
+
+function mjTagsSistemas(c) {
+    if (!c.sistemas || c.sistemas.length === 0) return '';
+    return c.sistemas.map(s => `<span class="mj-sist-tag">${s}</span>`).join('');
+}
+
+function mjFiltrarSistema(s) {
+    mjSistemaFiltro = s;
+    mjRender();
+}
+
+function mjAbrirSistemas() {
+    let checks = '';
+    MJ_SISTEMAS_CATALOGO.forEach(s => {
+        const on = mjSistemasClub.indexOf(s) > -1 ? 'checked' : '';
+        checks += `<label><input type="checkbox" class="mj-sist-club-check" value="${s}" ${on}> ${s}</label>`;
+    });
+    const ov = document.createElement('div');
+    ov.className = 'mj-modal-ov';
+    ov.id = 'mj-modal-ov';
+    ov.innerHTML = `
+        <div class="mj-modal">
+            <h3>⚙️ Sistemas de juego del club</h3>
+            <div class="ctx">Marca los sistemas con los que trabajáis. Aparecerán como filtros del árbol y podrás etiquetar cada principio con sus sistemas.</div>
+            <div class="mj-sist-checks">${checks}</div>
+            <div class="mj-modal-btns">
+                <button class="mj-btn-cancel" onclick="mjCerrarModal()">Cancelar</button>
+                <button class="mj-btn-ok" onclick="mjGuardarSistemasClub()">Guardar</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(ov);
+}
+
+async function mjGuardarSistemasClub() {
+    const arr = [];
+    document.querySelectorAll('.mj-sist-club-check:checked').forEach(ch => arr.push(ch.value));
+    try {
+        const { error } = await supabaseClient
+            .from('clubs')
+            .update({ sistemas_juego: arr })
+            .eq('id', mjClubId);
+        if (error) throw error;
+        mjSistemasClub = arr;
+        if (mjSistemaFiltro && arr.indexOf(mjSistemaFiltro) === -1) mjSistemaFiltro = null;
+        mjCerrarModal();
+        showToast('Sistemas guardados');
+        mjRender();
+    } catch (e) {
+        console.error('Error guardando sistemas:', e);
+        showToast('Error al guardar: ' + e.message);
+    }
 }
 
 function mjAbrirModal(nivel, parentId, momentoKey, conceptoExistente) {
@@ -216,6 +303,16 @@ function mjAbrirModal(nivel, parentId, momentoKey, conceptoExistente) {
             <input type="text" id="mj-input-nombre" placeholder="Ej: Salida de balón" value="${nombreVal}">
             <label>Descripción (opcional)</label>
             <textarea id="mj-input-desc" placeholder="Notas sobre este concepto...">${descVal}</textarea>
+            ${mjSistemasClub.length > 0 ? `
+            <label>Sistemas donde se trabaja (vacío = en todos)</label>
+            <div class="mj-sist-checks">
+                ${mjSistemasClub.map(s => {
+                    const marcado = esEdicion
+                        ? ((conceptoExistente.sistemas || []).indexOf(s) > -1)
+                        : (mjSistemaFiltro === s);
+                    return `<label><input type="checkbox" class="mj-sist-concepto-check" value="${s}" ${marcado ? 'checked' : ''}> ${s}</label>`;
+                }).join('')}
+            </div>` : ''}
             <div class="mj-modal-btns">
                 <button class="mj-btn-cancel" onclick="mjCerrarModal()">Cancelar</button>
                 <button class="mj-btn-ok" onclick="mjGuardar('${nivel}','${parentId || ''}','${momentoKey}','${esEdicion ? conceptoExistente.id : ''}')">Guardar</button>
@@ -244,11 +341,15 @@ async function mjGuardar(nivel, parentId, momentoKey, idEdicion) {
         return;
     }
 
+    const sistemasSel = [];
+    document.querySelectorAll('.mj-sist-concepto-check:checked').forEach(ch => sistemasSel.push(ch.value));
+    const sistemasVal = sistemasSel.length > 0 ? sistemasSel : null;
+
     try {
         if (idEdicion) {
             const { error } = await supabaseClient
                 .from('modelo_conceptos')
-                .update({ nombre: nombre, descripcion: desc || null })
+                .update({ nombre: nombre, descripcion: desc || null, sistemas: sistemasVal })
                 .eq('id', idEdicion);
             if (error) throw error;
         } else {
@@ -260,6 +361,7 @@ async function mjGuardar(nivel, parentId, momentoKey, idEdicion) {
                     nivel: nivel,
                     nombre: nombre,
                     descripcion: desc || null,
+                    sistemas: sistemasVal,
                     parent_id: parentId || null,
                     orden: mjConceptos.length
                 });
