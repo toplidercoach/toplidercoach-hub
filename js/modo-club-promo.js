@@ -5,7 +5,7 @@
 
 (function() {
     var host = window.location.hostname;
-    var esProduccion = (host === 'toplidercoach.com' || host === 'www.toplidercoach.com');
+    var esProduccion = (host === 'toplidercoach.com' || host === 'www.toplidercoach.com' || host === 'toplidercoach.github.io');
     if (!esProduccion) return; // en staging/local, fuera
 
     var PESTANAS_PROMO = [
