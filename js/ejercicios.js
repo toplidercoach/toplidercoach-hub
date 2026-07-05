@@ -613,14 +613,17 @@ if (ejP.activeTool === 'connect') { if (!isBackground && el) { var _cid = parseI
 
         if (ejP._plantillaMode && ejP._plantilla && ejP._plantillaSelIdx !== undefined) {
             const p = ejP._plantilla[ejP._plantillaSelIdx];
-            const isGk = p.position && p.position.toLowerCase().includes('portero');
-            const color = isGk ? ejP.myGkColor : ejP.myColor;
+            const posTxt = (p.position || '').toLowerCase();
+            const isGk = posTxt.includes('portero') || posTxt === 'por';
+            const color = ejP._plantillaEsRival
+                ? (isGk ? ejP.rivalGkColor : ejP.rivalColor)
+                : (isGk ? ejP.myGkColor : ejP.myColor);
             ejP.players.push({
                 id, x: pos.x, y: pos.y, color,
                 scale, number: p.number, name: p.name,
-                photo: p.photo || null,
+                photo: ejP._plantillaLabel === 'nofoto' ? null : (p.photo || null),
                 showNumber: ejP._plantillaLabel !== 'name',
-                showName: ejP._plantillaLabel === 'name' || ejP._plantillaLabel === 'both',
+                showName: ejP._plantillaLabel === 'name' || ejP._plantillaLabel === 'both' || ejP._plantillaLabel === 'nofoto',
                 hasVest: false, vestColor: ejP.vestColor
             });
             ejP._plantillaMode = false;
@@ -1646,6 +1649,10 @@ function ejRenderToolbar() {
         <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M4 0L4 20L9 15H16L4 0Z"/></svg>
         Seleccionar / Mover
     </button>
+    <div style="display:flex;gap:6px;margin-bottom:6px">
+        <button onclick="ejUndo()" title="Deshacer (Ctrl+Z)" style="flex:1;padding:7px;background:#1e293b;border:1px solid #334155;color:#e2e8f0;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">↩ Deshacer</button>
+        <button onclick="ejRedo()" title="Rehacer (Ctrl+Y)" style="flex:1;padding:7px;background:#1e293b;border:1px solid #334155;color:#94a3b8;border-radius:6px;cursor:pointer;font-size:12px">↪ Rehacer</button>
+    </div>
   <!-- BOTÓN MODO ANIMACIÓN (solo visible en modo animado) -->
 ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin-bottom:6px;width:100%;padding:8px;border-radius:6px;text-align:center;color:#fff;font-size:12px;font-weight:600">
         🎬 Modo Animación ON
@@ -1662,27 +1669,30 @@ ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin
         <button class="ej-btn-tool${t==='player'&&!ejP._plantillaMode?' active':''}" onclick="ejSetTool('player');ejP._plantillaMode=false;ejRenderToolbar()" style="justify-content:center;font-weight:600">
             ➕ Añadir jugador ${ejP._addingRival?'(rival)':'(mi equipo)'}
         </button>
-        <button onclick="ejCargarPlantilla()" style="width:100%;padding:11px;background:#1e3a5f;border:1px solid #2563eb;color:#93c5fd;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600">
-            👥 Cargar mi plantilla
-        </button>
+        ${ejP._addingRival
+            ? `<button onclick="ejCargarPlantillaRival()" style="width:100%;padding:11px;background:#5f1e1e;border:1px solid #dc2626;color:#fca5a5;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600">🛡️ Cargar plantilla rival</button>`
+            : `<button onclick="ejCargarPlantilla()" style="width:100%;padding:11px;background:#1e3a5f;border:1px solid #2563eb;color:#93c5fd;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600">👥 Cargar mi plantilla</button>`}
         <div>
             <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin:2px 0 4px">Formación rápida ${ejP._addingRival?'· rival':'· mi equipo'}</div>
             <div class="ej-formations${ejP._addingRival?' rival':''}">${formationBtns(ejP._addingRival?'ejApplyFormation_rival':'ejApplyFormation_my')}</div>
         </div>
         ${ejP._plantilla && ejP._plantilla.length ? `
         <div style="background:#0b1220;border:1px solid #2f405c;border-radius:8px;padding:8px">
-            <div style="font-size:10px;color:#64748b;margin-bottom:4px;text-transform:uppercase">Mi plantilla — clic para colocar</div>
+            <div style="font-size:10px;color:#64748b;margin-bottom:4px;text-transform:uppercase">${ejP._plantillaEsRival ? '🛡️ Plantilla rival' : 'Mi plantilla'} — clic para colocar</div>
             <div style="display:flex;gap:4px;margin-bottom:6px">
-                ${['num','name','both'].map(opt => {
-                    const lbl = opt==='num'?'Nº':opt==='name'?'Nombre':'Nº+Nombre';
+                ${['num','name','both','nofoto'].map(opt => {
+                    const lbl = opt==='num'?'Nº':opt==='name'?'Nombre':opt==='both'?'Nº+Nombre':'Sin foto';
                     const active = (ejP._plantillaLabel||'num') === opt;
                     return `<button onclick="ejP._plantillaLabel='${opt}';ejRenderToolbar()" style="flex:1;padding:3px;font-size:9px;border-radius:4px;border:1px solid ${active?'#3b82f6':'#334155'};background:${active?'#1e3a5f':'transparent'};color:${active?'#93c5fd':'#64748b'};cursor:pointer">${lbl}</button>`;
                 }).join('')}
             </div>
             <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;max-height:220px;overflow-y:auto">
                 ${ejP._plantilla.map((p, i) => {
-                    const isGk = p.position && p.position.toLowerCase().includes('portero');
-                    const col = isGk ? EJ_TEAM_COLORS[ejP.myGkColor] : EJ_TEAM_COLORS[ejP.myColor];
+                    const posTxt = (p.position || '').toLowerCase();
+                    const isGk = posTxt.includes('portero') || posTxt === 'por';
+                    const col = ejP._plantillaEsRival
+                        ? (isGk ? EJ_TEAM_COLORS[ejP.rivalGkColor] : EJ_TEAM_COLORS[ejP.rivalColor])
+                        : (isGk ? EJ_TEAM_COLORS[ejP.myGkColor] : EJ_TEAM_COLORS[ejP.myColor]);
                     const active = ejP._plantillaSelIdx === i;
                     const avatar = p.photo
                         ? `<div style="width:30px;height:30px;border-radius:50%;background-image:url('${p.photo}');background-size:cover;background-position:center;border:2px solid ${col?.stroke||'#2563eb'}"></div>`
@@ -1980,6 +1990,10 @@ root.innerHTML = `
     ejRenderSVG();
     // Tecla Supr para eliminar seleccionado
     document.addEventListener('keydown', function(e) {
+        const foco = document.activeElement;
+        const enInput = foco && (foco.tagName === 'INPUT' || foco.tagName === 'TEXTAREA');
+        if (!enInput && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); ejUndo(); return; }
+        if (!enInput && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') { e.preventDefault(); ejRedo(); return; }
         if ((e.key === 'Delete' || e.key === 'Backspace') && ejP.selectedId) {
             const focused = document.activeElement;
             const isInput = focused && (focused.tagName === 'INPUT' || focused.tagName === 'TEXTAREA');
@@ -3739,6 +3753,61 @@ async function ejCargarPlantilla() {
         ejRenderToolbar();
     } catch(err) {
         console.error('Error cargando plantilla:', err);
+        ejToast('Error: ' + err.message, 'error');
+    }
+}
+
+async function ejCargarPlantillaRival() {
+    try {
+        const cId = window.clubId || clubId;
+        const { data: equipos, error } = await supabaseClient
+            .from('equipos_rivales')
+            .select('id, nombre')
+            .eq('club_id', cId)
+            .order('nombre');
+        if (error) throw error;
+        if (!equipos || equipos.length === 0) {
+            ejToast('No tienes equipos rivales. Créalos en Gestión de Competición → Rivales.', 'warning');
+            return;
+        }
+        if (equipos.length === 1) { ejCargarJugadoresRival(equipos[0].id, equipos[0].nombre); return; }
+        const prev = document.getElementById('ej-rival-overlay');
+        if (prev) prev.remove();
+        const ov = document.createElement('div');
+        ov.id = 'ej-rival-overlay';
+        ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:99998;display:flex;align-items:center;justify-content:center;padding:16px;';
+        let lista = '';
+        equipos.forEach(function(e) {
+            const nom = String(e.nombre).replace(/</g, '&lt;');
+            lista += '<button onclick="ejCargarJugadoresRival(\'' + e.id + '\', this.textContent)" style="display:block;width:100%;text-align:left;padding:10px 14px;margin-bottom:6px;background:#1e293b;border:1px solid #334155;color:#e2e8f0;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600">' + nom + '</button>';
+        });
+        ov.innerHTML = '<div style="background:#0f172a;border:1px solid #334155;border-radius:12px;padding:22px;max-width:340px;width:100%"><div style="color:#e2e8f0;font-size:15px;font-weight:700;margin-bottom:12px">🛡️ Elige el equipo rival</div>' + lista + '<button onclick="document.getElementById(\'ej-rival-overlay\').remove()" style="width:100%;margin-top:6px;padding:9px;background:transparent;border:1px solid #475569;color:#94a3b8;border-radius:8px;cursor:pointer;font-size:13px">Cancelar</button></div>';
+        ov.onclick = function(e) { if (e.target === ov) ov.remove(); };
+        document.body.appendChild(ov);
+    } catch(err) {
+        ejToast('Error: ' + err.message, 'error');
+    }
+}
+
+async function ejCargarJugadoresRival(equipoId, nombreEquipo) {
+    const ov = document.getElementById('ej-rival-overlay');
+    if (ov) ov.remove();
+    try {
+        const { data, error } = await supabaseClient
+            .from('jugadores_rivales')
+            .select('id, nombre, dorsal, posicion')
+            .eq('equipo_rival_id', equipoId)
+            .order('dorsal');
+        if (error) throw error;
+        if (!data || data.length === 0) { ejToast('Ese equipo rival no tiene jugadores todavía.', 'warning'); return; }
+        ejP._plantilla = data.map(function(j) {
+            return { playerId: j.id, number: j.dorsal || '', name: j.nombre, position: j.posicion || '', photo: null };
+        });
+        ejP._plantillaEsRival = true;
+        ejP._addingRival = true;
+        ejToast('Plantilla rival cargada: ' + (nombreEquipo || ''), 'success');
+        ejRenderToolbar();
+    } catch(err) {
         ejToast('Error: ' + err.message, 'error');
     }
 }
