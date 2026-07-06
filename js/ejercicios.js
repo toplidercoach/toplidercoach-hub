@@ -475,6 +475,29 @@ for (const l of trajs) {
             if (_psh.type === 'rect') html += ejPanelParametrosSVG(_psh);
         }
     }
+    // Recuadro de selección múltiple + marcadores de seleccionados
+    if (ejP._marquee) {
+        var _mx = Math.min(ejP._marquee.x1, ejP._marquee.x2);
+        var _my = Math.min(ejP._marquee.y1, ejP._marquee.y2);
+        var _mw = Math.abs(ejP._marquee.x2 - ejP._marquee.x1);
+        var _mh = Math.abs(ejP._marquee.y2 - ejP._marquee.y1);
+        html += '<rect x="'+_mx+'" y="'+_my+'" width="'+_mw+'" height="'+_mh+'" fill="rgba(34,197,94,0.12)" stroke="#22c55e" stroke-width="1.5" stroke-dasharray="6 4" style="pointer-events:none"/>';
+    }
+    if (ejP.multiSel && ejP.multiSel.length > 0) {
+        ejP.multiSel.forEach(function(m) {
+            if (m.type === 'player') {
+                var _p = ejP.players.find(function(x){ return x.id === m.id; });
+                if (_p) { var _r = 14 * (_p.scale != null ? _p.scale : 1); html += '<circle cx="'+_p.x+'" cy="'+_p.y+'" r="'+(_r+6)+'" fill="none" stroke="#22c55e" stroke-width="2" stroke-dasharray="5 3" style="pointer-events:none"/>'; }
+            } else if (m.type === 'equipment') {
+                var _eq = ejP.equipment.find(function(x){ return x.id === m.id; });
+                if (_eq) { var _et = EJ_EQUIPMENT_TYPES.find(function(t){ return t.key === _eq.eqType; }); var _w = (_et ? _et.w : 40) * (_eq.scale || 1); var _h = (_et ? _et.h : 40) * (_eq.scale || 1); html += '<rect x="'+(_eq.x-_w/2-4)+'" y="'+(_eq.y-_h/2-4)+'" width="'+(_w+8)+'" height="'+(_h+8)+'" fill="none" stroke="#22c55e" stroke-width="2" stroke-dasharray="5 3" rx="4" style="pointer-events:none"/>'; }
+            } else if (m.type === 'text') {
+                var _t = ejP.texts.find(function(x){ return x.id === m.id; });
+                if (_t) html += '<circle cx="'+_t.x+'" cy="'+_t.y+'" r="16" fill="none" stroke="#22c55e" stroke-width="2" stroke-dasharray="5 3" style="pointer-events:none"/>';
+            }
+        });
+        html += '<text x="12" y="24" fill="#22c55e" font-size="13" font-weight="700" style="pointer-events:none">'+ejP.multiSel.length+' seleccionados — arrastra uno para mover el bloque</text>';
+    }
     svg.innerHTML = html;
 }
 
@@ -564,6 +587,14 @@ function ejSvgPointerDown(e) {
         var _hit = ejHitElemento(pos);
         if (_hit) { id = _hit.id; type = _hit.type; }
     }
+    // Si el elemento pertenece a la selección múltiple → mover todo el bloque
+    if (ejP.multiSel && ejP.multiSel.length > 0 && ejP.multiSel.some(function(m){ return m.id === id; })) {
+        ejP._blockDrag = true;
+        ejP._blockLast = { x: pos.x, y: pos.y };
+        ejP.isDragging = true;
+        return;
+    }
+    ejP.multiSel = [];
     ejP.selectedId = id;
     ejP.isDragging = true;
     ejP._ctrlId = null;
@@ -738,15 +769,34 @@ if (snapElem) {
         return;
     }
 
-    // Click en fondo con select = deseleccionar
+    // Click en fondo con select = deseleccionar e iniciar recuadro de selección múltiple
     if (ejP.activeTool === 'select' && isBackground) {
         ejP.selectedId = null;
+        ejP.multiSel = [];
+        ejP._marquee = { x1: pos.x, y1: pos.y, x2: pos.x, y2: pos.y };
         ejRenderSVG();
     }
 }
 
 function ejSvgPointerMove(e) {
     const pos = ejGetPos(e);
+
+    // Recuadro de selección múltiple en curso
+    if (ejP._marquee) {
+        ejP._marquee.x2 = pos.x; ejP._marquee.y2 = pos.y;
+        ejRenderSVG();
+        return;
+    }
+
+    // Mover selección múltiple en bloque
+    if (ejP.isDragging && ejP._blockDrag) {
+        var bdx = pos.x - ejP._blockLast.x;
+        var bdy = pos.y - ejP._blockLast.y;
+        ejP._blockLast = { x: pos.x, y: pos.y };
+        ejMoverMultiSel(bdx, bdy);
+        ejRenderSVG();
+        return;
+    }
 
   // Arrastrar punto de control de curva
     if (ejP.isDragging && ejP._ctrlId) {
@@ -853,6 +903,26 @@ function ejSvgPointerMove(e) {
 function ejSvgPointerUp(e) {
     const pos = ejGetPos(e);
 
+    // Fin del recuadro de selección múltiple
+    if (ejP._marquee) {
+        ejSeleccionarEnRecuadro();
+        ejP._marquee = null;
+        ejP.isDragging = false;
+        ejRenderSVG();
+        ejRenderToolbar();
+        return;
+    }
+
+    // Fin de arrastre en bloque
+    if (ejP.isDragging && ejP._blockDrag) {
+        ejP._blockDrag = false;
+        ejP.isDragging = false;
+        ejSaveHistory();
+        if (ejP.animMode) ejFrameSaveCurrent();
+        ejRenderSVG();
+        return;
+    }
+
     // Fin de arrastre
     if (ejP.isDragging && (ejP.selectedId || ejP._epDrag)) {
         ejSaveHistory();
@@ -952,6 +1022,22 @@ function ejSvgPointerUp(e) {
 // ACCIONES
 // =============================================
 function ejDelete() {
+    if (ejP.multiSel && ejP.multiSel.length > 0) {
+        ejSaveHistory();
+        var _ids = {};
+        ejP.multiSel.forEach(function(m){ _ids[m.type + '_' + m.id] = true; });
+        ejP.players = ejP.players.filter(function(p){ return !_ids['player_' + p.id]; });
+        ejP.equipment = ejP.equipment.filter(function(q){ return !_ids['equipment_' + q.id]; });
+        ejP.texts = ejP.texts.filter(function(t){ return !_ids['text_' + t.id]; });
+        ejP.shapes = ejP.shapes.filter(function(s){ return !_ids['shape_' + s.id]; });
+        ejP.lines = ejP.lines.filter(function(l){ return !_ids['line_' + l.id]; });
+        ejP.connections = ejP.connections.filter(function(c){ return !_ids['player_' + c.from] && !_ids['player_' + c.to]; });
+        ejP.multiSel = [];
+        if (ejP.animMode) ejFrameSaveCurrent();
+        ejRenderSVG();
+        ejRenderToolbar();
+        return;
+    }
     if (!ejP.selectedId) return;
     ejSaveHistory();
     const id = ejP.selectedId;
@@ -1014,7 +1100,7 @@ function ejNuevaPizarra() {
     ejSaveHistory();
     ejP.players = []; ejP.lines = []; ejP.shapes = []; ejP.texts = []; ejP.equipment = []; ejP.connections = [];
     ejP.selectedId = null; ejP.playerCounts = {}; ejP.nextId = 1;
-    ejFrameStop();r
+    ejFrameStop();
     ejP.animMode = false;
     ejP.frames = [];
     ejP.currentFrame = 0;
@@ -1944,7 +2030,7 @@ root.innerHTML = `
                 <span style="font-size:14px">📋</span>
                 <span id="ej-pizarra-nombre-label" style="color:#93c5fd;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Pizarra libre</span>
             </div>
-            <button onclick="ejNuevaPizarra()" style="background:#0f172a;border:1px solid #475569;color:#94a3b8;padding:5px 14px;border-radius:6px;cursor:pointer;font-size:12px;white-space:nowrap;flex-shrink:0">✕ Nueva pizarra</button>
+            <div style="display:flex;gap:8px;flex-shrink:0"><button onclick="ejPresentar()" style="background:#16a34a;border:none;color:#fff;padding:5px 14px;border-radius:6px;cursor:pointer;font-size:12px;white-space:nowrap;font-weight:600">📽️ Presentar</button><button onclick="ejNuevaPizarra()" style="background:#0f172a;border:1px solid #475569;color:#94a3b8;padding:5px 14px;border-radius:6px;cursor:pointer;font-size:12px;white-space:nowrap">✕ Nueva pizarra</button></div>
 </div>
         <div id="ej-toolbar"></div>
         </div>
@@ -1994,7 +2080,7 @@ root.innerHTML = `
         const enInput = foco && (foco.tagName === 'INPUT' || foco.tagName === 'TEXTAREA');
         if (!enInput && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); ejUndo(); return; }
         if (!enInput && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') { e.preventDefault(); ejRedo(); return; }
-        if ((e.key === 'Delete' || e.key === 'Backspace') && ejP.selectedId) {
+        if ((e.key === 'Delete' || e.key === 'Backspace') && (ejP.selectedId || (ejP.multiSel && ejP.multiSel.length > 0))) {
             const focused = document.activeElement;
             const isInput = focused && (focused.tagName === 'INPUT' || focused.tagName === 'TEXTAREA');
             if (!isInput) {
@@ -4135,3 +4221,125 @@ function ejShowTab(tab, btn) {
 // REGISTRO DEL MÓDULO
 // =============================================
 registrarModulo('pizarra', ejInit);
+// ===== MODO PRESENTACION (pantalla completa para el vestuario) =====
+function ejPresentar() {
+    var area = document.getElementById('ej-canvas-area');
+    if (!area) return;
+    var overlay = document.getElementById('ej-modo-overlay');
+    if (overlay && overlay.style.display !== 'none') { ejToast('Elige primero el tipo de ejercicio', 'warning'); return; }
+    var prev = document.getElementById('ej-present-controls');
+    if (prev) prev.remove();
+    var ctr = document.createElement('div');
+    ctr.id = 'ej-present-controls';
+    ctr.style.cssText = 'position:absolute;top:12px;right:12px;z-index:30;display:flex;gap:8px;';
+    var playBtn = (ejP.animMode && ejP.frames.length > 1)
+        ? '<button onclick="ejPresentPlay()" style="padding:9px 18px;background:#16a34a;border:none;color:#fff;border-radius:8px;cursor:pointer;font-size:14px;font-weight:700;box-shadow:0 2px 10px rgba(0,0,0,.5)">▶ Reproducir</button>'
+        : '';
+    ctr.innerHTML = playBtn
+        + '<button onclick="ejSalirPresentacion()" style="padding:9px 18px;background:#0f172a;border:1px solid #475569;color:#e2e8f0;border-radius:8px;cursor:pointer;font-size:14px;box-shadow:0 2px 10px rgba(0,0,0,.5)">✕ Salir (Esc)</button>';
+    area.appendChild(ctr);
+    ejP._presentOn = true;
+    ejPresentEstilos(true);
+    if (area.requestFullscreen) { area.requestFullscreen().catch(function(){}); }
+}
+function ejPresentEstilos(on) {
+    var area = document.getElementById('ej-canvas-area');
+    var svg = document.getElementById('ej-svg');
+    if (!area || !svg) return;
+    if (on) {
+        area.style.background = '#0b1220';
+        area.style.display = 'flex';
+        area.style.alignItems = 'center';
+        area.style.justifyContent = 'center';
+        area.style.position = 'fixed';
+        area.style.inset = '0';
+        area.style.zIndex = '99990';
+        svg.style.maxHeight = '100vh';
+        svg.style.maxWidth = '100vw';
+        svg.style.width = 'auto';
+        svg.style.height = '100%';
+    } else {
+        area.style.background = '';
+        area.style.display = '';
+        area.style.alignItems = '';
+        area.style.justifyContent = '';
+        area.style.position = 'relative';
+        area.style.inset = '';
+        area.style.zIndex = '';
+        svg.style.maxHeight = '';
+        svg.style.maxWidth = '';
+        svg.style.width = '100%';
+        svg.style.height = 'auto';
+        var ctr = document.getElementById('ej-present-controls');
+        if (ctr) ctr.remove();
+    }
+}
+function ejSalirPresentacion() {
+    ejP._presentOn = false;
+    if (document.fullscreenElement) { document.exitFullscreen().catch(function(){}); }
+    ejPresentEstilos(false);
+}
+function ejPresentPlay() { ejFrameStop(); ejFramePlay(0); }
+document.addEventListener('fullscreenchange', function() {
+    if (!document.fullscreenElement && ejP._presentOn) {
+        ejP._presentOn = false;
+        ejPresentEstilos(false);
+    }
+});
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && ejP._presentOn && !document.fullscreenElement) ejSalirPresentacion();
+});
+// ===== SELECCION MULTIPLE POR RECUADRO =====
+function ejSeleccionarEnRecuadro() {
+    var m = ejP._marquee;
+    if (!m) return;
+    var x1 = Math.min(m.x1, m.x2), x2 = Math.max(m.x1, m.x2);
+    var y1 = Math.min(m.y1, m.y2), y2 = Math.max(m.y1, m.y2);
+    if ((x2 - x1) < 8 && (y2 - y1) < 8) { ejP.multiSel = []; return; }
+    function dentro(x, y) { return x >= x1 && x <= x2 && y >= y1 && y <= y2; }
+    var sel = [];
+    ejP.players.forEach(function(p) { if (dentro(p.x, p.y)) sel.push({ type: 'player', id: p.id }); });
+    ejP.equipment.forEach(function(eq) { if (dentro(eq.x, eq.y)) sel.push({ type: 'equipment', id: eq.id }); });
+    ejP.texts.forEach(function(t) { if (dentro(t.x, t.y)) sel.push({ type: 'text', id: t.id }); });
+    ejP.shapes.forEach(function(s) {
+        var cx = (s.x !== undefined) ? s.x + (s.w || 0) / 2 : s.cx;
+        var cy = (s.y !== undefined) ? s.y + (s.h || 0) / 2 : s.cy;
+        if (cx !== undefined && cy !== undefined && dentro(cx, cy)) sel.push({ type: 'shape', id: s.id });
+    });
+    ejP.lines.forEach(function(l) {
+        if (l.x1 !== undefined && dentro((l.x1 + l.x2) / 2, (l.y1 + l.y2) / 2)) sel.push({ type: 'line', id: l.id });
+    });
+    ejP.multiSel = sel;
+    if (sel.length > 0) {
+        ejP.selectedId = null;
+        ejToast(sel.length + ' elemento(s) seleccionados — arrastra uno para mover el bloque', 'success');
+    }
+}
+function ejMoverMultiSel(dx, dy) {
+    ejP.multiSel.forEach(function(m) {
+        if (m.type === 'player') {
+            var p = ejP.players.find(function(x){ return x.id === m.id; });
+            if (p) { p.x += dx; p.y += dy; }
+        } else if (m.type === 'equipment') {
+            var eq = ejP.equipment.find(function(x){ return x.id === m.id; });
+            if (eq) { eq.x += dx; eq.y += dy; }
+        } else if (m.type === 'text') {
+            var t = ejP.texts.find(function(x){ return x.id === m.id; });
+            if (t) { t.x += dx; t.y += dy; }
+        } else if (m.type === 'shape') {
+            var s = ejP.shapes.find(function(x){ return x.id === m.id; });
+            if (s) {
+                if (s.x !== undefined) { s.x += dx; s.y += dy; }
+                else if (s.cx !== undefined) { s.cx += dx; s.cy += dy; }
+                if (s.points) s.points.forEach(function(pt){ pt.x += dx; pt.y += dy; });
+            }
+        } else if (m.type === 'line') {
+            var l = ejP.lines.find(function(x){ return x.id === m.id; });
+            if (l && l.x1 !== undefined) {
+                l.x1 += dx; l.y1 += dy; l.x2 += dx; l.y2 += dy;
+                if (l.cx !== undefined) { l.cx += dx; l.cy += dy; }
+                if (l.points) l.points.forEach(function(pt){ pt.x += dx; pt.y += dy; });
+            }
+        }
+    });
+}
