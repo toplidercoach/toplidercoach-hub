@@ -401,8 +401,8 @@ function irAAnalista(tab) {
     cambiarModulo('matchstats', btnMatchstats);
     document.querySelectorAll('.main-tab').forEach(function(t) { t.classList.remove('active'); });
     tab.classList.add('active');
-    var btnPlan = document.querySelector('#modulo-matchstats .sub-tab[onclick*="planpartido"]');
-    if (btnPlan) cambiarSubTab('matchstats', 'planpartido', btnPlan);
+    var btnPlan = document.querySelector('#modulo-matchstats .sub-tab[onclick*="analisisrival"]');
+    if (btnPlan) cambiarSubTab('matchstats', 'analisisrival', btnPlan);
 }
 
 function cambiarSubTab(modulo, subtab, btn) {

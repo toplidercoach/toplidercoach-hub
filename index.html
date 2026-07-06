@@ -613,6 +613,7 @@
     <button class="sub-tab" onclick="cambiarSubTab('matchstats', 'analisis', this)">📊 Análisis PostPartido</button>
     <button class="sub-tab" onclick="cambiarSubTab('matchstats', 'planpartido', this)">📋 Plan de Partido</button>
     <button class="sub-tab" onclick="cambiarSubTab('matchstats', 'rivales', this)">🛡️ Rivales</button>
+    <button class="sub-tab" onclick="cambiarSubTab('matchstats', 'analisisrival', this)">🔍 Análisis de Rivales</button>
 </div>
             
             <!-- Sub: Partidos -->
@@ -973,6 +974,10 @@
 <!-- Sub: Rivales -->
 <div id="matchstats-rivales" class="vista-contenido">
     <div id="rivales-root"></div>
+</div>
+<!-- Sub: Analisis de Rivales -->
+<div id="matchstats-analisisrival" class="vista-contenido">
+    <div id="analisisrival-root"></div>
 </div>
 </div>
 <!-- ==================== MODULO: TU CUERPO TÉCNICO ==================== -->
@@ -1906,6 +1911,7 @@ document.getElementById('modal-tacticlip').addEventListener('click', function(e)
     <script src="js/ej-images.js"></script>
     <script src="js/planpartido.js"></script>
     <script src="js/rivales.js"></script>
+    <script src="js/analista-rivales.js"></script>
     <script src="js/ejercicios.js"></script>
 
     <!-- Club Mode -->

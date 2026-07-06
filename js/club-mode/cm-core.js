@@ -322,6 +322,23 @@ function cmAplicarPermisos() {
         }
     });
 
+    // ===== Pestaña Analista (usa irAAnalista, no cambiarModulo) =====
+    var tabAnalista = document.querySelector('.main-tab.analista');
+    var cmEsAnalistaVideo = cmPuedeVer('modulo_analista_video');
+    var cmVeMatchstats = cmState.esAdmin || cmPuedeVer('matchstats');
+    if (tabAnalista && !cmVeMatchstats && !cmEsAnalistaVideo) {
+        tabAnalista.style.setProperty('display', 'none', 'important');
+    }
+    // Analista puro: dentro de Gestion de Competicion solo ve Rivales y Analisis de Rivales
+    if (cmEsAnalistaVideo && !cmVeMatchstats) {
+        document.querySelectorAll('#modulo-matchstats .sub-tab').forEach(function(st) {
+            var ocSub = st.getAttribute('onclick') || '';
+            if (!(ocSub.indexOf("'rivales'") > -1 || ocSub.indexOf("'analisisrival'") > -1)) {
+                st.style.setProperty('display', 'none', 'important');
+            }
+        });
+    }
+
     // Mostrar la pestaña "Club" si el usuario es admin del club
     if (cmState.esAdmin) {
         var tabClub = document.getElementById('cm-tab-club');
@@ -344,7 +361,8 @@ function cmAplicarPermisos() {
         var visibles = pestanasFuncionales.filter(function(tab) {
             return tab.style.display !== 'none';
         });
-        if (visibles.length === 0) {
+        var cmTabAnalistaVisible = tabAnalista && tabAnalista.style.display !== 'none';
+        if (visibles.length === 0 && !cmTabAnalistaVisible) {
             cmMostrarPantallaDesarrollo();
         }
     }
