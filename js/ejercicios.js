@@ -81,6 +81,12 @@ const EJ_FIELD_IMAGES = {
 // ---- ESTADO DE LA PIZARRA ----
 const ejP = {
     fieldType: 'full',
+    showCarriles: false,
+    showZonas: false,
+    camAngle: 0,
+    zoom: 1,
+    panX: 0,
+    panY: 0,
     fieldColor: '#1a6b30',
     svgW: 800, svgH: 500,
     fieldRealW: 105, fieldRealH: 68,
@@ -223,6 +229,7 @@ function ejRenderSVG() {
     // Campo
     let html = defs;
     html += ejGetFieldSVG(ejP.fieldType, ejP.fieldColor);
+    html += ejCarrilesZonasSVG();
 
     // Formas
     for (const s of ejP.shapes) {
@@ -498,7 +505,17 @@ for (const l of trajs) {
         });
         html += '<text x="12" y="24" fill="#22c55e" font-size="13" font-weight="700" style="pointer-events:none">'+ejP.multiSel.length+' seleccionados — arrastra uno para mover el bloque</text>';
     }
+    if ((ejP.camAngle || 0) > 0) {
+        var _vz = ejP.zoom || 1, _vw = ejP.svgW/_vz, _vh = ejP.svgH/_vz, _vx = ejP.panX||0, _vy = ejP.panY||0;
+        html += '<circle id="ej-cal-0" cx="'+(_vx+1)+'" cy="'+(_vy+1)+'" r="0.4" fill="transparent" style="pointer-events:none"/>'
+              + '<circle id="ej-cal-1" cx="'+(_vx+_vw-1)+'" cy="'+(_vy+1)+'" r="0.4" fill="transparent" style="pointer-events:none"/>'
+              + '<circle id="ej-cal-2" cx="'+(_vx+_vw-1)+'" cy="'+(_vy+_vh-1)+'" r="0.4" fill="transparent" style="pointer-events:none"/>'
+              + '<circle id="ej-cal-3" cx="'+(_vx+1)+'" cy="'+(_vy+_vh-1)+'" r="0.4" fill="transparent" style="pointer-events:none"/>';
+        ejP._calPts = [[_vx+1,_vy+1],[_vx+_vw-1,_vy+1],[_vx+_vw-1,_vy+_vh-1],[_vx+1,_vy+_vh-1]];
+    }
     svg.innerHTML = html;
+    ejAplicarViewBox();
+    ejAplicarCamara();
 }
 
 // =============================================
@@ -506,10 +523,14 @@ for (const l of trajs) {
 // =============================================
 function ejGetPos(e) {
     const svg = document.getElementById('ej-svg');
+    const cX = e.touches ? e.touches[0].clientX : (e.clientX ?? e.x);
+    const cY = e.touches ? e.touches[0].clientY : (e.clientY ?? e.y);
+    if ((ejP.camAngle || 0) > 0) {
+        const p = ejProyInversa(cX, cY);
+        if (p) return p;
+    }
     const pt = svg.createSVGPoint();
-    pt.x = e.touches ? e.touches[0].clientX : (e.clientX ?? e.x);
-    pt.y = e.touches ? e.touches[0].clientY : (e.clientY ?? e.y);
-    // Transformar coordenadas de pantalla a coordenadas del viewBox del SVG
+    pt.x = cX; pt.y = cY;
     const svgP = pt.matrixTransform(svg.getScreenCTM().inverse());
     return { x: svgP.x, y: svgP.y };
 }
@@ -1832,6 +1853,29 @@ ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin
         <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px">Tipo de campo</div>
         <div class="ej-field-btns">
             ${['full','half','halfDown','blank'].map(f=>`<button class="ej-btn-sm${ejP.fieldType===f?' active':''}" onclick="ejSetField('${f}')">${f==='full'?'Completo':f==='half'?'Medio ↑':f==='halfDown'?'Medio ↓':'Libre'}</button>`).join('')}
+            <button class="ej-btn-sm${ejP.showCarriles?' active':''}" onclick="ejToggleCarriles()" title="5 carriles del juego posicional">🛣️ Carriles</button>
+            <button class="ej-btn-sm${ejP.showZonas?' active':''}" onclick="ejToggleZonas()" title="3 tercios del campo">▦ Zonas</button>
+        </div>
+        <div style="font-size:11px;color:#9ca3af;margin:10px 0 4px">🎥 Cámara</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px">
+            <button class="ej-btn-sm${!ejP.camAngle?' active':''}" onclick="ejSetCamara(0)">Cenital</button>
+            <button class="ej-btn-sm${ejP.camAngle===35?' active':''}" onclick="ejSetCamara(35)">TV</button>
+            <button class="ej-btn-sm${ejP.camAngle===52?' active':''}" onclick="ejSetCamara(52)">Rasante</button>
+        </div>
+        <input type="range" min="0" max="60" value="${ejP.camAngle||0}" oninput="ejSetCamara(parseInt(this.value))" style="width:100%;accent-color:#22c55e"/>
+        ${ejP.camAngle?`<div style="font-size:10px;color:#f59e0b;margin-top:2px">Vista ${ejP.camAngle}° — puedes editar también en esta vista</div>`:''}
+        <div style="font-size:11px;color:#9ca3af;margin:10px 0 4px">🔍 Zoom <span id="ej-zoom-pct">${Math.round((ejP.zoom||1)*100)}%</span></div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+            <button class="ej-btn-sm" onclick="ejZoomCambiar(-0.25)">−</button>
+            <button class="ej-btn-sm" onclick="ejZoomReset()">100%</button>
+            <button class="ej-btn-sm" onclick="ejZoomCambiar(0.25)">+</button>
+            <button class="ej-btn-sm" onclick="ejPan(0,-1)">▲</button>
+            <button class="ej-btn-sm" onclick="ejPan(0,1)">▼</button>
+            <button class="ej-btn-sm" onclick="ejPan(-1,0)">◀</button>
+            <button class="ej-btn-sm" onclick="ejPan(1,0)">▶</button>
+        </div>
+        <div style="font-size:10px;color:#64748b;margin-top:2px">Consejo: Ctrl + rueda del ratón para hacer zoom donde apunta el cursor</div>
+        <div style="display:none">
         </div>
         <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin:8px 0 2px">Color del césped</div>
         <div style="display:flex;gap:4px">
@@ -2809,7 +2853,7 @@ async function ejEditarDibujo() {
         ejP.texts     = data.board_data.texts   || [];
         ejP.equipment = data.board_data.equipment || [];
         ejP.connections = data.board_data.connections || [];
-        ejP.fieldType = data.board_data.fieldType || 'full';
+        ejP.fieldType = data.board_data.fieldType || 'full'; ejP.showCarriles = !!data.board_data.showCarriles; ejP.showZonas = !!data.board_data.showZonas;
         ejP.selectedId = null;
         ejP._lastVideoUrl = data.animation_url || null;
 
@@ -2900,7 +2944,7 @@ let thumbnailSvg = window.ejThumbnailPendiente || null;
             players: ejP.players, lines: ejP.lines,
             shapes: ejP.shapes, texts: ejP.texts,
             equipment: ejP.equipment,connections: ejP.connections,
-            fieldType: ejP.fieldType,
+            fieldType: ejP.fieldType, showCarriles: ejP.showCarriles, showZonas: ejP.showZonas, showCarriles: ejP.showCarriles, showZonas: ejP.showZonas,
             animFrames: ejP.animMode ? ejP.frames : [],
             animMode: ejP.animMode
         } : null,
@@ -3219,7 +3263,7 @@ async function ejBancoCargar(id) {
             ejP.texts     = data.board_data.texts   || [];
             ejP.equipment = data.board_data.equipment || [];
             ejP.connections = data.board_data.connections || [];
-            ejP.fieldType = data.board_data.fieldType || 'full';
+            ejP.fieldType = data.board_data.fieldType || 'full'; ejP.showCarriles = !!data.board_data.showCarriles; ejP.showZonas = !!data.board_data.showZonas;
             ejP.selectedId = null;
             ejP._lastVideoUrl = data.animation_url || null;
 
@@ -3939,7 +3983,7 @@ function ejColocarJugadorPlantilla(idx) {
                 players: ejP.players, lines: ejP.lines,
                 shapes: ejP.shapes, texts: ejP.texts,
                 equipment: ejP.equipment,connections: ejP.connections,
-                fieldType: ejP.fieldType,
+                fieldType: ejP.fieldType, showCarriles: ejP.showCarriles, showZonas: ejP.showZonas, showCarriles: ejP.showCarriles, showZonas: ejP.showZonas,
                 animFrames: ejP.frames,
                 animMode: ejP.animMode
             },
@@ -4342,4 +4386,166 @@ function ejMoverMultiSel(dx, dy) {
             }
         }
     });
+}
+// ===== GUIAS TACTICAS: 5 CARRILES Y 3 ZONAS =====
+function ejCarrilesZonasSVG() {
+    if (!ejP.showCarriles && !ejP.showZonas) return '';
+    var ft = ejP.fieldType;
+    var x0 = 20, y0 = 15, w = 760, h = 470;
+    var vertical = (ft === 'half' || ft === 'halfDown');
+    var s = '<g style="pointer-events:none">';
+    if (ejP.showCarriles) {
+        if (!vertical) {
+            var bh = h / 5;
+            s += '<rect x="'+x0+'" y="'+(y0+bh)+'" width="'+w+'" height="'+bh+'" fill="rgba(255,255,255,0.06)"/>';
+            s += '<rect x="'+x0+'" y="'+(y0+3*bh)+'" width="'+w+'" height="'+bh+'" fill="rgba(255,255,255,0.06)"/>';
+            for (var i = 1; i < 5; i++) {
+                var yy = y0 + i * bh;
+                s += '<line x1="'+x0+'" y1="'+yy+'" x2="'+(x0+w)+'" y2="'+yy+'" stroke="#ffffff" stroke-width="1.5" stroke-dasharray="8 6" opacity="0.4"/>';
+            }
+        } else {
+            var bw = w / 5;
+            s += '<rect x="'+(x0+bw)+'" y="'+y0+'" width="'+bw+'" height="'+h+'" fill="rgba(255,255,255,0.06)"/>';
+            s += '<rect x="'+(x0+3*bw)+'" y="'+y0+'" width="'+bw+'" height="'+h+'" fill="rgba(255,255,255,0.06)"/>';
+            for (var j = 1; j < 5; j++) {
+                var xx = x0 + j * bw;
+                s += '<line x1="'+xx+'" y1="'+y0+'" x2="'+xx+'" y2="'+(y0+h)+'" stroke="#ffffff" stroke-width="1.5" stroke-dasharray="8 6" opacity="0.4"/>';
+            }
+        }
+    }
+    if (ejP.showZonas) {
+        if (!vertical) {
+            for (var k = 1; k < 3; k++) {
+                var zx = x0 + k * (w / 3);
+                s += '<line x1="'+zx+'" y1="'+y0+'" x2="'+zx+'" y2="'+(y0+h)+'" stroke="#facc15" stroke-width="1.5" stroke-dasharray="10 7" opacity="0.5"/>';
+            }
+        } else {
+            for (var q = 1; q < 3; q++) {
+                var zy = y0 + q * (h / 3);
+                s += '<line x1="'+x0+'" y1="'+zy+'" x2="'+(x0+w)+'" y2="'+zy+'" stroke="#facc15" stroke-width="1.5" stroke-dasharray="10 7" opacity="0.5"/>';
+            }
+        }
+    }
+    return s + '</g>';
+}
+function ejToggleCarriles() { ejP.showCarriles = !ejP.showCarriles; ejRenderSVG(); ejRenderToolbar(); }
+function ejToggleZonas() { ejP.showZonas = !ejP.showZonas; ejRenderSVG(); ejRenderToolbar(); }
+// ===== CAMARA EN PERSPECTIVA Y ZOOM =====
+function ejSetCamara(a) {
+    ejP.camAngle = a || 0;
+    ejAplicarCamara();
+    ejRenderToolbar();
+}
+function ejAplicarCamara() {
+    var svg = document.getElementById('ej-svg');
+    if (!svg) return;
+    var a = ejP.camAngle || 0;
+    if (a > 0) {
+        svg.style.transform = 'perspective(1100px) rotateX(' + a + 'deg)';
+        svg.style.transformOrigin = '50% 62%';
+        svg.style.transition = 'transform 0.25s';
+    } else {
+        svg.style.transform = '';
+    }
+}
+function ejAplicarViewBox() {
+    var svg = document.getElementById('ej-svg');
+    if (!svg) return;
+    var z = ejP.zoom || 1;
+    var w = ejP.svgW / z, h = ejP.svgH / z;
+    var maxX = ejP.svgW - w, maxY = ejP.svgH - h;
+    ejP.panX = Math.max(0, Math.min(maxX, ejP.panX || 0));
+    ejP.panY = Math.max(0, Math.min(maxY, ejP.panY || 0));
+    svg.setAttribute('viewBox', ejP.panX + ' ' + ejP.panY + ' ' + w + ' ' + h);
+}
+function ejZoomCambiar(d) {
+    var zPrev = ejP.zoom || 1;
+    var z = zPrev + d;
+    if (z < 1) z = 1;
+    if (z > 3) z = 3;
+    var cx = (ejP.panX || 0) + ejP.svgW / zPrev / 2;
+    var cy = (ejP.panY || 0) + ejP.svgH / zPrev / 2;
+    ejP.zoom = z;
+    ejP.panX = cx - ejP.svgW / z / 2;
+    ejP.panY = cy - ejP.svgH / z / 2;
+    ejAplicarViewBox();
+    ejRenderToolbar();
+}
+function ejZoomReset() {
+    ejP.zoom = 1; ejP.panX = 0; ejP.panY = 0;
+    ejAplicarViewBox();
+    ejRenderToolbar();
+}
+function ejPan(dx, dy) {
+    var paso = 60 / (ejP.zoom || 1);
+    ejP.panX = (ejP.panX || 0) + dx * paso;
+    ejP.panY = (ejP.panY || 0) + dy * paso;
+    ejAplicarViewBox();
+}
+document.addEventListener('wheel', function(e) {
+    if (!e.ctrlKey) return;
+    var svg = document.getElementById('ej-svg');
+    if (!svg) return;
+    if (e.target !== svg && !svg.contains(e.target)) return;
+    e.preventDefault();
+    var rect = svg.getBoundingClientRect();
+    var relX = (e.clientX - rect.left) / rect.width;
+    var relY = (e.clientY - rect.top) / rect.height;
+    var zPrev = ejP.zoom || 1;
+    var z = zPrev * (e.deltaY < 0 ? 1.15 : 0.87);
+    if (z < 1) z = 1;
+    if (z > 3) z = 3;
+    var wPrev = ejP.svgW / zPrev, hPrev = ejP.svgH / zPrev;
+    var fx = (ejP.panX || 0) + relX * wPrev;
+    var fy = (ejP.panY || 0) + relY * hPrev;
+    ejP.zoom = z;
+    ejP.panX = fx - relX * (ejP.svgW / z);
+    ejP.panY = fy - relY * (ejP.svgH / z);
+    ejAplicarViewBox();
+    var lbl = document.getElementById('ej-zoom-pct');
+    if (lbl) lbl.textContent = Math.round(z * 100) + '%';
+}, { passive: false });
+// ===== CALIBRACION EXACTA DE CLICS EN VISTA PERSPECTIVA =====
+function ejProyInversa(cX, cY) {
+    var svgPts = ejP._calPts;
+    if (!svgPts) return null;
+    var scr = [];
+    for (var i = 0; i < 4; i++) {
+        var el = document.getElementById('ej-cal-' + i);
+        if (!el) return null;
+        var r = el.getBoundingClientRect();
+        scr.push([r.left + r.width / 2, r.top + r.height / 2]);
+    }
+    var A = [], b = [];
+    for (var j = 0; j < 4; j++) {
+        var sx = scr[j][0], sy = scr[j][1], X = svgPts[j][0], Y = svgPts[j][1];
+        A.push([sx, sy, 1, 0, 0, 0, -sx * X, -sy * X]); b.push(X);
+        A.push([0, 0, 0, sx, sy, 1, -sx * Y, -sy * Y]); b.push(Y);
+    }
+    var h = ejResolver8(A, b);
+    if (!h) return null;
+    var den = h[6] * cX + h[7] * cY + 1;
+    if (Math.abs(den) < 1e-9) return null;
+    return {
+        x: (h[0] * cX + h[1] * cY + h[2]) / den,
+        y: (h[3] * cX + h[4] * cY + h[5]) / den
+    };
+}
+function ejResolver8(A, b) {
+    var n = 8, M = [];
+    for (var i = 0; i < n; i++) M.push(A[i].concat([b[i]]));
+    for (var c = 0; c < n; c++) {
+        var piv = c;
+        for (var f = c + 1; f < n; f++) if (Math.abs(M[f][c]) > Math.abs(M[piv][c])) piv = f;
+        if (Math.abs(M[piv][c]) < 1e-12) return null;
+        var tmp = M[c]; M[c] = M[piv]; M[piv] = tmp;
+        for (var f2 = 0; f2 < n; f2++) {
+            if (f2 === c) continue;
+            var fac = M[f2][c] / M[c][c];
+            for (var col = c; col <= n; col++) M[f2][col] -= fac * M[c][col];
+        }
+    }
+    var sol = [];
+    for (var s = 0; s < n; s++) sol.push(M[s][n] / M[s][s]);
+    return sol;
 }
