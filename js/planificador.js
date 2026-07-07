@@ -1216,6 +1216,20 @@ if (s.players && s.players.length > 0) {
             
             const { data: partidos } = await queryPartidos;
             
+            // Cargar marcadores del mes (descanso, voluntario, viaje, otro)
+            const { data: marcadores } = await supabaseClient
+                .from('calendario_marcadores')
+                .select('*')
+                .eq('club_id', clubId)
+                .gte('fecha', inicioMes)
+                .lte('fecha', finMes);
+            const marcadoresPorDia = {};
+            (marcadores || []).forEach(m => {
+                const dia = new Date(m.fecha + 'T12:00:00').getDate();
+                if (!marcadoresPorDia[dia]) marcadoresPorDia[dia] = [];
+                marcadoresPorDia[dia].push(m);
+            });
+            
             // Agrupar por día
             const sesionesPorDia = {};
             (sesiones || []).forEach(s => {
@@ -1301,9 +1315,23 @@ if (s.players && s.players.length > 0) {
                     });
                 }
                 
+                // Marcadores del día
+                const fechaISO = `${calendarioAnio}-${String(calendarioMes + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+                if (marcadoresPorDia[dia]) {
+                    marcadoresPorDia[dia].forEach(m => {
+                        const infoM = CAL_TIPOS_MARCADOR[m.tipo] || CAL_TIPOS_MARCADOR.otro;
+                        const etiqueta = (m.tipo === 'otro' && m.nota) ? m.nota : infoM.label;
+                        eventosHTML += `
+                            <div class="cal-evento" onclick="calQuitarMarcador('${m.id}', '${etiqueta.replace(/['"]/g, '')}')" title="Clic para quitar este marcador" style="background:${infoM.bg};color:${infoM.color};cursor:pointer">
+                                <span class="cal-evento-nombre">${infoM.icono} ${etiqueta}</span>
+                            </div>`;
+                    });
+                }
+                
                 html += `
-                    <div class="calendario-dia ${esHoy ? 'hoy' : ''} ${esSabado || esDomingo ? 'fin-semana' : ''} ${tienePartido ? 'dia-partido' : ''}">
+                    <div class="calendario-dia ${esHoy ? 'hoy' : ''} ${esSabado || esDomingo ? 'fin-semana' : ''} ${tienePartido ? 'dia-partido' : ''}" style="position:relative">
                         <div class="numero">${dia}</div>
+                        <span onclick="calAbrirMenuMarcador('${fechaISO}')" title="Marcar día (descanso, voluntario, viaje...)" style="position:absolute;top:4px;right:6px;cursor:pointer;color:#94a3b8;font-size:13px;font-weight:700;line-height:1">＋</span>
                         ${eventosHTML}
                     </div>
                 `;
@@ -1343,6 +1371,87 @@ if (s.players && s.players.length > 0) {
             if (calendarioMes > 11) { calendarioMes = 0; calendarioAnio++; }
             cargarCalendarioUnificado();
         }
+        
+        // ===== Marcadores de día del calendario =====
+        const CAL_TIPOS_MARCADOR = {
+            descanso:   { label: 'Descanso',   icono: '🛌', bg: '#e2e8f0', color: '#334155' },
+            voluntario: { label: 'Voluntario', icono: '🤝', bg: '#dcfce7', color: '#166534' },
+            viaje:      { label: 'Viaje',      icono: '🚌', bg: '#ede9fe', color: '#5b21b6' },
+            otro:       { label: 'Otro',       icono: '📝', bg: '#fef9c3', color: '#854d0e' }
+        };
+        
+        function calAbrirMenuMarcador(fechaISO) {
+            const prev = document.getElementById('cal-marc-ov');
+            if (prev) prev.remove();
+            const fFmt = new Date(fechaISO + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+            let botones = '';
+            Object.keys(CAL_TIPOS_MARCADOR).forEach(t => {
+                const i = CAL_TIPOS_MARCADOR[t];
+                botones += `<button onclick="calElegirMarcador('${fechaISO}','${t}')" style="display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:10px 14px;margin-bottom:6px;background:${i.bg};color:${i.color};border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600">${i.icono} ${t === 'otro' ? 'Otro (con nota)' : i.label}</button>`;
+            });
+            const ov = document.createElement('div');
+            ov.id = 'cal-marc-ov';
+            ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+            ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
+            ov.innerHTML = `
+                <div style="background:#fff;border-radius:14px;padding:20px;max-width:320px;width:100%">
+                    <div style="font-weight:700;color:#1f2937;margin-bottom:2px">Marcar día</div>
+                    <div style="font-size:12px;color:#6b7280;margin-bottom:14px;text-transform:capitalize">${fFmt}</div>
+                    ${botones}
+                    <div id="cal-marc-nota" style="display:none;margin-top:4px">
+                        <input type="text" id="cal-marc-nota-input" placeholder="Ej: charla táctica, acto del club..." style="width:100%;padding:9px 11px;border:1px solid #d1d5db;border-radius:8px;font-size:13px;box-sizing:border-box;margin-bottom:8px">
+                        <button onclick="calGuardarMarcador(document.getElementById('cal-marc-ov').dataset.fecha,'otro',document.getElementById('cal-marc-nota-input').value)" style="width:100%;padding:9px;background:#7c3aed;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600">Guardar</button>
+                    </div>
+                </div>`;
+            ov.dataset.fecha = fechaISO;
+            document.body.appendChild(ov);
+        }
+        
+        function calElegirMarcador(fechaISO, tipo) {
+            if (tipo === 'otro') {
+                const zona = document.getElementById('cal-marc-nota');
+                if (zona) { zona.style.display = 'block'; document.getElementById('cal-marc-nota-input').focus(); }
+                return;
+            }
+            calGuardarMarcador(fechaISO, tipo, null);
+        }
+        
+        async function calGuardarMarcador(fechaISO, tipo, nota) {
+            try {
+                const { error } = await supabaseClient
+                    .from('calendario_marcadores')
+                    .insert({ club_id: clubId, fecha: fechaISO, tipo: tipo, nota: (nota || '').trim() || null });
+                if (error) {
+                    if (String(error.message).indexOf('duplicate') > -1 || String(error.code) === '23505') {
+                        showToast('Ese día ya tiene ese marcador');
+                    } else { throw error; }
+                } else {
+                    showToast('Día marcado');
+                }
+                const ov = document.getElementById('cal-marc-ov');
+                if (ov) ov.remove();
+                cargarCalendarioUnificado();
+            } catch (e) {
+                showToast('Error: ' + e.message);
+            }
+        }
+        
+        async function calQuitarMarcador(id, etiqueta) {
+            if (!confirm('¿Quitar el marcador "' + etiqueta + '" de este día?')) return;
+            try {
+                const { error } = await supabaseClient.from('calendario_marcadores').delete().eq('id', id);
+                if (error) throw error;
+                showToast('Marcador quitado');
+                cargarCalendarioUnificado();
+            } catch (e) {
+                showToast('Error: ' + e.message);
+            }
+        }
+        
+        window.calAbrirMenuMarcador = calAbrirMenuMarcador;
+        window.calElegirMarcador = calElegirMarcador;
+        window.calGuardarMarcador = calGuardarMarcador;
+        window.calQuitarMarcador = calQuitarMarcador;
         // ========== PDF DEL CALENDARIO (mes en cuadricula / rangos en lista) ==========
 
 function calPdfMenu(btn) {
@@ -1396,7 +1505,16 @@ async function calCargarRango(inicioISO, finISO) {
     if (seasonId) qPar = qPar.eq('season_id', seasonId);
     const { data: partidos } = await qPar;
 
-    return { sesiones: sesiones || [], partidos: partidos || [] };
+    let qMar = supabaseClient
+        .from('calendario_marcadores')
+        .select('*')
+        .eq('club_id', clubId)
+        .gte('fecha', inicioISO)
+        .lte('fecha', finISO)
+        .order('fecha');
+    const { data: marcadores } = await qMar;
+
+    return { sesiones: sesiones || [], partidos: partidos || [], marcadores: marcadores || [] };
 }
 
 async function calGenerarPDF(rango) {
@@ -1438,7 +1556,7 @@ async function calGenerarPDF(rango) {
     const nombreClub = (clubData && clubData.name) ? clubData.name : 'Club';
 
     if (rango === 'mes') {
-        calPdfCuadricula(doc, calendarioMes, calendarioAnio, datos, nombreClub);
+        calPdfCuadricula2(doc, calendarioMes, calendarioAnio, datos, nombreClub);
     } else {
         calPdfLista(doc, inicio, fin, datos, nombreClub, titulo);
     }
@@ -1471,6 +1589,13 @@ function calPdfCuadricula(doc, mes, anio, datos, nombreClub) {
         if (!porDia[d]) porDia[d] = [];
         const hora = p.kick_off_time ? p.kick_off_time.slice(0, 5) + ' ' : '';
         porDia[d].push({ t: 'P', txt: hora + 'vs ' + p.opponent });
+    });
+    (datos.marcadores || []).forEach(function(m) {
+        const d = new Date(m.fecha + 'T12:00:00').getDate();
+        if (!porDia[d]) porDia[d] = [];
+        const nombresM = { descanso: 'Descanso', voluntario: 'Voluntario', viaje: 'Viaje', otro: 'Otro' };
+        const txtM = (m.tipo === 'otro' && m.nota) ? m.nota : (nombresM[m.tipo] || m.tipo);
+        porDia[d].push({ t: 'M', txt: txtM });
     });
 
     // Cuadricula 7 columnas
@@ -1512,6 +1637,7 @@ function calPdfCuadricula(doc, mes, anio, datos, nombreClub) {
         doc.setFontSize(6);
         eventos.slice(0, 3).forEach(function(ev) {
             if (ev.t === 'P') doc.setTextColor(163, 45, 45);
+            else if (ev.t === 'M') doc.setTextColor(107, 114, 128);
             else doc.setTextColor(83, 74, 183);
             const linea = doc.splitTextToSize(ev.txt, anchoCol - 3)[0] || '';
             doc.text(linea, x + 2, ey);
@@ -1538,6 +1664,8 @@ function calPdfCuadricula(doc, mes, anio, datos, nombreClub) {
     doc.text('Sesion', margenX, y);
     doc.setTextColor(163, 45, 45);
     doc.text('Partido', margenX + 25, y);
+    doc.setTextColor(107, 114, 128);
+    doc.text('Dia marcado (descanso, voluntario, viaje...)', margenX + 50, y);
 }
 
 function calPdfLista(doc, inicio, fin, datos, nombreClub, titulo) {
@@ -1569,6 +1697,16 @@ function calPdfLista(doc, inicio, fin, datos, nombreClub, titulo) {
             tipo: 'Partido',
             texto: 'vs ' + p.opponent + (p.home_away === 'home' ? ' (Local)' : ' (Visitante)'),
             esPartido: true
+        });
+    });
+    (datos.marcadores || []).forEach(function(m) {
+        const nombresM = { descanso: 'Descanso', voluntario: 'Entrenamiento voluntario', viaje: 'Viaje / concentracion', otro: 'Otro' };
+        eventos.push({
+            fecha: m.fecha,
+            hora: '',
+            tipo: 'Dia',
+            texto: (m.tipo === 'otro' && m.nota) ? m.nota : (nombresM[m.tipo] || m.tipo),
+            esPartido: false
         });
     });
     eventos.sort(function(a, b) {
@@ -1831,4 +1969,155 @@ function ejSvgToPng(svgString) {
         img.onerror = function() { resolve(''); URL.revokeObjectURL(url); };
         img.src = url;
     });
+}
+// ===== PDF DEL CALENDARIO v2 (diseño con escudo y pildoras de color) =====
+function calPdfCuadricula2(doc, mes, anio, datos, nombreClub) {
+    const W = doc.internal.pageSize.getWidth();
+
+    // Cabecera con banda morada y escudo
+    doc.setFillColor(38, 33, 92);
+    doc.rect(0, 0, W, 30, 'F');
+    try {
+        if (clubData && clubData.logo_url) doc.addImage(clubData.logo_url, 'PNG', 9, 4, 22, 22);
+    } catch (e) {}
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(15);
+    doc.setFont('helvetica', 'bold');
+    doc.text(nombreClub, 36, 14);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(200, 200, 215);
+    doc.text('Calendario — ' + MESES[mes] + ' ' + anio, 36, 21);
+
+    // Agrupar eventos por dia con su tipo y color
+    const porDia = {};
+    function anadir(d, ev) { if (!porDia[d]) porDia[d] = []; porDia[d].push(ev); }
+    datos.sesiones.forEach(function(s) {
+        const d = new Date(s.session_date + 'T12:00:00').getDate();
+        const hora = s.session_time ? s.session_time.slice(0, 5) + ' ' : '';
+        anadir(d, { txt: hora + s.name, bg: [38, 33, 92], fg: [255, 255, 255] });
+    });
+    datos.partidos.forEach(function(p) {
+        const d = new Date(p.match_date + 'T12:00:00').getDate();
+        let bg = [100, 116, 139];
+        let txt;
+        if (p.result) {
+            bg = p.result === 'win' ? [22, 163, 74] : (p.result === 'draw' ? [217, 119, 6] : [220, 38, 38]);
+            const gF = p.team_goals || 0, gC = p.opponent_goals || 0;
+            const marcador = p.home_away === 'home' ? (gF + '-' + gC) : (gC + '-' + gF);
+            txt = marcador + ' ' + p.opponent;
+        } else {
+            txt = (p.kick_off_time ? p.kick_off_time.slice(0, 5) + ' ' : '') + 'vs ' + p.opponent;
+        }
+        anadir(d, { txt: txt, bg: bg, fg: [255, 255, 255] });
+    });
+    const estilosM = {
+        descanso:   { bg: [226, 232, 240], fg: [51, 65, 85],  label: 'Descanso' },
+        voluntario: { bg: [220, 252, 231], fg: [22, 101, 52], label: 'Voluntario' },
+        viaje:      { bg: [237, 233, 254], fg: [91, 33, 182], label: 'Viaje' },
+        otro:       { bg: [254, 249, 195], fg: [133, 77, 14], label: 'Otro' }
+    };
+    (datos.marcadores || []).forEach(function(m) {
+        const d = new Date(m.fecha + 'T12:00:00').getDate();
+        const est = estilosM[m.tipo] || estilosM.otro;
+        const txt = (m.tipo === 'otro' && m.nota) ? m.nota : est.label;
+        anadir(d, { txt: txt, bg: est.bg, fg: est.fg });
+    });
+
+    // Cabecera de dias de la semana
+    const dows = ['LUN', 'MAR', 'MIE', 'JUE', 'VIE', 'SAB', 'DOM'];
+    const margenX = 8;
+    const anchoCol = (W - margenX * 2) / 7;
+    let y = 36;
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    for (let i = 0; i < 7; i++) {
+        doc.setFillColor(83, 74, 183);
+        doc.rect(margenX + i * anchoCol, y, anchoCol, 7, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.text(dows[i], margenX + i * anchoCol + anchoCol / 2, y + 4.8, { align: 'center' });
+    }
+    y += 7;
+
+    const primerDia = new Date(anio, mes, 1);
+    const ultimoDia = new Date(anio, mes + 1, 0).getDate();
+    let diaInicio = primerDia.getDay() || 7;
+    let col = diaInicio - 1;
+    const altoFila = 26;
+
+    function celda(c, fila_y, esFinde) {
+        const x = margenX + c * anchoCol;
+        if (esFinde) {
+            doc.setFillColor(255, 251, 235);
+            doc.rect(x, fila_y, anchoCol, altoFila, 'F');
+        }
+        doc.setDrawColor(203, 213, 225);
+        doc.rect(x, fila_y, anchoCol, altoFila);
+        return x;
+    }
+
+    for (let i = 0; i < col; i++) celda(i, y, i >= 5);
+
+    for (let dia = 1; dia <= ultimoDia; dia++) {
+        const x = celda(col, y, col >= 5);
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(60, 60, 60);
+        doc.text(String(dia), x + 2, y + 4.5);
+
+        const eventos = porDia[dia] || [];
+        let ey = y + 6.5;
+        doc.setFont('helvetica', 'normal');
+        eventos.slice(0, 3).forEach(function(ev) {
+            doc.setFillColor(ev.bg[0], ev.bg[1], ev.bg[2]);
+            doc.roundedRect(x + 1.3, ey, anchoCol - 2.6, 4.8, 1, 1, 'F');
+            doc.setTextColor(ev.fg[0], ev.fg[1], ev.fg[2]);
+            doc.setFontSize(5.6);
+            const linea = doc.splitTextToSize(ev.txt, anchoCol - 6)[0] || '';
+            doc.text(linea, x + 2.6, ey + 3.3);
+            ey += 5.8;
+        });
+        if (eventos.length > 3) {
+            doc.setTextColor(120, 120, 120);
+            doc.setFontSize(5.6);
+            doc.text('+' + (eventos.length - 3) + ' mas', x + 2.6, ey + 2.5);
+        }
+
+        col++;
+        if (col > 6) { col = 0; y += altoFila; }
+    }
+    if (col > 0) {
+        for (let i = col; i < 7; i++) celda(i, y, i >= 5);
+        y += altoFila;
+    }
+
+    // Leyenda con muestras de color
+    y += 8;
+    const leyenda = [
+        { label: 'Sesion',      bg: [38, 33, 92],    fg: [255, 255, 255] },
+        { label: 'Victoria',    bg: [22, 163, 74],   fg: [255, 255, 255] },
+        { label: 'Empate',      bg: [217, 119, 6],   fg: [255, 255, 255] },
+        { label: 'Derrota',     bg: [220, 38, 38],   fg: [255, 255, 255] },
+        { label: 'Pendiente',   bg: [100, 116, 139], fg: [255, 255, 255] },
+        { label: 'Descanso',    bg: [226, 232, 240], fg: [51, 65, 85] },
+        { label: 'Voluntario',  bg: [220, 252, 231], fg: [22, 101, 52] },
+        { label: 'Viaje',       bg: [237, 233, 254], fg: [91, 33, 182] },
+        { label: 'Otro',        bg: [254, 249, 195], fg: [133, 77, 14] }
+    ];
+    let lx = margenX;
+    doc.setFontSize(6.5);
+    leyenda.forEach(function(l) {
+        const wPill = doc.getTextWidth(l.label) + 6;
+        doc.setFillColor(l.bg[0], l.bg[1], l.bg[2]);
+        doc.roundedRect(lx, y, wPill, 5, 1.2, 1.2, 'F');
+        doc.setTextColor(l.fg[0], l.fg[1], l.fg[2]);
+        doc.text(l.label, lx + 3, y + 3.5);
+        lx += wPill + 4;
+    });
+
+    // Resumen del mes
+    y += 11;
+    doc.setFontSize(8);
+    doc.setTextColor(100, 100, 110);
+    doc.text(datos.sesiones.length + ' sesiones  ·  ' + datos.partidos.length + ' partidos  ·  ' + (datos.marcadores || []).length + ' dias marcados', margenX, y);
 }
