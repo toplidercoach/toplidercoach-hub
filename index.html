@@ -255,6 +255,7 @@
                 <button class="sub-tab" onclick="cambiarSubTab('planificador', 'mis-sesiones', this)">Mis Sesiones</button>
                 <button class="sub-tab" onclick="cambiarSubTab('planificador', 'calendario', this)">Calendario</button>
                 <button class="sub-tab" onclick="cambiarSubTab('planificador', 'asistencia', this)">📊 Asistencia</button>
+                <button class="sub-tab" onclick="cambiarSubTab('planificador', 'cargas', this)">📈 Cargas</button>
                 <button class="sub-tab" onclick="cambiarSubTab('planificador', 'periodizacion', this)">📅 Periodización</button>
                 <button class="sub-tab" onclick="cambiarSubTab('planificador', 'enlaces-wellness', this)">🔗 Enlaces wellness</button>
                 <button class="sub-tab" onclick="cambiarSubTab('planificador', 'modelo-juego', this)">📋 Modelo de juego</button>
@@ -495,6 +496,9 @@
                 </div>
             </div>
             <!-- Sub: Asistencia -->
+<div id="planificador-cargas" class="vista-contenido">
+    <div id="cargas-contenido"></div>
+</div>
 <div id="planificador-asistencia" class="vista-contenido">
     <div class="section-header">
         <h2>📊 Control de Asistencia</h2>
@@ -1901,6 +1905,7 @@ document.getElementById('modal-tacticlip').addEventListener('click', function(e)
     <script src="js/staff.js"></script>
     <script src="js/miclub.js"></script>
     <script src="js/asistencia.js"></script>
+    <script src="js/cargas.js"></script>
     <script src="js/wellness-enlaces.js"></script>
     <script src="js/modelo-juego.js"></script>
     <script src="js/sesion-conceptos.js"></script>

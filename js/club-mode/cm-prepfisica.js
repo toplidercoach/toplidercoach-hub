@@ -58,7 +58,8 @@ container.innerHTML=
 '</style>'+
 '<div class="cmpf-wrap"><div class="cmpf-panel">'+
 '<div class="cmpf-header"><h2>Preparacion Fisica</h2></div>'+
-'<div class="cmpf-vista-toggle"><button class="cmpf-vista-btn active" data-vista="jugadores" onclick="cmPfCambiarVista(\'jugadores\')">Jugadores</button><button class="cmpf-vista-btn" data-vista="sesiones" onclick="cmPfCambiarVista(\'sesiones\')">Sesiones GPS</button></div>'+
+'<div class="cmpf-vista-toggle"><button class="cmpf-vista-btn active" data-vista="jugadores" onclick="cmPfCambiarVista(\'jugadores\')">Jugadores</button><button class="cmpf-vista-btn" data-vista="sesiones" onclick="cmPfCambiarVista(\'sesiones\')">Sesiones GPS</button><button class="cmpf-vista-btn" data-vista="cargas" onclick="cmPfCambiarVista(\'cargas\')">Cargas RPE</button></div>'+
+'<div id="cmpf-vista-cargas" style="display:none"><div style="background:#f1f5f9;border-radius:12px;padding:16px"><div id="cmpf-cargas-contenido"></div></div></div>'+
 '<div id="cmpf-vista-jugadores">'+
 '<div class="cmpf-stats-bar"><div class="cmpf-stat"><div class="num" id="cmpf-stat-total">-</div><div class="label">Jugadores</div></div><div class="cmpf-stat"><div class="num" id="cmpf-stat-tests" style="color:#60a5fa">-</div><div class="label">Con pruebas</div></div><div class="cmpf-stat"><div class="num" id="cmpf-stat-anthro" style="color:#a78bfa">-</div><div class="label">Antropometria</div></div><div class="cmpf-stat"><div class="num" id="cmpf-stat-gps" style="color:#fbbf24">-</div><div class="label">Con GPS</div></div></div>'+
 '<div class="cmpf-filter-count" id="cmpf-filter-count"></div>'+
@@ -585,8 +586,13 @@ function cmPfCambiarVista(vista) {
     });
     var vj = document.getElementById('cmpf-vista-jugadores');
     var vs = document.getElementById('cmpf-vista-sesiones');
+    var vc = document.getElementById('cmpf-vista-cargas');
     if (vj) vj.style.display = vista === 'jugadores' ? 'block' : 'none';
     if (vs) vs.style.display = vista === 'sesiones' ? 'block' : 'none';
+    if (vc) vc.style.display = vista === 'cargas' ? 'block' : 'none';
+    if (vista === 'cargas' && typeof cargarPanelCargas === 'function') {
+        cargarPanelCargas('cmpf-cargas-contenido');
+    }
     if (vista === 'sesiones') {
         // Rellenar filtros
         var selEq = document.getElementById('cmpf-ses-filtro-equipo');
