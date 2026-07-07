@@ -66,6 +66,14 @@ async function cargarEnlacesWellness() {
             return;
         }
 
+        // Auto-arreglo: generar token a los jugadores que no lo tengan
+        const sinToken = jugadores.filter(j => !j.wellness_token);
+        for (const j of sinToken) {
+            const nuevo = Array.from(crypto.getRandomValues(new Uint8Array(9))).map(b => b.toString(16).padStart(2, '0')).join('');
+            const { error: errT } = await supabaseClient.from('players').update({ wellness_token: nuevo }).eq('id', j.id);
+            if (!errT) j.wellness_token = nuevo;
+        }
+
         let html = `
             <div class="wenl-cab">
                 <h2>🔗 Enlaces de wellness</h2>
