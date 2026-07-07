@@ -1,7 +1,7 @@
 // ========== WELLNESS-ENLACES.JS - TopLiderCoach HUB ==========
 // Pantalla para que el club vea y reparta los enlaces de wellness de cada jugador
 
-const WELLNESS_BASE_URL = window.location.origin + '/wellness/';
+const WELLNESS_BASE_URL = new URL('wellness/', window.location.href).href;
 const RPE_BASE_URL = new URL('rpe.html', window.location.href).href;
 
 (function() {
