@@ -2,6 +2,7 @@
 // Pantalla para que el club vea y reparta los enlaces de wellness de cada jugador
 
 const WELLNESS_BASE_URL = window.location.origin + '/wellness/';
+const RPE_BASE_URL = new URL('rpe.html', window.location.href).href;
 
 (function() {
     if (document.getElementById('wenl-styles')) return;
@@ -80,7 +81,8 @@ async function cargarEnlacesWellness() {
 
         jugadores.forEach(j => {
             const enlace = WELLNESS_BASE_URL + '?j=' + j.wellness_token;
-            window._wenlDatos.push({ nombre: j.name, enlace: enlace });
+            const enlaceRpe = RPE_BASE_URL + '?j=' + j.wellness_token;
+            window._wenlDatos.push({ nombre: j.name, enlace: enlace, enlaceRpe: enlaceRpe });
 
             const foto = j.photo_url
                 ? `<img src="${j.photo_url}" class="wenl-foto" alt="">`
@@ -91,6 +93,9 @@ async function cargarEnlacesWellness() {
             const waUrl = tieneTel
                 ? `https://wa.me/${telLimpio}?text=${wenlMensajeWhatsApp(j.name, enlace)}`
                 : `https://wa.me/?text=${wenlMensajeWhatsApp(j.name, enlace)}`;
+            const waUrlRpe = tieneTel
+                ? `https://wa.me/${telLimpio}?text=${encodeURIComponent('Hola ' + j.name + ' 👋\nEste es tu enlace personal para valorar tu esfuerzo (RPE) después de cada entrenamiento. Guárdalo en tu móvil:\n\n' + enlaceRpe + '\n\nÁbrelo al terminar cada sesión. ¡Gracias!')}`
+                : `https://wa.me/?text=${encodeURIComponent('Hola ' + j.name + ' 👋\nEste es tu enlace personal para valorar tu esfuerzo (RPE) después de cada entrenamiento. Guárdalo en tu móvil:\n\n' + enlaceRpe + '\n\nÁbrelo al terminar cada sesión. ¡Gracias!')}`;
 
             html += `
                 <div class="wenl-row">
@@ -99,9 +104,17 @@ async function cargarEnlacesWellness() {
                         <div class="wenl-nombre">${j.name}</div>
                         <div class="wenl-enlace">${enlace}</div>
                     </div>
-                    <div class="wenl-acciones">
-                        <button class="wenl-bcopiar" onclick="wenlCopiar('${enlace}', this)">📋 Copiar</button>
-                        <a href="${waUrl}" target="_blank" class="wenl-bwa ${tieneTel ? '' : 'sin-tel'}" title="${tieneTel ? 'Enviar por WhatsApp' : 'Sin teléfono: se abre WhatsApp para elegir contacto'}">📱 WhatsApp</a>
+                    <div class="wenl-acciones" style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+                        <div style="display:flex;gap:6px;align-items:center">
+                            <span style="font-size:10px;color:#6b7280;font-weight:700">🌅 WELLNESS</span>
+                            <button class="wenl-bcopiar" onclick="wenlCopiar('${enlace}', this)">📋 Copiar</button>
+                            <a href="${waUrl}" target="_blank" class="wenl-bwa ${tieneTel ? '' : 'sin-tel'}" title="${tieneTel ? 'Enviar por WhatsApp' : 'Sin teléfono: se abre WhatsApp para elegir contacto'}">📱 WhatsApp</a>
+                        </div>
+                        <div style="display:flex;gap:6px;align-items:center">
+                            <span style="font-size:10px;color:#6b7280;font-weight:700">🏃 RPE</span>
+                            <button class="wenl-bcopiar" onclick="wenlCopiar('${enlaceRpe}', this)">📋 Copiar</button>
+                            <a href="${waUrlRpe}" target="_blank" class="wenl-bwa ${tieneTel ? '' : 'sin-tel'}" title="${tieneTel ? 'Enviar por WhatsApp' : 'Sin teléfono: se abre WhatsApp para elegir contacto'}">📱 WhatsApp</a>
+                        </div>
                     </div>
                 </div>
             `;
@@ -128,7 +141,7 @@ function wenlCopiar(enlace, btn) {
 
 function wenlCopiarTodos() {
     if (!window._wenlDatos || window._wenlDatos.length === 0) return;
-    const texto = window._wenlDatos.map(d => d.nombre + ': ' + d.enlace).join('\n');
+    const texto = window._wenlDatos.map(d => d.nombre + '\n  Wellness: ' + d.enlace + '\n  RPE: ' + (d.enlaceRpe || '')).join('\n');
     navigator.clipboard.writeText(texto).then(() => {
         showToast('Todos los enlaces copiados (' + window._wenlDatos.length + ' jugadores)');
     }).catch(() => {

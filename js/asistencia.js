@@ -351,6 +351,7 @@ async function abrirModalAsistenciaSesion(sesionId) {
             const fatiga = asist.fatiga || '';
             const estres = asist.estres || '';
             const horasSueno = asist.horas_sueno || '';
+            const rpeVal = (asist.rpe === null || asist.rpe === undefined) ? '' : asist.rpe;
             const muscular = (asist.estado_muscular !== null && asist.estado_muscular !== undefined) ? asist.estado_muscular : '';
             const grupoMuscular = asist.grupo_muscular || '';
             const mostrarGrupo = (muscular !== '' && Number(muscular) >= 4);
@@ -404,6 +405,11 @@ async function abrirModalAsistenciaSesion(sesionId) {
                             <label>⏱️ Horas de sueño</label>
                             <input type="number" class="w-horas" placeholder="h" step="0.5" min="0" max="16" value="${horasSueno}">
                         </div>
+                        <div class="wreg-item">
+                            <label>🏃 RPE (esfuerzo de la sesión) <span class="wreg-val" data-for="rpe">${rpeVal === '' ? '-' : rpeVal}</span></label>
+                            <input type="range" class="w-rpe" min="0" max="10" value="${rpeVal === '' ? 0 : rpeVal}" data-set="${rpeVal === '' ? '0' : '1'}" oninput="wActualizarRpe(this)">
+                            <div class="wreg-extremos"><span>0 · Descanso</span><span>Máximo · 10</span></div>
+                        </div>
                     </div>
                     <div class="wreg-grupo" style="display:${mostrarGrupo ? 'block' : 'none'};">
                         <label>🩹 ¿Qué grupo muscular?</label>
@@ -417,7 +423,14 @@ async function abrirModalAsistenciaSesion(sesionId) {
             `;
         });
         
-        document.getElementById('modal-asistencia-jugadores').innerHTML = html;
+        const durGuardada = (asistencias || []).map(a => a.duracion_real).find(v => v !== null && v !== undefined);
+        const durBar = `
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#eef2ff;border:1px solid #c7d2fe;border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#3730a3;font-weight:600">
+                ⏱️ Duración real de la sesión:
+                <input type="number" id="w-duracion-real" min="0" max="240" value="${durGuardada || sesion.duration_minutes || ''}" style="width:70px;padding:6px 8px;border:1px solid #c7d2fe;border-radius:7px;font-size:13px"> min
+                <span style="font-weight:400;color:#6b7280;font-size:11px">Se usa para calcular la carga de entrenamiento (RPE × minutos)</span>
+            </div>`;
+        document.getElementById('modal-asistencia-jugadores').innerHTML = durBar + html;
         document.querySelectorAll('.wreg-card').forEach(c => wCalcularIndices(c));
     } catch (error) {
         console.error('Error cargando asistencia:', error);
@@ -488,6 +501,16 @@ async function guardarAsistenciaSesion() {
             estado_muscular: isNaN(muscVal) ? null : muscVal,
             grupo_muscular: (muscVal >= 4) ? (row.querySelector('.w-grupo').value || null) : null,
             horas_sueno: parseFloat(row.querySelector('.w-horas').value) || null,
+            rpe: (function() {
+                const inp = row.querySelector('.w-rpe');
+                if (!inp || inp.dataset.set !== '1') return null;
+                const v = parseInt(inp.value);
+                return isNaN(v) ? null : v;
+            })(),
+            duracion_real: (function() {
+                const d = parseInt((document.getElementById('w-duracion-real') || {}).value);
+                return isNaN(d) ? null : d;
+            })(),
             registrado_por: 'staff'
         });
     });
@@ -987,4 +1010,11 @@ async function generarPDFPlantillaGeneral() {
         console.error('Error generando PDF general:', error);
         showToast('Error al generar PDF: ' + error.message);
     }
+}
+// Actualiza el valor visible del deslizador de RPE y lo marca como registrado
+function wActualizarRpe(input) {
+    input.dataset.set = '1';
+    const card = input.closest('.wreg-card');
+    const span = card.querySelector('.wreg-val[data-for="rpe"]');
+    if (span) span.textContent = input.value;
 }

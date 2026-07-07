@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>RPE — TopLiderCoach</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(160deg, #0f172a, #1e1b4b); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 18px; }
+    .card { background: #fff; border-radius: 20px; padding: 26px 22px; max-width: 400px; width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,0.4); text-align: center; }
+    .logo { font-size: 13px; font-weight: 800; color: #7c3aed; letter-spacing: 1px; margin-bottom: 14px; }
+    .saludo { font-size: 19px; font-weight: 800; color: #1f2937; margin-bottom: 4px; }
+    .sesion-info { font-size: 13px; color: #6b7280; margin-bottom: 20px; }
+    .pregunta { font-size: 15px; font-weight: 700; color: #374151; margin-bottom: 18px; }
+    .rpe-num { font-size: 64px; font-weight: 900; line-height: 1; margin-bottom: 2px; transition: color 0.2s; }
+    .rpe-desc { font-size: 14px; font-weight: 700; margin-bottom: 20px; min-height: 18px; transition: color 0.2s; }
+    input[type=range] { width: 100%; height: 34px; accent-color: #7c3aed; margin-bottom: 4px; }
+    .extremos { display: flex; justify-content: space-between; font-size: 11px; color: #9ca3af; margin-bottom: 24px; }
+    .btn { width: 100%; padding: 15px; background: #16a34a; color: #fff; border: none; border-radius: 12px; font-size: 16px; font-weight: 800; cursor: pointer; }
+    .btn:disabled { background: #9ca3af; }
+    .estado { font-size: 14px; color: #6b7280; padding: 30px 6px; line-height: 1.5; }
+    .ok { font-size: 48px; margin-bottom: 12px; }
+    .aviso-previo { background: #fef3c7; color: #92400e; border-radius: 10px; padding: 8px 12px; font-size: 12px; margin-bottom: 16px; }
+    .sel-sesion { display: block; width: 100%; padding: 12px; margin-bottom: 8px; background: #f3f4f6; border: 1px solid #d1d5db; border-radius: 10px; font-size: 14px; font-weight: 600; color: #374151; cursor: pointer; }
+</style>
+</head>
+<body>
+<div class="card" id="card">
+    <div class="logo">⚽ TOPLIDERCOACH</div>
+    <div class="estado" id="contenido">Cargando...</div>
+</div>
+<script>
+const SUPABASE_URL = 'https://cqteodxyvavyroxeshoz.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNxdGVvZHh5dmF2eXJveGVzaG96Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUyNzc2OTksImV4cCI6MjA4MDg1MzY5OX0.8sJC6twae2pnrf8NDVlOV2KnSOhBC1RrqWC0IiuE614';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const RPE_DESCRIPCIONES = {
+    0: ['Descanso', '#64748b'], 1: ['Muy, muy suave', '#22c55e'], 2: ['Suave', '#22c55e'],
+    3: ['Moderado', '#84cc16'], 4: ['Algo duro', '#eab308'], 5: ['Duro', '#f59e0b'],
+    6: ['Duro', '#f59e0b'], 7: ['Muy duro', '#f97316'], 8: ['Muy, muy duro', '#ef4444'],
+    9: ['Casi máximo', '#dc2626'], 10: ['Esfuerzo máximo', '#b91c1c']
+};
+
+let jugador = null;
+let sesionElegida = null;
+let registroExistente = null;
+
+function hoyISO() {
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+function mostrar(html) { document.getElementById('contenido').innerHTML = html; }
+function mensaje(txt) { mostrar('<div class="estado">' + txt + '</div>'); }
+
+async function iniciar() {
+    const token = new URLSearchParams(location.search).get('j');
+    if (!token || token === 'null') { mensaje('Enlace no válido. Pide a tu entrenador que te lo reenvíe.'); return; }
+
+    const { data: jug } = await sb.from('players').select('id, name').eq('wellness_token', token).maybeSingle();
+    if (!jug) { mensaje('No encontramos tu ficha. Pide a tu entrenador que te reenvíe el enlace.'); return; }
+    jugador = jug;
+
+    const { data: sesiones } = await sb.from('training_sessions')
+        .select('id, name, session_date, session_time')
+        .eq('session_date', hoyISO())
+        .contains('players', JSON.stringify([{ player_id: jugador.id }]))
+        .order('session_time');
+
+    if (!sesiones || sesiones.length === 0) {
+        mensaje('Hola, <strong>' + jugador.name + '</strong> 👋<br><br>Hoy no tienes ninguna sesión registrada.<br>Vuelve a abrir este enlace después de entrenar.');
+        return;
+    }
+    if (sesiones.length === 1) { elegirSesion(sesiones[0]); return; }
+
+    let botones = '';
+    sesiones.forEach((s, i) => {
+        botones += '<button class="sel-sesion" onclick="elegirSesionIdx(' + i + ')">' + (s.session_time ? s.session_time.slice(0, 5) + ' · ' : '') + s.name + '</button>';
+    });
+    window._sesiones = sesiones;
+    mostrar('<div class="saludo">Hola, ' + jugador.name + ' 👋</div><div class="sesion-info">Hoy tienes varias sesiones. ¿Cuál quieres valorar?</div>' + botones);
+}
+
+function elegirSesionIdx(i) { elegirSesion(window._sesiones[i]); }
+
+async function elegirSesion(sesion) {
+    sesionElegida = sesion;
+    const { data: reg } = await sb.from('asistencia_sesiones')
+        .select('id, rpe')
+        .eq('sesion_id', sesion.id)
+        .eq('jugador_id', jugador.id)
+        .maybeSingle();
+    registroExistente = reg || null;
+
+    const yaTiene = reg && reg.rpe !== null && reg.rpe !== undefined;
+    const valorInicial = yaTiene ? reg.rpe : 5;
+
+    mostrar(
+        '<div class="saludo">Hola, ' + jugador.name + ' 👋</div>'
+        + '<div class="sesion-info">' + sesion.name + ' · hoy</div>'
+        + (yaTiene ? '<div class="aviso-previo">Ya registraste un ' + reg.rpe + '. Puedes corregirlo si quieres.</div>' : '')
+        + '<div class="pregunta">¿Cómo fue tu entrenamiento?</div>'
+        + '<div class="rpe-num" id="rpe-num">' + valorInicial + '</div>'
+        + '<div class="rpe-desc" id="rpe-desc"></div>'
+        + '<input type="range" id="rpe-slider" min="0" max="10" value="' + valorInicial + '" oninput="actualizarRpe(this.value)">'
+        + '<div class="extremos"><span>0 · Descanso</span><span>Máximo · 10</span></div>'
+        + '<button class="btn" id="btn-enviar" onclick="enviarRpe()">Enviar</button>'
+    );
+    actualizarRpe(valorInicial);
+}
+
+function actualizarRpe(v) {
+    const info = RPE_DESCRIPCIONES[v] || ['', '#374151'];
+    const num = document.getElementById('rpe-num');
+    const desc = document.getElementById('rpe-desc');
+    num.textContent = v;
+    num.style.color = info[1];
+    desc.textContent = info[0];
+    desc.style.color = info[1];
+}
+
+async function enviarRpe() {
+    const btn = document.getElementById('btn-enviar');
+    btn.disabled = true;
+    btn.textContent = 'Enviando...';
+    const valor = parseInt(document.getElementById('rpe-slider').value);
+    try {
+        if (registroExistente) {
+            const { error } = await sb.from('asistencia_sesiones').update({ rpe: valor }).eq('id', registroExistente.id);
+            if (error) throw error;
+        } else {
+            const { error } = await sb.from('asistencia_sesiones').insert({
+                sesion_id: sesionElegida.id,
+                jugador_id: jugador.id,
+                asistio: true,
+                rpe: valor,
+                registrado_por: 'jugador'
+            });
+            if (error) throw error;
+        }
+        mostrar('<div class="ok">✅</div><div class="saludo">¡Registrado!</div><div class="estado">Tu esfuerzo de hoy: <strong>' + valor + ' — ' + RPE_DESCRIPCIONES[valor][0] + '</strong><br><br>Gracias, ' + jugador.name + '. Descansa bien. 💪</div>');
+    } catch (e) {
+        btn.disabled = false;
+        btn.textContent = 'Enviar';
+        alert('Error al enviar: ' + e.message);
+    }
+}
+
+iniciar();
+</script>
+</body>
+</html>
