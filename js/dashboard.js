@@ -204,3 +204,188 @@ async function cargarAlertasWellness() {
     if(al.length===0){c.innerHTML='<div class="sin-datos"><div class="icono">✅</div><p>¡Equipo en buenas condiciones!</p></div>';return;}
     c.innerHTML=al.slice(0,5).map(a=>`<div class="alerta-item ${a.cl}"><div><div class="jugador-nombre">${a.j}</div><div class="alerta-detalle">${a.t}</div></div><div class="valor">${a.v}</div></div>`).join('');
 }
+// ================================================================
+// DASHBOARD 2.0 - Arreglos de datos + fila de widgets CRM
+// (las funciones con el mismo nombre sustituyen a las antiguas)
+// ================================================================
+
+// --- ARREGLO 1: asistencia y wellness del mes (tabla correcta) ---
+async function cargarDatosEntrenamientosDashboard() {
+    const now = new Date();
+    const ini = new Date(now.getFullYear(), now.getMonth(), 1).toLocaleDateString('en-CA');
+    const fin = new Date(now.getFullYear(), now.getMonth() + 1, 0).toLocaleDateString('en-CA');
+    const { data: ses } = await supabaseClient.from('training_sessions').select('id').eq('club_id', clubId).gte('session_date', ini).lte('session_date', fin);
+    const n = (ses && ses.length) || 0;
+    const elS = document.getElementById('dash-sesiones');
+    if (elS) elS.textContent = n;
+    const elA = document.getElementById('dash-asistencia-media');
+    const elW = document.getElementById('dash-wellness-medio');
+    if (n === 0) { if (elA) elA.textContent = '-'; if (elW) elW.textContent = '-'; return; }
+    const { data: att } = await supabaseClient.from('asistencia_sesiones').select('asistio, sueno, fatiga, estres').in('sesion_id', ses.map(s => s.id));
+    if (att && att.length > 0) {
+        const ok = att.filter(a => a.asistio).length;
+        if (elA) elA.textContent = Math.round((ok / att.length) * 100) + '%';
+        const medias = att.map(a => {
+            const v = [a.sueno, a.fatiga, a.estres].filter(x => x !== null && x !== undefined);
+            return v.length ? v.reduce((x, y) => x + y, 0) / v.length : null;
+        }).filter(x => x !== null);
+        if (elW) elW.textContent = medias.length ? (medias.reduce((x, y) => x + y, 0) / medias.length).toFixed(1) : '-';
+    } else { if (elA) elA.textContent = '-'; if (elW) elW.textContent = '-'; }
+}
+
+// --- ARREGLO 2: alertas de bienestar (tabla y campos correctos) ---
+async function cargarAlertasWellness() {
+    const c = document.getElementById('dash-alertas-wellness');
+    if (!c) return;
+    const { data: us } = await supabaseClient.from('training_sessions').select('id, session_date').eq('club_id', clubId).lte('session_date', new Date().toLocaleDateString('en-CA')).order('session_date', { ascending: false }).limit(1).maybeSingle();
+    if (!us) { c.innerHTML = '<div class="sin-datos"><div class="icono">✅</div><p>Sin datos recientes</p></div>'; return; }
+    const { data: att } = await supabaseClient.from('asistencia_sesiones').select('jugador_id, sueno, fatiga, estres, estado_muscular').eq('sesion_id', us.id);
+    if (!att || att.length === 0) { c.innerHTML = '<div class="sin-datos"><div class="icono">✅</div><p>Sin registros</p></div>'; return; }
+    const ids = [...new Set(att.map(a => a.jugador_id))];
+    const nombres = {};
+    if (ids.length) {
+        const { data: jugs } = await supabaseClient.from('players').select('id, name').in('id', ids);
+        (jugs || []).forEach(j => { nombres[j.id] = j.name; });
+    }
+    const al = [];
+    att.forEach(a => {
+        const v = [a.sueno, a.fatiga, a.estres].filter(x => x !== null && x !== undefined);
+        const bien = v.length ? v.reduce((x, y) => x + y, 0) / v.length : null;
+        if (bien !== null && bien <= 5) al.push({ j: nombres[a.jugador_id] || 'Jugador', t: 'Bienestar bajo', v: bien.toFixed(1), cl: bien <= 3.5 ? '' : 'warning' });
+        if (a.estado_muscular !== null && a.estado_muscular >= 6) al.push({ j: nombres[a.jugador_id] || 'Jugador', t: 'Daño muscular', v: a.estado_muscular, cl: a.estado_muscular >= 8 ? '' : 'warning' });
+    });
+    if (al.length === 0) { c.innerHTML = '<div class="sin-datos"><div class="icono">✅</div><p>¡Equipo en buenas condiciones!</p></div>'; return; }
+    c.innerHTML = al.slice(0, 5).map(a => '<div class="alerta-item ' + a.cl + '"><div><div class="jugador-nombre">' + a.j + '</div><div class="alerta-detalle">' + a.t + '</div></div><div class="valor">' + a.v + '</div></div>').join('');
+}
+
+// --- NUEVO: fila de widgets CRM (racha, cargas, carga semanal, cumpleanos) ---
+function dashInyectarEstilosInsights() {
+    if (document.getElementById('dash-ins-styles')) return;
+    const st = document.createElement('style');
+    st.id = 'dash-ins-styles';
+    st.textContent = '.dash-ins-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:14px;margin-bottom:18px}' +
+        '.dash-ins{background:#fff;border:1px solid #e9ecf2;border-radius:14px;padding:14px 16px;box-shadow:0 2px 10px rgba(15,23,42,.05)}' +
+        '.dash-ins-t{font-size:11px;font-weight:800;color:#8a93a6;text-transform:uppercase;letter-spacing:.5px;margin-bottom:9px;display:flex;align-items:center;gap:6px}' +
+        '.dash-racha{display:flex;gap:6px}.dash-racha span{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:13px}' +
+        '.dash-ch{display:inline-flex;align-items:center;gap:5px;padding:4px 9px;border-radius:7px;font-size:12px;font-weight:800;margin:0 5px 5px 0}' +
+        '.dash-cumple{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:13px;color:#374151}' +
+        '.dash-cumple b{color:#26215C}.dash-ins-big{font-size:26px;font-weight:900;color:#26215C;line-height:1.1}' +
+        '.dash-ins-sub{font-size:11px;color:#9ca3af;margin-top:3px}' +
+        '.dash-ins-link{margin-top:8px;font-size:11.5px;color:#7c3aed;font-weight:700;cursor:pointer;display:inline-block}';
+    document.head.appendChild(st);
+}
+
+function dashISO(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function dashAddDias(iso, n) { const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + n); return dashISO(d); }
+
+async function cargarInsightsDashboard() {
+    dashInyectarEstilosInsights();
+    const grid = document.querySelector('#modulo-dashboard .dash-main-grid');
+    if (!grid) return;
+    let row = document.getElementById('dash-ins-row');
+    if (!row) {
+        row = document.createElement('div');
+        row.id = 'dash-ins-row';
+        row.className = 'dash-ins-row';
+        grid.parentElement.insertBefore(row, grid);
+    }
+    row.innerHTML = '<div class="dash-ins"><div class="dash-ins-t">🔥 Racha (últimos 5)</div><div class="dash-racha" id="dash-ins-racha"><span style="background:#e5e7eb;color:#9ca3af">-</span></div></div>' +
+        '<div class="dash-ins"><div class="dash-ins-t">🚦 Estado de cargas (ACWR)</div><div id="dash-ins-cargas" style="font-size:12px;color:#9ca3af">Calculando...</div><span class="dash-ins-link" onclick="dashIrACargas()">Ver panel de cargas →</span></div>' +
+        '<div class="dash-ins"><div class="dash-ins-t">💪 Carga equipo · 7 días</div><div class="dash-ins-big" id="dash-ins-carga7">-</div><div class="dash-ins-sub" id="dash-ins-carga7-sub">media UA por jugador</div></div>' +
+        '<div class="dash-ins"><div class="dash-ins-t">🎂 Próximos cumpleaños</div><div id="dash-ins-cumples" style="font-size:12px;color:#9ca3af">-</div></div>';
+
+    // Racha: ultimos 5 partidos con resultado
+    try {
+        const { data: pj } = await supabaseClient.from('matches').select('result, opponent, match_date').eq('club_id', clubId).not('result', 'is', null).order('match_date', { ascending: false }).limit(5);
+        const el = document.getElementById('dash-ins-racha');
+        if (pj && pj.length) {
+            el.innerHTML = pj.reverse().map(p => {
+                const col = p.result === 'win' ? '#22c55e' : (p.result === 'draw' ? '#f59e0b' : '#ef4444');
+                const letra = p.result === 'win' ? 'V' : (p.result === 'draw' ? 'E' : 'D');
+                return '<span style="background:' + col + '" title="vs ' + (p.opponent || '') + '">' + letra + '</span>';
+            }).join('');
+        } else { el.innerHTML = '<span style="background:#e5e7eb;color:#9ca3af;width:auto;padding:0 10px;font-size:11px;font-weight:600">Sin partidos jugados</span>'; }
+    } catch (e) {}
+
+    // Cargas: ACWR de cada jugador (35 dias de datos)
+    try {
+        const hoy = dashISO(new Date());
+        const desde = dashAddDias(hoy, -35);
+        const { data: ses } = await supabaseClient.from('training_sessions').select('id, session_date, duration_minutes').eq('club_id', clubId).gte('session_date', desde).lte('session_date', hoy);
+        const sesMap = {}; (ses || []).forEach(s => { sesMap[s.id] = s; });
+        let att = [];
+        if (ses && ses.length) {
+            const r = await supabaseClient.from('asistencia_sesiones').select('sesion_id, jugador_id, asistio, rpe, duracion_real').in('sesion_id', ses.map(s => s.id));
+            att = r.data || [];
+        }
+        const cargas = {};
+        att.forEach(a => {
+            const s = sesMap[a.sesion_id];
+            if (!s || !a.asistio || a.rpe === null || a.rpe === undefined) return;
+            const mins = a.duracion_real || s.duration_minutes || 0;
+            if (!cargas[a.jugador_id]) cargas[a.jugador_id] = {};
+            cargas[a.jugador_id][s.session_date] = (cargas[a.jugador_id][s.session_date] || 0) + a.rpe * mins;
+        });
+        let opt = 0, aten = 0, riesgo = 0, agudaTotal = 0, nJug = 0;
+        Object.keys(cargas).forEach(jid => {
+            let aguda = 0, total28 = 0;
+            for (let i = 0; i < 28; i++) {
+                const v = cargas[jid][dashAddDias(hoy, -i)] || 0;
+                total28 += v;
+                if (i < 7) aguda += v;
+            }
+            if (total28 <= 0) return;
+            nJug++;
+            agudaTotal += aguda;
+            const acwr = aguda / (total28 / 4);
+            if (acwr > 1.5) riesgo++;
+            else if (acwr < 0.8 || acwr > 1.3) aten++;
+            else opt++;
+        });
+        const elC = document.getElementById('dash-ins-cargas');
+        if (nJug === 0) { elC.innerHTML = '<span style="font-size:12px;color:#9ca3af">Aún sin registros de RPE</span>'; }
+        else {
+            elC.innerHTML = '<span class="dash-ch" style="background:#dcfce7;color:#15803d">🟢 ' + opt + ' óptimo</span>' +
+                '<span class="dash-ch" style="background:#fef3c7;color:#b45309">🟡 ' + aten + ' atención</span>' +
+                '<span class="dash-ch" style="background:#fee2e2;color:#b91c1c">🔴 ' + riesgo + ' riesgo</span>';
+        }
+        const el7 = document.getElementById('dash-ins-carga7');
+        if (el7) el7.textContent = nJug > 0 ? Math.round(agudaTotal / nJug) + ' UA' : '-';
+    } catch (e) {}
+
+    // Cumpleanos en los proximos 30 dias
+    try {
+        const { data: jugs } = await supabaseClient.from('players').select('name, birth_date').eq('club_id', clubId).not('birth_date', 'is', null);
+        const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+        const lista = [];
+        (jugs || []).forEach(j => {
+            const b = new Date(j.birth_date + 'T12:00:00');
+            let prox = new Date(hoy.getFullYear(), b.getMonth(), b.getDate());
+            if (prox < hoy) prox = new Date(hoy.getFullYear() + 1, b.getMonth(), b.getDate());
+            const dias = Math.round((prox - hoy) / 86400000);
+            if (dias <= 30) lista.push({ n: j.name, dias: dias, edad: prox.getFullYear() - b.getFullYear() });
+        });
+        lista.sort((a, b) => a.dias - b.dias);
+        const el = document.getElementById('dash-ins-cumples');
+        if (!lista.length) { el.innerHTML = '<span style="font-size:12px;color:#9ca3af">Ninguno en 30 días</span>'; }
+        else {
+            el.innerHTML = lista.slice(0, 3).map(c => '<div class="dash-cumple">🎂 <b>' + c.n + '</b> · ' + (c.dias === 0 ? '¡HOY!' : 'en ' + c.dias + ' día' + (c.dias === 1 ? '' : 's')) + ' (' + c.edad + ')</div>').join('');
+        }
+    } catch (e) {}
+}
+
+function dashIrACargas() {
+    const tabPlan = document.querySelector('.main-tab[onclick*="planificador"]');
+    if (tabPlan) tabPlan.click();
+    setTimeout(function() {
+        const sub = document.querySelector('.sub-tab[onclick*="\'cargas\'"]');
+        if (sub) sub.click();
+    }, 300);
+}
+
+// Enganche: cada vez que se recargue el dashboard, se anade la fila nueva
+const _cargarDashboardOriginal = cargarDashboard;
+cargarDashboard = async function() {
+    await _cargarDashboardOriginal();
+    cargarInsightsDashboard();
+};
