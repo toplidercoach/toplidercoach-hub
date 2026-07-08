@@ -2121,3 +2121,187 @@ function calPdfCuadricula2(doc, mes, anio, datos, nombreClub) {
     doc.setTextColor(100, 100, 110);
     doc.text(datos.sesiones.length + ' sesiones  ·  ' + datos.partidos.length + ' partidos  ·  ' + (datos.marcadores || []).length + ' dias marcados', margenX, y);
 }
+// ================================================================
+// PUENTE UTILLERO (Club Mode) + Copiar lista de material
+// ================================================================
+function _parsearMaterialSesion() {
+    const raw = document.getElementById('sesion-material').value.trim();
+    if (!raw) return [];
+    const items = [];
+    raw.split(/[\n,]+/).forEach(function(l) {
+        l = l.trim();
+        if (!l) return;
+        const m = l.match(/^(\d+)\s*x?\s+(.+)$/);
+        if (m) items.push({ quantity: parseInt(m[1]), name: m[2] });
+        else items.push({ quantity: 1, name: l });
+    });
+    return items;
+}
+
+function _fechaSesionBonita() {
+    const f = document.getElementById('sesion-fecha').value;
+    if (!f) return '';
+    const p = f.split('-');
+    return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : f;
+}
+
+function copiarMaterialSesion() {
+    const items = _parsearMaterialSesion();
+    if (!items.length) { showToast('El campo de material esta vacio'); return; }
+    const nombre = document.getElementById('sesion-nombre').value.trim();
+    const fecha = _fechaSesionBonita();
+    let texto = 'MATERIAL - ' + (nombre || 'Sesion') + (fecha ? ' (' + fecha + ')' : '') + ':\n';
+    items.forEach(function(it) { texto += '- ' + it.quantity + ' ' + it.name + '\n'; });
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(texto).then(function() {
+            showToast('Lista copiada. Pegala en WhatsApp o donde quieras');
+        }).catch(function() { _copiarFallback(texto); });
+    } else { _copiarFallback(texto); }
+}
+
+function _copiarFallback(texto) {
+    const ta = document.createElement('textarea');
+    ta.value = texto; document.body.appendChild(ta);
+    ta.select(); document.execCommand('copy'); ta.remove();
+    showToast('Lista copiada. Pegala en WhatsApp o donde quieras');
+}
+
+async function enviarMaterialUtillero() {
+    if (typeof cmState === 'undefined' || !cmState.activo) {
+        showToast('Esta opcion solo esta disponible en Modo Club');
+        return;
+    }
+    const items = _parsearMaterialSesion();
+    if (!items.length) { showToast('El campo de material esta vacio'); return; }
+    const nombre = document.getElementById('sesion-nombre').value.trim();
+    const fecha = document.getElementById('sesion-fecha').value || null;
+    const quien = (typeof usuario !== 'undefined' && usuario && (usuario.nombre || usuario.display_name || usuario.name)) || 'Entrenador';
+
+    const res = await supabaseClient.from('cm_util_requests').insert({
+        club_id: clubId,
+        requested_by: (typeof usuario !== 'undefined' && usuario) ? usuario.id : 0,
+        requester_name: quien,
+        requester_role: 'entrenador',
+        items: items,
+        urgency: 'normal',
+        status: 'pending',
+        source: 'sesion',
+        session_id: sesionEditandoId || null,
+        session_date: fecha,
+        notes: nombre ? 'Sesion: ' + nombre : null
+    });
+    if (res.error) { showToast('Error enviando al utillero: ' + res.error.message); return; }
+
+    try {
+        const resumen = items.map(function(it) { return it.quantity + ' ' + it.name; }).join(', ');
+        await supabaseClient.from('cm_notifications').insert({
+            club_id: clubId,
+            type: 'material_request',
+            title: 'Material para sesion' + (fecha ? ' del ' + _fechaSesionBonita() : '') + ' - ' + quien,
+            message: resumen,
+            icon: 'material',
+            target_permission: 'modulo_utillero',
+            created_by: (typeof usuario !== 'undefined' && usuario) ? usuario.id : null
+        });
+    } catch (e) { console.error('Error notificacion utillero:', e); }
+
+    showToast('Material enviado al utillero');
+}
+
+(function _mostrarBotonUtillero() {
+    let n = 0;
+    const iv = setInterval(function() {
+        n++; if (n > 20) { clearInterval(iv); return; }
+        if (typeof cmState === 'undefined' || !cmState.activo) return;
+        clearInterval(iv);
+        const b = document.getElementById('btn-enviar-utillero');
+        if (b) b.style.display = '';
+    }, 500);
+})();
+// ===== PEDIDO AL UTILLERO CON LISTA CERRADA (sustituye a la version de texto libre) =====
+async function enviarMaterialUtillero() {
+    if (typeof cmState === 'undefined' || !cmState.activo) { showToast('Esta opcion solo esta disponible en Modo Club'); return; }
+    let items = [];
+    try {
+        const r = await supabaseClient.from('cm_util_items').select('id, name, category, qty_available').eq('club_id', clubId).eq('archived', false).order('category').order('name');
+        items = r.data || [];
+    } catch (e) {}
+    const prev = document.getElementById('util-pedido-ov'); if (prev) prev.remove();
+    const ov = document.createElement('div');
+    ov.id = 'util-pedido-ov';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+    ov.onclick = function(e) { if (e.target === ov) ov.remove(); };
+    const CATS = { balones:'Balones', textil_entreno:'Textil de entreno', equipacion_oficial:'Equipacion oficial', porterias_campo:'Porterias y campo', botiquin_campo:'Botiquin de campo', hidratacion:'Hidratacion', tecnologia:'Tecnologia', consumibles:'Consumibles', otros:'Otros' };
+    let lista = '';
+    let catAct = null;
+    items.forEach(function(it) {
+        if (it.category !== catAct) { catAct = it.category; lista += '<div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;margin:10px 0 4px">' + (CATS[catAct] || catAct) + '</div>'; }
+        lista += '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f3f4f6">'
+            + '<div style="flex:1;font-size:13px;color:#1f2937">' + it.name + ' <span style="color:#9ca3af;font-size:11px">(disp. ' + it.qty_available + ')</span></div>'
+            + '<input type="number" class="util-ped-qty" data-name="' + String(it.name).replace(/"/g, '') + '" min="0" max="999" value="0" style="width:64px;padding:5px 7px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;text-align:center">'
+            + '</div>';
+    });
+    if (!items.length) lista = '<div style="font-size:12px;color:#9ca3af;padding:8px 0">El utillero aun no tiene articulos en su inventario. Usa el campo de abajo.</div>';
+    ov.innerHTML = '<div style="background:#fff;border-radius:14px;max-width:460px;width:100%;max-height:86vh;display:flex;flex-direction:column">'
+        + '<div style="padding:16px 18px 8px"><div style="font-weight:700;color:#1f2937">📦 Pedir material al utillero</div>'
+        + '<div style="font-size:12px;color:#6b7280">Marca cantidades del inventario o anade material libre abajo</div></div>'
+        + '<div style="padding:0 18px;overflow-y:auto;flex:1">' + lista
+        + '<div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;margin:12px 0 4px">Otro material</div>'
+        + '<textarea id="util-ped-otros" placeholder="Ej: 2 escaleras de coordinacion, 1 bomba de aire" style="width:100%;min-height:54px;padding:8px 10px;border:1px solid #d1d5db;border-radius:8px;font-size:13px;box-sizing:border-box"></textarea></div>'
+        + '<div style="display:flex;gap:8px;justify-content:flex-end;padding:14px 18px">'
+        + '<button onclick="document.getElementById(\'util-pedido-ov\').remove()" style="padding:9px 16px;background:#f3f4f6;border:1px solid #d1d5db;color:#374151;border-radius:8px;cursor:pointer;font-size:13px">Cancelar</button>'
+        + '<button onclick="utilEnviarPedido()" style="padding:9px 16px;background:#f59e0b;border:none;color:#fff;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700">Enviar pedido</button>'
+        + '</div></div>';
+    document.body.appendChild(ov);
+}
+
+async function utilEnviarPedido() {
+    const items = [];
+    document.querySelectorAll('.util-ped-qty').forEach(function(inp) {
+        const q = parseInt(inp.value);
+        if (q > 0) items.push({ quantity: q, name: inp.dataset.name });
+    });
+    const otros = (document.getElementById('util-ped-otros').value || '').trim();
+    if (otros) {
+        otros.split(/[\n,]+/).forEach(function(l) {
+            l = l.trim(); if (!l) return;
+            const m = l.match(/^(\d+)\s*x?\s+(.+)$/);
+            if (m) items.push({ quantity: parseInt(m[1]), name: m[2] });
+            else items.push({ quantity: 1, name: l });
+        });
+    }
+    if (!items.length) { showToast('No has marcado ningun material'); return; }
+    const nombre = document.getElementById('sesion-nombre').value.trim();
+    const fecha = document.getElementById('sesion-fecha').value || null;
+    const quien = (typeof clubData !== 'undefined' && clubData && clubData.name) ? clubData.name : 'Club';
+    const res = await supabaseClient.from('cm_util_requests').insert({
+        club_id: clubId,
+        requested_by: (typeof usuario !== 'undefined' && usuario) ? usuario.id : 0,
+        requester_name: quien,
+        requester_role: 'entrenador',
+        items: items,
+        urgency: 'normal',
+        status: 'pending',
+        source: 'sesion',
+        session_id: (typeof sesionEditandoId !== 'undefined' ? sesionEditandoId : null) || null,
+        session_date: fecha,
+        notes: nombre ? 'Sesion: ' + nombre : null
+    });
+    if (res.error) { showToast('Error enviando al utillero: ' + res.error.message); return; }
+    const ta = document.getElementById('sesion-material');
+    if (ta) ta.value = items.map(function(it) { return it.quantity + ' ' + it.name; }).join(', ');
+    try {
+        const resumen = items.map(function(it) { return it.quantity + ' ' + it.name; }).join(', ');
+        await supabaseClient.from('cm_notifications').insert({
+            club_id: clubId,
+            type: 'material_request',
+            title: 'Material para sesion' + (fecha ? ' del ' + _fechaSesionBonita() : '') + ' - ' + quien,
+            message: resumen,
+            icon: 'material',
+            target_permission: 'modulo_utillero',
+            created_by: (typeof usuario !== 'undefined' && usuario) ? usuario.id : null
+        });
+    } catch (e) { console.error('Error notificacion utillero:', e); }
+    const ov = document.getElementById('util-pedido-ov'); if (ov) ov.remove();
+    showToast('Pedido enviado al utillero');
+}

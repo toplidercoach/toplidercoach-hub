@@ -331,6 +331,10 @@
                             <div class="campo-grupo full-width">
                                 <label>Material Necesario</label>
                                 <textarea id="sesion-material" placeholder="Ej: 20 conos, 10 petos, 2 porterias..."></textarea>
+                                <div style="display:flex;gap:8px;margin-top:6px">
+                                    <button type="button" onclick="copiarMaterialSesion()" style="padding:6px 14px;border-radius:6px;border:1px solid #cbd5e1;background:#fff;cursor:pointer;font-size:12px;font-weight:600">&#128203; Copiar lista</button>
+                                    <button type="button" id="btn-enviar-utillero" onclick="enviarMaterialUtillero()" style="display:none;padding:6px 14px;border-radius:6px;border:none;background:#f59e0b;color:#fff;cursor:pointer;font-size:12px;font-weight:600">&#128230; Enviar al utillero</button>
+                                </div>
                             </div>
                             
                             <div class="campo-grupo full-width">
@@ -1940,5 +1944,6 @@ document.getElementById('modal-tacticlip').addEventListener('click', function(e)
     <script src="js/club-mode/cm-misgastos.js"></script>
     <script src="js/club-mode/cm-rfef.js"></script>
     <script src="js/club-mode/cm-patrocinadores.js"></script>
+    <script src="js/club-mode/cm-utillero.js"></script>
 </body>
 </html>
