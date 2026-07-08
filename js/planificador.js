@@ -185,6 +185,10 @@ registrarSubTab('planificador', 'calendario', cargarCalendarioUnificado);
             const grid = document.getElementById('jugadores-sesion-grid');
             grid.style.maxHeight = 'none';
             grid.style.overflowY = 'visible';
+            grid.style.display = 'grid';
+            grid.style.gridTemplateColumns = 'repeat(auto-fill, minmax(175px, 1fr))';
+            grid.style.gap = '6px';
+            grid.style.alignItems = 'stretch';
             
             const grupos = planAgruparPorPosicion(jugadoresPlantilla);
             
@@ -195,15 +199,15 @@ registrarSubTab('planificador', 'calendario', cargarCalendarioUnificado);
                 const seleccionado = jugadoresSeleccionados.some(id => String(id) === String(sp.id));
                 const foto = jugador?.photo_url;
                 const inicial = jugador?.name ? jugador.name.charAt(0).toUpperCase() : '?';
-                const posBadge = sp._posCode ? `<span style="font-size:9px;font-weight:700;color:#7c3aed;margin-left:auto;">${sp._posCode}</span>` : '';
+                const posBadge = sp._posCode ? `<span style="font-size:9px;font-weight:700;color:#7c3aed;margin-left:auto;flex-shrink:0;">${sp._posCode}</span>` : '';
                 return `
-                    <div class="jugador-check ${seleccionado ? 'selected' : ''}" data-id="${sp.id}">
-                        <div class="jugador-foto-mini">
-                            ${foto ? `<img src="${foto}" alt="" style="width:36px;height:36px;border-radius:50%;object-fit:cover;">` 
-                                   : `<span class="jugador-inicial" style="width:36px;height:36px;border-radius:50%;background:#6b21a8;color:white;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;">${inicial}</span>`}
+                    <div class="jugador-check ${seleccionado ? 'selected' : ''}" data-id="${sp.id}" style="display:flex;align-items:center;gap:7px;padding:6px 9px;border:1.5px solid ${seleccionado ? '#7c3aed' : '#e5e7eb'};background:${seleccionado ? '#f5f3ff' : '#fff'};border-radius:10px;cursor:pointer;min-width:0;">
+                        <div class="jugador-foto-mini" style="flex-shrink:0;">
+                            ${foto ? `<img src="${foto}" alt="" style="width:32px;height:32px;border-radius:50%;object-fit:cover;display:block;">` 
+                                   : `<span class="jugador-inicial" style="width:32px;height:32px;border-radius:50%;background:#6b21a8;color:white;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;">${inicial}</span>`}
                         </div>
-                        <span class="dorsal">${sp.shirt_number || '?'}</span>
-                        <span class="nombre">${jugador?.name || 'Sin nombre'}</span>
+                        <span class="dorsal" style="flex-shrink:0;font-size:11px;font-weight:800;color:#26215C;min-width:18px;text-align:center;">${sp.shirt_number || '?'}</span>
+                        <span class="nombre" style="flex:1;min-width:0;font-size:12px;color:#1f2937;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${jugador?.name || 'Sin nombre'}</span>
                         ${posBadge}
                     </div>
                 `;
