@@ -439,7 +439,7 @@ async function abrirModalAsistenciaSesion(sesionId) {
 }
 
 function toggleAsistencia(btn) {
-    const row = btn.closest('.asistencia-jugador-row');
+    const row = btn.closest('.wreg-card');
     const motivoSelect = row.querySelector('.motivo-select');
     if (btn.classList.contains('si')) {
         btn.classList.remove('si'); btn.classList.add('no'); btn.textContent = '✗ No';
