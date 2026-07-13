@@ -157,6 +157,22 @@ function cgSemaforo(acwr) {
     if (acwr <= 1.5) return { label: acwr.toFixed(2) + ' · Atención', bg: '#fef3c7', fg: '#b45309' };
     return { label: acwr.toFixed(2) + ' · Riesgo', bg: '#fee2e2', fg: '#b91c1c' };
 }
+function cgHistorialDias(jid, refISO) {
+    const fechas = Object.keys(cgCargas[jid] || {}).sort();
+    if (!fechas.length) return 0;
+    const primera = new Date(fechas[0] + 'T12:00:00');
+    const ref = new Date(refISO + 'T12:00:00');
+    return Math.floor((ref - primera) / 86400000) + 1;
+}
+// El ACWR necesita historial: con menos de 21 dias de registros la carga
+// cronica no es representativa y el ratio sale disparado (falsos "Riesgo").
+function cgChipAcwr(m, jid, refISO) {
+    if (!m.tieneDatos || m.acwr === null) return { label: 'Sin datos', bg: '#f3f4f6', fg: '#9ca3af', title: '' };
+    if (cgHistorialDias(jid, refISO) < 21) {
+        return { label: '⏳ Acumulando historial', bg: '#f3f4f6', fg: '#6b7280', title: 'Necesitas más sesiones para que el dato sea fiable: el ACWR se mostrará cuando haya al menos 3 semanas de registros de este jugador.' };
+    }
+    return cgSemaforo(m.acwr);
+}
 function cgWellness7(jid, refISO) {
     let suma = 0, n = 0;
     for (let i = 0; i < 7; i++) {
@@ -189,13 +205,13 @@ function cgRender() {
     html += '<div class="cg-tabla-wrap"><table class="cg-tabla"><thead><tr><th>Jugador</th><th>Carga 7d (UA)</th><th>Crónica (media sem.)</th><th>ACWR</th><th>Monotonía</th><th>Strain</th><th>Bienestar 7d</th><th></th></tr></thead><tbody>';
     filas.forEach(f => {
         const j = cgJugadores[f.jid];
-        const sem = cgSemaforo(f.m.tieneDatos ? f.m.acwr : null);
+        const sem = cgChipAcwr(f.m, f.jid, hoy);
         const foto = j.photo_url ? `<img src="${j.photo_url}" class="cg-foto">` : `<div class="cg-foto-ph">${(j.name || '?').charAt(0)}</div>`;
         html += `<tr>
             <td><div class="cg-jug">${foto}<strong>${j.name}</strong></div></td>
             <td><strong>${f.m.aguda}</strong></td>
             <td>${f.m.cronica}</td>
-            <td><span class="cg-chip" style="background:${sem.bg};color:${sem.fg}">${sem.label}</span></td>
+            <td><span class="cg-chip" style="background:${sem.bg};color:${sem.fg}" title="${sem.title || ''}">${sem.label}</span></td>
             <td>${f.m.monotonia !== null ? f.m.monotonia.toFixed(2) : '-'}</td>
             <td>${f.m.strain !== null ? f.m.strain : '-'}</td>
             <td>${f.w !== null ? f.w + '/10' : '-'}</td>
@@ -236,7 +252,7 @@ function cgVerJugador(jid) {
     if (!j) return;
     const hoy = cgISO(new Date());
     const m = cgMetricas(jid, hoy);
-    const sem = cgSemaforo(m.tieneDatos ? m.acwr : null);
+    const sem = cgChipAcwr(m, jid, hoy);
 
     const prev = document.getElementById('cg-modal-ov');
     if (prev) prev.remove();
@@ -252,7 +268,7 @@ function cgVerJugador(jid) {
             <div class="cg-metricas">
                 <div class="cg-met"><div class="num">${m.aguda}</div><div class="lbl">Carga 7d (UA)</div></div>
                 <div class="cg-met"><div class="num">${m.cronica}</div><div class="lbl">Crónica</div></div>
-                <div class="cg-met"><div class="num" style="color:${sem.fg}">${m.tieneDatos && m.acwr !== null ? m.acwr.toFixed(2) : '-'}</div><div class="lbl">ACWR</div></div>
+                <div class="cg-met" title="${sem.title || ''}"><div class="num" style="color:${sem.fg}">${sem.title ? '⏳' : (m.tieneDatos && m.acwr !== null ? m.acwr.toFixed(2) : '-')}</div><div class="lbl">ACWR</div></div>
                 <div class="cg-met"><div class="num">${m.monotonia !== null ? m.monotonia.toFixed(2) : '-'}</div><div class="lbl">Monotonía</div></div>
                 <div class="cg-met"><div class="num">${m.strain !== null ? m.strain : '-'}</div><div class="lbl">Strain</div></div>
             </div>
