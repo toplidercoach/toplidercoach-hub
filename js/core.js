@@ -7,8 +7,22 @@ const SUPABASE_URL = 'https://cqteodxyvavyroxeshoz.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNxdGVvZHh5dmF2eXJveGVzaG96Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUyNzc2OTksImV4cCI6MjA4MDg1MzY5OX0.8sJC6twae2pnrf8NDVlOV2KnSOhBC1RrqWC0IiuE614';
 
 let supabaseClient = null;
+function crearClienteSupabase() {
+    // RLS Fase 0: si hay carnet JWT de WordPress (y no es sesion de miembro de club),
+    // se adjunta para que Supabase sepa quien es el usuario.
+    // Sin carnet, el cliente funciona exactamente como siempre (anonimo).
+    var opciones = {};
+    try {
+        var jwt = localStorage.getItem('hub_supabase_jwt');
+        var esMiembroClub = localStorage.getItem('cm_auth') === 'supabase';
+        if (jwt && !esMiembroClub) {
+            opciones.global = { headers: { Authorization: 'Bearer ' + jwt } };
+        }
+    } catch (e) {}
+    return window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, opciones);
+}
 try {
-    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    supabaseClient = crearClienteSupabase();
     console.log('Supabase configurado');
 } catch (e) {
     console.error('Error Supabase:', e);
@@ -101,6 +115,12 @@ async function login() {
             localStorage.setItem('hub_user', JSON.stringify(usuario));
             localStorage.setItem('hub_token', token);
             localStorage.removeItem('cm_auth');
+            if (data.supabase_jwt) {
+                localStorage.setItem('hub_supabase_jwt', data.supabase_jwt);
+            } else {
+                localStorage.removeItem('hub_supabase_jwt');
+            }
+            try { supabaseClient = crearClienteSupabase(); } catch (e) {}
             mostrarApp();
             return;
         } else {
@@ -126,6 +146,7 @@ async function login() {
                 localStorage.setItem('hub_user', JSON.stringify(usuario));
                 localStorage.setItem('cm_auth', 'supabase');
                 localStorage.removeItem('hub_token');
+                localStorage.removeItem('hub_supabase_jwt');
                 mostrarApp();
                 return;
             } else {
@@ -201,6 +222,7 @@ async function cmResolverAcceso(authUser) {
 function logout() {
     localStorage.removeItem('hub_user');
     localStorage.removeItem('hub_token');
+    localStorage.removeItem('hub_supabase_jwt');
     localStorage.removeItem('cm_auth');
     try { if (supabaseClient && supabaseClient.auth) supabaseClient.auth.signOut(); } catch (e) {}
     location.reload();
