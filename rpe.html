@@ -43,6 +43,7 @@ const RPE_DESCRIPCIONES = {
 };
 
 let jugador = null;
+let tokenActual = null;
 let sesionElegida = null;
 let registroExistente = null;
 
@@ -58,15 +59,12 @@ async function iniciar() {
     const token = new URLSearchParams(location.search).get('j');
     if (!token || token === 'null') { mensaje('Enlace no válido. Pide a tu entrenador que te lo reenvíe.'); return; }
 
-    const { data: jug } = await sb.from('players').select('id, name').eq('wellness_token', token).maybeSingle();
-    if (!jug) { mensaje('No encontramos tu ficha. Pide a tu entrenador que te reenvíe el enlace.'); return; }
-    jugador = jug;
+    const { data: ctx } = await sb.rpc('fn_token_contexto', { p_token: token });
+    if (!ctx || !ctx.ok) { mensaje('No encontramos tu ficha. Pide a tu entrenador que te reenvíe el enlace.'); return; }
+    jugador = ctx.jugador;
+    tokenActual = token;
 
-    const { data: sesiones } = await sb.from('training_sessions')
-        .select('id, name, session_date, session_time')
-        .eq('session_date', hoyISO())
-        .contains('players', JSON.stringify([{ player_id: jugador.id }]))
-        .order('session_time');
+    const sesiones = (ctx.sesiones || []).filter(s => s.convocado);
 
     if (!sesiones || sesiones.length === 0) {
         mensaje('Hola, <strong>' + jugador.name + '</strong> 👋<br><br>Hoy no tienes ninguna sesión registrada.<br>Vuelve a abrir este enlace después de entrenar.');
@@ -86,12 +84,8 @@ function elegirSesionIdx(i) { elegirSesion(window._sesiones[i]); }
 
 async function elegirSesion(sesion) {
     sesionElegida = sesion;
-    const { data: reg } = await sb.from('asistencia_sesiones')
-        .select('id, rpe')
-        .eq('sesion_id', sesion.id)
-        .eq('jugador_id', jugador.id)
-        .maybeSingle();
-    registroExistente = reg || null;
+    const reg = sesion.registro || null;
+    registroExistente = reg;
 
     const yaTiene = reg && reg.rpe !== null && reg.rpe !== undefined;
     const valorInicial = yaTiene ? reg.rpe : 5;
@@ -126,19 +120,9 @@ async function enviarRpe() {
     btn.textContent = 'Enviando...';
     const valor = parseInt(document.getElementById('rpe-slider').value);
     try {
-        if (registroExistente) {
-            const { error } = await sb.from('asistencia_sesiones').update({ rpe: valor }).eq('id', registroExistente.id);
-            if (error) throw error;
-        } else {
-            const { error } = await sb.from('asistencia_sesiones').insert({
-                sesion_id: sesionElegida.id,
-                jugador_id: jugador.id,
-                asistio: true,
-                rpe: valor,
-                registrado_por: 'jugador'
-            });
-            if (error) throw error;
-        }
+        const { data: res, error } = await sb.rpc('fn_token_guardar_rpe', { p_token: tokenActual, p_sesion_id: sesionElegida.id, p_rpe: valor });
+        if (error) throw error;
+        if (!res || !res.ok) throw new Error(res && res.error ? res.error : 'No se pudo guardar');
         mostrar('<div class="ok">✅</div><div class="saludo">¡Registrado!</div><div class="estado">Tu esfuerzo de hoy: <strong>' + valor + ' — ' + RPE_DESCRIPCIONES[valor][0] + '</strong><br><br>Gracias, ' + jugador.name + '. Descansa bien. 💪</div>');
     } catch (e) {
         btn.disabled = false;

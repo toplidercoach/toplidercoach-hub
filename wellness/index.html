@@ -106,26 +106,15 @@ async function init() {
         return;
     }
 
-    // Buscar jugador por token
-    const { data: jugador, error: errJ } = await sb
-        .from('players')
-        .select('id, name, club_id')
-        .eq('wellness_token', token)
-        .maybeSingle();
-
-    if (errJ || !jugador) {
+    // Contexto seguro via funcion-token (RLS Fase 3.3)
+    const { data: ctx } = await sb.rpc('fn_token_contexto', { p_token: token });
+    if (!ctx || !ctx.ok) {
         mensajeEstado('🔒', 'Enlace no válido. Pide a tu club el enlace correcto.');
         return;
     }
-
-    // Buscar sesión de hoy de su club
-    const hoy = hoyISO();
-    const { data: sesiones } = await sb
-        .from('training_sessions')
-        .select('id, name, session_date, session_time')
-        .eq('club_id', jugador.club_id)
-        .eq('session_date', hoy)
-        .order('session_time', { nullsFirst: false });
+    const jugador = ctx.jugador;
+    window._tokenWellness = token;
+    const sesiones = ctx.sesiones || [];
 
     if (!sesiones || sesiones.length === 0) {
         pintar(`
@@ -155,13 +144,8 @@ async function init() {
         }
     }
 
-    // Comprobar si ya envió hoy
-    const { data: yaReg } = await sb
-        .from('asistencia_sesiones')
-        .select('id, registrado_por, sueno')
-        .eq('sesion_id', sesion.id)
-        .eq('jugador_id', jugador.id)
-        .maybeSingle();
+    // Comprobar si ya envió hoy (viene en el contexto)
+    const yaReg = sesion.registro || null;
 
     if (yaReg && yaReg.registrado_por === 'jugador' && yaReg.sueno !== null) {
         pintar(`
@@ -254,9 +238,6 @@ async function enviar(jugadorId, sesionId) {
     btn.textContent = 'Enviando...';
 
     const registro = {
-        sesion_id: sesionId,
-        jugador_id: jugadorId,
-        asistio: true,
         sueno: parseInt(document.getElementById('r-sueno').value),
         fatiga: parseInt(document.getElementById('r-fatiga').value),
         estres: parseInt(document.getElementById('r-estres').value),
@@ -266,22 +247,11 @@ async function enviar(jugadorId, sesionId) {
         registrado_por: 'jugador'
     };
 
-    // Si ya existe una fila (del staff), actualizar; si no, insertar
-    const { data: existe } = await sb
-        .from('asistencia_sesiones')
-        .select('id')
-        .eq('sesion_id', sesionId)
-        .eq('jugador_id', jugadorId)
-        .maybeSingle();
-
-    let error;
-    if (existe) {
-        const r = await sb.from('asistencia_sesiones').update(registro).eq('id', existe.id);
-        error = r.error;
-    } else {
-        const r = await sb.from('asistencia_sesiones').insert(registro);
-        error = r.error;
-    }
+    // Guardado seguro via funcion-token (valida token, sesion de hoy y actua solo sobre su fila)
+    const { data: res, error: errRpc } = await sb.rpc('fn_token_guardar_wellness', {
+        p_token: window._tokenWellness, p_sesion_id: sesionId, p_datos: registro
+    });
+    let error = errRpc || (res && res.ok ? null : { message: (res && res.error) || 'No se pudo guardar' });
 
     if (error) {
         enviando = false;
