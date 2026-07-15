@@ -231,6 +231,21 @@ function cmSeleccionarEquipo(teamId) {
 // ========== SISTEMA DE PERMISOS ==========
 
 // Comprueba si el usuario puede VER un modulo
+// ========== IDENTIDAD UNIFICADA ==========
+// Devuelve el numero unico de persona (bigint), el mismo que fn_identidad_wp() en la base:
+// - Miembro de club (Supabase Auth): su wp_user_id de club_members (rango 100.000.001+)
+// - Usuario WordPress: su id numerico de siempre
+function cmIdentidad() {
+    if (typeof cmState !== 'undefined' && cmState.miembro && cmState.miembro.wp_user_id != null) {
+        return Number(cmState.miembro.wp_user_id);
+    }
+    if (typeof usuario !== 'undefined' && usuario && usuario.id != null && !isNaN(Number(usuario.id))) {
+        return Number(usuario.id);
+    }
+    return null;
+}
+window.cmIdentidad = cmIdentidad;
+
 function cmPuedeVer(modulo) {
     if (!cmState.activo) return true; // Coach autonomo -> ve todo lo suyo
     if (cmState.esAdmin) return true; // Admin del club ve todo
