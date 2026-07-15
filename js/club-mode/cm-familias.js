@@ -548,7 +548,7 @@ async function cmFamGuardarCircular(enviar) {
         // Nueva circular
         datos.club_id = clubId;
         datos.message_type = 'circular';
-        datos.created_by = (typeof cmState !== 'undefined' && cmState.miembro) ? cmState.miembro.id : null;
+        datos.created_by = (typeof cmIdentidad === 'function') ? cmIdentidad() : null;
         var resI = await supabaseClient.from('cm_comm_messages').insert(datos).select().single();
         if (resI.error) { showToast('Error al guardar: ' + resI.error.message, 'error'); return; }
         messageId = resI.data.id;

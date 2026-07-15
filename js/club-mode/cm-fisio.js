@@ -46,6 +46,16 @@ var CMFISIO_TECNICAS_FALLBACK = [
 
 
 // ========== INICIALIZACION ==========
+// ========== AUDIT RGPD ==========
+async function cmFisioRegistrarAudit(action, tableName, playerId, details) {
+    try {
+        await supabaseClient.from('cm_med_audit').insert({ club_id: clubId,
+            wp_user_id: (typeof cmIdentidad === 'function') ? cmIdentidad() : null,
+            player_id: playerId || null, action: action, table_name: tableName,
+            record_id: String(playerId || ''), details: details || null });
+    } catch (e) { console.warn('[Fisio] Audit error:', e); }
+}
+
 async function cmFisioInit(containerId) {
     var container = document.getElementById(containerId);
     if (!container) { console.error('cmFisioInit: contenedor no encontrado:', containerId); return; }
@@ -391,6 +401,7 @@ function cmFisioFiltrarEstado(estado, btn) {
 // ========== ABRIR FICHA ==========
 async function cmFisioAbrirFicha(playerId, playerName, photoUrl) {
     cmFisioJugadorActual = playerId;
+    cmFisioRegistrarAudit('SELECT', 'cm_fisio_ficha', playerId, 'Abrio ficha fisio: ' + playerName);
     cmFisioTabActiva = 'lesiones';
 
     var ficha = document.getElementById('cmfisio-ficha');
@@ -487,6 +498,7 @@ async function cmFisioCambiarDisponibilidad(playerId, nuevoEstado, btn) {
     document.querySelectorAll('.cmfisio-semaforo-btn').forEach(function(b) { b.classList.remove('selected'); });
     btn.classList.add('selected');
     showToast('Disponibilidad actualizada');
+    cmFisioRegistrarAudit('UPDATE', 'club_player_availability', playerId, 'Disponibilidad: ' + nuevoEstado);
 }
 
 
@@ -578,6 +590,7 @@ async function cmFisioGuardarTratamiento() {
     var res = await supabaseClient.from('cm_fisio_treatments').insert(treatment);
     if (res.error) { showToast('Error: ' + res.error.message, 'error'); return; }
     showToast('Tratamiento creado');
+    cmFisioRegistrarAudit('INSERT', 'cm_fisio_treatments', cmFisioJugadorActual, 'Creo tratamiento: ' + titulo);
     cmFisioCargarTratamientos(cmFisioJugadorActual);
 }
 
@@ -588,6 +601,7 @@ async function cmFisioCambiarEstadoTratamiento(treatmentId, nuevoEstado) {
     var res = await supabaseClient.from('cm_fisio_treatments').update(updateData).eq('id', treatmentId);
     if (res.error) { showToast('Error: ' + res.error.message, 'error'); return; }
     showToast('Estado actualizado');
+    cmFisioRegistrarAudit('UPDATE', 'cm_fisio_treatments', cmFisioJugadorActual, 'Estado tratamiento: ' + nuevoEstado);
     cmFisioCargarTratamientos(cmFisioJugadorActual);
 }
 
@@ -701,6 +715,7 @@ async function cmFisioGuardarSesion() {
     var res = await supabaseClient.from('cm_fisio_sessions').insert(session);
     if (res.error) { showToast('Error: ' + res.error.message, 'error'); return; }
     showToast('Sesion registrada');
+    cmFisioRegistrarAudit('INSERT', 'cm_fisio_sessions', cmFisioJugadorActual, 'Registro sesion SOAP');
     document.getElementById('cmfisio-form-session').style.display = 'none';
     cmFisioCargarSesiones(cmFisioJugadorActual);
 }
@@ -866,6 +881,7 @@ async function cmFisioEnviarInforme() {
     }, { onConflict: 'club_id,report_date,physio_wp_user_id' }).select().single();
 
     if (reportRes.error) { showToast('Error guardando informe: ' + reportRes.error.message, 'error'); return; }
+    cmFisioRegistrarAudit('INSERT', 'cm_fisio_daily_reports', null, 'Envio informe diario al entrenador');
 
     // Crear notificacion para el entrenador
     var fisioName = usuario ? (usuario.display_name || usuario.name || 'Fisio') : 'Fisio';
