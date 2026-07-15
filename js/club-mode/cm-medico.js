@@ -786,7 +786,7 @@ async function cmMedGuardarLesion() {
         osiics_code: document.getElementById('cmmed-inj-osiics').value || null, mechanism: document.getElementById('cmmed-inj-mechanism').value || null,
         context: document.getElementById('cmmed-inj-context').value || null, severity: document.getElementById('cmmed-inj-severity').value || null,
         estimated_days: parseInt(document.getElementById('cmmed-inj-days').value) || null, description: document.getElementById('cmmed-inj-desc').value.trim() || null,
-        status: 'active', registered_by: usuario ? usuario.id : null };
+        status: 'active', registered_by: cmIdentidad() };
 // Detectar recurrencia: misma zona + mismo OSIICS + alta < 2 meses
     if (zona && lesion.osiics_code) {
         var dosAtras = new Date();
@@ -934,7 +934,7 @@ async function cmMedGuardarSesion(injuryId) {
         session_type: document.getElementById('cmmed-ses-type').value,
         subjective: document.getElementById('cmmed-ses-subj').value.trim() || null, objective: document.getElementById('cmmed-ses-obj').value.trim() || null,
         assessment: document.getElementById('cmmed-ses-assess').value.trim() || null, plan: document.getElementById('cmmed-ses-plan').value.trim() || null,
-        conducted_by: usuario ? usuario.id : null };
+        conducted_by: cmIdentidad() };
     var res = await supabaseClient.from('cm_med_sessions').insert(sesion).select().single();
     if (res.error) { showToast('Error: ' + res.error.message, 'error'); return; }
     showToast('Sesion guardada');
@@ -1002,7 +1002,7 @@ async function cmMedToggleConsentimiento(playerId, tipo, estaActivo, btn) {
 async function cmMedCambiarDisponibilidad(playerId, status, btn) {
     var res = await supabaseClient.from('club_player_availability').upsert({
         club_id: clubId, player_id: playerId, status: status,
-        set_by_wp_user_id: usuario ? usuario.id : null, updated_at: new Date().toISOString()
+        set_by_wp_user_id: cmIdentidad(), updated_at: new Date().toISOString()
     }, { onConflict: 'club_id,player_id' });
 
     if (res.error) { console.error('Error disponibilidad:', res.error); showToast('Error: ' + res.error.message, 'error'); return; }
@@ -1408,7 +1408,7 @@ async function cmMedIniciarRTP(injuryId) {
     var hoy = new Date().toISOString().split('T')[0];
     var res = await supabaseClient.from('cm_med_rtp').insert({
         club_id: clubId, injury_id: injuryId, player_id: cmMedJugadorActual,
-        phase: 1, started_at: hoy, conducted_by: usuario ? usuario.id : null
+        phase: 1, started_at: hoy, conducted_by: cmIdentidad()
     });
     if (res.error) { showToast('Error: ' + res.error.message, 'error'); return; }
     showToast('Protocolo RTP iniciado - Fase 1: Reposo');
@@ -1439,7 +1439,7 @@ async function cmMedAvanzarRTP(injuryId, currentPhase) {
         // Crear siguiente fase
         await supabaseClient.from('cm_med_rtp').insert({
             club_id: clubId, injury_id: injuryId, player_id: cmMedJugadorActual,
-            phase: nextPhase, started_at: hoy, conducted_by: usuario ? usuario.id : null
+            phase: nextPhase, started_at: hoy, conducted_by: cmIdentidad()
         });
 
         var phaseInfo = CM_RTP_PHASES[nextPhase - 1];
@@ -1579,7 +1579,7 @@ async function cmMedGuardarOSTRC(injuryId) {
         q4_pain: q4,
         total_score: total,
         notes: document.getElementById('cmmed-ostrc-notes').value.trim() || null,
-        conducted_by: usuario ? usuario.id : null
+        conducted_by: cmIdentidad()
     }).select().single();
 
     if (res.error) { showToast('Error: ' + res.error.message, 'error'); return; }
@@ -1751,7 +1751,7 @@ async function cmMedSubirArchivo(injuryId) {
             file_size: file.size,
             storage_path: path,
             category: cmMedDetectarCategoria(file.name, file.type),
-            uploaded_by: usuario ? usuario.id : null
+            uploaded_by: cmIdentidad()
         });
 
         if (insRes.error) {
@@ -1939,7 +1939,7 @@ async function cmMedNotificar(type, title, message, playerName, relatedType, rel
             related_type: relatedType || null,
             related_id: relatedId || null,
             target_permission: 'entrenamientos',
-            created_by: usuario ? usuario.id : null
+            created_by: cmIdentidad()
         });
         console.log('NOTIF RESULTADO:', res.error ? res.error.message : 'OK');
     } catch (e) { console.error('Error creando notificacion:', e); }

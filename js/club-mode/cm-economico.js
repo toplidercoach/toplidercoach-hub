@@ -91,7 +91,8 @@ function cmEcoPuedeEditar() {
     return (typeof cmPuedeEditar === 'function') ? cmPuedeEditar('economico') : true;
 }
 function cmEcoMiembroId() {
-    return (typeof cmState !== 'undefined' && cmState.miembro) ? cmState.miembro.id : null;
+    // Identidad unificada (bigint), igual que fn_identidad_wp() en la base
+    return (typeof cmIdentidad === 'function') ? cmIdentidad() : null;
 }
 function cmEcoFileToBase64(file) {
     return new Promise(function(resolve, reject) {
