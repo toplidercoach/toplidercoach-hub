@@ -145,7 +145,7 @@ async function cmChatMostrarLista() {
     var res = await supabaseClient.from('cm_messages')
         .select('*')
         .eq('club_id', clubId)
-        .or('from_user_id.eq.' + usuario.id + ',to_user_id.eq.' + usuario.id)
+        .or('from_user_id.eq.' + cmIdentidad() + ',to_user_id.eq.' + cmIdentidad())
         .order('created_at', { ascending: false })
         .limit(100);
 
@@ -154,8 +154,8 @@ async function cmChatMostrarLista() {
     // Agrupar por conversacion (otro usuario)
     var convMap = {};
     messages.forEach(function(m) {
-        var otherUserId = m.from_user_id === usuario.id ? m.to_user_id : m.from_user_id;
-        var otherName = m.from_user_id === usuario.id ? m.to_name : m.from_name;
+        var otherUserId = m.from_user_id === cmIdentidad() ? m.to_user_id : m.from_user_id;
+        var otherName = m.from_user_id === cmIdentidad() ? m.to_name : m.from_name;
 
         if (!convMap[otherUserId]) {
             convMap[otherUserId] = {
@@ -167,7 +167,7 @@ async function cmChatMostrarLista() {
             };
         }
         // Contar no leidos (mensajes recibidos sin leer)
-        if (m.to_user_id === usuario.id && !m.read_at) {
+        if (m.to_user_id === cmIdentidad() && !m.read_at) {
             convMap[otherUserId].unread++;
         }
     });
@@ -251,8 +251,8 @@ async function cmChatCargarMensajes(otherUserId, scrollToBottom) {
         .select('*')
         .eq('club_id', clubId)
         .or(
-            'and(from_user_id.eq.' + usuario.id + ',to_user_id.eq.' + otherUserId + '),' +
-            'and(from_user_id.eq.' + otherUserId + ',to_user_id.eq.' + usuario.id + ')'
+            'and(from_user_id.eq.' + cmIdentidad() + ',to_user_id.eq.' + otherUserId + '),' +
+            'and(from_user_id.eq.' + otherUserId + ',to_user_id.eq.' + cmIdentidad() + ')'
         )
         .order('created_at', { ascending: true })
         .limit(100);
@@ -261,7 +261,7 @@ async function cmChatCargarMensajes(otherUserId, scrollToBottom) {
 
     // Marcar como leidos los recibidos
     var unreadIds = messages.filter(function(m) {
-        return m.to_user_id === usuario.id && !m.read_at;
+        return m.to_user_id === cmIdentidad() && !m.read_at;
     }).map(function(m) { return m.id; });
 
     if (unreadIds.length > 0) {
@@ -286,7 +286,7 @@ async function cmChatCargarMensajes(otherUserId, scrollToBottom) {
             lastDate = msgDate;
         }
 
-        var isSent = m.from_user_id === usuario.id;
+        var isSent = m.from_user_id === cmIdentidad();
         var time = new Date(m.created_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
 
         // Contexto vinculado
@@ -323,7 +323,7 @@ async function cmChatEnviar() {
 
     var msg = {
         club_id: clubId,
-        from_user_id: usuario.id,
+        from_user_id: cmIdentidad(),
         from_name: nombre,
         to_user_id: cmChatTargetUser.wp_user_id,
         to_name: cmChatTargetUser.display_name,
@@ -350,7 +350,7 @@ async function cmChatContarNoLeidos() {
     var res = await supabaseClient.from('cm_messages')
         .select('id', { count: 'exact', head: true })
         .eq('club_id', clubId)
-        .eq('to_user_id', usuario.id)
+        .eq('to_user_id', cmIdentidad())
         .is('read_at', null);
 
     cmChatUnread = res.count || 0;

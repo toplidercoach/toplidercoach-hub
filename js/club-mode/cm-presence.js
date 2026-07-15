@@ -46,7 +46,7 @@ async function cmPresHeartbeat() {
     try {
         await supabaseClient.from('cm_presence').upsert({
             club_id: clubId,
-            wp_user_id: usuario.id,
+            wp_user_id: cmIdentidad(),
             display_name: nombre,
             role_name: rol,
             last_seen: new Date().toISOString(),
@@ -234,7 +234,7 @@ function cmPresRenderUser(u) {
     if (parts.length > 1) initials += parts[parts.length - 1][0];
     initials = initials.toUpperCase();
 
-    var esYo = usuario && u.wp_user_id === usuario.id;
+    var esYo = usuario && u.wp_user_id === cmIdentidad();
     var nombreDisplay = u.display_name + (esYo ? ' (tu)' : '');
     var clickChat = esYo ? '' : ' onclick="cmPresCerrarPanel();cmChatIniciar(\'' + u.wp_user_id + '\',\'' + u.display_name.replace(/'/g, "\\'") + '\',\'' + (u.role_name || '').replace(/'/g, "\\'") + '\')" style="cursor:pointer" title="Enviar mensaje"';
 
@@ -259,7 +259,7 @@ window.addEventListener('beforeunload', function() {
         navigator.sendBeacon && supabaseClient.from('cm_presence')
             .update({ status: 'offline', last_seen: new Date(Date.now() - 600000).toISOString() })
             .eq('club_id', clubId)
-            .eq('wp_user_id', usuario.id);
+            .eq('wp_user_id', cmIdentidad());
     }
 });
 

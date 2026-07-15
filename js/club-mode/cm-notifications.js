@@ -170,7 +170,7 @@ async function cmNotifCargar() {
     // Cargar estados de lectura del usuario actual
     var readRes = await supabaseClient.from('cm_notification_reads')
         .select('notification_id')
-        .eq('wp_user_id', usuario.id);
+        .eq('wp_user_id', cmIdentidad());
 
     var readIds = {};
     (readRes.data || []).forEach(function(r) { readIds[r.notification_id] = true; });
@@ -224,7 +224,7 @@ async function cmNotifMarcarLeida(notifId, element) {
 
     await supabaseClient.from('cm_notification_reads').upsert({
         notification_id: notifId,
-        wp_user_id: usuario.id
+        wp_user_id: cmIdentidad()
     }, { onConflict: 'notification_id,wp_user_id' });
 
     if (element) {
@@ -253,7 +253,7 @@ async function cmNotifMarcarTodas() {
     if (notifs.length === 0) return;
 
     var inserts = notifs.map(function(n) {
-        return { notification_id: n.id, wp_user_id: usuario.id };
+        return { notification_id: n.id, wp_user_id: cmIdentidad() };
     });
 
     await supabaseClient.from('cm_notification_reads').upsert(inserts, { onConflict: 'notification_id,wp_user_id' });
