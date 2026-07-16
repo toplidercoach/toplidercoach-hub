@@ -313,7 +313,7 @@ async function pdzCargarSesionesPeriodo(periodo) {
     try {
         var { data: sesiones, error } = await supabaseClient
             .from('training_sessions')
-            .select('id, name, session_date, session_time, warm_up, main_part, cool_down, rpe, num_players')
+            .select('id, name, session_date, session_time, warm_up, main_part, cool_down, pre_field_work, post_field_work, rpe, num_players')
             .eq('club_id', clubId)
             .gte('session_date', periodo.date_start)
             .lte('session_date', periodo.date_end)
@@ -387,7 +387,7 @@ async function pdzCargarSesionesPeriodo(periodo) {
         sesiones.forEach(function(s) {
             var fecha = new Date(s.session_date + 'T12:00:00');
             var diaSem = ['DOM','LUN','MAR','MIE','JUE','VIE','SAB'][fecha.getDay()];
-            var totalEj = ((s.warm_up||[]).length) + ((s.main_part||[]).length) + ((s.cool_down||[]).length);
+            var totalEj = ((s.warm_up||[]).length) + ((s.main_part||[]).length) + ((s.cool_down||[]).length) + ((s.pre_field_work||[]).length) + ((s.post_field_work||[]).length);
             var duracion = pdzDuracionSesion(s);
             var hora = s.session_time ? s.session_time.slice(0,5) : '';
             var rpeBadge = s.rpe ? '<span style="padding:1px 6px;background:#78350f;border-radius:4px;font-size:10px;color:#fbbf24">RPE ' + s.rpe + '</span>' : '';
@@ -428,7 +428,9 @@ function pdzDuracionSesion(s) {
     var cal = (s.warm_up || []).reduce(function(sum, e) { return sum + (e.duracion || 0); }, 0);
     var pri = (s.main_part || []).reduce(function(sum, e) { return sum + (e.duracion || 0); }, 0);
     var enf = (s.cool_down || []).reduce(function(sum, e) { return sum + (e.duracion || 0); }, 0);
-    return cal + pri + enf;
+    var preC = (s.pre_field_work || []).reduce(function(sum, e) { return sum + (e.duracion || 0); }, 0);
+    var postC = (s.post_field_work || []).reduce(function(sum, e) { return sum + (e.duracion || 0); }, 0);
+     return cal + pri + enf + preC + postC;
 }
 
 function pdzMetricCard(valor, label, color) {
@@ -644,7 +646,7 @@ async function pdzObtenerMetricas(periodo) {
     try {
         var { data: sesiones } = await supabaseClient
             .from('training_sessions')
-            .select('id, warm_up, main_part, cool_down, rpe')
+            .select('id, warm_up, main_part, cool_down, pre_field_work, post_field_work, rpe')
             .eq('club_id', clubId)
             .gte('session_date', periodo.date_start)
             .lte('session_date', periodo.date_end);
@@ -817,7 +819,7 @@ async function pdzExportarPDF(id) {
     try {
         var { data: sesiones } = await supabaseClient
             .from('training_sessions')
-            .select('name, session_date, session_time, warm_up, main_part, cool_down, rpe')
+            .select('name, session_date, session_time, warm_up, main_part, cool_down, pre_field_work, post_field_work, rpe')
             .eq('club_id', clubId)
             .gte('session_date', periodo.date_start)
             .lte('session_date', periodo.date_end)
@@ -855,7 +857,7 @@ async function pdzExportarPDF(id) {
                 var diaSem = ['Dom','Lun','Mar','Mie','Jue','Vie','Sab'][fecha.getDay()];
                 var fechaStr = diaSem + ' ' + fecha.getDate() + '/' + (fecha.getMonth()+1);
                 var hora = s.session_time ? s.session_time.slice(0,5) : '';
-                var totalEj = ((s.warm_up||[]).length) + ((s.main_part||[]).length) + ((s.cool_down||[]).length);
+                var totalEj = ((s.warm_up||[]).length) + ((s.main_part||[]).length) + ((s.cool_down||[]).length) + ((s.pre_field_work||[]).length) + ((s.post_field_work||[]).length);
                 var duracion = pdzDuracionSesion(s);
 
                 doc.setFontSize(7);
