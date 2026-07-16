@@ -584,7 +584,7 @@ async function cmFisioGuardarTratamiento() {
         techniques_planned: tecnicas.length > 0 ? tecnicas : null,
         notes: document.getElementById('cmfisio-treat-notes').value.trim() || null,
         status: 'active',
-        created_by: usuario ? usuario.id : 0
+        created_by: cmIdentidad()
     };
 
     var res = await supabaseClient.from('cm_fisio_treatments').insert(treatment);
@@ -707,7 +707,7 @@ async function cmFisioGuardarSesion() {
         soap_action: document.getElementById('cmfisio-ses-action').value.trim() || null,
         techniques_applied: tecnicas.length > 0 ? tecnicas : null,
         soap_plan: document.getElementById('cmfisio-ses-plan').value.trim() || null,
-        performed_by: usuario ? usuario.id : 0,
+        performed_by: cmIdentidad(),
         coach_recommendation: document.getElementById('cmfisio-ses-rec').value || null,
         coach_note: document.getElementById('cmfisio-ses-coach-note').value.trim() || null
     };
@@ -788,7 +788,7 @@ async function cmFisioGenerarInformeDiario() {
     var hoy = new Date().toISOString().split('T')[0];
 
     // Cargar sesiones de hoy
-    var sesRes = await supabaseClient.from('cm_fisio_sessions').select('player_id, soap_action, techniques_applied, coach_recommendation, coach_note, pain_level').eq('club_id', clubId).eq('session_date', hoy).eq('performed_by', usuario ? usuario.id : 0).eq('archived', false);
+    var sesRes = await supabaseClient.from('cm_fisio_sessions').select('player_id, soap_action, techniques_applied, coach_recommendation, coach_note, pain_level').eq('club_id', clubId).eq('session_date', hoy).eq('performed_by', cmIdentidad()).eq('archived', false);
     var sesiones = sesRes.data || [];
 
     if (sesiones.length === 0) {
@@ -842,7 +842,7 @@ async function cmFisioEnviarInforme() {
     var hoy = new Date().toISOString().split('T')[0];
 
     // Recoger sesiones de hoy para el summary
-    var sesRes = await supabaseClient.from('cm_fisio_sessions').select('player_id, techniques_applied, coach_recommendation, coach_note, pain_level').eq('club_id', clubId).eq('session_date', hoy).eq('performed_by', usuario ? usuario.id : 0).eq('archived', false);
+    var sesRes = await supabaseClient.from('cm_fisio_sessions').select('player_id, techniques_applied, coach_recommendation, coach_note, pain_level').eq('club_id', clubId).eq('session_date', hoy).eq('performed_by', cmIdentidad()).eq('archived', false);
     var sesiones = sesRes.data || [];
 
     var playerIds = sesiones.map(function(s) { return s.player_id; });
@@ -874,7 +874,7 @@ async function cmFisioEnviarInforme() {
     var reportRes = await supabaseClient.from('cm_fisio_daily_reports').upsert({
         club_id: clubId,
         report_date: hoy,
-        physio_wp_user_id: usuario ? usuario.id : 0,
+        physio_wp_user_id: cmIdentidad(),
         players_summary: summary,
         general_notes: generalNotes || null,
         sent_at: ahora
