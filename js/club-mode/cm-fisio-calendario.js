@@ -63,8 +63,8 @@ async function cmFisioCalInit() {
     cmFisioCal.fisios = (fRes.data || []).filter(function(m) {
         return m.club_roles && (m.club_roles.name.toLowerCase().indexOf('fisio') !== -1 || m.club_roles.name.toLowerCase().indexOf('physio') !== -1);
     });
-    if (cmFisioCal.fisios.length === 0 && usuario) cmFisioCal.fisios = [{ wp_user_id: usuario.id, display_name: usuario.display_name || usuario.name || 'Yo' }];
-    if (!cmFisioCal.fisioSeleccionado) cmFisioCal.fisioSeleccionado = usuario ? usuario.id : null;
+    if (cmFisioCal.fisios.length === 0 && usuario) cmFisioCal.fisios = [{ wp_user_id: cmIdentidad(), display_name: usuario.display_name || usuario.name || 'Yo' }];
+    if (!cmFisioCal.fisioSeleccionado) cmFisioCal.fisioSeleccionado = usuario ? cmIdentidad() : null;
     var sIds = cmFisioTemporadas.map(function(s) { return s.id; });
     if (sIds.length > 0) {
         var spRes = await supabaseClient.from('season_players').select('player_id, team_id, shirt_number, players(id, name)').in('season_id', sIds);
@@ -235,7 +235,7 @@ async function cmFisioCalNuevaCita(fecha,hora){
 
 async function cmFisioCalGuardarCita(){var p=document.getElementById('cmfcal-p').value,f=document.getElementById('cmfcal-d').value,s=document.getElementById('cmfcal-s').value,e=document.getElementById('cmfcal-e').value;
     if(!p||!s||!e){showToast('Completa jugador y horario','error');return;}
-    var r=await supabaseClient.from('cm_fisio_appointments').insert({club_id:clubId,player_id:p,physio_wp_user_id:cmFisioCal.fisioSeleccionado||(usuario?usuario.id:0),appointment_date:f,time_start:s,time_end:e,type:document.getElementById('cmfcal-t').value,notes:document.getElementById('cmfcal-n').value.trim()||null,status:'scheduled'});
+    var r=await supabaseClient.from('cm_fisio_appointments').insert({club_id:clubId,player_id:p,physio_wp_user_id:cmFisioCal.fisioSeleccionado||(usuario?cmIdentidad():0),appointment_date:f,time_start:s,time_end:e,type:document.getElementById('cmfcal-t').value,notes:document.getElementById('cmfcal-n').value.trim()||null,status:'scheduled'});
     if(r.error){showToast('Error: '+r.error.message,'error');return;}showToast('Cita creada');document.getElementById('cmfcal-fov').remove();cmFisioCalRenderVista();}
 
 async function cmFisioCalEditarCita(cid){
@@ -285,7 +285,7 @@ async function cmFisioCalGuardarH(){var sc={};CMFCAL_DIAS.forEach(function(d){
     var s1=document.querySelector('.cmfcal-hs1[data-d="'+d+'"]').value,e1=document.querySelector('.cmfcal-he1[data-d="'+d+'"]').value;
     var s2=document.querySelector('.cmfcal-hs2[data-d="'+d+'"]').value,e2=document.querySelector('.cmfcal-he2[data-d="'+d+'"]').value;
     var fr=[];if(s1&&e1)fr.push({start:s1,end:e1});if(s2&&e2)fr.push({start:s2,end:e2});sc[d]=fr;});
-    var r=await supabaseClient.from('cm_fisio_working_hours').upsert({club_id:clubId,physio_wp_user_id:cmFisioCal.fisioSeleccionado||(usuario?usuario.id:0),schedule:sc,effective_from:new Date().toISOString().split('T')[0],is_external:document.getElementById('cmfcal-ie').checked,updated_at:new Date().toISOString()},{onConflict:'club_id,physio_wp_user_id,effective_from'});
+    var r=await supabaseClient.from('cm_fisio_working_hours').upsert({club_id:clubId,physio_wp_user_id:cmFisioCal.fisioSeleccionado||(usuario?cmIdentidad():0),schedule:sc,effective_from:new Date().toISOString().split('T')[0],is_external:document.getElementById('cmfcal-ie').checked,updated_at:new Date().toISOString()},{onConflict:'club_id,physio_wp_user_id,effective_from'});
     if(r.error){showToast('Error: '+r.error.message,'error');return;}showToast('Horario guardado');document.getElementById('cmfcal-hov').remove();
     await cmFisioCalCargarHorario();cmFisioCalRenderVista();}
 // ========== IMPRIMIR CALENDARIO EN PDF ==========

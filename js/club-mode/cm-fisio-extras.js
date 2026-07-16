@@ -363,7 +363,7 @@ cmFisioGenerarInformeDiario = async function() {
     var hoyDisplay = new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
     // Sesiones de hoy de ESTE fisio
-    var sesRes = await supabaseClient.from('cm_fisio_sessions').select('*').eq('club_id', clubId).eq('session_date', hoy).eq('performed_by', usuario ? usuario.id : 0).eq('archived', false).order('time_start');
+    var sesRes = await supabaseClient.from('cm_fisio_sessions').select('*').eq('club_id', clubId).eq('session_date', hoy).eq('performed_by', usuario ? cmIdentidad() : 0).eq('archived', false).order('time_start');
     var sesiones = sesRes.data || [];
 
     if (sesiones.length === 0) {
@@ -616,7 +616,7 @@ cmFisioGenerarInformeDiario = async function() {
     var reportRes = await supabaseClient.from('cm_fisio_daily_reports').upsert({
         club_id: clubId,
         report_date: hoy,
-        physio_wp_user_id: usuario ? usuario.id : 0,
+        physio_wp_user_id: usuario ? cmIdentidad() : 0,
         players_summary: summary,
         general_notes: null,
         sent_at: new Date().toISOString()
@@ -638,7 +638,7 @@ cmFisioGenerarInformeDiario = async function() {
             related_type: 'cm_fisio_daily_reports',
             related_id: reportRes.data ? reportRes.data.id : null,
             target_permission: 'entrenamientos',
-            created_by: usuario ? usuario.id : null
+            created_by: usuario ? cmIdentidad() : null
         });
     } catch (e) { console.error('Error notificacion:', e); }
 };

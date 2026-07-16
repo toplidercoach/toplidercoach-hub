@@ -983,6 +983,7 @@ async function cmMedCargarConsentimientos(playerId) {
         html += '<div class="cmmed-consent-row"><div class="cmmed-consent-info"><div class="cmmed-consent-type">'+t.label+'</div><div class="cmmed-consent-desc">'+t.desc+'</div>'+(grantedDate?'<div style="color:#64748b;font-size:11px;margin-top:4px">'+(isOn?'Concedido: '+grantedDate:'Revocado')+'</div>':'')+'</div><button class="cmmed-toggle '+(isOn?'on':'')+'" onclick="cmMedToggleConsentimiento(\''+playerId+'\',\''+t.type+'\','+(isOn?'true':'false')+',this)"></button></div>';
     });
     html += '<h4 style="margin:18px 0 6px;color:#e2e8f0">Registro de accesos</h4><p style="color:#94a3b8;font-size:12px;margin-bottom:10px">Quien ha visto o modificado los datos de salud de este jugador (registro inmutable).</p><div id="cmmed-rastro" style="max-height:260px;overflow:auto"></div>';
+    html += '<h4 style="margin:18px 0 6px;color:#f87171">Zona de supresion</h4><p style="color:#94a3b8;font-size:12px;margin-bottom:10px">Derecho de supresion (Art. 17): revoca los consentimientos, archiva el expediente y elimina los textos clinicos. Solo el administrador del club puede ejecutarla.</p><button class="cmmed-btn cmmed-btn-sm" style="background:#7f1d1d;color:#fecaca;border:1px solid #b91c1c" onclick="cmMedSuprimirExpediente(\'' + playerId + '\')">Suprimir expediente (RGPD)</button>';
     container.innerHTML = html;
     cmMedCargarRastro(playerId);
 }
@@ -1023,6 +1024,17 @@ async function cmMedToggleConsentimiento(playerId, tipo, estaActivo, btn) {
     cmMedRegistrarAudit('UPDATE', 'cm_med_consents', playerId, (estaActivo ? 'Revoco' : 'Concedio') + ' consentimiento: ' + tipo);
 }
 
+
+// ========== SUPRESION RGPD (Art. 17) ==========
+async function cmMedSuprimirExpediente(playerId) {
+    var conf = prompt('SUPRESION RGPD\n\nEsta accion revoca los consentimientos, archiva el expediente medico y elimina los textos clinicos de forma IRREVERSIBLE (se conservan los datos estructurados por obligacion legal).\n\nEscribe SUPRIMIR para confirmar:');
+    if (conf === null) return;
+    if (conf.trim().toUpperCase() !== 'SUPRIMIR') { showToast('Supresion cancelada', 'error'); return; }
+    var r = await supabaseClient.rpc('fn_med_suprimir_expediente', { p_club_id: clubId, p_player_id: playerId });
+    if (r.error) { showToast('Error: ' + r.error.message, 'error'); return; }
+    showToast('Expediente suprimido y auditado');
+    cmMedCargarConsentimientos(playerId);
+}
 
 // ========== VISOR DE AUDITORIA RGPD ==========
 var cmMedMapaActores = null;
