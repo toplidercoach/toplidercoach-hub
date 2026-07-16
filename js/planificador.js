@@ -653,11 +653,15 @@ if (typeof scGuardarConceptos === 'function') { await scGuardarConceptos(sesionI
                     const cal = s.warm_up || [];
                     const pri = s.main_part || [];
                     const enf = s.cool_down || [];
+                    const pre = s.pre_field_work || [];
+                    const post = s.post_field_work || [];
+                    const tPre = pre.reduce((sum, ej) => sum + (ej.duracion || 0), 0);
+                    const tPost = post.reduce((sum, ej) => sum + (ej.duracion || 0), 0);
                     
                     const tCal = cal.reduce((sum, ej) => sum + (ej.duracion || 0), 0);
                     const tPri = pri.reduce((sum, ej) => sum + (ej.duracion || 0), 0);
                     const tEnf = enf.reduce((sum, ej) => sum + (ej.duracion || 0), 0);
-                    const tTotal = tCal + tPri + tEnf;
+                    const tTotal = tCal + tPri + tEnf + tPre + tPost;
                     const totalEj = cal.length + pri.length + enf.length;
                     
                     const fechaObj = new Date(s.session_date + 'T12:00:00');
@@ -695,6 +699,14 @@ if (typeof scGuardarConceptos === 'function') { await scGuardarConceptos(sesionI
                                 ${tagsHTML ? `<div class="sc-tags">${tagsHTML}</div>` : ''}
                                 ${objetivo ? `<div class="sc-objetivo"><span class="sc-obj-label">Objetivo:</span> ${objetivo}</div>` : ''}
                                 <div class="sc-phases">
+                                    ${pre.length ? `
+                                    <div class="sc-phase" style="border-left-color:#8b5cf6;">
+                                        <div class="sc-phase-bar" style="background:#8b5cf6;"></div>
+                                        <div class="sc-phase-info">
+                                            <span class="sc-phase-name">Trabajo previo</span>
+                                            <span class="sc-phase-data"><strong>${pre.length}</strong> ej · ${tPre} min</span>
+                                        </div>
+                                    </div>` : ''}
                                     <div class="sc-phase warm">
                                         <div class="sc-phase-bar"></div>
                                         <div class="sc-phase-info">
@@ -712,10 +724,18 @@ if (typeof scGuardarConceptos === 'function') { await scGuardarConceptos(sesionI
                                     <div class="sc-phase cool">
                                         <div class="sc-phase-bar"></div>
                                         <div class="sc-phase-info">
-                                            <span class="sc-phase-name">Enfriamiento</span>
+                                            <span class="sc-phase-name">Parte Final</span>
                                             <span class="sc-phase-data"><strong>${enf.length}</strong> ej · ${tEnf} min</span>
                                         </div>
                                     </div>
+                                    ${post.length ? `
+                                    <div class="sc-phase" style="border-left-color:#64748b;">
+                                        <div class="sc-phase-bar" style="background:#64748b;"></div>
+                                        <div class="sc-phase-info">
+                                            <span class="sc-phase-name">Trabajo post-campo</span>
+                                            <span class="sc-phase-data"><strong>${post.length}</strong> ej · ${tPost} min</span>
+                                        </div>
+                                    </div>` : ''}
                                 </div>
                                 <div class="sc-footer">
                                     <div class="sc-stats">
