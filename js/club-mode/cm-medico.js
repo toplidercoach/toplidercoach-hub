@@ -439,6 +439,7 @@ async function cmMedCargarAntecedentes(playerId) {
 async function cmMedGuardarAntecedentes() {
     var playerId = cmMedJugadorActual;
     if (!playerId) return;
+    if (!(await cmMedConsentimientoVigente(playerId))) { cmMedAvisoConsentimiento(); return; }
     var record = {
         club_id: clubId, player_id: playerId,
         blood_type: document.getElementById('cmmed-blood-type').value || null,
@@ -777,6 +778,7 @@ document.addEventListener('click', function(e) {
 });
 async function cmMedGuardarLesion() {
     var playerId = cmMedJugadorActual;
+    if (!(await cmMedConsentimientoVigente(playerId))) { cmMedAvisoConsentimiento(); return; }
     var fecha = document.getElementById('cmmed-inj-date').value;
     var zona = document.getElementById('cmmed-inj-zone').value;
     if (!fecha) { showToast('La fecha es obligatoria', 'error'); return; }
@@ -981,6 +983,22 @@ async function cmMedCargarConsentimientos(playerId) {
     container.innerHTML = html;
 }
 
+// ========== PUERTA DE CONSENTIMIENTO (Art. 9 RGPD) ==========
+async function cmMedConsentimientoVigente(playerId) {
+    try {
+        var res = await supabaseClient.from('cm_med_consents').select('granted, revoked_at')
+            .eq('club_id', clubId).eq('player_id', playerId)
+            .eq('consent_type', 'medical_treatment').maybeSingle();
+        return !!(res.data && res.data.granted && !res.data.revoked_at);
+    } catch (e) { return false; }
+}
+
+function cmMedAvisoConsentimiento() {
+    showToast('RGPD: falta el consentimiento de tratamiento medico. Registralo antes de crear datos de salud.', 'error');
+    var btn = document.querySelector('.cmmed-tab[onclick*="consentimientos"]');
+    if (btn) btn.click();
+}
+
 async function cmMedToggleConsentimiento(playerId, tipo, estaActivo, btn) {
     var ahora = new Date().toISOString();
     if (estaActivo) {
@@ -989,7 +1007,11 @@ async function cmMedToggleConsentimiento(playerId, tipo, estaActivo, btn) {
         btn.classList.remove('on');
         showToast('Consentimiento revocado');
     } else {
-        var res = await supabaseClient.from('cm_med_consents').upsert({ club_id: clubId, player_id: playerId, consent_type: tipo, granted: true, granted_at: ahora, revoked_at: null, consent_version: '1.0' }, { onConflict: 'club_id,player_id,consent_type' });
+        var quien = prompt('Quien otorga el consentimiento?\n\n- Si el jugador es mayor de edad: escribe "jugador"\n- Si es menor: nombre completo del tutor legal');
+        if (quien === null) return;
+        quien = quien.trim();
+        if (!quien) { showToast('Debes indicar quien otorga el consentimiento', 'error'); return; }
+        var res = await supabaseClient.from('cm_med_consents').upsert({ club_id: clubId, player_id: playerId, consent_type: tipo, granted: true, granted_at: ahora, revoked_at: null, consent_version: '1.0', granted_by: quien }, { onConflict: 'club_id,player_id,consent_type' });
         if (res.error) { showToast('Error: ' + res.error.message, 'error'); return; }
         btn.classList.add('on');
         showToast('Consentimiento concedido');
@@ -1022,7 +1044,7 @@ async function cmMedCambiarDisponibilidad(playerId, status, btn) {
 // ========== AUDIT ==========
 async function cmMedRegistrarAudit(action, tableName, recordId, details) {
     try {
-        await supabaseClient.from('cm_med_audit').insert({ club_id: clubId, wp_user_id: usuario ? usuario.id : 0,
+        await supabaseClient.from('cm_med_audit').insert({ club_id: clubId, wp_user_id: (typeof cmIdentidad === 'function') ? cmIdentidad() : null,
             player_id: (tableName !== 'club_player_availability' && recordId) ? recordId : null,
             action: action, table_name: tableName, record_id: String(recordId || ''), details: details || null });
     } catch (e) { console.warn('Audit log error:', e); }
