@@ -1134,6 +1134,11 @@ function ejElegirModo(modo) {
     ejRenderToolbar();
 }
 // ========== PROYECTOS DE PIZARRA ==========
+function ejProyCoachId() {
+    if (window.ejCoachId) return String(window.ejCoachId);
+    try { const u = JSON.parse(localStorage.getItem('hub_user') || '{}'); if (u && u.id) return String(u.id); } catch (e) {}
+    return null;
+}
 let ejProyActual = null;
 let ejProyItems = [];
 let ejProyIdx = -1;
@@ -1156,7 +1161,7 @@ async function ejProyListar() {
     ejProyActual = null; ejProyItems = []; ejProyIdx = -1;
     const body = document.getElementById('ej-proy-body');
     body.innerHTML = 'Cargando...';
-    const { data, error } = await supabaseClient.from('pizarra_proyectos').select('id,nombre').eq('coach_id', String(window.ejCoachId)).order('updated_at', { ascending: false });
+    const { data, error } = await supabaseClient.from('pizarra_proyectos').select('id,nombre').eq('coach_id', ejProyCoachId()).order('updated_at', { ascending: false });
     if (error) { body.innerHTML = '<span style="color:#f87171">Error: ' + error.message + '</span>'; return; }
     let html = '<button onclick="ejProyCrear()" style="width:100%;padding:8px;background:#7c3aed;border:none;color:#fff;border-radius:8px;cursor:pointer;font-weight:600;margin-bottom:10px">+ Nuevo proyecto</button>';
     if (!data || !data.length) html += '<p style="color:#64748b">Sin proyectos todavia. Crea el primero (ej: "Presion alta").</p>';
@@ -1171,7 +1176,7 @@ async function ejProyListar() {
 async function ejProyCrear() {
     const nombre = prompt('Nombre del proyecto (ej: Presion alta):');
     if (!nombre || !nombre.trim()) return;
-    const { error } = await supabaseClient.from('pizarra_proyectos').insert({ coach_id: String(window.ejCoachId), nombre: nombre.trim() });
+    const { error } = await supabaseClient.from('pizarra_proyectos').insert({ coach_id: ejProyCoachId(), nombre: nombre.trim() });
     if (error) { ejToast('Error: ' + error.message, 'error'); return; }
     ejProyListar();
 }
