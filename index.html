@@ -432,11 +432,20 @@
                             <h3>Mi Sesion</h3>
                         </div>
                         <div class="panel-content">
+                            <!-- Trabajo previo a campo -->
+                            <div class="seccion-ejercicios">
+                                <div class="seccion-header" style="background:linear-gradient(135deg,#8b5cf6,#7c3aed);">
+                                    <span>Trabajo previo a campo</span>
+                                    <span style="display:flex;align-items:center;gap:8px;"><button onclick="abrirModalBloqueLibre('previo')" title="Anadir bloque libre" style="background:rgba(255,255,255,0.25);border:none;border-radius:6px;color:inherit;padding:2px 8px;cursor:pointer;font-size:12px;">+ Bloque</button><span id="tiempo-previo">0 min</span></span>
+                                </div>
+                                <div id="lista-previo"></div>
+                            </div>
+
                             <!-- Calentamiento -->
                             <div class="seccion-ejercicios">
                                 <div class="seccion-header calentamiento">
                                     <span>Calentamiento</span>
-                                    <span id="tiempo-calentamiento">0 min</span>
+                                    <span style="display:flex;align-items:center;gap:8px;"><button onclick="abrirModalBloqueLibre('calentamiento')" title="Anadir bloque libre" style="background:rgba(255,255,255,0.25);border:none;border-radius:6px;color:inherit;padding:2px 8px;cursor:pointer;font-size:12px;">+ Bloque</button><span id="tiempo-calentamiento">0 min</span></span>
                                 </div>
                                 <div id="lista-calentamiento"></div>
                             </div>
@@ -445,18 +454,27 @@
                             <div class="seccion-ejercicios">
                                 <div class="seccion-header principal">
                                     <span>Parte Principal</span>
-                                    <span id="tiempo-principal">0 min</span>
+                                    <span style="display:flex;align-items:center;gap:8px;"><button onclick="abrirModalBloqueLibre('principal')" title="Anadir bloque libre" style="background:rgba(255,255,255,0.25);border:none;border-radius:6px;color:inherit;padding:2px 8px;cursor:pointer;font-size:12px;">+ Bloque</button><span id="tiempo-principal">0 min</span></span>
                                 </div>
                                 <div id="lista-principal"></div>
                             </div>
                             
-                            <!-- Enfriamiento -->
+                            <!-- Parte Final -->
                             <div class="seccion-ejercicios">
                                 <div class="seccion-header enfriamiento">
-                                    <span>Enfriamiento</span>
-                                    <span id="tiempo-enfriamiento">0 min</span>
+                                    <span>Parte Final</span>
+                                    <span style="display:flex;align-items:center;gap:8px;"><button onclick="abrirModalBloqueLibre('enfriamiento')" title="Anadir bloque libre" style="background:rgba(255,255,255,0.25);border:none;border-radius:6px;color:inherit;padding:2px 8px;cursor:pointer;font-size:12px;">+ Bloque</button><span id="tiempo-enfriamiento">0 min</span></span>
                                 </div>
                                 <div id="lista-enfriamiento"></div>
+                            </div>
+
+                            <!-- Trabajo post-campo -->
+                            <div class="seccion-ejercicios">
+                                <div class="seccion-header" style="background:linear-gradient(135deg,#64748b,#475569);">
+                                    <span>Trabajo post-campo</span>
+                                    <span style="display:flex;align-items:center;gap:8px;"><button onclick="abrirModalBloqueLibre('postcampo')" title="Anadir bloque libre" style="background:rgba(255,255,255,0.25);border:none;border-radius:6px;color:inherit;padding:2px 8px;cursor:pointer;font-size:12px;">+ Bloque</button><span id="tiempo-postcampo">0 min</span></span>
+                                </div>
+                                <div id="lista-postcampo"></div>
                             </div>
                         </div>
                     </div>
@@ -1675,13 +1693,34 @@
             </div>
             <p style="margin-bottom: 15px; color: #6b7280; font-size: 14px;">¿A qué parte de la sesión?</p>
                 <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <button class="btn-primary" style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);" onclick="seleccionarSeccion('previo')">Trabajo previo a campo</button>
                     <button class="btn-primary" style="background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);" onclick="seleccionarSeccion('calentamiento')">Calentamiento</button>
                     <button class="btn-primary" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);" onclick="seleccionarSeccion('principal')">Parte Principal</button>
-                    <button class="btn-primary" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);" onclick="seleccionarSeccion('enfriamiento')">Enfriamiento</button>
+                    <button class="btn-primary" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);" onclick="seleccionarSeccion('enfriamiento')">Parte Final</button>
+                    <button class="btn-primary" style="background: linear-gradient(135deg, #64748b 0%, #475569 100%);" onclick="seleccionarSeccion('postcampo')">Trabajo post-campo</button>
                 </div>
             </div>
         </div>
     </div>
+    <!-- ==================== MODAL: BLOQUE LIBRE ==================== -->
+    <div id="modal-bloque-libre" class="modal-overlay" style="display: none;" onclick="cerrarModalBloqueLibre()">
+        <div class="modal-content" style="max-width: 460px;" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h3>Bloque libre</h3>
+                <button class="modal-close" onclick="cerrarModalBloqueLibre()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <label style="display:block;font-weight:600;color:#374151;margin-bottom:6px;">Titulo</label>
+                <input type="text" id="bloque-libre-titulo" placeholder="Ej: Charla tactica ABP" style="width:100%;padding:10px;border:2px solid #e5e7eb;border-radius:8px;margin-bottom:14px;">
+                <label style="display:block;font-weight:600;color:#374151;margin-bottom:6px;">Duracion (minutos)</label>
+                <input type="number" id="bloque-libre-minutos" value="15" min="1" max="120" style="width:110px;padding:10px;border:2px solid #7c3aed;border-radius:8px;font-weight:600;text-align:center;margin-bottom:14px;">
+                <label style="display:block;font-weight:600;color:#374151;margin-bottom:6px;">Notas / desarrollo</label>
+                <textarea id="bloque-libre-notas" rows="5" placeholder="Ej: Repasar marcajes en corners, ver clips del rival, insistir en el segundo palo..." style="width:100%;padding:10px;border:2px solid #e5e7eb;border-radius:8px;resize:vertical;"></textarea>
+                <button class="btn-primary purple" style="width:100%;margin-top:16px;" onclick="guardarBloqueLibre()">Anadir a la sesion</button>
+            </div>
+        </div>
+    </div>
+
     <!-- ==================== MODAL: OPCIONES PDF SESIÓN ==================== -->
 <div id="modal-pdf-sesion" class="modal-overlay" style="display: none;" onclick="cerrarModalPDFSesion(event)">
     <div class="modal-content" style="max-width: 400px;" onclick="event.stopPropagation()">
