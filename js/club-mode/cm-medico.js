@@ -149,6 +149,7 @@ function cmMedRenderPanel(container) {
             '<div style="display:flex;gap:8px">' +
                 '<button class="cmmed-btn cmmed-btn-primary cmmed-btn-sm" id="cmmed-btn-jugadores" onclick="cmMedVistaJugadores()" style="opacity:0.5">Jugadores</button>' +
                 '<button class="cmmed-btn cmmed-btn-secondary cmmed-btn-sm" id="cmmed-btn-dashboard" onclick="cmMedVistaDashboard()">Dashboard</button>' +
+                '<button class="cmmed-btn cmmed-btn-secondary cmmed-btn-sm" onclick="cmMedVistaAuditoria()">Auditoria</button>' +
             '</div>' +
         '</div>' +
         '<div class="cmmed-stats-bar" id="cmmed-stats-bar">' +
@@ -980,7 +981,9 @@ async function cmMedCargarConsentimientos(playerId) {
         var grantedDate = consent && consent.granted_at ? new Date(consent.granted_at).toLocaleDateString('es-ES') : '';
         html += '<div class="cmmed-consent-row"><div class="cmmed-consent-info"><div class="cmmed-consent-type">'+t.label+'</div><div class="cmmed-consent-desc">'+t.desc+'</div>'+(grantedDate?'<div style="color:#64748b;font-size:11px;margin-top:4px">'+(isOn?'Concedido: '+grantedDate:'Revocado')+'</div>':'')+'</div><button class="cmmed-toggle '+(isOn?'on':'')+'" onclick="cmMedToggleConsentimiento(\''+playerId+'\',\''+t.type+'\','+(isOn?'true':'false')+',this)"></button></div>';
     });
+    html += '<h4 style="margin:18px 0 6px;color:#e2e8f0">Registro de accesos</h4><p style="color:#94a3b8;font-size:12px;margin-bottom:10px">Quien ha visto o modificado los datos de salud de este jugador (registro inmutable).</p><div id="cmmed-rastro" style="max-height:260px;overflow:auto"></div>';
     container.innerHTML = html;
+    cmMedCargarRastro(playerId);
 }
 
 // ========== PUERTA DE CONSENTIMIENTO (Art. 9 RGPD) ==========
@@ -1019,6 +1022,71 @@ async function cmMedToggleConsentimiento(playerId, tipo, estaActivo, btn) {
     cmMedRegistrarAudit('UPDATE', 'cm_med_consents', playerId, (estaActivo ? 'Revoco' : 'Concedio') + ' consentimiento: ' + tipo);
 }
 
+
+// ========== VISOR DE AUDITORIA RGPD ==========
+var cmMedMapaActores = null;
+async function cmMedNombresActores() {
+    if (cmMedMapaActores) return cmMedMapaActores;
+    cmMedMapaActores = {};
+    try {
+        var r = await supabaseClient.from('club_members').select('wp_user_id, display_name').eq('club_id', clubId);
+        (r.data || []).forEach(function(m) { if (m.wp_user_id != null) cmMedMapaActores[m.wp_user_id] = m.display_name; });
+    } catch (e) {}
+    return cmMedMapaActores;
+}
+
+function cmMedFilaAudit(a, nombres) {
+    var actor = (a.wp_user_id != null && nombres[a.wp_user_id]) ? nombres[a.wp_user_id] : (a.wp_user_id != null ? 'ID ' + a.wp_user_id : 'Desconocido');
+    var fecha = a.created_at ? new Date(a.created_at).toLocaleString('es-ES') : '';
+    return '<div style="display:flex;gap:10px;padding:8px 10px;background:#1e293b;border-radius:6px;margin-bottom:6px;font-size:12px;align-items:center">' +
+        '<span style="color:#64748b;white-space:nowrap">' + fecha + '</span>' +
+        '<span style="color:#e2e8f0;font-weight:600;white-space:nowrap">' + actor + '</span>' +
+        '<span style="color:#38bdf8;white-space:nowrap">' + (a.action || '') + '</span>' +
+        '<span style="color:#94a3b8">' + (a.details || a.table_name || '') + '</span>' +
+    '</div>';
+}
+
+async function cmMedCargarRastro(playerId) {
+    var cont = document.getElementById('cmmed-rastro');
+    if (!cont) return;
+    cont.innerHTML = '<p style="color:#64748b;font-size:12px">Cargando...</p>';
+    var nombres = await cmMedNombresActores();
+    var r = await supabaseClient.from('cm_med_audit').select('*').eq('club_id', clubId).eq('player_id', playerId).order('created_at', { ascending: false }).limit(50);
+    if (r.error) { cont.innerHTML = '<p style="color:#f87171;font-size:12px">Error cargando el registro</p>'; return; }
+    if (!r.data || !r.data.length) { cont.innerHTML = '<p style="color:#64748b;font-size:12px">Sin accesos registrados todavia.</p>'; return; }
+    cont.innerHTML = r.data.map(function(a) { return cmMedFilaAudit(a, nombres); }).join('');
+}
+
+async function cmMedVistaAuditoria() {
+    var viejo = document.getElementById('cmmed-audit-modal');
+    if (viejo) viejo.remove();
+    var modal = document.createElement('div');
+    modal.id = 'cmmed-audit-modal';
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px';
+    modal.innerHTML = '<div style="background:#0f172a;border:1px solid #334155;border-radius:12px;max-width:820px;width:100%;max-height:85vh;display:flex;flex-direction:column;padding:20px">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h3 style="margin:0;color:#e2e8f0">Auditoria de accesos (RGPD)</h3><button onclick="document.getElementById(\'cmmed-audit-modal\').remove()" style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer">✕</button></div>' +
+        '<input id="cmmed-audit-filtro" placeholder="Filtrar por texto (actor, accion, detalle...)" oninput="cmMedFiltrarAudit()" style="background:#1e293b;border:1px solid #334155;border-radius:6px;color:#e2e8f0;padding:8px 10px;font-size:13px;margin-bottom:10px">' +
+        '<div id="cmmed-audit-lista" style="overflow:auto;flex:1"><p style="color:#64748b;font-size:12px">Cargando...</p></div></div>';
+    document.body.appendChild(modal);
+    var nombres = await cmMedNombresActores();
+    var r = await supabaseClient.from('cm_med_audit').select('*').eq('club_id', clubId).order('created_at', { ascending: false }).limit(200);
+    var lista = document.getElementById('cmmed-audit-lista');
+    if (r.error) { lista.innerHTML = '<p style="color:#f87171;font-size:12px">Error: ' + r.error.message + '</p>'; return; }
+    window.cmMedAuditRows = (r.data || []).map(function(a) { a._actor = (nombres[a.wp_user_id] || ('ID ' + a.wp_user_id)); return a; });
+    cmMedFiltrarAudit();
+}
+
+function cmMedFiltrarAudit() {
+    var lista = document.getElementById('cmmed-audit-lista');
+    if (!lista) return;
+    var q = (document.getElementById('cmmed-audit-filtro').value || '').toLowerCase();
+    var nombres = cmMedMapaActores || {};
+    var rows = (window.cmMedAuditRows || []).filter(function(a) {
+        if (!q) return true;
+        return ((a._actor || '') + ' ' + (a.action || '') + ' ' + (a.table_name || '') + ' ' + (a.details || '')).toLowerCase().indexOf(q) !== -1;
+    });
+    lista.innerHTML = rows.length ? rows.map(function(a) { return cmMedFilaAudit(a, nombres); }).join('') : '<p style="color:#64748b;font-size:12px">Sin resultados.</p>';
+}
 
 // ========== SEMÁFORO ==========
 async function cmMedCambiarDisponibilidad(playerId, status, btn) {
