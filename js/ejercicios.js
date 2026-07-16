@@ -1154,6 +1154,25 @@ function ejProyPanel() {
         '<button onclick="document.getElementById(\'ej-proy-panel\').style.display=\'none\'" style="background:none;border:none;color:#94a3b8;font-size:16px;cursor:pointer">✕</button></div>' +
         '<div id="ej-proy-body" style="padding:12px;overflow:auto;color:#e2e8f0;font-size:13px"></div>';
     document.body.appendChild(p);
+    (function() {
+        const header = p.firstElementChild;
+        header.style.cursor = 'move';
+        let dx = 0, dy = 0, drag = false;
+        header.addEventListener('mousedown', function(ev) {
+            if (ev.target.tagName === 'BUTTON') return;
+            drag = true;
+            const r = p.getBoundingClientRect();
+            dx = ev.clientX - r.left; dy = ev.clientY - r.top;
+            p.style.right = 'auto'; p.style.bottom = 'auto';
+            ev.preventDefault();
+        });
+        document.addEventListener('mousemove', function(ev) {
+            if (!drag) return;
+            p.style.left = Math.max(0, ev.clientX - dx) + 'px';
+            p.style.top = Math.max(0, ev.clientY - dy) + 'px';
+        });
+        document.addEventListener('mouseup', function() { drag = false; });
+    })();
     ejProyListar();
 }
 
@@ -1192,7 +1211,7 @@ async function ejProyAbrir(id, nombre) {
     const body = document.getElementById('ej-proy-body');
     body.innerHTML = 'Cargando...';
     const { data, error } = await supabaseClient.from('pizarra_proyecto_items')
-        .select('id, orden, exercise_id, custom_exercises(id, name, thumbnail_svg)')
+        .select('id, orden, exercise_id, nombre, board_data, thumbnail_svg, custom_exercises(id, name, thumbnail_svg)')
         .eq('proyecto_id', id).order('orden');
     if (error) { body.innerHTML = '<span style="color:#f87171">Error: ' + error.message + '</span>'; return; }
     ejProyItems = data || [];
@@ -1207,25 +1226,45 @@ function ejProyPintar() {
         '<strong style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + ejProyActual.nombre + '</strong>' +
         '<button onclick="ejProyNav(-1)" title="Fase anterior (flecha izquierda)" style="background:#1e293b;border:1px solid #334155;color:#e2e8f0;border-radius:6px;padding:4px 10px;cursor:pointer">◀</button>' +
         '<button onclick="ejProyNav(1)" title="Fase siguiente (flecha derecha)" style="background:#1e293b;border:1px solid #334155;color:#e2e8f0;border-radius:6px;padding:4px 10px;cursor:pointer">▶</button></div>' +
-        '<button onclick="ejProyAnadirActual()" style="width:100%;padding:7px;background:#16a34a;border:none;color:#fff;border-radius:8px;cursor:pointer;font-weight:600;margin-bottom:10px">+ Anadir pizarra actual</button>';
-    if (!ejProyItems.length) html += '<p style="color:#64748b">Proyecto vacio. Dibuja o carga una pizarra, guardala como ejercicio, y pulsa "Anadir pizarra actual".</p>';
+        '<button onclick="ejProyAnadirFase()" style="width:100%;padding:7px;background:#16a34a;border:none;color:#fff;border-radius:8px;cursor:pointer;font-weight:600;margin-bottom:10px">+ Anadir fase (captura el dibujo actual)</button>';
+    if (!ejProyItems.length) html += '<p style="color:#64748b">Proyecto vacio. Dibuja la fase en la pizarra y pulsa "Anadir fase".</p>';
     else html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' + ejProyItems.map(function(it, i) {
         const ex = it.custom_exercises || {};
-        const thumb = ex.thumbnail_svg ? 'data:image/svg+xml;utf8,' + encodeURIComponent(ex.thumbnail_svg) : '';
+        const nombreItem = it.nombre || ex.name || '(pizarra)';
+        const svgThumb = it.thumbnail_svg || ex.thumbnail_svg;
+        const thumb = svgThumb ? 'data:image/svg+xml;utf8,' + encodeURIComponent(svgThumb) : '';
         return '<div onclick="ejProyIr(' + i + ')" style="cursor:pointer;background:' + (i === ejProyIdx ? '#1d4ed8' : '#1e293b') + ';border-radius:8px;padding:6px;position:relative">' +
             (thumb ? '<img src="' + thumb + '" style="width:100%;border-radius:6px;background:#14532d">' : '<div style="height:60px;background:#14532d;border-radius:6px"></div>') +
-            '<div style="font-size:11px;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (i + 1) + '. ' + (ex.name || '(pizarra)') + '</div>' +
+            '<div style="font-size:11px;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (i + 1) + '. ' + nombreItem + '</div>' +
             '<button onclick="event.stopPropagation();ejProyQuitar(\'' + it.id + '\')" title="Quitar del proyecto" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,.5);border:none;color:#f87171;border-radius:4px;cursor:pointer;font-size:11px">✕</button></div>';
     }).join('') + '</div>';
     body.innerHTML = html;
 }
 
-async function ejProyAnadirActual() {
+async function ejProyAnadirFase() {
     if (!ejProyActual) return;
-    if (!ejEditandoId) { ejToast('Guarda primero la pizarra (Guardar ejercicio) y vuelve a pulsar', 'warning'); return; }
-    if (ejProyItems.some(function(it) { return it.exercise_id === ejEditandoId; })) { ejToast('Esta pizarra ya esta en el proyecto', 'warning'); return; }
+    const hayDibujo = ejP.players.length > 0 || ejP.lines.length > 0 || ejP.shapes.length > 0 || ejP.equipment.length > 0 || ejP.texts.length > 0;
+    if (!hayDibujo) { ejToast('La pizarra esta vacia: dibuja la fase antes de anadirla', 'warning'); return; }
+    const nombre = prompt('Nombre de la fase:', 'Fase ' + (ejProyItems.length + 1));
+    if (nombre === null) return;
+    const bd = {
+        players: ejP.players, lines: ejP.lines,
+        shapes: ejP.shapes, texts: ejP.texts,
+        equipment: ejP.equipment, connections: ejP.connections,
+        fieldType: ejP.fieldType, showCarriles: ejP.showCarriles, showZonas: ejP.showZonas,
+        animFrames: ejP.animMode ? ejP.frames : [],
+        animMode: ejP.animMode
+    };
+    let thumb = null;
+    const svgEl = document.getElementById('ej-svg');
+    if (svgEl) {
+        thumb = new XMLSerializer().serializeToString(svgEl)
+            .replace(/width="[^"]*"/, 'width="100%"')
+            .replace(/height="[^"]*"/, 'height="100%"');
+        thumb = ejComprimirThumbSVG(thumb);
+    }
     const { error } = await supabaseClient.from('pizarra_proyecto_items')
-        .insert({ proyecto_id: ejProyActual.id, exercise_id: ejEditandoId, orden: ejProyItems.length });
+        .insert({ proyecto_id: ejProyActual.id, nombre: (nombre.trim() || 'Fase ' + (ejProyItems.length + 1)), board_data: bd, thumbnail_svg: thumb, orden: ejProyItems.length });
     if (error) { ejToast('Error: ' + error.message, 'error'); return; }
     ejProyAbrir(ejProyActual.id, ejProyActual.nombre);
 }
@@ -1238,8 +1277,47 @@ async function ejProyQuitar(itemId) {
 function ejProyIr(i) {
     if (i < 0 || i >= ejProyItems.length) return;
     ejProyIdx = i;
-    ejBancoCargar(ejProyItems[i].exercise_id);
+    const it = ejProyItems[i];
+    if (it.board_data) { ejProyCargarFase(it); }
+    else if (it.exercise_id) { ejBancoCargar(it.exercise_id); }
     ejProyPintar();
+}
+
+function ejProyCargarFase(it) {
+    const bd = it.board_data;
+    ejFrameStop();
+    ejSaveHistory();
+    ejP.players = bd.players || [];
+    ejP.lines = bd.lines || [];
+    ejP.shapes = bd.shapes || [];
+    ejP.texts = bd.texts || [];
+    ejP.equipment = bd.equipment || [];
+    ejP.connections = bd.connections || [];
+    ejP.fieldType = bd.fieldType || 'full';
+    ejP.showCarriles = !!bd.showCarriles;
+    ejP.showZonas = !!bd.showZonas;
+    ejP.selectedId = null;
+    ejP.nextId = [].concat(ejP.players, ejP.lines, ejP.shapes, ejP.texts, ejP.equipment, ejP.connections).reduce(function(max, e) { return (e.id > max ? e.id : max); }, 0) + 1;
+    if (bd.animFrames && bd.animFrames.length > 0) {
+        ejP.frames = bd.animFrames;
+        ejP.currentFrame = 0;
+        ejP.animMode = bd.animMode || false;
+        ejFrameRestore(ejP.frames[0]);
+    } else {
+        ejP.animMode = false;
+        ejP.frames = [];
+        ejP.currentFrame = 0;
+    }
+    var overlay = document.getElementById('ej-modo-overlay');
+    if (overlay) overlay.style.display = 'none';
+    var tb = document.getElementById('ej-toolbar');
+    if (tb) tb.style.display = '';
+    ejRenderSVG();
+    var tlBar = document.getElementById('ej-timeline-bar');
+    if (tlBar) tlBar.style.display = ejP.animMode ? 'block' : 'none';
+    ejRenderTimeline();
+    var lbl = document.getElementById('ej-pizarra-nombre-label');
+    if (lbl) lbl.textContent = (ejProyActual ? ejProyActual.nombre + ' · ' : '') + (it.nombre || 'Fase');
 }
 
 function ejProyNav(delta) {
