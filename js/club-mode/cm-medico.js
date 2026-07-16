@@ -377,6 +377,7 @@ async function cmMedAbrirFicha(playerId, playerName, photoUrl) {
         '<div class="cmmed-ficha-header"><h3>' + avatarHtml + playerName + '</h3><button class="cmmed-ficha-close" onclick="cmMedCerrarFicha()">✕</button></div>' +
         '<div class="cmmed-tabs">' +
             '<button class="cmmed-btn cmmed-btn-secondary cmmed-btn-sm" onclick="cmMedPDFHistorial(\'' + playerId + '\',\'' + playerName.replace(/'/g, "\\'") + '\')" style="margin-right:auto">PDF Historial</button>' +
+            '<button class="cmmed-btn cmmed-btn-secondary cmmed-btn-sm" onclick="cmMedExportarDatos(\'' + playerId + '\',\'' + playerName.replace(/'/g, "\\'") + '\')">Exportar RGPD</button>' +
             '<button class="cmmed-tab active" onclick="cmMedCambiarTab(\'antecedentes\',this)">Antecedentes</button>' +
             '<button class="cmmed-tab" onclick="cmMedCambiarTab(\'lesiones\',this)">Lesiones</button>' +
             '<button class="cmmed-tab" onclick="cmMedCambiarTab(\'sesiones\',this)">Sesiones</button>' +
@@ -1254,6 +1255,46 @@ async function cmMedPDFLesion(injuryId) {
     doc.save('Lesion_' + playerName.replace(/\s/g, '_') + '_' + (inj.injury_date || 'sin_fecha') + '.pdf');
     showToast('PDF generado');
     cmMedRegistrarAudit('EXPORT', 'cm_med_injuries', injuryId, 'Exporto PDF informe lesion');
+}
+
+// ========== EXPORTACION ESTRUCTURADA (Arts. 15/20 RGPD) ==========
+async function cmMedExportarDatos(playerId, playerName) {
+    showToast('Preparando exportacion RGPD...');
+    try {
+        var pr = function(res) { return res.error ? null : (res.data || null); };
+        var expediente = {
+            _meta: {
+                descripcion: 'Exportacion del expediente de salud (derecho de acceso y portabilidad, Arts. 15 y 20 RGPD)',
+                jugador: playerName,
+                player_id: playerId,
+                exportado_en: new Date().toISOString(),
+                formato: 'JSON estructurado'
+            },
+            ficha_medica: pr(await supabaseClient.from('cm_med_player_record').select('*').eq('club_id', clubId).eq('player_id', playerId).maybeSingle()),
+            consentimientos: pr(await supabaseClient.from('cm_med_consents').select('consent_type, granted, granted_by, granted_at, revoked_at, consent_version').eq('club_id', clubId).eq('player_id', playerId)) || [],
+            lesiones: pr(await supabaseClient.from('cm_med_injuries').select('*, cm_med_osiics_codes(code, description_es), cm_med_body_zones(zone_name_es)').eq('club_id', clubId).eq('player_id', playerId).order('injury_date', { ascending: false })) || [],
+            sesiones_medicas: pr(await supabaseClient.from('cm_med_sessions').select('*').eq('club_id', clubId).eq('player_id', playerId)) || [],
+            retorno_al_juego: pr(await supabaseClient.from('cm_med_rtp').select('*').eq('club_id', clubId).eq('player_id', playerId)) || [],
+            cuestionarios_ostrc: pr(await supabaseClient.from('cm_med_ostrc').select('*').eq('club_id', clubId).eq('player_id', playerId)) || [],
+            adjuntos: pr(await supabaseClient.from('cm_med_attachments').select('id, injury_id, file_name, file_type, created_at').eq('club_id', clubId).eq('player_id', playerId)) || [],
+            disponibilidad: pr(await supabaseClient.from('club_player_availability').select('status, notes, updated_at').eq('club_id', clubId).eq('player_id', playerId).maybeSingle()),
+            registro_de_accesos: pr(await supabaseClient.from('cm_med_audit').select('wp_user_id, action, table_name, details, created_at').eq('club_id', clubId).eq('player_id', playerId).order('created_at', { ascending: false })) || []
+        };
+
+        var blob = new Blob([JSON.stringify(expediente, null, 2)], { type: 'application/json' });
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'expediente-rgpd-' + playerName.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + new Date().toISOString().slice(0, 10) + '.json';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(a.href);
+
+        cmMedRegistrarAudit('EXPORT', 'expediente_completo', playerId, 'Exportacion RGPD estructurada (JSON): ' + playerName);
+        showToast('Expediente exportado (JSON)');
+    } catch (e) {
+        showToast('Error en la exportacion: ' + e.message, 'error');
+    }
 }
 
 async function cmMedPDFHistorial(playerId, playerName) {
