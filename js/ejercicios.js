@@ -70,6 +70,20 @@ const EJ_EQUIPMENT_TYPES = [
     { key: 'bosu',       name: 'Bosu',           w: 50, h: 36 }
 ];
 
+// ---- MATERIAL QUE ADMITE COLOR (plano) ----
+const EJ_COLORABLE_EQUIP = ['cone','marker','discBlue','discRed','ringRed','ringGreen','stickRed','stickYellow','hurdle'];
+const EJ_EQUIP_COLORS = [
+    { c: null,      n: 'Original' },
+    { c: '#3b82f6', n: 'Azul' },
+    { c: '#ef4444', n: 'Rojo' },
+    { c: '#eab308', n: 'Amarillo' },
+    { c: '#22c55e', n: 'Verde' },
+    { c: '#f97316', n: 'Naranja' },
+    { c: '#a855f7', n: 'Morado' },
+    { c: '#ec4899', n: 'Rosa' },
+    { c: '#06b6d4', n: 'Cian' }
+];
+
 // ---- IMÁGENES DEL CAMPO ----
 const EJ_FIELD_IMAGES = {
     full:  'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA4MDAgNTAwIj48cmVjdCB3aWR0aD0iODAwIiBoZWlnaHQ9IjUwMCIgZmlsbD0iIzFhNmIzMCIvPjxjbGlwUGF0aCBpZD0iZmMiPjxyZWN0IHg9IjIwIiB5PSIxNSIgd2lkdGg9Ijc2MCIgaGVpZ2h0PSI0NzAiIHJ4PSIxIi8+PC9jbGlwUGF0aD48ZyBjbGlwLXBhdGg9InVybCgjZmMpIj48cmVjdCB4PSIyMCIgeT0iMTUiIHdpZHRoPSI2MyIgaGVpZ2h0PSI0NzAiIGZpbGw9IiMyMDczMzIiLz48cmVjdCB4PSI4MyIgeT0iMTUiIHdpZHRoPSI2NCIgaGVpZ2h0PSI0NzAiIGZpbGw9IiMxYTZiMzAiLz48cmVjdCB4PSIxNDciIHk9IjE1IiB3aWR0aD0iNjMiIGhlaWdodD0iNDcwIiBmaWxsPSIjMjA3MzMyIi8+PHJlY3QgeD0iMjEwIiB5PSIxNSIgd2lkdGg9IjY0IiBoZWlnaHQ9IjQ3MCIgZmlsbD0iIzFhNmIzMCIvPjxyZWN0IHg9IjI3NCIgeT0iMTUiIHdpZHRoPSI2MyIgaGVpZ2h0PSI0NzAiIGZpbGw9IiMyMDczMzIiLz48cmVjdCB4PSIzMzciIHk9IjE1IiB3aWR0aD0iNjMiIGhlaWdodD0iNDcwIiBmaWxsPSIjMWE2YjMwIi8+PHJlY3QgeD0iNDAwIiB5PSIxNSIgd2lkdGg9IjY0IiBoZWlnaHQ9IjQ3MCIgZmlsbD0iIzIwNzMzMiIvPjxyZWN0IHg9IjQ2NCIgeT0iMTUiIHdpZHRoPSI2MyIgaGVpZ2h0PSI0NzAiIGZpbGw9IiMxYTZiMzAiLz48cmVjdCB4PSI1MjciIHk9IjE1IiB3aWR0aD0iNjMiIGhlaWdodD0iNDcwIiBmaWxsPSIjMjA3MzMyIi8+PHJlY3QgeD0iNTkwIiB5PSIxNSIgd2lkdGg9IjY0IiBoZWlnaHQ9IjQ3MCIgZmlsbD0iIzFhNmIzMCIvPjxyZWN0IHg9IjY1NCIgeT0iMTUiIHdpZHRoPSI2MyIgaGVpZ2h0PSI0NzAiIGZpbGw9IiMyMDczMzIiLz48cmVjdCB4PSI3MTciIHk9IjE1IiB3aWR0aD0iNjMiIGhlaWdodD0iNDcwIiBmaWxsPSIjMWE2YjMwIi8+PC9nPjxnIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxyZWN0IHg9IjIwIiB5PSIxNSIgd2lkdGg9Ijc2MCIgaGVpZ2h0PSI0NzAiIHJ4PSIxIi8+PGxpbmUgeDE9IjQwMCIgeTE9IjE1IiB4Mj0iNDAwIiB5Mj0iNDg1Ii8+PGNpcmNsZSBjeD0iNDAwIiBjeT0iMjUwIiByPSI2NSIvPjxyZWN0IHg9IjIwIiB5PSIxMzMiIHdpZHRoPSIxMDgiIGhlaWdodD0iMjM0Ii8+PHJlY3QgeD0iNjcyIiB5PSIxMzMiIHdpZHRoPSIxMDgiIGhlaWdodD0iMjM0Ii8+PHJlY3QgeD0iMjAiIHk9IjE5NSIgd2lkdGg9IjQwIiBoZWlnaHQ9IjExMCIvPjxyZWN0IHg9Ijc0MCIgeT0iMTk1IiB3aWR0aD0iNDAiIGhlaWdodD0iMTEwIi8+PHJlY3QgeD0iMTAiIHk9IjIyMCIgd2lkdGg9IjEwIiBoZWlnaHQ9IjYwIi8+PHJlY3QgeD0iNzgwIiB5PSIyMjAiIHdpZHRoPSIxMCIgaGVpZ2h0PSI2MCIvPjxwYXRoIGQ9Ik0xMjggMTk5IEE2NSA2NSAwIDAgMSAxMjggMzAxIi8+PHBhdGggZD0iTTY3MiAxOTkgQTY1IDY1IDAgMCAwIDY3MiAzMDEiLz48cGF0aCBkPSJNMjAgMjIgQTcgNyAwIDAgMSAyNyAxNSIvPjxwYXRoIGQ9Ik03NzMgMTUgQTcgNyAwIDAgMSA3ODAgMjIiLz48cGF0aCBkPSJNNzgwIDQ3OCBBNyA3IDAgMCAxIDc3MyA0ODUiLz48cGF0aCBkPSJNMjcgNDg1IEE3IDcgMCAwIDEgMjAgNDc4Ii8+PC9nPjxjaXJjbGUgY3g9IjQwMCIgY3k9IjI1MCIgcj0iMy41IiBmaWxsPSIjZmZmIi8+PGNpcmNsZSBjeD0iMTAwIiBjeT0iMjUwIiByPSIzLjUiIGZpbGw9IiNmZmYiLz48Y2lyY2xlIGN4PSI3MDAiIGN5PSIyNTAiIHI9IjMuNSIgZmlsbD0iI2ZmZiIvPjwvc3ZnPgo=',
@@ -117,6 +131,8 @@ const ejP = {
     equipment: [],
     connections: [],
     selectedEquipmentType: 'cone',
+   equipDefaultMul: 1,
+    equipDefaultColor: null,
 
     selectedId: null,
     isDragging: false,
@@ -275,7 +291,8 @@ function ejRenderSVG() {
         const sel = eq.id === ejP.selectedId;
         const img = EJ_EQUIPMENT_IMAGES[eq.eqType];
         html += `<g data-id="${eq.id}" data-type="equipment" style="cursor:move" transform="rotate(${eq.rotation||0},${eq.x},${eq.y})">
-            <image href="${img}" x="${eq.x - w/2}" y="${eq.y - h/2}" width="${w}" height="${h}" preserveAspectRatio="xMidYMid meet"/>
+           ${eq.color ? `<filter id="eqtint-${eq.id}" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="0.2126 0.7152 0.0722 0 0 0.2126 0.7152 0.0722 0 0 0.2126 0.7152 0.0722 0 0 0 0 0 1 0" result="g"/><feComponentTransfer in="g" result="gb"><feFuncR type="linear" slope="0.55" intercept="0.5"/><feFuncG type="linear" slope="0.55" intercept="0.5"/><feFuncB type="linear" slope="0.55" intercept="0.5"/></feComponentTransfer><feFlood flood-color="${eq.color}" result="c"/><feBlend in="c" in2="gb" mode="multiply" result="t"/><feComposite in="t" in2="SourceGraphic" operator="in"/></filter>` : ''}
+            <image href="${img}" x="${eq.x - w/2}" y="${eq.y - h/2}" width="${w}" height="${h}" preserveAspectRatio="xMidYMid meet"${eq.color ? ` filter="url(#eqtint-${eq.id})"` : ''}/>
             ${sel ? `<rect x="${eq.x - w/2 - 3}" y="${eq.y - h/2 - 3}" width="${w+6}" height="${h+6}" fill="none" stroke="#22c55e" stroke-width="1.5" stroke-dasharray="4 2" rx="3"/>` : ''}
         </g>`;
     }
@@ -703,7 +720,7 @@ if (ejP.activeTool === 'connect') { if (!isBackground && el) { var _cid = parseI
     if (ejP.activeTool === 'equipment' && isBackground) {
         ejSaveHistory();
         const id = ejP.nextId++;
-        ejP.equipment.push({ id, x: pos.x, y: pos.y, eqType: ejP.selectedEquipmentType, scale: ({'ball':0.20,'cone':0.20,'marker':0.20,'goalSmall':0.95}[ejP.selectedEquipmentType] || 0.5), rotation: 0 });
+        ejP.equipment.push({ id, x: pos.x, y: pos.y, eqType: ejP.selectedEquipmentType, scale: Math.round(({'ball':0.20,'cone':0.20,'marker':0.20,'goalSmall':0.95}[ejP.selectedEquipmentType] || 0.5) * (ejP.equipDefaultMul || 1) * 100) / 100, rotation: 0, color: (EJ_COLORABLE_EQUIP.includes(ejP.selectedEquipmentType) ? (ejP.equipDefaultColor || null) : null) });
 ejP.selectedId = id;
         ejP.expandedSection = 'material';
 ejRenderSVG();
@@ -1576,6 +1593,24 @@ function ejTogglePlayerNumber(show) {
     ejRenderSVG();
 }
 
+function ejChangeEquipDefault(dir) {
+    const step = 0.15;
+    const cur = ejP.equipDefaultMul || 1;
+    ejP.equipDefaultMul = dir === 'up' ? Math.min(cur + step, 3.0) : Math.max(cur - step, 0.4);
+    ejP.equipDefaultMul = Math.round(ejP.equipDefaultMul * 100) / 100;
+    ejRenderToolbar();
+}
+function ejChangeEquipmentColor(color) {
+    if (!ejP.selectedId) return;
+    ejP.equipment = ejP.equipment.map(function(eq){ return eq.id === ejP.selectedId ? Object.assign({}, eq, { color: color || null }) : eq; });
+    ejSaveHistory();
+    ejRenderSVG();
+    ejRenderToolbar();
+}
+function ejSetEquipDefaultColor(color) {
+    ejP.equipDefaultColor = color || null;
+    ejRenderToolbar();
+}
 function ejChangeEquipmentSize(dir) {
     if (!ejP.selectedId) return;
     ejP.equipment = ejP.equipment.map(eq => {
@@ -1756,11 +1791,23 @@ function ejRenderToolbar() {
         <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M4 0L4 20L9 15H16L4 0Z"/></svg>
         Seleccionar / Mover
     </button>
+   
+   
+   
+   
     <div style="display:flex;gap:6px;margin-bottom:6px">
         <button onclick="ejUndo()" title="Deshacer (Ctrl+Z)" style="flex:1;padding:7px;background:#1e293b;border:1px solid #334155;color:#e2e8f0;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">↩ Deshacer</button>
         <button onclick="ejRedo()" title="Rehacer (Ctrl+Y)" style="flex:1;padding:7px;background:#1e293b;border:1px solid #334155;color:#94a3b8;border-radius:6px;cursor:pointer;font-size:12px">↪ Rehacer</button>
     </div>
-  <!-- BOTÓN MODO ANIMACIÓN (solo visible en modo animado) -->
+ ${(ejP.multiSel && ejP.multiSel.length > 0) ? `
+    <div style="margin-bottom:8px;padding:8px;background:#0f172a;border:1px solid #22c55e;border-radius:8px">
+        <div style="font-size:11px;color:#22c55e;font-weight:700;margin-bottom:6px">${ejP.multiSel.length} seleccionados</div>
+        <div style="display:flex;gap:4px">
+            <button onclick="ejResizeMultiSel('down')" style="flex:1;padding:6px;font-size:11px;background:#1e293b;border:1px solid #334155;color:#f97316;border-radius:6px;cursor:pointer">− Menor todos</button>
+            <button onclick="ejResizeMultiSel('up')" style="flex:1;padding:6px;font-size:11px;background:#1e293b;border:1px solid #334155;color:#22c55e;border-radius:6px;cursor:pointer">+ Mayor todos</button>
+        </div>
+    </div>` : ''}
+  <!-- PANEL MODO ANIMACION -->
 ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin-bottom:6px;width:100%;padding:8px;border-radius:6px;text-align:center;color:#fff;font-size:12px;font-weight:600">
         🎬 Modo Animación ON
     </div>` : ''}
@@ -1974,6 +2021,17 @@ ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin
                 <img src="${EJ_EQUIPMENT_IMAGES[eq.key]}" alt="${eq.name}" class="ej-eq-thumb"/>
                 <span>${eq.name}</span>
             </button>`).join('')}
+    </div>
+        <div style="margin-top:8px;padding-top:8px;border-top:1px solid #334155">
+            <div style="font-size:11px;color:#9ca3af;margin-bottom:6px">Tamaño al colocar: <strong style="color:#fff">×${(ejP.equipDefaultMul||1).toFixed(2)}</strong></div>
+            <div style="display:flex;gap:4px">
+                <button onclick="ejChangeEquipDefault('down')" style="flex:1;padding:5px;font-size:11px;background:#1e293b;border:1px solid #334155;color:#f97316;border-radius:6px;cursor:pointer">− Menor</button>
+                <button onclick="ejChangeEquipDefault('up')" style="flex:1;padding:5px;font-size:11px;background:#1e293b;border:1px solid #334155;color:#22c55e;border-radius:6px;cursor:pointer">+ Mayor</button>
+            </div>
+        </div>
+          <div style="margin-top:6px">
+            <div style="font-size:11px;color:#9ca3af;margin-bottom:4px">Color al colocar (conos, discos, aros...):</div>
+            <div style="display:flex;flex-wrap:wrap;gap:4px">${EJ_EQUIP_COLORS.map(function(c){ var call = c.c ? "ejSetEquipDefaultColor('"+c.c+"')" : "ejSetEquipDefaultColor(null)"; var bg = c.c || "conic-gradient(from 0deg,#ef4444,#eab308,#22c55e,#3b82f6,#a855f7,#ef4444)"; var brd = ((ejP.equipDefaultColor||null)===c.c) ? "#22c55e" : "#334155"; return '<div title="'+c.n+'" onclick="'+call+'" style="width:20px;height:20px;border-radius:50%;cursor:pointer;border:2px solid '+brd+';background:'+bg+'"></div>'; }).join('')}</div>
         </div>
         ${selEquipment ? `
         <div style="margin-top:8px;padding-top:8px;border-top:1px solid #334155">
@@ -1982,6 +2040,7 @@ ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin
                 <button onclick="ejChangeEquipmentSize('down')" style="flex:1;padding:5px;font-size:11px;background:#1e293b;border:1px solid #334155;color:#f97316;border-radius:6px;cursor:pointer">− Menor</button>
                 <button onclick="ejChangeEquipmentSize('up')" style="flex:1;padding:5px;font-size:11px;background:#1e293b;border:1px solid #334155;color:#22c55e;border-radius:6px;cursor:pointer">+ Mayor</button>
             </div>
+            ${EJ_COLORABLE_EQUIP.includes(selEquipment.eqType) ? `<div style="font-size:11px;color:#9ca3af;margin:2px 0 4px">Color:</div><div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">${EJ_EQUIP_COLORS.map(function(c){ var call = c.c ? "ejChangeEquipmentColor('"+c.c+"')" : "ejChangeEquipmentColor(null)"; var bg = c.c || "conic-gradient(from 0deg,#ef4444,#eab308,#22c55e,#3b82f6,#a855f7,#ef4444)"; var brd = ((selEquipment.color||null)===c.c) ? "#22c55e" : "#334155"; return '<div title="'+c.n+'" onclick="'+call+'" style="width:20px;height:20px;border-radius:50%;cursor:pointer;border:2px solid '+brd+';background:'+bg+'"></div>'; }).join('')}</div>` : ''}
             <div style="font-size:10px;color:#9ca3af;margin-bottom:4px">Rotación: ${selEquipment.rotation||0}°</div>
             <div style="display:flex;gap:3px;margin-bottom:4px">
                 <button onclick="ejRotateEquipment(-45)" style="flex:1;padding:4px;font-size:10px;background:#1e293b;border:1px solid #334155;color:#9ca3af;border-radius:4px;cursor:pointer">−45°</button>
@@ -4358,6 +4417,22 @@ function ejSeleccionarEnRecuadro() {
         ejP.selectedId = null;
         ejToast(sel.length + ' elemento(s) seleccionados — arrastra uno para mover el bloque', 'success');
     }
+}
+function ejResizeMultiSel(dir) {
+    if (!ejP.multiSel || ejP.multiSel.length === 0) return;
+    const step = 0.15;
+    ejP.multiSel.forEach(function(m) {
+        if (m.type === 'player') {
+            var p = ejP.players.find(function(x){ return x.id === m.id; });
+            if (p) { var ns = dir === 'up' ? Math.min((p.scale ?? 1) + step, 2.5) : Math.max((p.scale ?? 1) - step, 0.3); p.scale = Math.round(ns * 100) / 100; }
+        } else if (m.type === 'equipment') {
+            var eq = ejP.equipment.find(function(x){ return x.id === m.id; });
+            if (eq) { var ne = dir === 'up' ? Math.min((eq.scale ?? 1) + step, 3.0) : Math.max((eq.scale ?? 1) - step, 0.3); eq.scale = Math.round(ne * 100) / 100; }
+        }
+    });
+    ejSaveHistory();
+    ejRenderSVG();
+    ejRenderToolbar();
 }
 function ejMoverMultiSel(dx, dy) {
     ejP.multiSel.forEach(function(m) {
