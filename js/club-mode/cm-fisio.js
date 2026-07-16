@@ -491,7 +491,7 @@ async function cmFisioCargarLesiones(playerId) {
 async function cmFisioCambiarDisponibilidad(playerId, nuevoEstado, btn) {
     var res = await supabaseClient.from('club_player_availability').upsert({
         club_id: clubId, player_id: playerId, status: nuevoEstado,
-        set_by_wp_user_id: usuario ? usuario.id : null, updated_at: new Date().toISOString()
+        set_by_wp_user_id: cmIdentidad(), updated_at: new Date().toISOString()
     }, { onConflict: 'club_id,player_id' });
 
     if (res.error) { showToast('Error: ' + res.error.message, 'error'); return; }
@@ -900,7 +900,7 @@ async function cmFisioEnviarInforme() {
             related_type: 'cm_fisio_daily_reports',
             related_id: reportRes.data ? reportRes.data.id : null,
             target_permission: 'entrenamientos',
-            created_by: usuario ? usuario.id : null
+            created_by: cmIdentidad()
         });
 
         // Actualizar informe con el ID de notificacion
