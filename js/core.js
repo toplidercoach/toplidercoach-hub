@@ -38,7 +38,7 @@ let clubData = null;
 // Planificador
 let ejercicioSeleccionado = null;
 let paginaEjercicios = 1;
-let sesion = { nombre: '', fecha: '', calentamiento: [], principal: [], enfriamiento: [] };
+let sesion = { nombre: '', fecha: '', previo: [], calentamiento: [], principal: [], enfriamiento: [], postcampo: [] };
 let calendarioMesSesiones = new Date().getMonth();
 let calendarioAnioSesiones = new Date().getFullYear();
 let calendarioMesPartidos = new Date().getMonth();
