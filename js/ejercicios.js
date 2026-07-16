@@ -1133,6 +1133,127 @@ function ejElegirModo(modo) {
     ejP.expandedSection = '';
     ejRenderToolbar();
 }
+// ========== PROYECTOS DE PIZARRA ==========
+let ejProyActual = null;
+let ejProyItems = [];
+let ejProyIdx = -1;
+
+function ejProyPanel() {
+    let p = document.getElementById('ej-proy-panel');
+    if (p) { p.style.display = 'flex'; ejProyListar(); return; }
+    p = document.createElement('div');
+    p.id = 'ej-proy-panel';
+    p.style.cssText = 'position:fixed;right:16px;bottom:16px;width:360px;max-height:70vh;background:#0f172a;border:1px solid #334155;border-radius:12px;z-index:99998;display:flex;flex-direction:column;box-shadow:0 10px 40px rgba(0,0,0,.5);overflow:hidden';
+    p.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#1e3a5f;">' +
+        '<strong style="color:#93c5fd;font-size:13px">📁 Proyectos de pizarra</strong>' +
+        '<button onclick="document.getElementById(\'ej-proy-panel\').style.display=\'none\'" style="background:none;border:none;color:#94a3b8;font-size:16px;cursor:pointer">✕</button></div>' +
+        '<div id="ej-proy-body" style="padding:12px;overflow:auto;color:#e2e8f0;font-size:13px"></div>';
+    document.body.appendChild(p);
+    ejProyListar();
+}
+
+async function ejProyListar() {
+    ejProyActual = null; ejProyItems = []; ejProyIdx = -1;
+    const body = document.getElementById('ej-proy-body');
+    body.innerHTML = 'Cargando...';
+    const { data, error } = await supabaseClient.from('pizarra_proyectos').select('id,nombre').eq('coach_id', String(window.ejCoachId)).order('updated_at', { ascending: false });
+    if (error) { body.innerHTML = '<span style="color:#f87171">Error: ' + error.message + '</span>'; return; }
+    let html = '<button onclick="ejProyCrear()" style="width:100%;padding:8px;background:#7c3aed;border:none;color:#fff;border-radius:8px;cursor:pointer;font-weight:600;margin-bottom:10px">+ Nuevo proyecto</button>';
+    if (!data || !data.length) html += '<p style="color:#64748b">Sin proyectos todavia. Crea el primero (ej: "Presion alta").</p>';
+    else html += data.map(pr =>
+        '<div style="display:flex;align-items:center;justify-content:space-between;background:#1e293b;border-radius:8px;padding:8px 10px;margin-bottom:6px">' +
+        '<span onclick="ejProyAbrir(\'' + pr.id + '\',\'' + (pr.nombre || '').replace(/'/g, "\\'") + '\')" style="cursor:pointer;font-weight:600;flex:1">' + pr.nombre + '</span>' +
+        '<button onclick="ejProyBorrar(\'' + pr.id + '\')" title="Eliminar proyecto (no borra las pizarras)" style="background:none;border:none;color:#64748b;cursor:pointer">🗑</button></div>'
+    ).join('');
+    body.innerHTML = html;
+}
+
+async function ejProyCrear() {
+    const nombre = prompt('Nombre del proyecto (ej: Presion alta):');
+    if (!nombre || !nombre.trim()) return;
+    const { error } = await supabaseClient.from('pizarra_proyectos').insert({ coach_id: String(window.ejCoachId), nombre: nombre.trim() });
+    if (error) { ejToast('Error: ' + error.message, 'error'); return; }
+    ejProyListar();
+}
+
+async function ejProyBorrar(id) {
+    if (!confirm('Eliminar el proyecto? (las pizarras NO se borran, solo la coleccion)')) return;
+    await supabaseClient.from('pizarra_proyectos').delete().eq('id', id);
+    ejProyListar();
+}
+
+async function ejProyAbrir(id, nombre) {
+    ejProyActual = { id: id, nombre: nombre };
+    const body = document.getElementById('ej-proy-body');
+    body.innerHTML = 'Cargando...';
+    const { data, error } = await supabaseClient.from('pizarra_proyecto_items')
+        .select('id, orden, exercise_id, custom_exercises(id, name, thumbnail_svg)')
+        .eq('proyecto_id', id).order('orden');
+    if (error) { body.innerHTML = '<span style="color:#f87171">Error: ' + error.message + '</span>'; return; }
+    ejProyItems = data || [];
+    ejProyIdx = -1;
+    ejProyPintar();
+}
+
+function ejProyPintar() {
+    const body = document.getElementById('ej-proy-body');
+    let html = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">' +
+        '<button onclick="ejProyListar()" style="background:#1e293b;border:1px solid #334155;color:#94a3b8;border-radius:6px;padding:4px 8px;cursor:pointer">←</button>' +
+        '<strong style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + ejProyActual.nombre + '</strong>' +
+        '<button onclick="ejProyNav(-1)" title="Fase anterior (flecha izquierda)" style="background:#1e293b;border:1px solid #334155;color:#e2e8f0;border-radius:6px;padding:4px 10px;cursor:pointer">◀</button>' +
+        '<button onclick="ejProyNav(1)" title="Fase siguiente (flecha derecha)" style="background:#1e293b;border:1px solid #334155;color:#e2e8f0;border-radius:6px;padding:4px 10px;cursor:pointer">▶</button></div>' +
+        '<button onclick="ejProyAnadirActual()" style="width:100%;padding:7px;background:#16a34a;border:none;color:#fff;border-radius:8px;cursor:pointer;font-weight:600;margin-bottom:10px">+ Anadir pizarra actual</button>';
+    if (!ejProyItems.length) html += '<p style="color:#64748b">Proyecto vacio. Dibuja o carga una pizarra, guardala como ejercicio, y pulsa "Anadir pizarra actual".</p>';
+    else html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' + ejProyItems.map(function(it, i) {
+        const ex = it.custom_exercises || {};
+        const thumb = ex.thumbnail_svg ? 'data:image/svg+xml;utf8,' + encodeURIComponent(ex.thumbnail_svg) : '';
+        return '<div onclick="ejProyIr(' + i + ')" style="cursor:pointer;background:' + (i === ejProyIdx ? '#1d4ed8' : '#1e293b') + ';border-radius:8px;padding:6px;position:relative">' +
+            (thumb ? '<img src="' + thumb + '" style="width:100%;border-radius:6px;background:#14532d">' : '<div style="height:60px;background:#14532d;border-radius:6px"></div>') +
+            '<div style="font-size:11px;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (i + 1) + '. ' + (ex.name || '(pizarra)') + '</div>' +
+            '<button onclick="event.stopPropagation();ejProyQuitar(\'' + it.id + '\')" title="Quitar del proyecto" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,.5);border:none;color:#f87171;border-radius:4px;cursor:pointer;font-size:11px">✕</button></div>';
+    }).join('') + '</div>';
+    body.innerHTML = html;
+}
+
+async function ejProyAnadirActual() {
+    if (!ejProyActual) return;
+    if (!ejEditandoId) { ejToast('Guarda primero la pizarra (Guardar ejercicio) y vuelve a pulsar', 'warning'); return; }
+    if (ejProyItems.some(function(it) { return it.exercise_id === ejEditandoId; })) { ejToast('Esta pizarra ya esta en el proyecto', 'warning'); return; }
+    const { error } = await supabaseClient.from('pizarra_proyecto_items')
+        .insert({ proyecto_id: ejProyActual.id, exercise_id: ejEditandoId, orden: ejProyItems.length });
+    if (error) { ejToast('Error: ' + error.message, 'error'); return; }
+    ejProyAbrir(ejProyActual.id, ejProyActual.nombre);
+}
+
+async function ejProyQuitar(itemId) {
+    await supabaseClient.from('pizarra_proyecto_items').delete().eq('id', itemId);
+    ejProyAbrir(ejProyActual.id, ejProyActual.nombre);
+}
+
+function ejProyIr(i) {
+    if (i < 0 || i >= ejProyItems.length) return;
+    ejProyIdx = i;
+    ejBancoCargar(ejProyItems[i].exercise_id);
+    ejProyPintar();
+}
+
+function ejProyNav(delta) {
+    if (!ejProyItems.length) return;
+    let i = ejProyIdx + delta;
+    if (i < 0) i = ejProyItems.length - 1;
+    if (i >= ejProyItems.length) i = 0;
+    ejProyIr(i);
+}
+
+document.addEventListener('keydown', function(e) {
+    const panel = document.getElementById('ej-proy-panel');
+    if (!panel || panel.style.display === 'none' || !ejProyActual) return;
+    const tag = (e.target && e.target.tagName) || '';
+    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+    if (e.key === 'ArrowRight') { ejProyNav(1); e.preventDefault(); }
+    if (e.key === 'ArrowLeft') { ejProyNav(-1); e.preventDefault(); }
+});
+
 function ejNuevaPizarra() {
     ejConfirm('¿Limpiar la pizarra y empezar desde cero?', () => {
     ejSaveHistory();
@@ -2133,7 +2254,7 @@ root.innerHTML = `
                 <span style="font-size:14px">📋</span>
                 <span id="ej-pizarra-nombre-label" style="color:#93c5fd;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Pizarra libre</span>
             </div>
-            <div style="display:flex;gap:8px;flex-shrink:0"><button onclick="ejPresentar()" style="background:#16a34a;border:none;color:#fff;padding:5px 14px;border-radius:6px;cursor:pointer;font-size:12px;white-space:nowrap;font-weight:600">📽️ Presentar</button><button onclick="ejNuevaPizarra()" style="background:#0f172a;border:1px solid #475569;color:#94a3b8;padding:5px 14px;border-radius:6px;cursor:pointer;font-size:12px;white-space:nowrap">✕ Nueva pizarra</button></div>
+            <div style="display:flex;gap:8px;flex-shrink:0"><button onclick="ejProyPanel()" style="background:#7c3aed;border:none;color:#fff;padding:5px 14px;border-radius:6px;cursor:pointer;font-size:12px;white-space:nowrap;font-weight:600">📁 Proyectos</button><button onclick="ejPresentar()" style="background:#16a34a;border:none;color:#fff;padding:5px 14px;border-radius:6px;cursor:pointer;font-size:12px;white-space:nowrap;font-weight:600">📽️ Presentar</button><button onclick="ejNuevaPizarra()" style="background:#0f172a;border:1px solid #475569;color:#94a3b8;padding:5px 14px;border-radius:6px;cursor:pointer;font-size:12px;white-space:nowrap">✕ Nueva pizarra</button></div>
 </div>
         <div id="ej-toolbar"></div>
         </div>
