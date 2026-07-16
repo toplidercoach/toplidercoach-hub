@@ -440,7 +440,7 @@ registrarSubTab('planificador', 'calendario', cargarCalendarioUnificado);
         function renderizarSesion() {
             let duracionTotal = 0;
             
-            ['calentamiento', 'principal', 'enfriamiento'].forEach(seccion => {
+            ['previo', 'calentamiento', 'principal', 'enfriamiento', 'postcampo'].forEach(seccion => {
                 const lista = document.getElementById(`lista-${seccion}`);
                 const tiempo = document.getElementById(`tiempo-${seccion}`);
                 
@@ -453,10 +453,10 @@ registrarSubTab('planificador', 'calendario', cargarCalendarioUnificado);
               } else {
                     const totalEnSeccion = sesion[seccion].length;
                     lista.innerHTML = sesion[seccion].map((ej, idx) => `
-                        <div class="ejercicio-en-sesion" onclick="seleccionarEjercicio('${ej.id}')" style="cursor: pointer;">
+                        <div class="ejercicio-en-sesion" ${ej.tipo === 'libre' ? 'style="border-left:4px solid #8b5cf6;"' : `onclick="seleccionarEjercicio('${ej.id}')" style="cursor: pointer;"`}>
                             <div>
-                                <div class="nombre">${ej.titulo}</div>
-                                <div class="duracion">${ej.duracion} min</div>
+                                <div class="nombre">${ej.tipo === 'libre' ? '📋 ' : ''}${ej.titulo}</div>
+                                <div class="duracion">${ej.duracion} min${ej.tipo === 'libre' && ej.notas ? ' · <span style="font-style:italic;color:#8b5cf6;">' + (ej.notas.length > 60 ? ej.notas.slice(0, 60) + '…' : ej.notas) + '</span>' : ''}</div>
                             </div>
                             <button onclick="event.stopPropagation(); moverEjercicio('${seccion}', ${idx}, -1)" title="Subir" ${idx === 0 ? 'disabled' : ''} style="background:#e5e7eb; border:none; border-radius:4px; padding:4px 8px; cursor:${idx === 0 ? 'not-allowed' : 'pointer'}; opacity:${idx === 0 ? '0.3' : '1'}; font-size:11px; color:#374151; margin-right:2px;">▲</button>
                             <button onclick="event.stopPropagation(); moverEjercicio('${seccion}', ${idx}, 1)" title="Bajar" ${idx === totalEnSeccion - 1 ? 'disabled' : ''} style="background:#e5e7eb; border:none; border-radius:4px; padding:4px 8px; cursor:${idx === totalEnSeccion - 1 ? 'not-allowed' : 'pointer'}; opacity:${idx === totalEnSeccion - 1 ? '0.3' : '1'}; font-size:11px; color:#374151; margin-right:4px;">▼</button>
@@ -469,6 +469,28 @@ registrarSubTab('planificador', 'calendario', cargarCalendarioUnificado);
             
             document.getElementById('duracion-total').textContent = `${duracionTotal} min`;
         }
+        let bloqueLibreSeccion = null;
+        function abrirModalBloqueLibre(seccion) {
+            bloqueLibreSeccion = seccion;
+            document.getElementById('bloque-libre-titulo').value = '';
+            document.getElementById('bloque-libre-minutos').value = 15;
+            document.getElementById('bloque-libre-notas').value = '';
+            document.getElementById('modal-bloque-libre').style.display = 'flex';
+        }
+        function cerrarModalBloqueLibre() {
+            document.getElementById('modal-bloque-libre').style.display = 'none';
+        }
+        function guardarBloqueLibre() {
+            const titulo = document.getElementById('bloque-libre-titulo').value.trim();
+            const minutos = parseInt(document.getElementById('bloque-libre-minutos').value) || 0;
+            const notas = document.getElementById('bloque-libre-notas').value.trim();
+            if (!titulo) { showToast('Pon un titulo al bloque (ej: Charla tactica)'); return; }
+            if (!minutos || minutos < 1) { showToast('Indica los minutos del bloque'); return; }
+            sesion[bloqueLibreSeccion].push({ tipo: 'libre', id: null, titulo: titulo, duracion: minutos, notas: notas, imagen: '', objetivo: '' });
+            cerrarModalBloqueLibre();
+            renderizarSesion();
+        }
+
         function quitarEjercicio(seccion, idx) {
             sesion[seccion].splice(idx, 1);
             renderizarSesion();
@@ -488,7 +510,7 @@ registrarSubTab('planificador', 'calendario', cargarCalendarioUnificado);
             sesionEditandoId = null;
             const ahora = new Date();
 const fechaHoy = ahora.getFullYear() + '-' + String(ahora.getMonth() + 1).padStart(2, '0') + '-' + String(ahora.getDate()).padStart(2, '0');
-sesion = { nombre: '', fecha: fechaHoy, calentamiento: [], principal: [], enfriamiento: [] };
+sesion = { nombre: '', fecha: fechaHoy, previo: [], calentamiento: [], principal: [], enfriamiento: [], postcampo: [] };
             document.getElementById('sesion-nombre').value = '';
             document.getElementById('sesion-fecha').value = sesion.fecha;
             document.getElementById('sesion-hora').value = '';
@@ -537,9 +559,11 @@ sesion = { nombre: '', fecha: fechaHoy, calentamiento: [], principal: [], enfria
                     materials: material || null,
                    notes: notas || null,
                     rpe: document.getElementById('sesion-rpe').value ? parseFloat(document.getElementById('sesion-rpe').value) : null,
-                    warm_up: sesion.calentamiento,
+                     warm_up: sesion.calentamiento,
                     main_part: sesion.principal,
                     cool_down: sesion.enfriamiento,
+                    pre_field_work: sesion.previo,
+                    post_field_work: sesion.postcampo,
                     players: obtenerJugadoresParaGuardar(),
                     fase: (typeof window._scFase !== 'undefined' ? window._scFase : null)
                 };
@@ -737,9 +761,11 @@ if (typeof scGuardarConceptos === 'function') { await scGuardarConceptos(sesionI
                 sesion = {
                     nombre: data.name,
                     fecha: data.session_date,
+                    previo: data.pre_field_work || [],
                     calentamiento: data.warm_up || [],
                     principal: data.main_part || [],
-                    enfriamiento: data.cool_down || []
+                    enfriamiento: data.cool_down || [],
+                    postcampo: data.post_field_work || []
                 };
                 
                 // Campos principales
@@ -824,7 +850,9 @@ async function exportarSesionPDF(id, conTitulos = true, hojaPorEjercicio = false
             // Calcular duracion total
             const duracionTotal = (s.warm_up || []).reduce((sum, e) => sum + (e.duracion || 0), 0) +
                                   (s.main_part || []).reduce((sum, e) => sum + (e.duracion || 0), 0) +
-                                  (s.cool_down || []).reduce((sum, e) => sum + (e.duracion || 0), 0);
+                                  (s.cool_down || []).reduce((sum, e) => sum + (e.duracion || 0), 0) +
+                                  (s.pre_field_work || []).reduce((sum, e) => sum + (e.duracion || 0), 0) +
+                                  (s.post_field_work || []).reduce((sum, e) => sum + (e.duracion || 0), 0);
             
             // ===== HEADER =====
             doc.setFillColor(0, 51, 102);
@@ -993,9 +1021,11 @@ if (s.players && s.players.length > 0) {
             
             // ===== SECCIONES =====
             const secciones = [
+                { nombre: 'TRABAJO PREVIO A CAMPO', datos: s.pre_field_work || [], color: [139, 92, 246] },
                 { nombre: 'CALENTAMIENTO', datos: s.warm_up || [], color: [255, 153, 0] },
                 { nombre: 'PARTE PRINCIPAL', datos: s.main_part || [], color: [0, 102, 204] },
-                { nombre: 'PARTE FINAL', datos: s.cool_down || [], color: [0, 153, 76] }
+                { nombre: 'PARTE FINAL', datos: s.cool_down || [], color: [0, 153, 76] },
+                { nombre: 'TRABAJO POST-CAMPO', datos: s.post_field_work || [], color: [100, 116, 139] }
             ];
             
             // Recuperar miniaturas de ejercicios propios que se guardaron sin imagen
@@ -1043,6 +1073,31 @@ if (s.players && s.players.length > 0) {
                     // Ejercicios de la seccion
                     for (let i = 0; i < sec.datos.length; i++) {
                         const ej = sec.datos[i];
+
+                        if (ej.tipo === 'libre') {
+                            if (hojaPorEjercicio && i > 0) { doc.addPage(); y = 20; }
+                            const notasLineas = ej.notas ? doc.splitTextToSize(limpiarTexto(ej.notas), 180) : [];
+                            const alturaBloque = 14 + notasLineas.length * 4;
+                            if (y + alturaBloque > 280) { doc.addPage(); y = 20; }
+                            doc.setFillColor(237, 233, 254);
+                            doc.rect(10, y, 190, 7, 'F');
+                            doc.setTextColor(76, 29, 149);
+                            doc.setFontSize(9);
+                            doc.setFont('helvetica', 'bold');
+                            doc.text(`${i + 1}. ${ej.titulo}`, 12, y + 5);
+                            doc.setFont('helvetica', 'normal');
+                            doc.text(`${ej.duracion} min`, 195, y + 5, { align: 'right' });
+                            y += 10;
+                            if (notasLineas.length) {
+                                doc.setFontSize(8);
+                                doc.setTextColor(60, 60, 60);
+                                doc.text(notasLineas, 12, y + 3);
+                                y += notasLineas.length * 4 + 3;
+                            }
+                            y += 3;
+                            continue;
+                        }
+
                         const alturaEjercicio = 45;
                         
                         // Modo "una hoja por ejercicio": salto de pagina solo ENTRE ejercicios
