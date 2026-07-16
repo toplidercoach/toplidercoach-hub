@@ -155,7 +155,7 @@ async function cmFisioMaterialEnviar() {
 
     var res = await supabaseClient.from('cm_fisio_material_requests').insert({
         club_id: clubId,
-        requested_by: usuario ? usuario.id : 0,
+        requested_by: usuario ? cmIdentidad() : 0,
         items: items,
         urgency: document.getElementById('cmfmat-urgencia').value,
         notes: document.getElementById('cmfmat-notes').value.trim() || null,
@@ -177,7 +177,7 @@ async function cmFisioMaterialEnviar() {
             message: resumen,
             icon: 'material',
             target_permission: 'modulo_utillero',
-            created_by: usuario ? usuario.id : null
+            created_by: usuario ? cmIdentidad() : null
         });
     } catch (e) { console.error('Error notificacion material:', e); }
 
