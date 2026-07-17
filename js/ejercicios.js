@@ -1236,9 +1236,10 @@ function ejProyPintar() {
         const nombreItem = it.nombre || ex.name || '(pizarra)';
         const svgThumb = it.thumbnail_svg || ex.thumbnail_svg;
         const thumb = svgThumb ? 'data:image/svg+xml;utf8,' + encodeURIComponent(svgThumb) : '';
-        return '<div onclick="ejProyIr(' + i + ')" title="' + nombreItem.replace(/"/g, '&quot;') + '" style="cursor:pointer;background:' + (i === ejProyIdx ? '#1d4ed8' : '#1e293b') + ';border-radius:8px;padding:6px;position:relative">' +
+        return '<div onclick="ejProyIr(' + i + ')" title="' + nombreItem.replace(/"/g, '&quot;') + '" style="cursor:pointer;background:' + (i === ejProyIdx ? '#1d4ed8' : '#1e293b') + ';border-radius:8px;padding:6px;position:relative;min-width:0;overflow:hidden">' +
             (thumb ? '<img src="' + thumb + '" style="width:100%;height:64px;object-fit:contain;border-radius:6px;background:#14532d">' : '<div style="height:64px;background:#14532d;border-radius:6px"></div>') +
             '<div style="font-size:10px;color:#cbd5e1;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (i + 1) + '. ' + nombreItem + '</div>' +
+            '<button onclick="event.stopPropagation();ejProyRenombrar(\'' + it.id + '\')" title="Renombrar fase" style="position:absolute;top:4px;right:26px;background:rgba(0,0,0,.5);border:none;color:#93c5fd;border-radius:4px;cursor:pointer;font-size:11px">✎</button>' +
             '<button onclick="event.stopPropagation();ejProyQuitar(\'' + it.id + '\')" title="Quitar del proyecto" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,.5);border:none;color:#f87171;border-radius:4px;cursor:pointer;font-size:11px">✕</button></div>';
     }).join('') + '</div>';
     body.innerHTML = html;
@@ -1270,6 +1271,20 @@ async function ejProyAnadirFase() {
         .insert({ proyecto_id: ejProyActual.id, nombre: (nombre.trim() || 'Fase ' + (ejProyItems.length + 1)), board_data: bd, thumbnail_svg: thumb, orden: ejProyItems.length });
     if (error) { ejToast('Error: ' + error.message, 'error'); return; }
     ejProyAbrir(ejProyActual.id, ejProyActual.nombre);
+}
+
+async function ejProyRenombrar(itemId) {
+    const it = ejProyItems.find(function(x) { return x.id === itemId; });
+    if (!it) return;
+    const actual = it.nombre || (it.custom_exercises && it.custom_exercises.name) || '';
+    const nuevo = prompt('Nuevo nombre de la fase:', actual);
+    if (nuevo === null) return;
+    const limpio = nuevo.trim();
+    if (!limpio) { ejToast('El nombre no puede quedar vacio', 'warning'); return; }
+    const { error } = await supabaseClient.from('pizarra_proyecto_items').update({ nombre: limpio }).eq('id', itemId);
+    if (error) { ejToast('Error: ' + error.message, 'error'); return; }
+    it.nombre = limpio;
+    ejProyPintar();
 }
 
 async function ejProyQuitar(itemId) {
