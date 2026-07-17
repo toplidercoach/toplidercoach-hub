@@ -1226,16 +1226,19 @@ function ejProyPintar() {
         '<strong style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + ejProyActual.nombre + '</strong>' +
         '<button onclick="ejProyNav(-1)" title="Fase anterior (flecha izquierda)" style="background:#1e293b;border:1px solid #334155;color:#e2e8f0;border-radius:6px;padding:4px 10px;cursor:pointer">◀</button>' +
         '<button onclick="ejProyNav(1)" title="Fase siguiente (flecha derecha)" style="background:#1e293b;border:1px solid #334155;color:#e2e8f0;border-radius:6px;padding:4px 10px;cursor:pointer">▶</button></div>' +
-        '<button onclick="ejProyAnadirFase()" style="width:100%;padding:7px;background:#16a34a;border:none;color:#fff;border-radius:8px;cursor:pointer;font-weight:600;margin-bottom:10px">+ Anadir fase (captura el dibujo actual)</button>';
+        '<button onclick="ejProyAnadirFase()" style="width:100%;padding:7px;background:#16a34a;border:none;color:#fff;border-radius:8px;cursor:pointer;font-weight:600;margin-bottom:6px">+ Anadir fase (captura el dibujo actual)</button>' +
+        '<div style="display:flex;gap:6px;margin-bottom:10px">' +
+        '<button onclick="ejProyEnviarBanco()" title="Crea una ficha en Mis Ejercicios para poder meterla en sesiones" style="flex:1;padding:6px;background:#1e293b;border:1px solid #7c3aed;color:#c4b5fd;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600">📤 Enviar al banco</button>' +
+        '<button onclick="ejProyPDF()" title="PDF del proyecto con todas las fases" style="flex:1;padding:6px;background:#1e293b;border:1px solid #334155;color:#e2e8f0;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600">📄 PDF</button></div>';
     if (!ejProyItems.length) html += '<p style="color:#64748b">Proyecto vacio. Dibuja la fase en la pizarra y pulsa "Anadir fase".</p>';
     else html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' + ejProyItems.map(function(it, i) {
         const ex = it.custom_exercises || {};
         const nombreItem = it.nombre || ex.name || '(pizarra)';
         const svgThumb = it.thumbnail_svg || ex.thumbnail_svg;
         const thumb = svgThumb ? 'data:image/svg+xml;utf8,' + encodeURIComponent(svgThumb) : '';
-        return '<div onclick="ejProyIr(' + i + ')" style="cursor:pointer;background:' + (i === ejProyIdx ? '#1d4ed8' : '#1e293b') + ';border-radius:8px;padding:6px;position:relative">' +
-            (thumb ? '<img src="' + thumb + '" style="width:100%;border-radius:6px;background:#14532d">' : '<div style="height:60px;background:#14532d;border-radius:6px"></div>') +
-            '<div style="font-size:11px;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (i + 1) + '. ' + nombreItem + '</div>' +
+        return '<div onclick="ejProyIr(' + i + ')" title="' + nombreItem.replace(/"/g, '&quot;') + '" style="cursor:pointer;background:' + (i === ejProyIdx ? '#1d4ed8' : '#1e293b') + ';border-radius:8px;padding:6px;position:relative">' +
+            (thumb ? '<img src="' + thumb + '" style="width:100%;height:64px;object-fit:contain;border-radius:6px;background:#14532d">' : '<div style="height:64px;background:#14532d;border-radius:6px"></div>') +
+            '<div style="font-size:10px;color:#cbd5e1;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (i + 1) + '. ' + nombreItem + '</div>' +
             '<button onclick="event.stopPropagation();ejProyQuitar(\'' + it.id + '\')" title="Quitar del proyecto" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,.5);border:none;color:#f87171;border-radius:4px;cursor:pointer;font-size:11px">✕</button></div>';
     }).join('') + '</div>';
     body.innerHTML = html;
@@ -1272,6 +1275,84 @@ async function ejProyAnadirFase() {
 async function ejProyQuitar(itemId) {
     await supabaseClient.from('pizarra_proyecto_items').delete().eq('id', itemId);
     ejProyAbrir(ejProyActual.id, ejProyActual.nombre);
+}
+
+async function ejProyEnviarBanco() {
+    if (!ejProyActual || !ejProyItems.length) { ejToast('Abre un proyecto con fases primero', 'warning'); return; }
+    if (ejProyIdx < 0) { ejToast('Selecciona primero la fase que hara de portada (clic en su miniatura)', 'warning'); return; }
+    const it = ejProyItems[ejProyIdx];
+    if (!it.board_data && it.exercise_id) { ejToast('Esa fase ya es una pizarra del banco', 'warning'); return; }
+    const desc = prompt('Descripcion para la ficha del banco (opcional):', '');
+    if (desc === null) return;
+    const item = {
+        club_id: window.ejClubId || null,
+        coach_id: ejProyCoachId(),
+        name: ejProyActual.nombre,
+        description: (desc && desc.trim()) ? desc.trim() : null,
+        board_data: it.board_data || null,
+        thumbnail_svg: it.thumbnail_svg || null,
+        visibility: 'private',
+        approval_status: 'approved',
+        source: 'custom'
+    };
+    const { error } = await supabaseClient.from('custom_exercises').insert(item);
+    if (error) { ejToast('Error: ' + error.message, 'error'); return; }
+    ejToast('Ficha creada en Mis Ejercicios: ya puedes anadirla a una sesion');
+}
+
+function ejProySvgAPng(svgStr) {
+    return new Promise(function(resolve, reject) {
+        let s = svgStr.replace('width="100%"', 'width="1200"').replace('height="100%"', 'height="800"');
+        const img = new Image();
+        img.onload = function() {
+            const c = document.createElement('canvas');
+            c.width = 1200; c.height = 800;
+            const ctx = c.getContext('2d');
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, c.width, c.height);
+            ctx.drawImage(img, 0, 0, c.width, c.height);
+            resolve(c.toDataURL('image/png'));
+        };
+        img.onerror = reject;
+        img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(s);
+    });
+}
+
+async function ejProyPDF() {
+    if (!ejProyActual || !ejProyItems.length) { ejToast('Abre un proyecto con fases primero', 'warning'); return; }
+    ejToast('Generando PDF del proyecto...');
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    doc.setFillColor(124, 58, 237);
+    doc.rect(0, 0, 210, 22, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(15);
+    doc.setFont('helvetica', 'bold');
+    doc.text(ejProyActual.nombre, 105, 14, { align: 'center' });
+    let y = 30;
+    for (let i = 0; i < ejProyItems.length; i++) {
+        const it = ejProyItems[i];
+        const nombre = it.nombre || (it.custom_exercises && it.custom_exercises.name) || ('Fase ' + (i + 1));
+        const svg = it.thumbnail_svg || (it.custom_exercises && it.custom_exercises.thumbnail_svg);
+        const alto = 108;
+        if (y + alto + 4 > 290) { doc.addPage(); y = 15; }
+        doc.setFillColor(237, 233, 254);
+        doc.rect(10, y, 190, 8, 'F');
+        doc.setTextColor(76, 29, 149);
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        doc.text((i + 1) + '. ' + nombre, 12, y + 5.5);
+        y += 10;
+        if (svg) {
+            try {
+                const png = await ejProySvgAPng(svg);
+                doc.addImage(png, 'PNG', 20, y, 170, alto - 12);
+            } catch (e) {}
+        }
+        y += alto - 8;
+    }
+    doc.save('proyecto-' + ejProyActual.nombre.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '.pdf');
+    ejToast('PDF del proyecto descargado');
 }
 
 function ejProyIr(i) {
