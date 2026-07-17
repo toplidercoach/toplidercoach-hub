@@ -5,7 +5,9 @@ const SC_MOMENTOS = {
     ataque:       { nombre: 'Ataque organizado', icono: '⚔️', color: '#0F6E56' },
     defensa:      { nombre: 'Defensa organizada', icono: '🛡️', color: '#A32D2D' },
     trans_of_def: { nombre: 'Transición of-def', icono: '🔻', color: '#854F0B' },
-    trans_def_of: { nombre: 'Transición def-of', icono: '🔺', color: '#185FA5' }
+    trans_def_of: { nombre: 'Transición def-of', icono: '🔺', color: '#185FA5' },
+    abp:          { nombre: 'ABP (balón parado)', icono: '🎯', color: '#6D28D9' },
+    otros:        { nombre: 'Otros aspectos a trabajar', icono: '🧰', color: '#475569' }
 };
 
 const SC_NIVELES_TRABAJO = ['Individual', 'Sectorial', 'Completo'];

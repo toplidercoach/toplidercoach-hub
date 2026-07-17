@@ -5,7 +5,9 @@ const MJ_MOMENTOS = [
     { key: 'ataque',       nombre: 'Ataque organizado',     icono: '⚔️', color: '#0F6E56', bg: '#E1F5EE' },
     { key: 'defensa',      nombre: 'Defensa organizada',    icono: '🛡️', color: '#A32D2D', bg: '#FCEBEB' },
     { key: 'trans_of_def', nombre: 'Transición of-def',     icono: '🔻', color: '#854F0B', bg: '#FAEEDA' },
-    { key: 'trans_def_of', nombre: 'Transición def-of',     icono: '🔺', color: '#185FA5', bg: '#E6F1FB' }
+    { key: 'trans_def_of', nombre: 'Transición def-of',     icono: '🔺', color: '#185FA5', bg: '#E6F1FB' },
+    { key: 'abp',          nombre: 'ABP (balón parado)',    icono: '🎯', color: '#6D28D9', bg: '#EDE9FE' },
+    { key: 'otros',        nombre: 'Otros aspectos a trabajar', icono: '🧰', color: '#475569', bg: '#F1F5F9' }
 ];
 
 const MJ_NIVELES = {
@@ -128,7 +130,7 @@ function mjRender() {
                 <button class="mj-vista-btn" id="mj-btn-cuadro" onclick="mjVistaCuadro()">📊 Cuadro de control</button>
             </div>
         </div>
-        <div class="mj-info">Define tus principios, subprincipios y sub-subprincipios organizados por los 4 momentos del juego.</div>
+        <div class="mj-info">Define tus principios, subprincipios y sub-subprincipios organizados por los momentos del juego, el balón parado y otros aspectos.</div>
         <div class="mj-sist-bar">
             <span class="lbl">Sistema:</span>
             <button class="mj-sist-btn ${!mjSistemaFiltro ? 'activa' : ''}" onclick="mjFiltrarSistema(null)">Todos</button>
