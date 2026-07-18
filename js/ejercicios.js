@@ -93,6 +93,54 @@ const EJ_FIELD_IMAGES = {
 };
 
 // ---- ESTADO DE LA PIZARRA ----
+(function() {
+    var s = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500">'
+        + '<rect width="800" height="500" fill="#1a6b30"/>'
+        + '<clipPath id="fart"><rect x="20" y="15" width="760" height="470" rx="1"/></clipPath>'
+        + '<g clip-path="url(#fart)">'
+        + '<rect x="20" y="15" width="63" height="470" fill="#207332"/>'
+        + '<rect x="147" y="15" width="63" height="470" fill="#207332"/>'
+        + '<rect x="274" y="15" width="63" height="470" fill="#207332"/>'
+        + '<rect x="400" y="15" width="64" height="470" fill="#207332"/>'
+        + '<rect x="527" y="15" width="63" height="470" fill="#207332"/>'
+        + '<rect x="654" y="15" width="63" height="470" fill="#207332"/>'
+        + '</g>'
+        + '<g fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+        + '<rect x="20" y="15" width="760" height="470" rx="1"/>'
+        + '<line x1="400" y1="15" x2="400" y2="485"/>'
+        + '<circle cx="400" cy="250" r="65"/>'
+        + '<rect x="20" y="133" width="108" height="234"/>'
+        + '<rect x="672" y="133" width="108" height="234"/>'
+        + '<rect x="20" y="195" width="40" height="110"/>'
+        + '<rect x="740" y="195" width="40" height="110"/>'
+        + '<rect x="10" y="220" width="10" height="60"/>'
+        + '<rect x="780" y="220" width="10" height="60"/>'
+        + '<path d="M128 199 A65 65 0 0 1 128 301"/>'
+        + '<path d="M672 199 A65 65 0 0 0 672 301"/>'
+        + '<path d="M20 22 A7 7 0 0 1 27 15"/>'
+        + '<path d="M773 15 A7 7 0 0 1 780 22"/>'
+        + '<path d="M780 478 A7 7 0 0 1 773 485"/>'
+        + '<path d="M27 485 A7 7 0 0 1 20 478"/>'
+        + '</g>'
+        + '<circle cx="400" cy="250" r="3.5" fill="#fff"/>'
+        + '<circle cx="100" cy="250" r="3.5" fill="#fff"/>'
+        + '<circle cx="700" cy="250" r="3.5" fill="#fff"/>'
+        + '<g fill="none" stroke="#eab308" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.9">'
+        + '<rect x="55" y="15" width="290" height="470"/>'
+        + '<line x1="55" y1="250" x2="345" y2="250"/>'
+        + '<rect x="135" y="15" width="130" height="65"/>'
+        + '<rect x="135" y="420" width="130" height="65"/>'
+        + '<rect x="455" y="15" width="290" height="470"/>'
+        + '<line x1="455" y1="250" x2="745" y2="250"/>'
+        + '<rect x="575" y="15" width="130" height="65"/>'
+        + '<rect x="575" y="420" width="130" height="65"/>'
+        + '</g>'
+        + '<circle cx="200" cy="250" r="2.5" fill="#eab308"/>'
+        + '<circle cx="600" cy="250" r="2.5" fill="#eab308"/>'
+        + '</svg>';
+    EJ_FIELD_IMAGES.artificial = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(s)));
+})();
+
 const ejP = {
     fieldType: 'full',
     showCarriles: false,
@@ -2203,7 +2251,7 @@ ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin
     <div class="ej-section-body">
         <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px">Tipo de campo</div>
         <div class="ej-field-btns">
-            ${['full','half','halfDown','blank'].map(f=>`<button class="ej-btn-sm${ejP.fieldType===f?' active':''}" onclick="ejSetField('${f}')">${f==='full'?'Completo':f==='half'?'Medio ↑':f==='halfDown'?'Medio ↓':'Libre'}</button>`).join('')}
+            ${['full','half','halfDown','blank','artificial'].map(f=>`<button class="ej-btn-sm${ejP.fieldType===f?' active':''}" onclick="ejSetField('${f}')">${f==='full'?'Completo':f==='half'?'Medio ↑':f==='halfDown'?'Medio ↓':f==='blank'?'Libre':'Artificial'}</button>`).join('')}
             <button class="ej-btn-sm${ejP.showCarriles?' active':''}" onclick="ejToggleCarriles()" title="5 carriles del juego posicional">🛣️ Carriles</button>
             <button class="ej-btn-sm${ejP.showZonas?' active':''}" onclick="ejToggleZonas()" title="3 tercios del campo">▦ Zonas</button>
         </div>
