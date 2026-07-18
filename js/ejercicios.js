@@ -1839,7 +1839,34 @@ function ejGetFieldSVG(type, color) {
         s += '<path d="M298 485 A102 82 0 0 1 502 485"/>';
         s += '<path d="M20 22 A7 7 0 0 1 27 15"/><path d="M773 15 A7 7 0 0 1 780 22"/>';
         s += '</g><circle cx="400" cy="113" r="3.5" fill="'+dotCol+'"/><circle cx="400" cy="485" r="3.5" fill="'+dotCol+'"/>';
-    } else if (type === 'halfDown') {
+    } else if (type === 'artificial') {
+        s += '<line x1="400" y1="15" x2="400" y2="485"/>';
+        s += '<circle cx="400" cy="250" r="65"/>';
+        s += '<rect x="20" y="133" width="108" height="234"/>';
+        s += '<rect x="672" y="133" width="108" height="234"/>';
+        s += '<rect x="20" y="195" width="40" height="110"/>';
+        s += '<rect x="740" y="195" width="40" height="110"/>';
+        s += '<rect x="10" y="220" width="10" height="60"/>';
+        s += '<rect x="780" y="220" width="10" height="60"/>';
+        s += '<path d="M128 199 A65 65 0 0 1 128 301"/>';
+        s += '<path d="M672 199 A65 65 0 0 0 672 301"/>';
+        s += '<path d="M20 22 A7 7 0 0 1 27 15"/><path d="M773 15 A7 7 0 0 1 780 22"/>';
+        s += '<path d="M780 478 A7 7 0 0 1 773 485"/><path d="M27 485 A7 7 0 0 1 20 478"/>';
+        s += '</g>';
+        s += '<g fill="none" stroke="#eab308" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.9">';
+        s += '<rect x="55" y="15" width="290" height="470"/>';
+        s += '<line x1="55" y1="250" x2="345" y2="250"/>';
+        s += '<rect x="135" y="15" width="130" height="65"/>';
+        s += '<rect x="135" y="420" width="130" height="65"/>';
+        s += '<rect x="455" y="15" width="290" height="470"/>';
+        s += '<line x1="455" y1="250" x2="745" y2="250"/>';
+        s += '<rect x="575" y="15" width="130" height="65"/>';
+        s += '<rect x="575" y="420" width="130" height="65"/>';
+        s += '</g>';
+        s += '<circle cx="400" cy="250" r="3.5" fill="'+dotCol+'"/>';
+        s += '<circle cx="100" cy="250" r="3.5" fill="'+dotCol+'"/><circle cx="700" cy="250" r="3.5" fill="'+dotCol+'"/>';
+        s += '<circle cx="200" cy="250" r="2.5" fill="#eab308"/><circle cx="600" cy="250" r="2.5" fill="#eab308"/>';
+} else if (type === 'halfDown') {
         s += '<rect x="359" y="485" width="82" height="13"/>';
         s += '<rect x="175" y="337" width="450" height="148"/>';
         s += '<rect x="298" y="435" width="204" height="50"/>';
