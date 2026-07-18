@@ -1292,6 +1292,10 @@ async function ejProyQuitar(itemId) {
     ejProyAbrir(ejProyActual.id, ejProyActual.nombre);
 }
 
+function ejProyCoachId() {
+    return window.ejCoachId || null;
+}
+
 async function ejProyEnviarBanco() {
     if (!ejProyActual || !ejProyItems.length) { ejToast('Abre un proyecto con fases primero', 'warning'); return; }
     if (ejProyIdx < 0) { ejToast('Selecciona primero la fase que hara de portada (clic en su miniatura)', 'warning'); return; }
@@ -4585,7 +4589,14 @@ function ejInit() {
 
     // Extraer club/coach del contexto global si existe
     var _hubUser = JSON.parse(localStorage.getItem('hub_user') || '{}');
-    window.ejCoachId = _hubUser.id || null;
+    Object.defineProperty(window, 'ejCoachId', {
+        configurable: true,
+        get: function() {
+            if (typeof usuario !== 'undefined' && usuario && usuario.id) return String(usuario.id);
+            if (_hubUser.wp_user_id) return String(_hubUser.wp_user_id);
+            return null;
+        }
+    });
     window.ejClubId  = window.currentClubId || null;
 
     root.innerHTML = `
