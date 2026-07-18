@@ -4589,14 +4589,15 @@ function ejInit() {
 
     // Extraer club/coach del contexto global si existe
     var _hubUser = JSON.parse(localStorage.getItem('hub_user') || '{}');
-    Object.defineProperty(window, 'ejCoachId', {
-        configurable: true,
-        get: function() {
-            if (typeof usuario !== 'undefined' && usuario && usuario.id) return String(usuario.id);
-            if (_hubUser.wp_user_id) return String(_hubUser.wp_user_id);
-            return null;
-        }
-    });
+    delete window.ejCoachId;
+    window.ejCoachId = null;
+    (async function() {
+        try {
+            const { data, error } = await supabaseClient.rpc('fn_identidad_wp');
+            if (!error && data) { window.ejCoachId = String(data); return; }
+        } catch (e) {}
+        if (_hubUser.wp_user_id) window.ejCoachId = String(_hubUser.wp_user_id);
+    })();
     window.ejClubId  = window.currentClubId || null;
 
     root.innerHTML = `
