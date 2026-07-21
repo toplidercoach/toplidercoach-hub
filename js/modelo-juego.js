@@ -84,8 +84,7 @@ async function cargarModeloJuego() {
     cont.innerHTML = '<div class="mj-vacio-momento">Cargando modelo de juego...</div>';
 
     try {
-        const { data: clubInfo } = await supabaseClient
-            .from('clubs').select('id, sistemas_juego').eq('wp_user_id', usuario.id).single();
+        const clubInfo = clubData || null;
         if (!clubInfo) throw new Error('Club no encontrado');
         mjClubId = clubInfo.id;
         mjSistemasClub = clubInfo.sistemas_juego || [];
