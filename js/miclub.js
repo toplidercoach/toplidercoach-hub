@@ -331,6 +331,8 @@ registrarSubTab('config', 'datos', cargarDatosClub);
 return `
     <div class="pcard" onclick="abrirFichaJugador('${j.id}')" style="--pos-color:${col};position:relative;overflow:hidden" data-pos="${j.position_detail||''}" data-sub23="${j.is_sub23?'1':'0'}" data-origen="${j.acquisition||''}">
         ${j.is_sub23 ? '<div style="position:absolute;top:0;right:0;width:74px;height:74px;overflow:hidden;pointer-events:none;z-index:5"><div style="position:absolute;transform:rotate(45deg);background:#7c3aed;color:#fff;font-size:10px;font-weight:800;letter-spacing:.5px;text-align:center;width:100px;top:16px;right:-26px;padding:3px 0;box-shadow:0 1px 4px rgba(0,0,0,.35)">U23</div></div>' : ''}
+        ${j.acquisition === 'prueba' ? '<div style="position:absolute;top:0;left:0;width:74px;height:74px;overflow:hidden;pointer-events:none;z-index:5"><div style="position:absolute;transform:rotate(-45deg);background:#f97316;color:#fff;font-size:9px;font-weight:800;text-align:center;width:100px;top:16px;left:-26px;padding:3px 0;box-shadow:0 1px 4px rgba(0,0,0,.35)">A PRUEBA</div></div>' : ''}
+        ${j.acquisition === 'prueba' ? '<div style="position:absolute;top:0;left:0;width:74px;height:74px;overflow:hidden;pointer-events:none;z-index:5"><div style="position:absolute;transform:rotate(-45deg);background:#f97316;color:#fff;font-size:9px;font-weight:800;letter-spacing:.3px;text-align:center;width:100px;top:16px;left:-26px;padding:3px 0;box-shadow:0 1px 4px rgba(0,0,0,.35)">A PRUEBA</div></div>' : ''}
         <div class="pcard-top">
             <div class="pcard-dorsal">${sp.shirt_number || '-'}</div>
             <div class="pcard-pos-badge">${posAb}</div>
