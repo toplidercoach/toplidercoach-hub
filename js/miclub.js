@@ -267,11 +267,12 @@ registrarSubTab('config', 'datos', cargarDatosClub);
                 
                 const count = (data || []).length;
                 
+                const maxJug = (clubData && clubData.max_players) ? clubData.max_players : 40;
                 const contador = document.getElementById('plantilla-contador');
-                contador.textContent = `${count} / 30 jugadores`;
+                contador.textContent = `${count} / ${maxJug} jugadores`;
                 contador.className = 'plantilla-contador';
-                if (count >= 25) contador.classList.add('warning');
-                if (count >= 30) contador.classList.add('full');
+                if (count >= maxJug - 5) contador.classList.add('warning');
+                if (count >= maxJug) contador.classList.add('full');
                 
                 function posColor(pos) {
                     if (!pos) return '#6b7280';
@@ -365,7 +366,7 @@ return `
 `;
                 }).join('');
                 
-                if (count < 30) {
+                if (count < maxJug) {
                     html += `<div class="add-jugador-card" onclick="abrirModalJugador()"><div class="icon">+</div><span>Añadir Jugador</span></div>`;
                 }
                 
@@ -407,7 +408,7 @@ return `
                   '<option value="">Todos los orígenes</option>' +
                   '<option value="nueva_incorporacion">Nueva incorporación</option>' +
                   '<option value="cantera">Cantera</option>' +
-                  '<option value="propiedad">En propiedad</option></select>' +
+                  '<option value="propiedad">En propiedad</option><option value="prueba">A prueba</option></select>' +
                 '<span id="mc-f-count" style="margin-left:auto;color:#64748b;font-size:13px"></span>';
             lista.parentNode.insertBefore(bar, lista);
         }
@@ -461,7 +462,7 @@ return `
                         '<select id="jugador-origen"><option value="">—</option>' +
                         '<option value="nueva_incorporacion">Nueva incorporación</option>' +
                         '<option value="cantera">Cantera</option>' +
-                        '<option value="propiedad">En propiedad</option></select></div>' +
+                        '<option value="propiedad">En propiedad</option><option value="prueba">A prueba</option></select></div>' +
                     '</div>' +
                     '<div class="form-group"><label style="display:flex;align-items:center;gap:8px;cursor:pointer">' +
                       '<input type="checkbox" id="jugador-sub23" style="width:auto;margin:0"> Sub-23</label></div>';

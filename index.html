@@ -1124,7 +1124,7 @@
                     <div class="card-body">
                         <div style="background: #f0fdf4; border-left: 4px solid #10b981; padding: 15px; border-radius: 0 10px 10px 0; margin-bottom: 20px;">
                             <strong>Como funcionan las temporadas</strong>
-                            <p style="margin: 5px 0 0; font-size: 14px; color: #065f46;">Cada temporada tiene su propia plantilla (max 30 jugadores). Las sesiones, partidos y estadisticas se asocian a la temporada activa.</p>
+                            <p style="margin: 5px 0 0; font-size: 14px; color: #065f46;">Cada temporada tiene su propia plantilla (max 40 jugadores). Las sesiones, partidos y estadisticas se asocian a la temporada activa.</p>
                         </div>
                         
                         <div id="lista-temporadas" class="temporadas-grid">
@@ -1165,7 +1165,7 @@
                             <label>Temporada:</label>
                             <select id="plantilla-temporada" onchange="cargarPlantilla()"></select>
                         </div>
-            <div id="plantilla-contador" class="plantilla-contador">0 / 30 jugadores</div>
+            <div id="plantilla-contador" class="plantilla-contador">0 / 40 jugadores</div>
                         <button class="btn-primary" style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 8px 20px; font-size: 13px;" onclick="abrirModalDescargarPlantilla()">📄 Descargar Plantilla PDF</button>
                     </div>
                 </div>
@@ -1530,7 +1530,7 @@
                             <option value="">—</option>
                             <option value="nueva_incorporacion">Nueva incorporación</option>
                             <option value="cantera">Cantera</option>
-                            <option value="propiedad">En propiedad</option>
+                            <option value="propiedad">En propiedad</option><option value="prueba">A prueba</option>
                         </select>
                     </div>
                 </div>
