@@ -43,7 +43,7 @@ function wenlIniciales(nombre) {
 }
 
 function wenlMensajeWhatsApp(nombre, enlace) {
-    return encodeURIComponent('Hola ' + nombre + ' ðŸ‘‹\nEste es tu enlace personal para rellenar tu wellness antes de cada entrenamiento. GuÃ¡rdalo en tu mÃ³vil:\n\n' + enlace + '\n\nÃbrelo cada maÃ±ana de dÃ­a de sesiÃ³n. Â¡Gracias!');
+    return encodeURIComponent('Hola ' + nombre + ' 👋\nEste es tu enlace personal para rellenar tu wellness antes de cada entrenamiento. Guárdalo en tu móvil:\n\n' + enlace + '\n\nÁbrelo cada mañana de día de sesión. ¡Gracias!');
 }
 
 async function cargarEnlacesWellness() {
@@ -65,7 +65,7 @@ async function cargarEnlacesWellness() {
             .single();
 
         if (errTemp || !temporada) {
-            cont.innerHTML = '<div class="wenl-vacio">No hay ninguna temporada activa.<br>Activa una en Mi Club â†’ Temporadas.</div>';
+            cont.innerHTML = '<div class="wenl-vacio">No hay ninguna temporada activa.<br>Activa una en Mi Club → Temporadas.</div>';
             return;
         }
 
@@ -83,7 +83,7 @@ async function cargarEnlacesWellness() {
             .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'es'));
 
         if (jugadores.length === 0) {
-            cont.innerHTML = '<div class="wenl-vacio">No hay jugadores en la plantilla de la temporada <strong>' + temporada.name + '</strong>.<br>AÃ±Ã¡delos en Mi Club â†’ Plantilla.</div>';
+            cont.innerHTML = '<div class="wenl-vacio">No hay jugadores en la plantilla de la temporada <strong>' + temporada.name + '</strong>.<br>Añádelos en Mi Club → Plantilla.</div>';
             return;
         }
 
@@ -97,11 +97,11 @@ async function cargarEnlacesWellness() {
 
         let html = `
             <div class="wenl-cab">
-                <h2>ðŸ”— Enlaces de wellness<span class="wenl-temporada">${temporada.name}</span></h2>
-                <button class="wenl-btn-todos" onclick="wenlCopiarTodos()">ðŸ“‹ Copiar todos los enlaces</button>
+                <h2>🔗 Enlaces de wellness<span class="wenl-temporada">${temporada.name}</span></h2>
+                <button class="wenl-btn-todos" onclick="wenlCopiarTodos()">📋 Copiar todos los enlaces</button>
             </div>
             <div class="wenl-info">
-                Cada jugador tiene un enlace personal y permanente. MÃ¡ndaselo una vez por WhatsApp y lo usarÃ¡ cada maÃ±ana de entrenamiento. El enlace no caduca. Se muestran solo los jugadores de la plantilla de la temporada activa.
+                Cada jugador tiene un enlace personal y permanente. Mándaselo una vez por WhatsApp y lo usará cada mañana de entrenamiento. El enlace no caduca. Se muestran solo los jugadores de la plantilla de la temporada activa.
             </div>
             <div class="wenl-lista">
         `;
@@ -123,8 +123,8 @@ async function cargarEnlacesWellness() {
                 ? `https://wa.me/${telLimpio}?text=${wenlMensajeWhatsApp(j.name, enlace)}`
                 : `https://wa.me/?text=${wenlMensajeWhatsApp(j.name, enlace)}`;
             const waUrlRpe = tieneTel
-                ? `https://wa.me/${telLimpio}?text=${encodeURIComponent('Hola ' + j.name + ' ðŸ‘‹\nEste es tu enlace personal para valorar tu esfuerzo (RPE) despuÃ©s de cada entrenamiento. GuÃ¡rdalo en tu mÃ³vil:\n\n' + enlaceRpe + '\n\nÃbrelo al terminar cada sesiÃ³n. Â¡Gracias!')}`
-                : `https://wa.me/?text=${encodeURIComponent('Hola ' + j.name + ' ðŸ‘‹\nEste es tu enlace personal para valorar tu esfuerzo (RPE) despuÃ©s de cada entrenamiento. GuÃ¡rdalo en tu mÃ³vil:\n\n' + enlaceRpe + '\n\nÃbrelo al terminar cada sesiÃ³n. Â¡Gracias!')}`;
+                ? `https://wa.me/${telLimpio}?text=${encodeURIComponent('Hola ' + j.name + ' 👋\nEste es tu enlace personal para valorar tu esfuerzo (RPE) después de cada entrenamiento. Guárdalo en tu móvil:\n\n' + enlaceRpe + '\n\nÁbrelo al terminar cada sesión. ¡Gracias!')}`
+                : `https://wa.me/?text=${encodeURIComponent('Hola ' + j.name + ' 👋\nEste es tu enlace personal para valorar tu esfuerzo (RPE) después de cada entrenamiento. Guárdalo en tu móvil:\n\n' + enlaceRpe + '\n\nÁbrelo al terminar cada sesión. ¡Gracias!')}`;
 
             html += `
                 <div class="wenl-row">
@@ -135,14 +135,14 @@ async function cargarEnlacesWellness() {
                     </div>
                     <div class="wenl-acciones" style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
                         <div style="display:flex;gap:6px;align-items:center">
-                            <span style="font-size:10px;color:#6b7280;font-weight:700">ðŸŒ… WELLNESS</span>
-                            <button class="wenl-bcopiar" onclick="wenlCopiar('${enlace}', this)">ðŸ“‹ Copiar</button>
-                            <a href="${waUrl}" target="_blank" class="wenl-bwa ${tieneTel ? '' : 'sin-tel'}" title="${tieneTel ? 'Enviar por WhatsApp' : 'Sin telÃ©fono: se abre WhatsApp para elegir contacto'}">ðŸ“± WhatsApp</a>
+                            <span style="font-size:10px;color:#6b7280;font-weight:700">🌅 WELLNESS</span>
+                            <button class="wenl-bcopiar" onclick="wenlCopiar('${enlace}', this)">📋 Copiar</button>
+                            <a href="${waUrl}" target="_blank" class="wenl-bwa ${tieneTel ? '' : 'sin-tel'}" title="${tieneTel ? 'Enviar por WhatsApp' : 'Sin teléfono: se abre WhatsApp para elegir contacto'}">📱 WhatsApp</a>
                         </div>
                         <div style="display:flex;gap:6px;align-items:center">
-                            <span style="font-size:10px;color:#6b7280;font-weight:700">ðŸƒ RPE</span>
-                            <button class="wenl-bcopiar" onclick="wenlCopiar('${enlaceRpe}', this)">ðŸ“‹ Copiar</button>
-                            <a href="${waUrlRpe}" target="_blank" class="wenl-bwa ${tieneTel ? '' : 'sin-tel'}" title="${tieneTel ? 'Enviar por WhatsApp' : 'Sin telÃ©fono: se abre WhatsApp para elegir contacto'}">ðŸ“± WhatsApp</a>
+                            <span style="font-size:10px;color:#6b7280;font-weight:700">🏃 RPE</span>
+                            <button class="wenl-bcopiar" onclick="wenlCopiar('${enlaceRpe}', this)">📋 Copiar</button>
+                            <a href="${waUrlRpe}" target="_blank" class="wenl-bwa ${tieneTel ? '' : 'sin-tel'}" title="${tieneTel ? 'Enviar por WhatsApp' : 'Sin teléfono: se abre WhatsApp para elegir contacto'}">📱 WhatsApp</a>
                         </div>
                     </div>
                 </div>
@@ -161,7 +161,7 @@ async function cargarEnlacesWellness() {
 function wenlCopiar(enlace, btn) {
     navigator.clipboard.writeText(enlace).then(() => {
         const txt = btn.textContent;
-        btn.textContent = 'âœ“ Copiado';
+        btn.textContent = '✓ Copiado';
         setTimeout(() => { btn.textContent = txt; }, 1500);
     }).catch(() => {
         showToast('No se pudo copiar');
