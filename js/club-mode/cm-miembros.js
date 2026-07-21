@@ -52,12 +52,13 @@
     // en cm-core.js + scouting/direccion_deportiva que comprueban permiso
     // dentro de su propio modulo).
     const CM_MODULOS_ACTIVOS = [
-        'entrenamientos', 'pizarra', 'matchstats', 'asistencia', 'periodizacion',
-        'analisis_postpartido', 'cuerpo_tecnico_ia', 'configuracion_club',
+        'crear_sesion', 'mis_sesiones', 'calendario', 'asistencia', 'cargas',
+        'wellness', 'modelo_juego', 'periodizacion', 'pizarra',
+        'partidos', 'estadisticas', 'analisis_postpartido', 'plan_partido',
+        'rivales', 'analisis_rivales', 'cuerpo_tecnico_ia', 'configuracion_club',
         'modulo_medico', 'modulo_fisio', 'modulo_preparacion_fisica',
-        'scouting', 'direccion_deportiva', 'pagos_cuotas', 'comunicacion_familias',
-        'modulo_analista_video',
-        'cargas', 'wellness', 'modelo_juego'
+        'modulo_analista_video', 'scouting', 'direccion_deportiva',
+        'pagos_cuotas', 'comunicacion_familias'
     ];
 
     // -------- Orden y etiquetas de los bloques del catalogo --------

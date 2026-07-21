@@ -3,7 +3,7 @@
 // Depende de: core.js (supabaseClient, clubId, usuario, registrarInit)
 // Ubicacion: js/club-mode/cm-core.js
 
-// ========== CATALOGO DE MODULOS DEL CLUB MODE (41 totales) ==========
+// ========== CATALOGO DE MODULOS DEL CLUB MODE (47 totales) ==========
 // Esta constante define TODOS los modulos posibles del Club Mode.
 // Sirve como referencia para construir UIs de permisos (club-admin-cargos)
 // y como fuente de verdad para validar claves de permiso.
@@ -14,17 +14,23 @@
 // - block: 'campo_comun' | 'campo_despacho' | 'oficina' | 'compartido'
 
 var CM_MODULOS = [
-    // ========== CAMPO - COMUNES (11) ==========
+    // ========== CAMPO - COMUNES (17) ==========
     // Modulos que comparten todos los roles del campo (entrenadores, segundos, ...)
     { key: 'plantilla',            label: 'Plantilla',                  block: 'campo_comun' },
     { key: 'asistencia',           label: 'Asistencia y bienestar',     block: 'campo_comun' },
-    { key: 'entrenamientos',       label: 'Entrenamientos',             block: 'campo_comun' },
+    { key: 'crear_sesion',         label: 'Crear sesion',               block: 'campo_comun' },
+    { key: 'mis_sesiones',         label: 'Mis sesiones',               block: 'campo_comun' },
+    { key: 'calendario',           label: 'Calendario de sesiones',     block: 'campo_comun' },
     { key: 'pizarra',              label: 'Pizarra tactica',            block: 'campo_comun' },
     { key: 'periodizacion',        label: 'Periodizacion deportiva',    block: 'campo_comun' },
     { key: 'cargas',               label: 'Cargas (sRPE)',              block: 'campo_comun' },
     { key: 'wellness',             label: 'Enlaces wellness',           block: 'campo_comun' },
     { key: 'modelo_juego',         label: 'Modelo de juego',            block: 'campo_comun' },
-    { key: 'matchstats',           label: 'MatchStats / Competicion',   block: 'campo_comun' },
+    { key: 'partidos',             label: 'Partidos',                   block: 'campo_comun' },
+    { key: 'estadisticas',         label: 'Estadisticas',               block: 'campo_comun' },
+    { key: 'plan_partido',         label: 'Plan de partido',            block: 'campo_comun' },
+    { key: 'rivales',              label: 'Rivales',                    block: 'campo_comun' },
+    { key: 'analisis_rivales',     label: 'Analisis de rivales',        block: 'campo_comun' },
     { key: 'analisis_postpartido', label: 'Analisis post-partido',      block: 'campo_comun' },
     { key: 'cuerpo_tecnico_ia',    label: 'Cuerpo tecnico IA',          block: 'campo_comun' },
 
@@ -286,153 +292,152 @@ function cmJugadorVisible(teamIds) {
 }
 
 // ========== APLICAR PERMISOS A LA UI DEL HUB ==========
+
+// True si el rol puede ver alguna de las claves indicadas (incluye claves legacy)
+function cmVerAlguna(claves) {
+    for (var i = 0; i < claves.length; i++) {
+        if (cmPuedeVer(claves[i])) return true;
+    }
+    return false;
+}
+
+// Modal "sin acceso": se muestra al pulsar un elemento bloqueado
+function cmModalSinAcceso() {
+    var overlay = document.getElementById('cm-modal-sin-acceso');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'cm-modal-sin-acceso';
+        overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;z-index:99999;';
+        overlay.innerHTML =
+            '<div style="background:#1e293b;border-radius:12px;padding:28px;max-width:420px;width:90%;color:#fff;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,0.4);">' +
+            '<div style="font-size:34px;margin-bottom:10px;">\uD83D\uDD12</div>' +
+            '<p style="margin:0 0 8px;font-size:16px;font-weight:600;">No tienes acceso a este m\u00f3dulo</p>' +
+            '<p style="margin:0 0 20px;font-size:14px;color:#cbd5e1;">Si necesitas usarlo, p\u00eddele permiso al administrador de tu club.</p>' +
+            '<button onclick="document.getElementById(\'cm-modal-sin-acceso\').style.display=\'none\'" style="padding:9px 26px;border-radius:8px;border:none;background:#3b82f6;color:#fff;font-weight:600;cursor:pointer;">Entendido</button>' +
+            '</div>';
+        overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.style.display = 'none'; });
+        document.body.appendChild(overlay);
+    }
+    overlay.style.display = 'flex';
+}
+
+// Marca un tab o subtab como bloqueado: candado, atenuado y modal al pulsar
+function cmBloquear(el) {
+    if (!el || el.dataset.cmLocked === '1') return;
+    el.dataset.cmLocked = '1';
+    el.setAttribute('onclick', 'cmModalSinAcceso(); return false;');
+    el.style.opacity = '0.45';
+    el.style.cursor = 'not-allowed';
+    if ((el.textContent || '').indexOf('\uD83D\uDD12') === -1) {
+        el.insertAdjacentText('afterbegin', '\uD83D\uDD12 ');
+    }
+}
+
 function cmAplicarPermisos() {
     if (!cmState.activo) return;
 
-    // Mapeo de tabs del HUB actual a claves de permisos del Club Mode.
-    // null = el tab NO se controla por permisos (lo ven todos los miembros del club).
-    // TODO: cuando se integren los modulos nuevos del Club Mode al HUB, anadirlos aqui.
-    var MAPEO_HUB_PERMISOS = {
-        'planificador':  'entrenamientos',        // Planificador HUB -> Entrenamientos
-        'pizarra':       'pizarra',
-        'matchstats':    'matchstats',
-        'asistencia':    'asistencia',
-        'config':        'configuracion_club',    // Mi Club HUB -> Configuracion del club
-        'periodizacion': 'periodizacion',
-        'analisis':      'analisis_postpartido',
-        'plan_partido':  'matchstats',            // Plan partido es parte del flujo MatchStats
-        'staff':         'cuerpo_tecnico_ia',
-        'dashboard':     null,                     // Dashboard general: lo ven todos
-        'medico':        'modulo_medico',          // Panel medico -> Despacho medico
-        'pagos':         'pagos_cuotas',           // Pagos y cuotas -> Oficina
-        'fisio':         'modulo_fisio',           // Panel fisio -> Despacho fisio
-        'familias':      'comunicacion_familias',  // Comunicacion a familias -> Oficina
-        'prepfisica':    'modulo_preparacion_fisica', // Preparacion fisica -> Campo compartido
-        'scouting':      'scouting'                   // Scouting -> Oficina
-    };
-
-    // Ocultar tabs de modulos sin permiso de ver
-    // Ocultar Dashboard y TactiClip a roles que no son de campo
-    if (!cmState.esAdmin) {
-        var CM_CAMPO_KEYS = ['entrenamientos','pizarra','asistencia','matchstats','periodizacion','analisis_postpartido','cuerpo_tecnico_ia'];
-        var cmEsRolCampo = CM_CAMPO_KEYS.some(function(k) { return cmPuedeVer(k); });
-        if (!cmEsRolCampo) {
-            document.querySelectorAll('.main-tab').forEach(function(td) {
-                var ocd = td.getAttribute('onclick') || '';
-                if (/cambiarModulo\('dashboard'/.test(ocd) || /abrirPromoTactiClip/.test(ocd)) {
-                    td.style.setProperty('display', 'none', 'important');
-                }
-            });
-        }
+    // El admin del club ve y usa todo; solo mostrar la pestana Club
+    if (cmState.esAdmin) {
+        var tabClubAdm = document.getElementById('cm-tab-club');
+        if (tabClubAdm) tabClubAdm.style.setProperty('display', 'flex', 'important');
+        return;
     }
 
+    // ===== Subpestanas del Planificador (clave propia + legacy 'entrenamientos') =====
+    var CM_PLAN_SUBTABS = {
+        'crear':            ['crear_sesion', 'entrenamientos'],
+        'mis-sesiones':     ['mis_sesiones', 'entrenamientos'],
+        'calendario':       ['calendario', 'entrenamientos'],
+        'asistencia':       ['asistencia'],
+        'cargas':           ['cargas'],
+        'enlaces-wellness': ['wellness'],
+        'periodizacion':    ['periodizacion'],
+        'modelo-juego':     ['modelo_juego']
+    };
+
+    // ===== Subpestanas de Gestion de Competicion (clave propia + legacy 'matchstats') =====
+    // Nota: 'modulo_analista_video' da acceso a Rivales y Analisis de rivales (analista puro)
+    var CM_GC_SUBTABS = {
+        'partidos':      ['partidos', 'matchstats'],
+        'estadisticas':  ['estadisticas', 'matchstats'],
+        'analisis':      ['analisis_postpartido', 'matchstats'],
+        'planpartido':   ['plan_partido', 'matchstats'],
+        'rivales':       ['rivales', 'matchstats', 'modulo_analista_video'],
+        'analisisrival': ['analisis_rivales', 'matchstats', 'modulo_analista_video']
+    };
+
+    function cmGestionarSubtabs(selector, modulo, mapa) {
+        var alguna = false, primera = null, defaultOk = false, defaultKey = null;
+        document.querySelectorAll(selector).forEach(function(st) {
+            var oc = st.getAttribute('onclick') || '';
+            var m = oc.match(new RegExp("cambiarSubTab\\('" + modulo + "',\\s*'([\\w-]+)'"));
+            if (!m) return;
+            if (defaultKey === null) defaultKey = m[1];
+            var claves = mapa[m[1]];
+            if (claves && !cmVerAlguna(claves)) {
+                cmBloquear(st);
+            } else {
+                alguna = true;
+                if (!primera) primera = st;
+                if (m[1] === defaultKey) defaultOk = true;
+            }
+        });
+        return { alguna: alguna, primera: primera, defaultOk: defaultOk };
+    }
+
+    var plan = cmGestionarSubtabs('.planificador-subtabs .sub-tab', 'planificador', CM_PLAN_SUBTABS);
+    var gc   = cmGestionarSubtabs('#modulo-matchstats .sub-tab', 'matchstats', CM_GC_SUBTABS);
+
+    // ===== Pestanas principales: candado en vez de ocultar =====
+    var MAPEO_HUB_PERMISOS = {
+        'pizarra':    ['pizarra'],
+        'config':     ['configuracion_club'],
+        'staff':      ['cuerpo_tecnico_ia'],
+        'medico':     ['modulo_medico'],
+        'pagos':      ['pagos_cuotas'],
+        'fisio':      ['modulo_fisio'],
+        'familias':   ['comunicacion_familias'],
+        'prepfisica': ['modulo_preparacion_fisica'],
+        'scouting':   ['scouting']
+    };
     var tabs = document.querySelectorAll('.main-tab');
     tabs.forEach(function(tab) {
         var onclick = tab.getAttribute('onclick') || '';
         var match = onclick.match(/cambiarModulo\('(\w+)'/);
-        if (match) {
-            var moduloHUB = match[1];
-            var moduloPerm = MAPEO_HUB_PERMISOS[moduloHUB];
-            // Si la clave es null (no controlado) o el usuario tiene permiso, dejar visible
-            if (moduloPerm && !cmPuedeVer(moduloPerm)) {
-                tab.style.setProperty('display', 'none', 'important');
-            }
+        if (!match) return;
+        var mod = match[1];
+        if (mod === 'planificador') {
+            if (!plan.alguna) cmBloquear(tab);
+            return;
         }
+        if (mod === 'matchstats') {
+            if (!gc.alguna) cmBloquear(tab);
+            return;
+        }
+        var claves = MAPEO_HUB_PERMISOS[mod];
+        if (claves && !cmVerAlguna(claves)) cmBloquear(tab);
     });
 
-    // ===== Subpestanas del Planificador: control granular por permiso =====
-    // Cada subpestana se gobierna por su propia clave. La pestana Planificador
-    // se muestra si el rol puede ver CUALQUIERA de sus subpestanas.
-    var CM_PLAN_SUBTABS = {
-        'crear':            'entrenamientos',
-        'mis-sesiones':     'entrenamientos',
-        'calendario':       'entrenamientos',
-        'asistencia':       'asistencia',
-        'cargas':           'cargas',
-        'enlaces-wellness': 'wellness',
-        'periodizacion':    'periodizacion',
-        'modelo-juego':     'modelo_juego'
-    };
-    var cmPlanAlguna = false;
-    var cmPlanPrimera = null;
-    var cmPlanCrearVisible = false;
-    document.querySelectorAll('.planificador-subtabs .sub-tab').forEach(function(st) {
-        var ocSt = st.getAttribute('onclick') || '';
-        var mSt = ocSt.match(/cambiarSubTab\('planificador',\s*'([\w-]+)'/);
-        if (!mSt) return;
-        var permSt = CM_PLAN_SUBTABS[mSt[1]];
-        if (permSt && !cmPuedeVer(permSt)) {
-            st.style.setProperty('display', 'none', 'important');
-        } else {
-            cmPlanAlguna = true;
-            if (!cmPlanPrimera) cmPlanPrimera = st;
-            if (mSt[1] === 'crear') cmPlanCrearVisible = true;
-        }
-    });
-    var cmTabPlan = null;
-    tabs.forEach(function(td) {
-        var ocTd = td.getAttribute('onclick') || '';
-        if (/cambiarModulo\('planificador'/.test(ocTd)) cmTabPlan = td;
-    });
-    if (cmTabPlan) {
-        if (cmPlanAlguna) {
-            cmTabPlan.style.removeProperty('display');
-        } else {
-            cmTabPlan.style.setProperty('display', 'none', 'important');
-        }
-    }
-    // Si no ve "Crear Sesion" (subpestana por defecto), activar la primera visible
-    if (cmPlanAlguna && !cmPlanCrearVisible && cmPlanPrimera) {
-        try { cmPlanPrimera.click(); } catch (e) {}
-    }
-
-    // ===== Pestaña Analista (usa irAAnalista, no cambiarModulo) =====
+    // Pestana Analista: accesible si ve algo de competicion o es analista de video
     var tabAnalista = document.querySelector('.main-tab.analista');
-    var cmEsAnalistaVideo = cmPuedeVer('modulo_analista_video');
-    var cmVeMatchstats = cmState.esAdmin || cmPuedeVer('matchstats');
-    if (tabAnalista && !cmVeMatchstats && !cmEsAnalistaVideo) {
-        tabAnalista.style.setProperty('display', 'none', 'important');
+    if (tabAnalista && !gc.alguna && !cmPuedeVer('modulo_analista_video')) {
+        cmBloquear(tabAnalista);
     }
-    // Analista puro: dentro de Gestion de Competicion solo ve Rivales y Analisis de Rivales
-    if (cmEsAnalistaVideo && !cmVeMatchstats) {
-        document.querySelectorAll('#modulo-matchstats .sub-tab').forEach(function(st) {
-            var ocSub = st.getAttribute('onclick') || '';
-            if (!(ocSub.indexOf("'rivales'") > -1 || ocSub.indexOf("'analisisrival'") > -1)) {
-                st.style.setProperty('display', 'none', 'important');
-            }
+
+    // TactiClip: candado si el rol no tiene ningun permiso de campo
+    var CM_CAMPO_KEYS = ['crear_sesion','mis_sesiones','calendario','entrenamientos','pizarra',
+        'asistencia','cargas','wellness','modelo_juego','periodizacion','partidos','estadisticas',
+        'plan_partido','rivales','analisis_rivales','matchstats','analisis_postpartido',
+        'cuerpo_tecnico_ia','modulo_analista_video'];
+    if (!cmVerAlguna(CM_CAMPO_KEYS)) {
+        tabs.forEach(function(td) {
+            if (/abrirPromoTactiClip/.test(td.getAttribute('onclick') || '')) cmBloquear(td);
         });
     }
 
-    // Mostrar la pestaña "Club" si el usuario es admin del club
-    if (cmState.esAdmin) {
-        var tabClub = document.getElementById('cm-tab-club');
-        if (tabClub) {
-            tabClub.style.setProperty('display', 'flex', 'important');
-        }
-    }
-
-    // ===== PANTALLA "EN DESARROLLO" para roles sin pestañas visibles =====
-    // Si el usuario no es admin y no tiene ninguna pestaña funcional visible,
-    // su rol no tiene aún panel construido. Mostramos un mensaje claro.
-    if (!cmState.esAdmin) {
-        var pestanasFuncionales = Array.from(document.querySelectorAll('.main-tab')).filter(function(tab) {
-            var oc = tab.getAttribute('onclick') || '';
-            var m = oc.match(/cambiarModulo\('(\w+)'/);
-            if (!m) return false;
-            // Ignorar tacticlip (link externo) y club (manejado aparte)
-            return m[1] !== 'tacticlip' && m[1] !== 'club';
-        });
-        var visibles = pestanasFuncionales.filter(function(tab) {
-            return tab.style.display !== 'none';
-        });
-        var cmTabAnalistaVisible = tabAnalista && tabAnalista.style.display !== 'none';
-        if (visibles.length === 0 && !cmTabAnalistaVisible) {
-            cmMostrarPantallaDesarrollo();
-        }
-    }
-
-    // Los botones de edicion los gestionara cada modulo individualmente
-    // consultando cmPuedeEditar() cuando renderice
+    // Si la subpestana por defecto esta bloqueada, activar la primera permitida
+    if (plan.alguna && !plan.defaultOk && plan.primera) { try { plan.primera.click(); } catch (e) {} }
+    if (gc.alguna && !gc.defaultOk && gc.primera)       { try { gc.primera.click(); } catch (e) {} }
 }
 
 // ========== PANTALLA "EN DESARROLLO" ==========
