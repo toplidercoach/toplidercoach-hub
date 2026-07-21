@@ -52,8 +52,7 @@ async function cargarEnlacesWellness() {
     cont.innerHTML = '<div class="wenl-vacio">Cargando jugadores...</div>';
 
     try {
-        const { data: clubInfo } = await supabaseClient
-            .from('clubs').select('id').eq('wp_user_id', usuario.id).single();
+        const clubInfo = clubData || (clubId ? { id: clubId } : null);
         if (!clubInfo) throw new Error('Club no encontrado');
 
         // 1. Temporada activa del club

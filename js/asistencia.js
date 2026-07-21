@@ -62,8 +62,7 @@ async function cargarTemporadasAsistencia() {
     if (!select) return;
     
     try {
-        const { data: clubInfo } = await supabaseClient
-            .from('clubs').select('id').eq('wp_user_id', usuario.id).single();
+        const clubInfo = clubData || (clubId ? { id: clubId } : null);
         if (!clubInfo) return;
         
         const { data: temporadas } = await supabaseClient
@@ -179,8 +178,7 @@ async function cargarAsistenciaRango() {
     tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;">Cargando...</td></tr>';
     
     try {
-        const { data: clubInfo } = await supabaseClient
-            .from('clubs').select('id').eq('wp_user_id', usuario.id).single();
+        const clubInfo = clubData || (clubId ? { id: clubId } : null);
         if (!clubInfo) throw new Error('Club no encontrado');
         
         // Temporada seleccionada
@@ -581,7 +579,7 @@ async function verDetalleJugador(jugadorId, nombreJugador) {
     var selectedSeasonId = getAsistenciaSeasonId();
     
     try {
-        const { data: clubInfo } = await supabaseClient.from('clubs').select('id').eq('wp_user_id', usuario.id).single();
+        const clubInfo = clubData || (clubId ? { id: clubId } : null);
         
         var queryDetalle = supabaseClient
             .from('training_sessions').select('id, name, session_date')
@@ -642,7 +640,7 @@ async function generarPDFJugador(jugadorId) {
         const { data: jugador } = await supabaseClient.from('players').select('*').eq('id', jugadorId).single();
         if (!jugador) { showToast('Jugador no encontrado'); return; }
         
-        const { data: clubInfo } = await supabaseClient.from('clubs').select('*').eq('wp_user_id', usuario.id).single();
+        const clubInfo = clubData || (clubId ? { id: clubId } : null);
         
         var queryPDF = supabaseClient
             .from('training_sessions').select('id, name, session_date')
@@ -810,7 +808,7 @@ async function generarPDFPlantillaGeneral() {
     var selectedSeasonId = getAsistenciaSeasonId();
     
     try {
-        const { data: clubInfo } = await supabaseClient.from('clubs').select('*').eq('wp_user_id', usuario.id).single();
+        const clubInfo = clubData || (clubId ? { id: clubId } : null);
         if (!clubInfo) throw new Error('Club no encontrado');
         
         // Sesiones (filtradas por temporada si hay seleccionada)
