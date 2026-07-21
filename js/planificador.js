@@ -1540,6 +1540,7 @@ function calPdfMenu(btn) {
     menu.id = 'cal-pdf-menu';
     menu.style.cssText = 'position:absolute;background:#1e293b;border:1px solid #334155;border-radius:8px;padding:6px;z-index:9999;box-shadow:0 6px 18px rgba(0,0,0,0.4);min-width:180px;';
     const opciones = [
+        { l: 'Semana para jugadores', r: 'semana_jug' },
         { l: 'Este mes', r: 'mes' },
         { l: 'Trimestre (3 meses)', r: 'trimestre' },
         { l: 'Semestre (6 meses)', r: 'semestre' },
@@ -1547,7 +1548,8 @@ function calPdfMenu(btn) {
     ];
     let h = '';
     opciones.forEach(function(o) {
-        h += '<div onclick="calGenerarPDF(\'' + o.r + '\')" style="padding:8px 12px;color:#e2e8f0;font-size:13px;cursor:pointer;border-radius:6px" onmouseenter="this.style.background=\'#334155\'" onmouseleave="this.style.background=\'transparent\'">' + o.l + '</div>';
+        var accion = (o.r === 'semana_jug') ? 'calPdfSemanaJugadores()' : ('calGenerarPDF(\'' + o.r + '\')');
+        h += '<div onclick="' + accion + '" style="padding:8px 12px;color:#e2e8f0;font-size:13px;cursor:pointer;border-radius:6px" onmouseenter="this.style.background=\'#334155\'" onmouseleave="this.style.background=\'transparent\'">' + o.l + '</div>';
     });
     menu.innerHTML = h;
     const rect = btn.getBoundingClientRect();
@@ -2383,4 +2385,138 @@ async function utilEnviarPedido() {
     } catch (e) { console.error('Error notificacion utillero:', e); }
     const ov = document.getElementById('util-pedido-ov'); if (ov) ov.remove();
     showToast('Pedido enviado al utillero');
+}// ========== PDF SEMANAL PARA JUGADORES ==========
+function calPdfSemanaJugadores() {
+    var menu = document.getElementById('cal-pdf-menu');
+    if (menu) menu.remove();
+    var hoy = new Date();
+    var iso = hoy.getFullYear() + '-' + String(hoy.getMonth() + 1).padStart(2, '0') + '-' + String(hoy.getDate()).padStart(2, '0');
+    var ov = document.createElement('div');
+    ov.id = 'cal-semana-modal';
+    ov.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;z-index:99999';
+    ov.innerHTML = '<div style="background:#1e293b;border-radius:12px;padding:24px;width:330px;color:#fff;box-shadow:0 8px 24px rgba(0,0,0,.4)">' +
+        '<p style="margin:0 0 6px;font-size:15px;font-weight:600">Semana para jugadores</p>' +
+        '<p style="margin:0 0 14px;font-size:13px;color:#94a3b8">Elige un dia y se genera su semana completa (lunes a domingo).</p>' +
+        '<input type="date" id="cal-semana-fecha" value="' + iso + '" style="width:100%;padding:9px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:#fff;font-size:14px">' +
+        '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">' +
+        '<button onclick="document.getElementById(\'cal-semana-modal\').remove()" style="padding:8px 18px;border-radius:8px;border:1px solid #475569;background:transparent;color:#fff;cursor:pointer">Cancelar</button>' +
+        '<button onclick="calPdfSemanaGenerar()" style="padding:8px 18px;border-radius:8px;border:none;background:#7c3aed;color:#fff;font-weight:600;cursor:pointer">Generar PDF</button>' +
+        '</div></div>';
+    ov.addEventListener('click', function(e) { if (e.target === ov) ov.remove(); });
+    document.body.appendChild(ov);
+}
+
+async function calPdfSemanaGenerar() {
+    var input = document.getElementById('cal-semana-fecha');
+    if (!input || !input.value) { showToast('Elige una fecha'); return; }
+
+    var base = new Date(input.value + 'T12:00:00');
+    var dow = base.getDay();
+    var offset = (dow === 0) ? -6 : 1 - dow;
+    var lunes = new Date(base);
+    lunes.setDate(base.getDate() + offset);
+
+    function fISO(d) {
+        return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }
+
+    var dias = [];
+    for (var i = 0; i < 7; i++) {
+        var d = new Date(lunes);
+        d.setDate(lunes.getDate() + i);
+        dias.push(d);
+    }
+    var desde = fISO(dias[0]);
+    var hasta = fISO(dias[6]);
+
+    var modal = document.getElementById('cal-semana-modal');
+    if (modal) modal.remove();
+
+    try {
+        var res = await supabaseClient
+            .from('training_sessions')
+            .select('name, session_date, session_time')
+            .eq('club_id', clubId)
+            .gte('session_date', desde)
+            .lte('session_date', hasta)
+            .order('session_date');
+        var sesiones = res.data || [];
+
+        var doc = new window.jspdf.jsPDF('p', 'mm', 'a4');
+        var nombreClub = (clubData && clubData.name) ? clubData.name : 'Club';
+        var MESES_S = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+        var DIAS_S = ['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO', 'DOMINGO'];
+
+        doc.setFillColor(38, 33, 92);
+        doc.rect(0, 0, 210, 34, 'F');
+        doc.setFillColor(124, 58, 237);
+        doc.rect(0, 34, 210, 2, 'F');
+        try {
+            if (clubData && clubData.logo_url) doc.addImage(clubData.logo_url, 'PNG', 9, 5, 24, 24);
+        } catch (e) {}
+        doc.setTextColor(255, 255, 255);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(17);
+        doc.text(nombreClub.toUpperCase(), 38, 16);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        doc.setTextColor(200, 200, 215);
+        doc.text('Semana del ' + dias[0].getDate() + ' al ' + dias[6].getDate() + ' de ' + MESES_S[dias[6].getMonth()] + ' de ' + dias[6].getFullYear(), 38, 24);
+
+        var y = 48;
+        dias.forEach(function(dia, idx) {
+            var key = fISO(dia);
+            var delDia = sesiones.filter(function(s) { return s.session_date === key; });
+            var alto = Math.max(24, 14 + delDia.length * 10);
+
+            if (y + alto > 285) { doc.addPage(); y = 20; }
+
+            if (delDia.length) {
+                doc.setFillColor(241, 245, 249);
+            } else {
+                doc.setFillColor(250, 250, 252);
+            }
+            doc.roundedRect(14, y, 182, alto, 3, 3, 'F');
+
+            if (delDia.length) {
+                doc.setFillColor(124, 58, 237);
+            } else {
+                doc.setFillColor(203, 213, 225);
+            }
+            doc.rect(14, y, 3, alto, 'F');
+
+            doc.setTextColor(15, 23, 42);
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(11);
+            doc.text(DIAS_S[idx] + ' ' + dia.getDate(), 22, y + 9);
+
+            if (!delDia.length) {
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(10);
+                doc.setTextColor(148, 163, 184);
+                doc.text('Libre', 22, y + 18);
+            } else {
+                var ly = y + 18;
+                delDia.forEach(function(s) {
+                    doc.setFont('helvetica', 'bold');
+                    doc.setFontSize(12);
+                    doc.setTextColor(124, 58, 237);
+                    doc.text(s.session_time ? String(s.session_time).substring(0, 5) : '--:--', 22, ly);
+                    doc.setFont('helvetica', 'normal');
+                    doc.setTextColor(30, 41, 59);
+                    doc.text(String(s.name || 'Sesion'), 48, ly);
+                    ly += 10;
+                });
+            }
+            y += alto + 4;
+        });
+
+        doc.setFontSize(8);
+        doc.setTextColor(148, 163, 184);
+        doc.text('TopLiderCoach', 105, 290, { align: 'center' });
+        doc.save('semana-' + desde + '.pdf');
+    } catch (e) {
+        console.error('calPdfSemanaGenerar:', e);
+        showToast('Error al generar el PDF');
+    }
 }
