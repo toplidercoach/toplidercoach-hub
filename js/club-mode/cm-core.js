@@ -3,7 +3,7 @@
 // Depende de: core.js (supabaseClient, clubId, usuario, registrarInit)
 // Ubicacion: js/club-mode/cm-core.js
 
-// ========== CATALOGO DE MODULOS DEL CLUB MODE (38 totales) ==========
+// ========== CATALOGO DE MODULOS DEL CLUB MODE (41 totales) ==========
 // Esta constante define TODOS los modulos posibles del Club Mode.
 // Sirve como referencia para construir UIs de permisos (club-admin-cargos)
 // y como fuente de verdad para validar claves de permiso.
@@ -14,13 +14,16 @@
 // - block: 'campo_comun' | 'campo_despacho' | 'oficina' | 'compartido'
 
 var CM_MODULOS = [
-    // ========== CAMPO - COMUNES (8) ==========
+    // ========== CAMPO - COMUNES (11) ==========
     // Modulos que comparten todos los roles del campo (entrenadores, segundos, ...)
     { key: 'plantilla',            label: 'Plantilla',                  block: 'campo_comun' },
     { key: 'asistencia',           label: 'Asistencia y bienestar',     block: 'campo_comun' },
     { key: 'entrenamientos',       label: 'Entrenamientos',             block: 'campo_comun' },
     { key: 'pizarra',              label: 'Pizarra tactica',            block: 'campo_comun' },
     { key: 'periodizacion',        label: 'Periodizacion deportiva',    block: 'campo_comun' },
+    { key: 'cargas',               label: 'Cargas (sRPE)',              block: 'campo_comun' },
+    { key: 'wellness',             label: 'Enlaces wellness',           block: 'campo_comun' },
+    { key: 'modelo_juego',         label: 'Modelo de juego',            block: 'campo_comun' },
     { key: 'matchstats',           label: 'MatchStats / Competicion',   block: 'campo_comun' },
     { key: 'analisis_postpartido', label: 'Analisis post-partido',      block: 'campo_comun' },
     { key: 'cuerpo_tecnico_ia',    label: 'Cuerpo tecnico IA',          block: 'campo_comun' },
@@ -336,6 +339,52 @@ function cmAplicarPermisos() {
             }
         }
     });
+
+    // ===== Subpestanas del Planificador: control granular por permiso =====
+    // Cada subpestana se gobierna por su propia clave. La pestana Planificador
+    // se muestra si el rol puede ver CUALQUIERA de sus subpestanas.
+    var CM_PLAN_SUBTABS = {
+        'crear':            'entrenamientos',
+        'mis-sesiones':     'entrenamientos',
+        'calendario':       'entrenamientos',
+        'asistencia':       'asistencia',
+        'cargas':           'cargas',
+        'enlaces-wellness': 'wellness',
+        'periodizacion':    'periodizacion',
+        'modelo-juego':     'modelo_juego'
+    };
+    var cmPlanAlguna = false;
+    var cmPlanPrimera = null;
+    var cmPlanCrearVisible = false;
+    document.querySelectorAll('.planificador-subtabs .sub-tab').forEach(function(st) {
+        var ocSt = st.getAttribute('onclick') || '';
+        var mSt = ocSt.match(/cambiarSubTab\('planificador',\s*'([\w-]+)'/);
+        if (!mSt) return;
+        var permSt = CM_PLAN_SUBTABS[mSt[1]];
+        if (permSt && !cmPuedeVer(permSt)) {
+            st.style.setProperty('display', 'none', 'important');
+        } else {
+            cmPlanAlguna = true;
+            if (!cmPlanPrimera) cmPlanPrimera = st;
+            if (mSt[1] === 'crear') cmPlanCrearVisible = true;
+        }
+    });
+    var cmTabPlan = null;
+    tabs.forEach(function(td) {
+        var ocTd = td.getAttribute('onclick') || '';
+        if (/cambiarModulo\('planificador'/.test(ocTd)) cmTabPlan = td;
+    });
+    if (cmTabPlan) {
+        if (cmPlanAlguna) {
+            cmTabPlan.style.removeProperty('display');
+        } else {
+            cmTabPlan.style.setProperty('display', 'none', 'important');
+        }
+    }
+    // Si no ve "Crear Sesion" (subpestana por defecto), activar la primera visible
+    if (cmPlanAlguna && !cmPlanCrearVisible && cmPlanPrimera) {
+        try { cmPlanPrimera.click(); } catch (e) {}
+    }
 
     // ===== Pestaña Analista (usa irAAnalista, no cambiarModulo) =====
     var tabAnalista = document.querySelector('.main-tab.analista');
