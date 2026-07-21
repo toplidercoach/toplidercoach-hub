@@ -55,7 +55,8 @@
         'entrenamientos', 'pizarra', 'matchstats', 'asistencia', 'periodizacion',
         'analisis_postpartido', 'cuerpo_tecnico_ia', 'configuracion_club',
         'modulo_medico', 'modulo_fisio', 'modulo_preparacion_fisica',
-        'scouting', 'direccion_deportiva', 'pagos_cuotas', 'comunicacion_familias'
+        'scouting', 'direccion_deportiva', 'pagos_cuotas', 'comunicacion_familias',
+        'modulo_analista_video'
     ];
 
     // -------- Orden y etiquetas de los bloques del catalogo --------
