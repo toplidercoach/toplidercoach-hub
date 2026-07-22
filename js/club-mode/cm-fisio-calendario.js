@@ -10,7 +10,7 @@ var cmFisioCal = {
     semanaInicio: null, diaActual: null, mesActual: null, anioActual: null,
     citas: [], fisios: [], fisioSeleccionado: null, horario: null,
     vistaActiva: 'jugadores', vistaCalendario: 'semanal',
-    filtroEquipo: 'all', horaInicio: 8, horaFin: 21, intervalo: 30,
+    filtroEquipo: 'all', horaInicio: 8, horaFin: 21, intervalo: parseInt(localStorage.getItem('cmfcal_intervalo') || '15', 10),
     jugadoresMap: {}
 };
 
@@ -130,6 +130,7 @@ function cmFisioCalCabecera(tit) {
     '<div class="cmfcal-t">'+tit+'</div><div style="display:flex;gap:6px">'+vBtns+'</div></div>'+
     '<div class="cmfcal-h"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'+fSel+
     '<select onchange="cmFisioCal.filtroEquipo=this.value;cmFisioCalRenderVista()" style="background:#fff;border:1px solid #d1d5db;color:#1f2937;padding:5px 10px;border-radius:6px;font-size:12px">'+eOpts+'</select>'+
+    '<select onchange="cmFisioCalCambiarIntervalo(this.value)" title="Duracion de cada franja" style="background:#fff;border:1px solid #d1d5db;color:#1f2937;padding:5px 10px;border-radius:6px;font-size:12px">'+[30,15,10].map(function(iv){return '<option value="'+iv+'"'+(cmFisioCal.intervalo===iv?' selected':'')+'>'+iv+' min</option>';}).join('')+'</select>'+
     '<button class="cmfcal-nb" onclick="cmFisioCalConfigHorario()">Horario</button>'+
     '<button class="cmfcal-nb" onclick="cmFisioCalImprimirPDF()">Imprimir</button></div></div>';
 }
@@ -160,7 +161,7 @@ async function cmFisioCalRenderDiaria() {
     tit=tit.charAt(0).toUpperCase()+tit.slice(1);
     var dw=d.getDay(),dk=CMFCAL_DIAS[dw===0?6:dw-1];
     var hf=[];if(cmFisioCal.horario&&cmFisioCal.horario.schedule)hf=cmFisioCal.horario.schedule[dk]||[];
-    var sl=[];for(var h=cmFisioCal.horaInicio;h<cmFisioCal.horaFin;h++){sl.push(('0'+h).slice(-2)+':00');sl.push(('0'+h).slice(-2)+':30');}
+    var sl=[];for(var h=cmFisioCal.horaInicio;h<cmFisioCal.horaFin;h++){for(var mm=0;mm<60;mm+=cmFisioCal.intervalo){sl.push(('0'+h).slice(-2)+':'+('0'+mm).slice(-2));}}
     var html=cmFisioCalCabecera(tit)+'<div class="cmfcal-dg">';
     sl.forEach(function(s){var off=false;if(cmFisioCal.horario){if(hf.length===0)off=true;else{off=true;hf.forEach(function(x){if(s>=x.start&&s<x.end)off=false;});}}
         html+='<div class="cmfcal-tm" style="height:40px;align-items:center">'+(s.endsWith(':00')?s:'')+'</div>';
@@ -193,12 +194,12 @@ async function cmFisioCalCargarCitasRango(desde,hasta,modo){
     var citas=r.data||[];
     if(cmFisioCal.filtroEquipo!=='all')citas=citas.filter(function(c){var p=cmFisioCal.jugadoresMap[c.player_id];return p&&p.teamId===cmFisioCal.filtroEquipo;});
     cmFisioCal.citas=citas;
-    if(modo==='semanal')citas.forEach(function(c){var col=CMFCAL_COLORS[c.type]||CMFCAL_COLORS.treatment;var tk=c.time_start.substring(0,5).replace(':','');var cl=document.getElementById('cmfcal-'+c.appointment_date+'-'+tk);if(!cl)return;
+    if(modo==='semanal')citas.forEach(function(c){var col=CMFCAL_COLORS[c.type]||CMFCAL_COLORS.treatment;var tkm=parseInt(c.time_start.substring(0,2))*60+parseInt(c.time_start.substring(3,5));tkm=Math.floor(tkm/cmFisioCal.intervalo)*cmFisioCal.intervalo;var tk=('0'+Math.floor(tkm/60)).slice(-2)+('0'+(tkm%60)).slice(-2);var cl=document.getElementById('cmfcal-'+c.appointment_date+'-'+tk);if(!cl)return;
         var sM=parseInt(c.time_start.substring(0,2))*60+parseInt(c.time_start.substring(3,5)),eM=parseInt(c.time_end.substring(0,2))*60+parseInt(c.time_end.substring(3,5));
         var alt=Math.max(1,Math.round((eM-sM)/cmFisioCal.intervalo))*26-2;var p=cmFisioCal.jugadoresMap[c.player_id];var nm=p?p.name:'Jugador';
         var el=document.createElement('div');el.className='cmfcal-a';el.style.cssText='background:'+col.bg+';border-color:'+col.border+';color:'+col.text+';height:'+alt+'px';
         el.title=nm+' | '+c.time_start.substring(0,5)+'-'+c.time_end.substring(0,5);el.textContent=nm;el.onclick=function(e){e.stopPropagation();cmFisioCalEditarCita(c.id);};cl.appendChild(el);});
-    else if(modo==='diaria')citas.forEach(function(c){var col=CMFCAL_COLORS[c.type]||CMFCAL_COLORS.treatment;var tk=c.time_start.substring(0,5).replace(':','');var cl=document.getElementById('cmfcal-day-'+tk);if(!cl)return;
+    else if(modo==='diaria')citas.forEach(function(c){var col=CMFCAL_COLORS[c.type]||CMFCAL_COLORS.treatment;var tkm=parseInt(c.time_start.substring(0,2))*60+parseInt(c.time_start.substring(3,5));tkm=Math.floor(tkm/cmFisioCal.intervalo)*cmFisioCal.intervalo;var tk=('0'+Math.floor(tkm/60)).slice(-2)+('0'+(tkm%60)).slice(-2);var cl=document.getElementById('cmfcal-day-'+tk);if(!cl)return;
         var p=cmFisioCal.jugadoresMap[c.player_id];var nm=p?(p.dorsal?p.dorsal+' ':'')+p.name:'Jugador';
         var el=document.createElement('div');el.className='cmfcal-da';el.style.borderColor=col.border;
         el.innerHTML='<div style="display:flex;justify-content:space-between"><strong style="color:'+col.text+'">'+nm+'</strong><span style="color:#6b7280;font-size:11px">'+c.time_start.substring(0,5)+'-'+c.time_end.substring(0,5)+'</span></div>'+(c.notes?'<div style="color:#6b7280;font-size:11px">'+c.notes+'</div>':'');
@@ -219,7 +220,7 @@ function cmFisioCalNavHoy(){var h=new Date();cmFisioCal.diaActual=new Date(h);cm
 function cmFisioCalCambiarFisio(id){cmFisioCal.fisioSeleccionado=id;cmFisioCalCargarHorario().then(function(){cmFisioCalRenderVista();});}
 
 async function cmFisioCalNuevaCita(fecha,hora){
-    var hp=hora.split(':'),he=parseInt(hp[0]),me=parseInt(hp[1])+30;if(me>=60){me-=60;he++;}var hf=('0'+he).slice(-2)+':'+('0'+me).slice(-2);
+    var hp=hora.split(':'),he=parseInt(hp[0]),me=parseInt(hp[1])+cmFisioCal.intervalo;if(me>=60){me-=60;he++;}var hf=('0'+he).slice(-2)+':'+('0'+me).slice(-2);
     var ps=[];Object.keys(cmFisioCal.jugadoresMap).forEach(function(pid){var p=cmFisioCal.jugadoresMap[pid];if(cmFisioCal.filtroEquipo!=='all'&&p.teamId!==cmFisioCal.filtroEquipo)return;ps.push({id:pid,name:p.name,dorsal:p.dorsal});});
     ps.sort(function(a,b){return a.name.localeCompare(b.name);});
     var opts=ps.map(function(p){return'<option value="'+p.id+'">'+(p.dorsal?p.dorsal+' ':'')+p.name+'</option>';}).join('');
@@ -753,3 +754,9 @@ function cmFisioCalPDFMensual(_jsPDF, fisioName, equipoNombre, colPDF) {
     showToast('PDF mensual descargado');
 }
 console.log('[Panel Fisio] cm-fisio-calendario.js v2 cargado');
+// ========== SELECTOR DE INTERVALO DE CITAS (30/15/10 min) ==========
+function cmFisioCalCambiarIntervalo(v) {
+    cmFisioCal.intervalo = parseInt(v, 10);
+    localStorage.setItem('cmfcal_intervalo', String(cmFisioCal.intervalo));
+    cmFisioCalRenderVista();
+}
