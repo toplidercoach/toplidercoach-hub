@@ -58,7 +58,7 @@
         'rivales', 'analisis_rivales', 'cuerpo_tecnico_ia', 'configuracion_club',
         'modulo_medico', 'modulo_fisio', 'modulo_preparacion_fisica',
         'modulo_analista_video', 'scouting', 'direccion_deportiva',
-        'pagos_cuotas', 'comunicacion_familias'
+        'pagos_cuotas', 'comunicacion_familias', 'documentos'
     ];
 
     // -------- Orden y etiquetas de los bloques del catalogo --------

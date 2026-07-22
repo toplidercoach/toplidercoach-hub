@@ -46,6 +46,7 @@ var CM_MODULOS = [
     // Modulos de gestion del club (no del equipo concreto)
     { key: 'direccion_deportiva',     label: 'Direccion deportiva',     block: 'oficina' },
     { key: 'scouting',                label: 'Scouting',                block: 'oficina' },
+    { key: 'documentos',              label: 'Documentos',              block: 'oficina' },
     { key: 'marketing',               label: 'Marketing',               block: 'oficina' },
     { key: 'economico',               label: 'Economico',               block: 'oficina' },
     { key: 'cumplimiento_rfef',       label: 'Cumplimiento RFEF',       block: 'oficina' },
@@ -398,7 +399,8 @@ function cmAplicarPermisos() {
         'fisio':      ['modulo_fisio'],
         'familias':   ['comunicacion_familias'],
         'prepfisica': ['modulo_preparacion_fisica'],
-        'scouting':   ['scouting']
+        'scouting':   ['scouting'],
+        'docs':       ['documentos']
     };
     var tabs = document.querySelectorAll('.main-tab');
     tabs.forEach(function(tab) {
