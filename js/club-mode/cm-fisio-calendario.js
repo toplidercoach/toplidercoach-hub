@@ -142,7 +142,7 @@ async function cmFisioCalRenderSemanal() {
     var mt = fs[0].toLocaleDateString('es-ES',{month:'long',year:'numeric'});
     var tit = fs[0].getDate()+' - '+fs[6].getDate()+' '+mt.charAt(0).toUpperCase()+mt.slice(1);
     var hm={}; if(cmFisioCal.horario&&cmFisioCal.horario.schedule) CMFCAL_DIAS.forEach(function(d){hm[d]=cmFisioCal.horario.schedule[d]||[];});
-    var sl=[]; for(var h=cmFisioCal.horaInicio;h<cmFisioCal.horaFin;h++){sl.push(('0'+h).slice(-2)+':00');sl.push(('0'+h).slice(-2)+':30');}
+    var sl=[]; for(var h=cmFisioCal.horaInicio;h<cmFisioCal.horaFin;h++){for(var mm=0;mm<60;mm+=cmFisioCal.intervalo){sl.push(('0'+h).slice(-2)+':'+('0'+mm).slice(-2));}}
     var html=cmFisioCalCabecera(tit)+'<div class="cmfcal-g">';
     html+='<div class="cmfcal-gh"><div class="d" style="font-size:10px">Hora</div></div>';
     fs.forEach(function(f,i){var s=f.toISOString().split('T')[0];html+='<div class="cmfcal-gh'+(s===hS?' hoy':'')+'"><div class="d">'+CMFCAL_DIAS_LABEL[i]+'</div><div class="n">'+f.getDate()+'</div></div>';});
