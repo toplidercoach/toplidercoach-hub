@@ -65,12 +65,15 @@ async function cmFisioCalInit() {
     });
     if (cmFisioCal.fisios.length === 0 && usuario) cmFisioCal.fisios = [{ wp_user_id: cmIdentidad(), display_name: usuario.display_name || usuario.name || 'Yo' }];
     if (!cmFisioCal.fisioSeleccionado) cmFisioCal.fisioSeleccionado = usuario ? cmIdentidad() : null;
-    var sIds = cmFisioTemporadas.map(function(s) { return s.id; });
-    if (sIds.length > 0) {
-        var spRes = await supabaseClient.from('season_players').select('player_id, team_id, shirt_number, players(id, name)').in('season_id', sIds);
-        cmFisioCal.jugadoresMap = {};
-        (spRes.data || []).forEach(function(sp) { if (sp.players && !cmFisioCal.jugadoresMap[sp.players.id]) cmFisioCal.jugadoresMap[sp.players.id] = { name: sp.players.name, dorsal: sp.shirt_number || '', teamId: sp.team_id }; });
-    }
+    var cpRes = await supabaseClient.from('club_players').select('id, name').eq('club_id', clubId).eq('active', true).order('name');
+    var cpsRes = await supabaseClient.from('club_player_seasons').select('player_id, team_id, shirt_number').eq('club_id', clubId).eq('active', true);
+    var cpsMap = {};
+    (cpsRes.data || []).forEach(function(cs) { if (!cpsMap[cs.player_id]) cpsMap[cs.player_id] = cs; });
+    cmFisioCal.jugadoresMap = {};
+    (cpRes.data || []).forEach(function(cp) {
+        var cs = cpsMap[cp.id] || {};
+        cmFisioCal.jugadoresMap[cp.id] = { name: cp.name, dorsal: cs.shirt_number || '', teamId: cs.team_id || null };
+    });
     await cmFisioCalCargarHorario();
     cmFisioCalRenderVista();
 }
