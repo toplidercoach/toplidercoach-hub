@@ -295,7 +295,7 @@ async function cargarAsistenciaRango() {
                     <td>${promWellness}</td>
                     <td>${promMuscular}</td>
                     <td>
-                        <button class="btn-ver-detalle" onclick="verDetalleJugador('${jugador.id}', '${jugador.name}')">👁 Ver</button>
+                        <button class="btn-ver-detalle" onclick="verDetalleJugador('${jugador.id}', '${(jugador.name || '').replace(/['"\\]/g, '')}')">👁 Ver</button>
                         <button class="btn-pdf-jugador" onclick="generarPDFJugador('${jugador.id}')">📄 PDF</button>
                     </td>
                 </tr>
