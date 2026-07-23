@@ -2443,6 +2443,7 @@ ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin
     <div style="margin-top:10px;display:flex;flex-direction:column;gap:6px">
         ${ejP.animMode && ejEditandoId ? '' : '<button class="ej-act-btn purple full" onclick="ejCapturarParaFicha()" style="width:100%;padding:10px;background:#7c3aed;border:none;color:#fff;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600">📋 Guardar ejercicio</button>'}
         <button class="ej-act-btn green full" onclick="ejExportPNG()" style="width:100%;padding:8px;background:#0f172a;border:1px solid #334155;color:#94a3b8;border-radius:8px;cursor:pointer;font-size:12px">📥 Exportar PNG</button>
+        <button class="ej-act-btn full" onclick="ejMontajeAbrir()" style="width:100%;padding:8px;background:#7c2d12;border:1px solid #9a3412;color:#fdba74;border-radius:8px;cursor:pointer;font-size:12px;margin-top:6px">🏟️ Guardar montaje de sesion</button>
         <button class="ej-act-btn red full" onclick="ejDelete()" ${!sel?'disabled':''} style="width:100%;padding:8px;background:#7f1d1d;border:1px solid #dc2626;color:#fca5a5;border-radius:8px;cursor:pointer;font-size:12px">🗑 Eliminar seleccionado</button>
     </div>
     `;
@@ -5017,4 +5018,111 @@ function ejResolver8(A, b) {
     var sol = [];
     for (var s = 0; s < n; s++) sol.push(M[s][n] / M[s][s]);
     return sol;
+}
+
+// ========== MONTAJES DE CAMPO (vinculados a una sesion) ==========
+// Captura la pizarra actual como PNG y devuelve un dataURL
+function ejMontajeCapturar() {
+    return new Promise(function(resolve, reject) {
+        try {
+            ejP.selectedId = null;
+            ejRenderSVG();
+            setTimeout(function() {
+                const svg = document.getElementById('ej-svg');
+                if (!svg) { reject(new Error('pizarra no visible')); return; }
+                const clone = svg.cloneNode(true);
+                clone.setAttribute('width', ejP.svgW);
+                clone.setAttribute('height', ejP.svgH);
+                const data = new XMLSerializer().serializeToString(clone);
+                const canvas = document.createElement('canvas');
+                canvas.width = ejP.svgW * 2;
+                canvas.height = ejP.svgH * 2;
+                const ctx = canvas.getContext('2d');
+                const img = new Image();
+                img.onload = function() {
+                    ctx.scale(2, 2);
+                    ctx.drawImage(img, 0, 0, ejP.svgW, ejP.svgH);
+                    resolve(canvas.toDataURL('image/png'));
+                };
+                img.onerror = function() { reject(new Error('no se pudo rasterizar')); };
+                img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(data)));
+            }, 100);
+        } catch (err) { reject(err); }
+    });
+}
+
+async function ejMontajeAbrir() {
+    try {
+        const hoyISO = new Date().toISOString().slice(0, 10);
+        const { data: ses } = await supabaseClient
+            .from('training_sessions')
+            .select('id, name, session_date')
+            .eq('club_id', clubId)
+            .gte('session_date', hoyISO)
+            .order('session_date', { ascending: true })
+            .limit(15);
+        let opts = '';
+        (ses || []).forEach(function(s) {
+            opts += '<option value="' + s.id + '">' + s.session_date + ' · ' + (s.name || 'Sesion') + '</option>';
+        });
+        if (!opts) { showToast('No hay sesiones futuras. Crea la sesion primero.'); return; }
+
+        const ov = document.createElement('div');
+        ov.id = 'ej-montaje-modal';
+        ov.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:2147483000';
+        ov.innerHTML =
+            '<div style="background:#1e293b;border-radius:12px;padding:22px;width:380px;max-width:92%;color:#fff">' +
+                '<h3 style="margin:0 0 14px;font-size:16px">🏟️ Guardar montaje de campo</h3>' +
+                '<label style="display:block;color:#94a3b8;font-size:12px;margin-bottom:4px">Sesion</label>' +
+                '<select id="ej-montaje-sesion" style="width:100%;padding:9px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:#fff;font-size:13px;margin-bottom:12px">' + opts + '</select>' +
+                '<label style="display:block;color:#94a3b8;font-size:12px;margin-bottom:4px">Titulo del montaje</label>' +
+                '<input type="text" id="ej-montaje-titulo" placeholder="Ej: Montaje 1 - Ej.1 dcha + Ej.2 izda" style="width:100%;padding:9px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:#fff;font-size:13px;box-sizing:border-box">' +
+                '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">' +
+                    '<button onclick="document.getElementById(\'ej-montaje-modal\').remove()" style="padding:8px 16px;border-radius:8px;border:1px solid #475569;background:transparent;color:#fff;cursor:pointer">Cancelar</button>' +
+                    '<button id="ej-montaje-btn" onclick="ejMontajeGuardar()" style="padding:8px 16px;border-radius:8px;border:none;background:#f97316;color:#fff;font-weight:600;cursor:pointer">Guardar</button>' +
+                '</div>' +
+            '</div>';
+        ov.addEventListener('click', function(ev) { if (ev.target === ov) ov.remove(); });
+        document.body.appendChild(ov);
+    } catch (err) {
+        console.error('ejMontajeAbrir:', err);
+        showToast('Error al preparar el montaje');
+    }
+}
+
+async function ejMontajeGuardar() {
+    const sesionId = document.getElementById('ej-montaje-sesion').value;
+    const titulo = (document.getElementById('ej-montaje-titulo').value || '').trim();
+    if (!sesionId) { showToast('Elige una sesion'); return; }
+    const btn = document.getElementById('ej-montaje-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
+    try {
+        const dataUrl = await ejMontajeCapturar();
+        const blob = await (await fetch(dataUrl)).blob();
+        const path = clubId + '/' + sesionId + '/' + Date.now() + '.png';
+        const up = await supabaseClient.storage.from('sesion-montajes').upload(path, blob, { contentType: 'image/png' });
+        if (up.error) throw up.error;
+
+        const { data: prev } = await supabaseClient.from('sesion_montajes')
+            .select('orden').eq('session_id', sesionId)
+            .order('orden', { ascending: false }).limit(1);
+        const orden = (prev && prev.length) ? (prev[0].orden + 1) : 1;
+
+        const ins = await supabaseClient.from('sesion_montajes').insert({
+            session_id: sesionId,
+            club_id: clubId,
+            orden: orden,
+            titulo: titulo || ('Montaje ' + orden),
+            image_path: path
+        });
+        if (ins.error) throw ins.error;
+
+        showToast('Montaje ' + orden + ' guardado en la sesion');
+        const m = document.getElementById('ej-montaje-modal');
+        if (m) m.remove();
+    } catch (err) {
+        console.error('ejMontajeGuardar:', err);
+        showToast('Error al guardar el montaje');
+        if (btn) { btn.disabled = false; btn.textContent = 'Guardar'; }
+    }
 }

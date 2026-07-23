@@ -746,6 +746,7 @@ if (typeof scGuardarConceptos === 'function') { await scGuardarConceptos(sesionI
                                     </div>
                                     <div class="sc-actions">
                                         <button class="sc-btn" style="background:#1e1b4b;" onclick="abrirModoVestuario('${s.id}')" title="Modo vestuario (presentacion)">📽️</button>
+                                        <button class="sc-btn" style="background:#7c2d12;" onclick="abrirMontajesSesion('${s.id}')" title="Montajes de campo">🏟️</button>
                                         <button class="sc-btn sc-btn-cargar" onclick="cargarSesionEnEditor('${s.id}')" title="Cargar">✏️</button>
                                         <button class="sc-btn sc-btn-asistencia" onclick="abrirModalAsistenciaSesion('${s.id}')" title="Asistencia">📋</button>
                                         <button class="sc-btn sc-btn-pdf" onclick="abrirModalPDFSesion('${s.id}')" title="PDF">📄</button>
@@ -2674,4 +2675,126 @@ function mvCerrar() {
     if (document.fullscreenElement) { document.exitFullscreen().catch(function() {}); }
     const ov = document.getElementById('mv-overlay');
     if (ov) ov.remove();
+}
+
+
+// ========== MONTAJES DE CAMPO DE LA SESION (ver, ordenar, borrar, PDF) ==========
+var msLista = [];
+var msSesionId = null;
+
+async function abrirMontajesSesion(sesionId) {
+    msSesionId = sesionId;
+    let ov = document.getElementById('ms-modal');
+    if (ov) ov.remove();
+    ov = document.createElement('div');
+    ov.id = 'ms-modal';
+    ov.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:2147483000';
+    ov.innerHTML =
+        '<div style="background:#1e293b;border-radius:12px;padding:22px;width:560px;max-width:94%;max-height:88vh;overflow-y:auto;color:#fff">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">' +
+                '<h3 style="margin:0;font-size:16px">🏟️ Montajes de campo</h3>' +
+                '<div style="display:flex;gap:8px">' +
+                    '<button onclick="msImprimirPDF()" style="padding:7px 14px;border-radius:8px;border:none;background:#f97316;color:#fff;font-weight:600;cursor:pointer;font-size:12px">📄 PDF para ayudantes</button>' +
+                    '<button onclick="document.getElementById(\'ms-modal\').remove()" style="padding:7px 12px;border-radius:8px;border:1px solid #475569;background:transparent;color:#fff;cursor:pointer;font-size:12px">Cerrar</button>' +
+                '</div>' +
+            '</div>' +
+            '<p style="margin:0 0 12px;font-size:12px;color:#94a3b8">Se dibujan en la Pizarra y se guardan con el boton "Guardar montaje de sesion".</p>' +
+            '<div id="ms-lista"><p style="color:#64748b;text-align:center;padding:20px">Cargando...</p></div>' +
+        '</div>';
+    ov.addEventListener('click', function(e) { if (e.target === ov) ov.remove(); });
+    document.body.appendChild(ov);
+    await msCargar();
+}
+
+async function msCargar() {
+    const cont = document.getElementById('ms-lista');
+    try {
+        const { data, error } = await supabaseClient.from('sesion_montajes')
+            .select('*').eq('session_id', msSesionId).order('orden');
+        if (error) throw error;
+        msLista = data || [];
+        if (!msLista.length) {
+            cont.innerHTML = '<p style="color:#64748b;text-align:center;padding:24px">Esta sesion no tiene montajes todavia.<br>Ve a la Pizarra, dibuja el montaje y pulsa "🏟️ Guardar montaje de sesion".</p>';
+            return;
+        }
+        let h = '';
+        msLista.forEach(function(m, i) {
+            const url = supabaseClient.storage.from('sesion-montajes').getPublicUrl(m.image_path).data.publicUrl;
+            h += '<div style="background:#0f172a;border:1px solid #334155;border-radius:10px;padding:10px;margin-bottom:10px;display:flex;gap:12px;align-items:center">' +
+                '<img src="' + url + '" style="width:150px;border-radius:6px;background:#1e293b">' +
+                '<div style="flex:1;min-width:0">' +
+                    '<div style="font-weight:600;font-size:13px;margin-bottom:4px">' + (m.orden) + '. ' + (m.titulo || 'Montaje') + '</div>' +
+                    '<div style="display:flex;gap:6px">' +
+                        '<button onclick="msMover(' + i + ',-1)" ' + (i === 0 ? 'disabled' : '') + ' style="padding:4px 10px;border-radius:6px;border:1px solid #334155;background:#1e293b;color:#94a3b8;cursor:pointer;font-size:12px">▲</button>' +
+                        '<button onclick="msMover(' + i + ',1)" ' + (i === msLista.length - 1 ? 'disabled' : '') + ' style="padding:4px 10px;border-radius:6px;border:1px solid #334155;background:#1e293b;color:#94a3b8;cursor:pointer;font-size:12px">▼</button>' +
+                        '<button onclick="msBorrar(\'' + m.id + '\')" style="padding:4px 10px;border-radius:6px;border:none;background:#7f1d1d;color:#fecaca;cursor:pointer;font-size:12px">Borrar</button>' +
+                    '</div>' +
+                '</div>' +
+            '</div>';
+        });
+        cont.innerHTML = h;
+    } catch (e) {
+        console.error('msCargar:', e);
+        cont.innerHTML = '<p style="color:#f87171;text-align:center">Error al cargar los montajes.</p>';
+    }
+}
+
+async function msMover(i, d) {
+    const a = msLista[i], b = msLista[i + d];
+    if (!a || !b) return;
+    await supabaseClient.from('sesion_montajes').update({ orden: b.orden }).eq('id', a.id);
+    await supabaseClient.from('sesion_montajes').update({ orden: a.orden }).eq('id', b.id);
+    await msCargar();
+}
+
+async function msBorrar(id) {
+    if (!confirm('¿Borrar este montaje?')) return;
+    const m = msLista.find(function(x) { return x.id === id; });
+    await supabaseClient.from('sesion_montajes').delete().eq('id', id);
+    if (m && m.image_path) {
+        try { await supabaseClient.storage.from('sesion-montajes').remove([m.image_path]); } catch (e) {}
+    }
+    await msCargar();
+}
+
+async function msImprimirPDF() {
+    if (!msLista.length) { showToast('No hay montajes que imprimir'); return; }
+    try {
+        const { data: s } = await supabaseClient.from('training_sessions')
+            .select('name, session_date').eq('id', msSesionId).single();
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('l', 'mm', 'a4'); // apaisado: 297x210
+        for (let i = 0; i < msLista.length; i++) {
+            const m = msLista[i];
+            if (i > 0) doc.addPage();
+            doc.setFillColor(38, 33, 92);
+            doc.rect(0, 0, 297, 20, 'F');
+            doc.setTextColor(255, 255, 255);
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(14);
+            doc.text((m.orden) + '. ' + (m.titulo || 'Montaje'), 10, 13);
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(10);
+            doc.setTextColor(200, 200, 215);
+            doc.text((s ? (s.name + ' · ' + s.session_date) : ''), 287, 13, { align: 'right' });
+            const url = supabaseClient.storage.from('sesion-montajes').getPublicUrl(m.image_path).data.publicUrl;
+            const dataUrl = await msUrlADataUrl(url);
+            if (dataUrl) doc.addImage(dataUrl, 'PNG', 10, 26, 277, 176, undefined, 'FAST');
+        }
+        doc.save('montajes-' + (s ? s.session_date : 'sesion') + '.pdf');
+    } catch (e) {
+        console.error('msImprimirPDF:', e);
+        showToast('Error al generar el PDF de montajes');
+    }
+}
+
+function msUrlADataUrl(url) {
+    return fetch(url).then(function(r) { return r.blob(); }).then(function(blob) {
+        return new Promise(function(res) {
+            const rd = new FileReader();
+            rd.onload = function() { res(rd.result); };
+            rd.onerror = function() { res(null); };
+            rd.readAsDataURL(blob);
+        });
+    }).catch(function() { return null; });
 }
