@@ -745,6 +745,7 @@ if (typeof scGuardarConceptos === 'function') { await scGuardarConceptos(sesionI
                                         ${numJugadores ? `<span class="sc-stat">👥 ${numJugadores} jugadores</span>` : ''}
                                     </div>
                                     <div class="sc-actions">
+                                        <button class="sc-btn" style="background:#1e1b4b;" onclick="abrirModoVestuario('${s.id}')" title="Modo vestuario (presentacion)">📽️</button>
                                         <button class="sc-btn sc-btn-cargar" onclick="cargarSesionEnEditor('${s.id}')" title="Cargar">✏️</button>
                                         <button class="sc-btn sc-btn-asistencia" onclick="abrirModalAsistenciaSesion('${s.id}')" title="Asistencia">📋</button>
                                         <button class="sc-btn sc-btn-pdf" onclick="abrirModalPDFSesion('${s.id}')" title="PDF">📄</button>
@@ -2521,4 +2522,156 @@ async function calPdfSemanaGenerar() {
         console.error('calPdfSemanaGenerar:', e);
         showToast('Error al generar el PDF');
     }
+}
+
+// ========== MODO VESTUARIO (presentacion de la sesion) ==========
+var mvSlides = [];
+var mvIdx = 0;
+
+async function abrirModoVestuario(id) {
+    try {
+        const { data: s } = await supabaseClient.from('training_sessions').select('*').eq('id', id).single();
+        if (!s) { showToast('No se pudo cargar la sesion'); return; }
+
+        const secciones = [
+            { nombre: 'Trabajo previo a campo', datos: s.pre_field_work || [], color: '#8b5cf6' },
+            { nombre: 'Calentamiento', datos: s.warm_up || [], color: '#f97316' },
+            { nombre: 'Parte principal', datos: s.main_part || [], color: '#2563eb' },
+            { nombre: 'Parte final', datos: s.cool_down || [], color: '#16a34a' },
+            { nombre: 'Trabajo post-campo', datos: s.post_field_work || [], color: '#64748b' }
+        ];
+
+        // Recuperar miniaturas que se guardaron sin imagen (mismo patron que el PDF)
+        for (const sec of secciones) {
+            for (const ej of sec.datos) {
+                if ((!ej.imagen || ej.imagen.indexOf('data:') !== 0) && typeof ej.id === 'string' && ej.id.indexOf('-') > 0) {
+                    try {
+                        const resEj = await supabaseClient.from('custom_exercises').select('thumbnail_svg').eq('id', ej.id).single();
+                        if (resEj.data && resEj.data.thumbnail_svg) {
+                            if (resEj.data.thumbnail_svg.indexOf('data:') === 0) ej.imagen = resEj.data.thumbnail_svg;
+                            else if (typeof ejSvgToPng === 'function') ej.imagen = await ejSvgToPng(resEj.data.thumbnail_svg);
+                        }
+                    } catch (e) { /* sin miniatura */ }
+                }
+            }
+        }
+
+        // Construir slides: portada + un slide por ejercicio
+        const fechaObj = new Date(s.session_date + 'T12:00:00');
+        const fechaTxt = fechaObj.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+        const hora = s.session_time ? s.session_time.substring(0, 5) : '';
+        let totalEj = 0;
+        secciones.forEach(function(sec) { totalEj += sec.datos.length; });
+
+        mvSlides = [{
+            tipo: 'portada',
+            nombre: s.name || 'Sesion',
+            fecha: fechaTxt + (hora ? ' · ' + hora : ''),
+            micro: s.microciclo || '',
+            md: s.match_day || '',
+            objetivo: s.objective || '',
+            totalEj: totalEj
+        }];
+        let n = 0;
+        secciones.forEach(function(sec) {
+            sec.datos.forEach(function(ej) {
+                n++;
+                mvSlides.push({
+                    tipo: 'ejercicio',
+                    fase: sec.nombre,
+                    color: sec.color,
+                    num: n,
+                    total: totalEj,
+                    titulo: ej.titulo || ej.name || 'Ejercicio',
+                    imagen: (ej.imagen && ej.imagen.indexOf('data:') === 0) ? ej.imagen : null,
+                    duracion: ej.duracion || null,
+                    texto: ej.objetivo || ej.notas || ''
+                });
+            });
+        });
+
+        if (mvSlides.length === 1) { showToast('La sesion no tiene ejercicios'); return; }
+        mvIdx = 0;
+        mvRender();
+        const ov = document.getElementById('mv-overlay');
+        if (ov && ov.requestFullscreen) { ov.requestFullscreen().catch(function() {}); }
+        document.addEventListener('keydown', mvTeclado);
+    } catch (e) {
+        console.error('Modo vestuario:', e);
+        showToast('Error al abrir el modo vestuario');
+    }
+}
+
+function mvRender() {
+    let ov = document.getElementById('mv-overlay');
+    if (!ov) {
+        ov = document.createElement('div');
+        ov.id = 'mv-overlay';
+        ov.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:#0b0f1a;z-index:99998;display:flex;flex-direction:column;color:#fff;font-family:inherit';
+        document.body.appendChild(ov);
+    }
+    const sl = mvSlides[mvIdx];
+    let cuerpo = '';
+    if (sl.tipo === 'portada') {
+        cuerpo =
+            '<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:4vh 6vw">' +
+                '<div style="font-size:2.2vh;letter-spacing:3px;color:#94a3b8;text-transform:uppercase;margin-bottom:2vh">' + (sl.fecha || '') + '</div>' +
+                '<h1 style="font-size:6.5vh;margin:0 0 2vh;line-height:1.1">' + sl.nombre + '</h1>' +
+                '<div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-bottom:4vh">' +
+                    (sl.micro ? '<span style="background:#7c3aed;padding:6px 18px;border-radius:20px;font-size:2vh;font-weight:700">' + sl.micro + '</span>' : '') +
+                    (sl.md ? '<span style="background:#334155;padding:6px 18px;border-radius:20px;font-size:2vh;font-weight:700">' + sl.md + '</span>' : '') +
+                    '<span style="background:#334155;padding:6px 18px;border-radius:20px;font-size:2vh;font-weight:700">' + sl.totalEj + ' ejercicios</span>' +
+                '</div>' +
+                (sl.objetivo ?
+                    '<div style="max-width:70vw;background:#111827;border:1px solid #1f2937;border-left:6px solid #7c3aed;border-radius:12px;padding:3vh 3vw">' +
+                        '<div style="font-size:1.8vh;letter-spacing:2px;color:#a78bfa;text-transform:uppercase;margin-bottom:1vh">Objetivo de la sesion</div>' +
+                        '<div style="font-size:3.4vh;line-height:1.35">' + sl.objetivo + '</div>' +
+                    '</div>' : '') +
+            '</div>';
+    } else {
+        cuerpo =
+            '<div style="display:flex;align-items:center;justify-content:space-between;padding:2vh 3vw 0">' +
+                '<span style="background:' + sl.color + ';padding:5px 16px;border-radius:16px;font-size:1.9vh;font-weight:800;text-transform:uppercase;letter-spacing:1px">' + sl.fase + '</span>' +
+                '<span style="color:#64748b;font-size:2vh;font-weight:700">' + sl.num + ' / ' + sl.total + '</span>' +
+            '</div>' +
+            '<div style="flex:1;display:flex;gap:3vw;padding:2vh 3vw;min-height:0;align-items:stretch">' +
+                '<div style="flex:1.4;display:flex;align-items:center;justify-content:center;background:#111827;border-radius:14px;overflow:hidden">' +
+                    (sl.imagen
+                        ? '<img src="' + sl.imagen + '" style="max-width:100%;max-height:100%;object-fit:contain">'
+                        : '<span style="color:#334155;font-size:2.4vh">Sin imagen</span>') +
+                '</div>' +
+                '<div style="flex:1;display:flex;flex-direction:column;justify-content:center;min-width:0">' +
+                    '<h2 style="font-size:4.6vh;margin:0 0 2vh;line-height:1.15">' + sl.titulo + '</h2>' +
+                    (sl.duracion ? '<div style="font-size:2.6vh;color:#fbbf24;font-weight:800;margin-bottom:2vh">&#9201; ' + sl.duracion + ' min</div>' : '') +
+                    (sl.texto ? '<div style="font-size:2.7vh;line-height:1.5;color:#cbd5e1;overflow-y:auto;max-height:46vh">' + sl.texto + '</div>' : '') +
+                '</div>' +
+            '</div>';
+    }
+    ov.innerHTML = cuerpo +
+        '<div style="display:flex;align-items:center;justify-content:center;gap:20px;padding:0 0 2.5vh">' +
+            '<button onclick="mvMover(-1)" style="background:#1f2937;border:none;color:#fff;font-size:2.6vh;padding:1vh 3vw;border-radius:10px;cursor:pointer">&#8592;</button>' +
+            '<button onclick="mvCerrar()" style="background:#7f1d1d;border:none;color:#fff;font-size:2vh;padding:1vh 2.5vw;border-radius:10px;cursor:pointer">Salir</button>' +
+            '<button onclick="mvMover(1)" style="background:#1f2937;border:none;color:#fff;font-size:2.6vh;padding:1vh 3vw;border-radius:10px;cursor:pointer">&#8594;</button>' +
+        '</div>';
+}
+
+function mvMover(d) {
+    const nuevo = mvIdx + d;
+    if (nuevo < 0 || nuevo >= mvSlides.length) return;
+    mvIdx = nuevo;
+    mvRender();
+}
+
+function mvTeclado(e) {
+    if (!document.getElementById('mv-overlay')) return;
+    if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') { e.preventDefault(); mvMover(1); }
+    else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); mvMover(-1); }
+    else if (e.key === 'Escape') { mvCerrar(); }
+}
+
+function mvCerrar() {
+    document.removeEventListener('keydown', mvTeclado);
+    if (document.fullscreenElement) { document.exitFullscreen().catch(function() {}); }
+    const ov = document.getElementById('mv-overlay');
+    if (ov) ov.remove();
 }
