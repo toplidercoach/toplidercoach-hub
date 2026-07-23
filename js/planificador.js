@@ -2582,8 +2582,8 @@ async function abrirModoVestuario(id) {
                     color: sec.color,
                     num: n,
                     total: totalEj,
-                    titulo: ej.titulo || ej.name || 'Ejercicio',
-                    imagen: (ej.imagen && ej.imagen.indexOf('data:') === 0) ? ej.imagen : null,
+                    titulo: 'Ejercicio ' + n,
+                    imagen: ej.imagen || null,
                     duracion: ej.duracion || null,
                     texto: ej.objetivo || ej.notas || ''
                 });
