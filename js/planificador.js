@@ -664,7 +664,7 @@ if (typeof scGuardarConceptos === 'function') { await scGuardarConceptos(sesionI
                     const tPri = pri.reduce((sum, ej) => sum + (ej.duracion || 0), 0);
                     const tEnf = enf.reduce((sum, ej) => sum + (ej.duracion || 0), 0);
                     const tTotal = tCal + tPri + tEnf + tPre + tPost;
-                    const totalEj = cal.length + pri.length + enf.length;
+                    const totalEj = pre.length + cal.length + pri.length + enf.length + post.length;
                     
                     const fechaObj = new Date(s.session_date + 'T12:00:00');
                     const diaSemana = ['DOM', 'LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB'][fechaObj.getDay()];
