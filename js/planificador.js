@@ -2694,7 +2694,10 @@ async function abrirMontajesSesion(sesionId) {
             '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">' +
                 '<h3 style="margin:0;font-size:16px">🏟️ Montajes de campo</h3>' +
                 '<div style="display:flex;gap:8px">' +
-                    '<button onclick="msImprimirPDF()" style="padding:7px 14px;border-radius:8px;border:none;background:#f97316;color:#fff;font-weight:600;cursor:pointer;font-size:12px">📄 PDF para ayudantes</button>' +
+                    '<span style="color:#94a3b8;font-size:11px;align-self:center">📄 PDF:</span>' +
+                    '<button onclick="msImprimirPDF(1)" style="padding:7px 10px;border-radius:8px;border:none;background:#f97316;color:#fff;font-weight:700;cursor:pointer;font-size:12px">1/folio</button>' +
+                    '<button onclick="msImprimirPDF(2)" style="padding:7px 10px;border-radius:8px;border:none;background:#ea580c;color:#fff;font-weight:700;cursor:pointer;font-size:12px">2/folio</button>' +
+                    '<button onclick="msImprimirPDF(4)" style="padding:7px 10px;border-radius:8px;border:none;background:#c2410c;color:#fff;font-weight:700;cursor:pointer;font-size:12px">4/folio</button>' +
                     '<button onclick="document.getElementById(\'ms-modal\').remove()" style="padding:7px 12px;border-radius:8px;border:1px solid #475569;background:transparent;color:#fff;cursor:pointer;font-size:12px">Cerrar</button>' +
                 '</div>' +
             '</div>' +
@@ -2757,29 +2760,50 @@ async function msBorrar(id) {
     await msCargar();
 }
 
-async function msImprimirPDF() {
+async function msImprimirPDF(porFolio) {
+    porFolio = porFolio || 1;
     if (!msLista.length) { showToast('No hay montajes que imprimir'); return; }
     try {
         const { data: s } = await supabaseClient.from('training_sessions')
             .select('name, session_date').eq('id', msSesionId).single();
         const { jsPDF } = window.jspdf;
-        const doc = new jsPDF('l', 'mm', 'a4'); // apaisado: 297x210
+        const doc = new jsPDF('l', 'mm', 'a4'); // 297 x 210
+        const grid = { 1: { c: 1, f: 1 }, 2: { c: 2, f: 1 }, 4: { c: 2, f: 2 } }[porFolio] || { c: 1, f: 1 };
+        const margen = 8, sep = 6, cab = 20;
+        const areaH = 210 - cab - margen;
+        const celW = (297 - margen * 2 - (grid.c - 1) * sep) / grid.c;
+        const celH = (areaH - (grid.f - 1) * sep) / grid.f;
+
         for (let i = 0; i < msLista.length; i++) {
+            const pos = i % porFolio;
+            if (i > 0 && pos === 0) doc.addPage();
+            if (pos === 0) {
+                doc.setFillColor(38, 33, 92);
+                doc.rect(0, 0, 297, 16, 'F');
+                doc.setTextColor(255, 255, 255);
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(12);
+                doc.text('Montajes de campo', 10, 11);
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(9);
+                doc.setTextColor(200, 200, 215);
+                doc.text((s ? (s.name + ' · ' + s.session_date) : ''), 287, 11, { align: 'right' });
+            }
             const m = msLista[i];
-            if (i > 0) doc.addPage();
-            doc.setFillColor(38, 33, 92);
-            doc.rect(0, 0, 297, 20, 'F');
-            doc.setTextColor(255, 255, 255);
+            const col = pos % grid.c;
+            const fila = Math.floor(pos / grid.c);
+            const x = margen + col * (celW + sep);
+            const y = cab + fila * (celH + sep);
+
+            doc.setTextColor(15, 23, 42);
             doc.setFont('helvetica', 'bold');
-            doc.setFontSize(14);
-            doc.text((m.orden) + '. ' + (m.titulo || 'Montaje'), 10, 13);
-            doc.setFont('helvetica', 'normal');
-            doc.setFontSize(10);
-            doc.setTextColor(200, 200, 215);
-            doc.text((s ? (s.name + ' · ' + s.session_date) : ''), 287, 13, { align: 'right' });
+            doc.setFontSize(porFolio === 4 ? 9 : 11);
+            const tit = doc.splitTextToSize((m.orden) + '. ' + (m.titulo || 'Montaje'), celW);
+            doc.text(tit[0], x, y + 4);
+
             const url = supabaseClient.storage.from('sesion-montajes').getPublicUrl(m.image_path).data.publicUrl;
             const dataUrl = await msUrlADataUrl(url);
-            if (dataUrl) doc.addImage(dataUrl, 'PNG', 10, 26, 277, 176, undefined, 'FAST');
+            if (dataUrl) doc.addImage(dataUrl, 'PNG', x, y + 6, celW, celH - 8, undefined, 'FAST');
         }
         doc.save('montajes-' + (s ? s.session_date : 'sesion') + '.pdf');
     } catch (e) {
