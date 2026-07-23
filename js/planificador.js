@@ -2585,7 +2585,7 @@ async function abrirModoVestuario(id) {
                     titulo: 'Ejercicio ' + n,
                     imagen: ej.imagen || null,
                     duracion: ej.duracion || null,
-                    texto: ej.objetivo || ej.notas || ''
+                    texto: (ej.tipo === 'libre' && ej.titulo) ? (ej.titulo + (ej.notas ? ' · ' + ej.notas : '')) : (ej.objetivo || ej.notas || '')
                 });
             });
         });
@@ -2607,7 +2607,7 @@ function mvRender() {
     if (!ov) {
         ov = document.createElement('div');
         ov.id = 'mv-overlay';
-        ov.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:#0b0f1a;z-index:99998;display:flex;flex-direction:column;color:#fff;font-family:inherit';
+        ov.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:#0b0f1a;z-index:2147483000;display:flex;flex-direction:column;color:#fff;font-family:inherit';
         document.body.appendChild(ov);
     }
     const sl = mvSlides[mvIdx];
