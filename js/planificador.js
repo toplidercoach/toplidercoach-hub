@@ -2697,7 +2697,7 @@ async function abrirMontajesSesion(sesionId) {
                     '<span style="color:#94a3b8;font-size:11px;align-self:center">📄 PDF:</span>' +
                     '<button onclick="msImprimirPDF(1)" style="padding:7px 10px;border-radius:8px;border:none;background:#f97316;color:#fff;font-weight:700;cursor:pointer;font-size:12px">1/folio</button>' +
                     '<button onclick="msImprimirPDF(2)" style="padding:7px 10px;border-radius:8px;border:none;background:#ea580c;color:#fff;font-weight:700;cursor:pointer;font-size:12px">2/folio</button>' +
-                    '<button onclick="msImprimirPDF(4)" style="padding:7px 10px;border-radius:8px;border:none;background:#c2410c;color:#fff;font-weight:700;cursor:pointer;font-size:12px">4/folio</button>' +
+                    '<button onclick="msImprimirPDF(6)" style="padding:7px 10px;border-radius:8px;border:none;background:#c2410c;color:#fff;font-weight:700;cursor:pointer;font-size:12px">6/folio</button>' +
                     '<button onclick="document.getElementById(\'ms-modal\').remove()" style="padding:7px 12px;border-radius:8px;border:1px solid #475569;background:transparent;color:#fff;cursor:pointer;font-size:12px">Cerrar</button>' +
                 '</div>' +
             '</div>' +
@@ -2766,50 +2766,75 @@ async function msImprimirPDF(porFolio) {
     try {
         const { data: s } = await supabaseClient.from('training_sessions')
             .select('name, session_date').eq('id', msSesionId).single();
+        const conf = {
+            1: { o: 'l', W: 297, H: 210, c: 1, f: 1 },
+            2: { o: 'l', W: 297, H: 210, c: 1, f: 2 },
+            6: { o: 'p', W: 210, H: 297, c: 2, f: 3 }
+        }[porFolio] || { o: 'l', W: 297, H: 210, c: 1, f: 1 };
         const { jsPDF } = window.jspdf;
-        const doc = new jsPDF('l', 'mm', 'a4'); // 297 x 210
-        const grid = { 1: { c: 1, f: 1 }, 2: { c: 2, f: 1 }, 4: { c: 2, f: 2 } }[porFolio] || { c: 1, f: 1 };
-        const margen = 8, sep = 6, cab = 20;
-        const areaH = 210 - cab - margen;
-        const celW = (297 - margen * 2 - (grid.c - 1) * sep) / grid.c;
-        const celH = (areaH - (grid.f - 1) * sep) / grid.f;
+        const doc = new jsPDF(conf.o, 'mm', 'a4');
+        const margen = 8, sep = 5, cab = 18;
+        const celW = (conf.W - margen * 2 - (conf.c - 1) * sep) / conf.c;
+        const areaH = conf.H - cab - margen;
+        const celH = (areaH - (conf.f - 1) * sep) / conf.f;
+        const porPagina = conf.c * conf.f;
 
         for (let i = 0; i < msLista.length; i++) {
-            const pos = i % porFolio;
+            const pos = i % porPagina;
             if (i > 0 && pos === 0) doc.addPage();
             if (pos === 0) {
                 doc.setFillColor(38, 33, 92);
-                doc.rect(0, 0, 297, 16, 'F');
+                doc.rect(0, 0, conf.W, 14, 'F');
                 doc.setTextColor(255, 255, 255);
                 doc.setFont('helvetica', 'bold');
-                doc.setFontSize(12);
-                doc.text('Montajes de campo', 10, 11);
+                doc.setFontSize(11);
+                doc.text('Montajes de campo', 8, 9.5);
                 doc.setFont('helvetica', 'normal');
-                doc.setFontSize(9);
+                doc.setFontSize(8);
                 doc.setTextColor(200, 200, 215);
-                doc.text((s ? (s.name + ' · ' + s.session_date) : ''), 287, 11, { align: 'right' });
+                doc.text((s ? (s.name + ' · ' + s.session_date) : ''), conf.W - 8, 9.5, { align: 'right' });
             }
             const m = msLista[i];
-            const col = pos % grid.c;
-            const fila = Math.floor(pos / grid.c);
+            const col = pos % conf.c;
+            const fila = Math.floor(pos / conf.c);
             const x = margen + col * (celW + sep);
             const y = cab + fila * (celH + sep);
 
             doc.setTextColor(15, 23, 42);
             doc.setFont('helvetica', 'bold');
-            doc.setFontSize(porFolio === 4 ? 9 : 11);
+            doc.setFontSize(porFolio === 6 ? 8.5 : 10.5);
             const tit = doc.splitTextToSize((m.orden) + '. ' + (m.titulo || 'Montaje'), celW);
-            doc.text(tit[0], x, y + 4);
+            doc.text(tit[0], x, y + 3.5);
 
             const url = supabaseClient.storage.from('sesion-montajes').getPublicUrl(m.image_path).data.publicUrl;
-            const dataUrl = await msUrlADataUrl(url);
-            if (dataUrl) doc.addImage(dataUrl, 'PNG', x, y + 6, celW, celH - 8, undefined, 'FAST');
+            const img = await msCargarImagen(url);
+            if (img) {
+                const zonaW = celW, zonaH = celH - 6;
+                const esc = Math.min(zonaW / img.w, zonaH / img.h);
+                const dw = img.w * esc, dh = img.h * esc;
+                const dx = x + (zonaW - dw) / 2;
+                const dy = y + 5 + (zonaH - dh) / 2;
+                doc.addImage(img.dataUrl, 'PNG', dx, dy, dw, dh, undefined, 'FAST');
+            }
         }
         doc.save('montajes-' + (s ? s.session_date : 'sesion') + '.pdf');
     } catch (e) {
         console.error('msImprimirPDF:', e);
         showToast('Error al generar el PDF de montajes');
     }
+}
+
+// Carga una imagen y devuelve dataURL + dimensiones reales (para mantener proporcion)
+function msCargarImagen(url) {
+    return msUrlADataUrl(url).then(function(dataUrl) {
+        if (!dataUrl) return null;
+        return new Promise(function(res) {
+            const im = new Image();
+            im.onload = function() { res({ dataUrl: dataUrl, w: im.naturalWidth, h: im.naturalHeight }); };
+            im.onerror = function() { res(null); };
+            im.src = dataUrl;
+        });
+    });
 }
 
 function msUrlADataUrl(url) {
