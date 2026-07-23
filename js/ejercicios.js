@@ -3523,7 +3523,7 @@ async function ejBancoLoad() {
             .from('custom_exercises')
             .select('id,name,category,age_group,difficulty,duration_min,players_count,game_phase,field_width,field_length,eii,objectives,description,variants,coach_notes,materials,thumbnail_svg,animation_url,tema,num_goalkeepers')
             
-            .eq('coach_id', String(window.ejCoachId))
+            .or(window.ejClubId ? ('club_id.eq.' + window.ejClubId + ',coach_id.eq.' + String(window.ejCoachId)) : ('coach_id.eq.' + String(window.ejCoachId)))
             .order('created_at', { ascending: false })
             .limit(200);
         if (error) throw error;
@@ -4680,7 +4680,7 @@ function ejInit() {
         } catch (e) {}
         if (_hubUser.wp_user_id) window.ejCoachId = String(_hubUser.wp_user_id);
     })();
-    window.ejClubId  = window.currentClubId || null;
+    window.ejClubId  = (typeof cmState !== 'undefined' && cmState.activo && typeof clubId !== 'undefined') ? clubId : null;
 
     root.innerHTML = `
     <div class="ej-module">
