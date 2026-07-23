@@ -247,6 +247,8 @@ registrarSubTab('planificador', 'calendario', cargarCalendarioUnificado);
         
         function actualizarContadorJugadores() {
             document.getElementById('contador-jugadores').textContent = `${jugadoresSeleccionados.length} seleccionados`;
+            var inpNJ = document.getElementById('sesion-jugadores');
+            if (inpNJ && jugadoresSeleccionados.length) inpNJ.value = jugadoresSeleccionados.length;
         }
         
         function obtenerJugadoresParaGuardar() {
@@ -553,7 +555,7 @@ sesion = { nombre: '', fecha: fechaHoy, previo: [], calentamiento: [], principal
                     session_time: hora || null,
                     microciclo: microciclo || null,
                     match_day: md || null,
-                    num_players: jugadores ? parseInt(jugadores) : null,
+                    num_players: (typeof jugadoresSeleccionados !== 'undefined' && jugadoresSeleccionados.length) ? jugadoresSeleccionados.length : (jugadores ? parseInt(jugadores) : null),
                     team_category: equipo || null,
                     objective: objetivo || null,
                     materials: material || null,

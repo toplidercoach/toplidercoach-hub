@@ -1,4 +1,23 @@
 // ========== ASISTENCIA.JS - TopLiderCoach HUB ==========
+
+// ¿La sesion ya se ha celebrado? (no cuenta hasta llegar su dia y hora)
+function asisSesionYaCelebrada(s) {
+    var ahora = new Date();
+    var hoyISO = ahora.getFullYear() + '-' + String(ahora.getMonth() + 1).padStart(2, '0') + '-' + String(ahora.getDate()).padStart(2, '0');
+    if (s.session_date < hoyISO) return true;
+    if (s.session_date > hoyISO) return false;
+    if (!s.session_time) return true;
+    var hm = String(s.session_time).substring(0, 5);
+    var ahoraHM = String(ahora.getHours()).padStart(2, '0') + ':' + String(ahora.getMinutes()).padStart(2, '0');
+    return hm <= ahoraHM;
+}
+
+function asisFiltrarCelebradas(sesiones) {
+    if (!sesiones) return;
+    for (var i = sesiones.length - 1; i >= 0; i--) {
+        if (!asisSesionYaCelebrada(sesiones[i])) sesiones.splice(i, 1);
+    }
+}
 // Asistencia por rango de fechas, filtro por temporada, bienestar, PDF individual y general
 
 (function() {
@@ -187,7 +206,7 @@ async function cargarAsistenciaRango() {
         // Sesiones en el rango (filtradas por season_id si hay temporada seleccionada)
         var querySesiones = supabaseClient
             .from('training_sessions')
-            .select('id, session_date')
+            .select('id, session_date, session_time')
             .eq('club_id', clubInfo.id)
             .gte('session_date', fechaInicio)
             .lte('session_date', fechaFin)
@@ -198,6 +217,7 @@ async function cargarAsistenciaRango() {
         }
         
         const { data: sesiones, error: errSes } = await querySesiones;
+        asisFiltrarCelebradas(sesiones);
         
         if (errSes) throw errSes;
         
@@ -295,7 +315,7 @@ async function cargarAsistenciaRango() {
                     <td>${promWellness}</td>
                     <td>${promMuscular}</td>
                     <td>
-                        <button class="btn-ver-detalle" onclick="verDetalleJugador('${jugador.id}', '${(jugador.name || '').replace(/['"\\]/g, '')}')">👁 Ver</button>
+                        <button class="btn-ver-detalle" onclick="verDetalleJugador('${jugador.id}', '${jugador.name}')">👁 Ver</button>
                         <button class="btn-pdf-jugador" onclick="generarPDFJugador('${jugador.id}')">📄 PDF</button>
                     </td>
                 </tr>
@@ -582,7 +602,7 @@ async function verDetalleJugador(jugadorId, nombreJugador) {
         const clubInfo = clubData || (clubId ? { id: clubId } : null);
         
         var queryDetalle = supabaseClient
-            .from('training_sessions').select('id, name, session_date')
+            .from('training_sessions').select('id, name, session_date, session_time')
             .eq('club_id', clubInfo.id).gte('session_date', fechaInicio).lte('session_date', fechaFin)
             .order('session_date', { ascending: true });
         
@@ -591,6 +611,7 @@ async function verDetalleJugador(jugadorId, nombreJugador) {
         }
         
         const { data: sesiones } = await queryDetalle;
+        asisFiltrarCelebradas(sesiones);
         
         const sesionIds = sesiones ? sesiones.map(s => s.id) : [];
         const { data: asistencias } = await supabaseClient
@@ -643,7 +664,7 @@ async function generarPDFJugador(jugadorId) {
         const clubInfo = clubData || (clubId ? { id: clubId } : null);
         
         var queryPDF = supabaseClient
-            .from('training_sessions').select('id, name, session_date')
+            .from('training_sessions').select('id, name, session_date, session_time')
             .eq('club_id', clubInfo.id).gte('session_date', fechaInicio).lte('session_date', fechaFin)
             .order('session_date', { ascending: true });
         
@@ -652,6 +673,7 @@ async function generarPDFJugador(jugadorId) {
         }
         
         const { data: sesiones } = await queryPDF;
+        asisFiltrarCelebradas(sesiones);
         
         const sesionIds = sesiones ? sesiones.map(s => s.id) : [];
         const { data: asistencias } = await supabaseClient
@@ -813,7 +835,7 @@ async function generarPDFPlantillaGeneral() {
         
         // Sesiones (filtradas por temporada si hay seleccionada)
         var queryPDFGen = supabaseClient
-            .from('training_sessions').select('id, name, session_date')
+            .from('training_sessions').select('id, name, session_date, session_time')
             .eq('club_id', clubInfo.id).gte('session_date', fechaInicio).lte('session_date', fechaFin)
             .order('session_date', { ascending: true });
         
@@ -822,6 +844,7 @@ async function generarPDFPlantillaGeneral() {
         }
         
         const { data: sesiones } = await queryPDFGen;
+        asisFiltrarCelebradas(sesiones);
         
         const totalSesiones = sesiones ? sesiones.length : 0;
         if (totalSesiones === 0) { showToast('No hay sesiones en el periodo seleccionado'); return; }
