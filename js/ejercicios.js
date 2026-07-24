@@ -145,6 +145,7 @@ const ejP = {
     fieldType: 'full',
     showCarriles: false,
     showZonas: false,
+    showRejilla: false,
     camAngle: 0,
     zoom: 1,
     panX: 0,
@@ -294,6 +295,7 @@ function ejRenderSVG() {
     let html = defs;
     html += ejGetFieldSVG(ejP.fieldType, ejP.fieldColor);
     html += ejCarrilesZonasSVG();
+    html += ejRejillaMetrosSVG();
 
     // Formas
     for (const s of ejP.shapes) {
@@ -1303,7 +1305,7 @@ async function ejProyAnadirFase() {
         players: ejP.players, lines: ejP.lines,
         shapes: ejP.shapes, texts: ejP.texts,
         equipment: ejP.equipment, connections: ejP.connections,
-        fieldType: ejP.fieldType, showCarriles: ejP.showCarriles, showZonas: ejP.showZonas,
+        fieldType: ejP.fieldType, showCarriles: ejP.showCarriles, showZonas: ejP.showZonas, showRejilla: ejP.showRejilla,
         animFrames: ejP.animMode ? ejP.frames : [],
         animMode: ejP.animMode
     };
@@ -1444,6 +1446,7 @@ function ejProyCargarFase(it) {
     ejP.fieldType = bd.fieldType || 'full';
     ejP.showCarriles = !!bd.showCarriles;
     ejP.showZonas = !!bd.showZonas;
+    ejP.showRejilla = !!bd.showRejilla;
     ejP.selectedId = null;
     ejP.nextId = [].concat(ejP.players, ejP.lines, ejP.shapes, ejP.texts, ejP.equipment, ejP.connections).reduce(function(max, e) { return (e.id > max ? e.id : max); }, 0) + 1;
     if (bd.animFrames && bd.animFrames.length > 0) {
@@ -2284,6 +2287,9 @@ ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin
             ${['full','half','halfDown','blank','artificial'].map(f=>`<button class="ej-btn-sm${ejP.fieldType===f?' active':''}" onclick="ejSetField('${f}')">${f==='full'?'Completo':f==='half'?'Medio ↑':f==='halfDown'?'Medio ↓':f==='blank'?'Libre':'Artificial'}</button>`).join('')}
             <button class="ej-btn-sm${ejP.showCarriles?' active':''}" onclick="ejToggleCarriles()" title="5 carriles del juego posicional">🛣️ Carriles</button>
             <button class="ej-btn-sm${ejP.showZonas?' active':''}" onclick="ejToggleZonas()" title="3 tercios del campo">▦ Zonas</button>
+        </div>
+        <div class="ej-field-btns" style="margin-top:6px">
+            <button class="ej-btn-sm${ejP.showRejilla?' active':''}" onclick="ejToggleRejilla()" title="Rejilla de metros del campo Artificial (105x65, marcas cada 5 m)">📏 Rejilla</button>
         </div>
         <div style="font-size:11px;color:#9ca3af;margin:10px 0 4px">🎥 Cámara</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px">
@@ -3295,7 +3301,7 @@ async function ejEditarDibujo() {
         ejP.texts     = data.board_data.texts   || [];
         ejP.equipment = data.board_data.equipment || [];
         ejP.connections = data.board_data.connections || [];
-        ejP.fieldType = data.board_data.fieldType || 'full'; ejP.showCarriles = !!data.board_data.showCarriles; ejP.showZonas = !!data.board_data.showZonas;
+        ejP.fieldType = data.board_data.fieldType || 'full'; ejP.showCarriles = !!data.board_data.showCarriles; ejP.showZonas = !!data.board_data.showZonas; ejP.showRejilla = !!data.board_data.showRejilla;
         ejP.selectedId = null;
         ejP._lastVideoUrl = data.animation_url || null;
 
@@ -3386,7 +3392,7 @@ let thumbnailSvg = window.ejThumbnailPendiente || null;
             players: ejP.players, lines: ejP.lines,
             shapes: ejP.shapes, texts: ejP.texts,
             equipment: ejP.equipment,connections: ejP.connections,
-            fieldType: ejP.fieldType, showCarriles: ejP.showCarriles, showZonas: ejP.showZonas, showCarriles: ejP.showCarriles, showZonas: ejP.showZonas,
+            fieldType: ejP.fieldType, showCarriles: ejP.showCarriles, showZonas: ejP.showZonas, showRejilla: ejP.showRejilla, showCarriles: ejP.showCarriles, showZonas: ejP.showZonas, showRejilla: ejP.showRejilla,
             animFrames: ejP.animMode ? ejP.frames : [],
             animMode: ejP.animMode
         } : null,
@@ -3705,7 +3711,7 @@ async function ejBancoCargar(id) {
             ejP.texts     = data.board_data.texts   || [];
             ejP.equipment = data.board_data.equipment || [];
             ejP.connections = data.board_data.connections || [];
-            ejP.fieldType = data.board_data.fieldType || 'full'; ejP.showCarriles = !!data.board_data.showCarriles; ejP.showZonas = !!data.board_data.showZonas;
+            ejP.fieldType = data.board_data.fieldType || 'full'; ejP.showCarriles = !!data.board_data.showCarriles; ejP.showZonas = !!data.board_data.showZonas; ejP.showRejilla = !!data.board_data.showRejilla;
             ejP.selectedId = null;
             ejP._lastVideoUrl = data.animation_url || null;
 
@@ -4425,7 +4431,7 @@ function ejColocarJugadorPlantilla(idx) {
                 players: ejP.players, lines: ejP.lines,
                 shapes: ejP.shapes, texts: ejP.texts,
                 equipment: ejP.equipment,connections: ejP.connections,
-                fieldType: ejP.fieldType, showCarriles: ejP.showCarriles, showZonas: ejP.showZonas, showCarriles: ejP.showCarriles, showZonas: ejP.showZonas,
+                fieldType: ejP.fieldType, showCarriles: ejP.showCarriles, showZonas: ejP.showZonas, showRejilla: ejP.showRejilla, showCarriles: ejP.showCarriles, showZonas: ejP.showZonas, showRejilla: ejP.showRejilla,
                 animFrames: ejP.frames,
                 animMode: ejP.animMode
             },
@@ -4896,6 +4902,45 @@ function ejCarrilesZonasSVG() {
 }
 function ejToggleCarriles() { ejP.showCarriles = !ejP.showCarriles; ejRenderSVG(); ejRenderToolbar(); }
 function ejToggleZonas() { ejP.showZonas = !ejP.showZonas; ejRenderSVG(); ejRenderToolbar(); }
+function ejToggleRejilla() {
+    ejP.showRejilla = !ejP.showRejilla;
+    if (ejP.showRejilla && ejP.fieldType !== 'artificial') ejP.fieldType = 'artificial';
+    ejRenderSVG(); ejRenderToolbar();
+}
+function ejRejillaMetrosSVG() {
+    if (!ejP.showRejilla || ejP.fieldType !== 'artificial') return '';
+    var x0 = 20, y0 = 15, w = 760, h = 470, largo = 105, ancho = 65;
+    var sx = w / largo, sy = h / ancho;
+    var s = '<g style="pointer-events:none">';
+    var i, px, py;
+    for (i = 5; i < largo; i += 5) {
+        px = (x0 + i * sx).toFixed(1);
+        s += '<line x1="' + px + '" y1="' + y0 + '" x2="' + px + '" y2="' + (y0 + h) + '" stroke="#ffffff" stroke-width="1" opacity="0.08"/>';
+    }
+    for (i = 5; i < ancho; i += 5) {
+        py = (y0 + i * sy).toFixed(1);
+        s += '<line x1="' + x0 + '" y1="' + py + '" x2="' + (x0 + w) + '" y2="' + py + '" stroke="#ffffff" stroke-width="1" opacity="0.08"/>';
+    }
+    for (i = 0; i <= largo; i += 5) {
+        px = (x0 + i * sx).toFixed(1);
+        s += '<line x1="' + px + '" y1="' + y0 + '" x2="' + px + '" y2="' + (y0 + 8) + '" stroke="#fff" stroke-width="1.3" opacity="0.9"/>';
+        s += '<line x1="' + px + '" y1="' + (y0 + h - 8) + '" x2="' + px + '" y2="' + (y0 + h) + '" stroke="#fff" stroke-width="1.3" opacity="0.9"/>';
+        if (i > 0 && i < largo) {
+            s += '<text x="' + px + '" y="' + (y0 + 19) + '" font-size="9" fill="#fff" opacity="0.85" text-anchor="middle">' + i + '</text>';
+            s += '<text x="' + px + '" y="' + (y0 + h - 12) + '" font-size="9" fill="#fff" opacity="0.85" text-anchor="middle">' + i + '</text>';
+        }
+    }
+    for (i = 0; i <= ancho; i += 5) {
+        py = y0 + i * sy;
+        s += '<line x1="' + x0 + '" y1="' + py.toFixed(1) + '" x2="' + (x0 + 8) + '" y2="' + py.toFixed(1) + '" stroke="#fff" stroke-width="1.3" opacity="0.9"/>';
+        s += '<line x1="' + (x0 + w - 8) + '" y1="' + py.toFixed(1) + '" x2="' + (x0 + w) + '" y2="' + py.toFixed(1) + '" stroke="#fff" stroke-width="1.3" opacity="0.9"/>';
+        if (i > 0 && i < ancho) {
+            s += '<text x="' + (x0 + 11) + '" y="' + (py + 3).toFixed(1) + '" font-size="9" fill="#fff" opacity="0.85" text-anchor="start">' + i + '</text>';
+            s += '<text x="' + (x0 + w - 11) + '" y="' + (py + 3).toFixed(1) + '" font-size="9" fill="#fff" opacity="0.85" text-anchor="end">' + i + '</text>';
+        }
+    }
+    return s + '</g>';
+}
 // ===== CAMARA EN PERSPECTIVA Y ZOOM =====
 function ejSetCamara(a) {
     ejP.camAngle = a || 0;
