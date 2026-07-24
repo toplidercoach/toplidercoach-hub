@@ -1819,14 +1819,14 @@ function ejGetFieldSVG(type, color) {
     if (type === 'full') {
         s += '<line x1="400" y1="15" x2="400" y2="485"/>';
         s += '<circle cx="400" cy="250" r="65"/>';
-        s += '<rect x="20" y="133" width="108" height="234"/>';
-        s += '<rect x="672" y="133" width="108" height="234"/>';
-        s += '<rect x="20" y="195" width="40" height="110"/>';
-        s += '<rect x="740" y="195" width="40" height="110"/>';
+        s += '<rect x="20" y="105" width="119" height="290"/>';
+        s += '<rect x="661" y="105" width="119" height="290"/>';
+        s += '<rect x="20" y="184" width="40" height="132"/>';
+        s += '<rect x="740" y="184" width="40" height="132"/>';
         s += '<rect x="10" y="220" width="10" height="60"/>';
         s += '<rect x="780" y="220" width="10" height="60"/>';
-        s += '<path d="M128 199 A65 65 0 0 1 128 301"/>';
-        s += '<path d="M672 199 A65 65 0 0 0 672 301"/>';
+        s += '<path d="M139 198 A65 65 0 0 1 139 302"/>';
+        s += '<path d="M661 198 A65 65 0 0 0 661 302"/>';
         s += '<path d="M20 22 A7 7 0 0 1 27 15"/><path d="M773 15 A7 7 0 0 1 780 22"/>';
         s += '<path d="M780 478 A7 7 0 0 1 773 485"/><path d="M27 485 A7 7 0 0 1 20 478"/>';
         s += '</g><circle cx="400" cy="250" r="3.5" fill="'+dotCol+'"/>';
@@ -1842,14 +1842,14 @@ function ejGetFieldSVG(type, color) {
     } else if (type === 'artificial') {
         s += '<line x1="400" y1="15" x2="400" y2="485"/>';
         s += '<circle cx="400" cy="250" r="65"/>';
-        s += '<rect x="20" y="133" width="108" height="234"/>';
-        s += '<rect x="672" y="133" width="108" height="234"/>';
-        s += '<rect x="20" y="195" width="40" height="110"/>';
-        s += '<rect x="740" y="195" width="40" height="110"/>';
+        s += '<rect x="20" y="105" width="119" height="290"/>';
+        s += '<rect x="661" y="105" width="119" height="290"/>';
+        s += '<rect x="20" y="184" width="40" height="132"/>';
+        s += '<rect x="740" y="184" width="40" height="132"/>';
         s += '<rect x="10" y="220" width="10" height="60"/>';
         s += '<rect x="780" y="220" width="10" height="60"/>';
-        s += '<path d="M128 199 A65 65 0 0 1 128 301"/>';
-        s += '<path d="M672 199 A65 65 0 0 0 672 301"/>';
+        s += '<path d="M139 198 A65 65 0 0 1 139 302"/>';
+        s += '<path d="M661 198 A65 65 0 0 0 661 302"/>';
         s += '<path d="M20 22 A7 7 0 0 1 27 15"/><path d="M773 15 A7 7 0 0 1 780 22"/>';
         s += '<path d="M780 478 A7 7 0 0 1 773 485"/><path d="M27 485 A7 7 0 0 1 20 478"/>';
         s += '</g>';
