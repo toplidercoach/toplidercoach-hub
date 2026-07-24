@@ -109,14 +109,14 @@ const EJ_FIELD_IMAGES = {
         + '<rect x="20" y="15" width="760" height="470" rx="1"/>'
         + '<line x1="400" y1="15" x2="400" y2="485"/>'
         + '<circle cx="400" cy="250" r="65"/>'
-        + '<rect x="20" y="133" width="108" height="234"/>'
-        + '<rect x="672" y="133" width="108" height="234"/>'
-        + '<rect x="20" y="195" width="40" height="110"/>'
-        + '<rect x="740" y="195" width="40" height="110"/>'
+        + '<rect x="20" y="105" width="119" height="290"/>'
+        + '<rect x="661" y="105" width="119" height="290"/>'
+        + '<rect x="20" y="184" width="40" height="132"/>'
+        + '<rect x="740" y="184" width="40" height="132"/>'
         + '<rect x="10" y="220" width="10" height="60"/>'
         + '<rect x="780" y="220" width="10" height="60"/>'
-        + '<path d="M128 199 A65 65 0 0 1 128 301"/>'
-        + '<path d="M672 199 A65 65 0 0 0 672 301"/>'
+        + '<path d="M139 198 A65 65 0 0 1 139 302"/>'
+        + '<path d="M661 198 A65 65 0 0 0 661 302"/>'
         + '<path d="M20 22 A7 7 0 0 1 27 15"/>'
         + '<path d="M773 15 A7 7 0 0 1 780 22"/>'
         + '<path d="M780 478 A7 7 0 0 1 773 485"/>'
@@ -1854,22 +1854,18 @@ function ejGetFieldSVG(type, color) {
         s += '<path d="M780 478 A7 7 0 0 1 773 485"/><path d="M27 485 A7 7 0 0 1 20 478"/>';
         s += '</g>';
         s += '<g fill="none" stroke="#eab308" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.9">';
-        s += '<line x1="59" y1="15" x2="59" y2="485"/>';
-        s += '<line x1="375" y1="15" x2="375" y2="485"/>';
-        s += '<line x1="421" y1="15" x2="421" y2="485"/>';
+        s += '<line x1="60" y1="15" x2="60" y2="485"/>';
+        s += '<line x1="385" y1="15" x2="385" y2="485"/>';
+        s += '<line x1="415" y1="15" x2="415" y2="485"/>';
         s += '<line x1="740" y1="15" x2="740" y2="485"/>';
-        s += '<line x1="59" y1="126" x2="375" y2="126"/>';
-        s += '<line x1="421" y1="126" x2="740" y2="126"/>';
-        s += '<line x1="59" y1="371" x2="375" y2="371"/>';
-        s += '<line x1="421" y1="371" x2="740" y2="371"/>';
-        s += '<rect x="120" y="15" width="194" height="78"/>';
-        s += '<rect x="120" y="407" width="194" height="78"/>';
-        s += '<rect x="166" y="15" width="102" height="29"/>';
-        s += '<rect x="166" y="456" width="102" height="29"/>';
-        s += '<rect x="483" y="15" width="195" height="78"/>';
-        s += '<rect x="483" y="407" width="195" height="78"/>';
-        s += '<rect x="530" y="15" width="101" height="29"/>';
-        s += '<rect x="530" y="456" width="101" height="29"/>';
+        s += '<line x1="60" y1="101" x2="385" y2="101"/>';
+        s += '<line x1="415" y1="101" x2="740" y2="101"/>';
+        s += '<line x1="60" y1="399" x2="385" y2="399"/>';
+        s += '<line x1="415" y1="399" x2="740" y2="399"/>';
+        s += '<rect x="136" y="15" width="173" height="60"/>';
+        s += '<rect x="136" y="425" width="173" height="60"/>';
+        s += '<rect x="491" y="15" width="173" height="60"/>';
+        s += '<rect x="491" y="425" width="173" height="60"/>';
         s += '</g>';
         s += '<circle cx="400" cy="250" r="3.5" fill="'+dotCol+'"/>';
         s += '<circle cx="100" cy="250" r="3.5" fill="'+dotCol+'"/><circle cx="700" cy="250" r="3.5" fill="'+dotCol+'"/>';
@@ -3101,14 +3097,14 @@ function ejComprimirThumbSVG(svgStr) {
         + '<rect x="20" y="15" width="760" height="470" rx="1"/>'
         + '<line x1="400" y1="15" x2="400" y2="485"/>'
         + '<circle cx="400" cy="250" r="65"/>'
-        + '<rect x="20" y="133" width="108" height="234"/>'
-        + '<rect x="672" y="133" width="108" height="234"/>'
-        + '<rect x="20" y="195" width="40" height="110"/>'
-        + '<rect x="740" y="195" width="40" height="110"/>'
+        + '<rect x="20" y="105" width="119" height="290"/>'
+        + '<rect x="661" y="105" width="119" height="290"/>'
+        + '<rect x="20" y="184" width="40" height="132"/>'
+        + '<rect x="740" y="184" width="40" height="132"/>'
         + '<rect x="10" y="220" width="10" height="60"/>'
         + '<rect x="780" y="220" width="10" height="60"/>'
-        + '<path d="M128 199 A65 65 0 0 1 128 301"/>'
-        + '<path d="M672 199 A65 65 0 0 0 672 301"/>'
+        + '<path d="M139 198 A65 65 0 0 1 139 302"/>'
+        + '<path d="M661 198 A65 65 0 0 0 661 302"/>'
         + '<path d="M20 22 A7 7 0 0 1 27 15"/>'
         + '<path d="M773 15 A7 7 0 0 1 780 22"/>'
         + '<path d="M780 478 A7 7 0 0 1 773 485"/>'
