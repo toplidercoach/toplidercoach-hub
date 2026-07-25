@@ -2724,7 +2724,7 @@ async function msCargar() {
         msLista.forEach(function(m, i) {
             const url = supabaseClient.storage.from('sesion-montajes').getPublicUrl(m.image_path).data.publicUrl;
             h += '<div style="background:#0f172a;border:1px solid #334155;border-radius:10px;padding:10px;margin-bottom:10px;display:flex;gap:12px;align-items:center">' +
-                '<img src="' + url + '" style="width:150px;border-radius:6px;background:#1e293b">' +
+                '<img src="' + url + '" onclick="msVerGrande(' + i + ')" title="Ver en grande" style="width:150px;border-radius:6px;background:#1e293b;cursor:zoom-in">' +
                 '<div style="flex:1;min-width:0">' +
                     '<div style="font-weight:600;font-size:13px;margin-bottom:4px">' + (m.orden) + '. ' + (m.titulo || 'Montaje') + '</div>' +
                     '<div style="display:flex;gap:6px">' +
@@ -2740,6 +2740,23 @@ async function msCargar() {
         console.error('msCargar:', e);
         cont.innerHTML = '<p style="color:#f87171;text-align:center">Error al cargar los montajes.</p>';
     }
+}
+
+function msVerGrande(i) {
+    const m = msLista[i];
+    if (!m) return;
+    const url = supabaseClient.storage.from('sesion-montajes').getPublicUrl(m.image_path).data.publicUrl;
+    let ov = document.getElementById('ms-ver');
+    if (ov) ov.remove();
+    ov = document.createElement('div');
+    ov.id = 'ms-ver';
+    ov.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.85);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:2147483200;cursor:zoom-out';
+    ov.innerHTML =
+        '<div style="color:#fff;font-weight:600;font-size:15px;margin-bottom:10px">' + (m.orden) + '. ' + (m.titulo || 'Montaje') + '</div>' +
+        '<img src="' + url + '" style="max-width:96vw;max-height:88vh;border-radius:10px;background:#1e293b">' +
+        '<div style="color:#94a3b8;font-size:12px;margin-top:10px">Clic en cualquier sitio para cerrar</div>';
+    ov.addEventListener('click', function() { ov.remove(); });
+    document.body.appendChild(ov);
 }
 
 async function msMover(i, d) {
