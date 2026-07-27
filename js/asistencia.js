@@ -380,7 +380,7 @@ async function abrirModalAsistenciaSesion(sesionId) {
             });
 
             html += `
-                <div class="wreg-card" data-player-id="${j.player_id}">
+                <div class="wreg-card" data-player-id="${j.player_id}" data-sin-datos="${(asist.sueno != null || asist.rpe != null) ? '0' : '1'}">
                     <div class="wreg-top">
                         <div class="wreg-nombre">${j.shirt_number || '?'}. ${j.name}</div>
                         <button type="button" class="toggle-asistio ${asistio ? 'si' : 'no'}" onclick="toggleAsistencia(this)">
@@ -448,8 +448,18 @@ async function abrirModalAsistenciaSesion(sesionId) {
                 <input type="number" id="w-duracion-real" min="0" max="240" value="${durGuardada || sesion.duration_minutes || ''}" style="width:70px;padding:6px 8px;border:1px solid #c7d2fe;border-radius:7px;font-size:13px"> min
                 <span style="font-weight:400;color:#6b7280;font-size:11px">Se usa para calcular la carga de entrenamiento (RPE × minutos)</span>
             </div>`;
-        document.getElementById('modal-asistencia-jugadores').innerHTML = durBar + html;
+        const barraVistas = '<style>.wvista-btn{background:#f3f4f6;border:1px solid #d1d5db;color:#374151;border-radius:8px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer}.wvista-btn.activo{background:#7c3aed;border-color:#7c3aed;color:#fff}</style>' +
+            '<div style="display:flex;gap:8px;margin-bottom:12px">' +
+            '<button type="button" class="wvista-btn activo" data-v="lista" onclick="wVistaCambiar(\'lista\')">▤ Lista</button>' +
+            '<button type="button" class="wvista-btn" data-v="fichas" onclick="wVistaCambiar(\'fichas\')">▦ Fichas</button></div>';
+        document.getElementById('modal-asistencia-jugadores').innerHTML = durBar + barraVistas + '<div id="wreg-lista"></div><div id="wreg-fichas" style="display:none">' + html + '</div>';
         document.querySelectorAll('.wreg-card').forEach(c => wCalcularIndices(c));
+        document.getElementById('wreg-fichas').addEventListener('input', function(e) {
+            const c = e.target.closest('.wreg-card');
+            if (c) c.dataset.sinDatos = '0';
+        });
+        window._wListaOrden = { campo: 'muscular', dir: 'desc' };
+        wListaRender();
     } catch (error) {
         console.error('Error cargando asistencia:', error);
         document.getElementById('modal-asistencia-jugadores').innerHTML = '<p style="color:red;">Error al cargar</p>';
@@ -542,6 +552,129 @@ async function guardarAsistenciaSesion() {
         console.error('Error guardando asistencia:', error);
         showToast('Error al guardar: ' + error.message);
     }
+}
+
+function wVistaCambiar(v) {
+    document.getElementById('wreg-lista').style.display = v === 'lista' ? 'block' : 'none';
+    document.getElementById('wreg-fichas').style.display = v === 'lista' ? 'none' : 'block';
+    document.querySelectorAll('.wvista-btn').forEach(b => b.classList.toggle('activo', b.dataset.v === v));
+    if (v === 'lista') wListaRender();
+}
+
+function wListaLeerCards() {
+    const filas = [];
+    document.querySelectorAll('.wreg-card').forEach(card => {
+        const sinDatos = card.dataset.sinDatos === '1';
+        const rpeInp = card.querySelector('.w-rpe');
+        const f = {
+            id: card.dataset.playerId,
+            nombre: card.querySelector('.wreg-nombre').textContent,
+            asistio: card.querySelector('.toggle-asistio').classList.contains('si'),
+            motivo: card.querySelector('.motivo-select').value || '',
+            sinDatos: sinDatos,
+            sueno: sinDatos ? null : Number(card.querySelector('.w-sueno').value),
+            fatiga: sinDatos ? null : Number(card.querySelector('.w-fatiga').value),
+            estres: sinDatos ? null : Number(card.querySelector('.w-estres').value),
+            muscular: sinDatos ? null : Number(card.querySelector('.w-muscular').value),
+            horas: sinDatos ? null : (parseFloat(card.querySelector('.w-horas').value) || null),
+            rpe: (sinDatos || rpeInp.dataset.set !== '1') ? null : Number(rpeInp.value),
+            grupo: card.querySelector('.w-grupo').value || ''
+        };
+        f.bienestar = (f.sueno != null) ? Number(((f.sueno + f.fatiga + f.estres) / 3).toFixed(1)) : null;
+        filas.push(f);
+    });
+    return filas;
+}
+
+function wListaColor(campo, v) {
+    if (v === null || v === undefined || isNaN(v)) return '#9ca3af';
+    if (campo === 'muscular') return v <= 3 ? '#10b981' : v <= 5 ? '#d97706' : v <= 7 ? '#ea580c' : '#dc2626';
+    if (campo === 'rpe') return v >= 8 ? '#ea580c' : v >= 6 ? '#d97706' : '#3b82f6';
+    return v >= 7 ? '#10b981' : v >= 5 ? '#d97706' : '#dc2626';
+}
+
+function wListaOrdenar(campo) {
+    const o = window._wListaOrden || (window._wListaOrden = { campo: 'muscular', dir: 'desc' });
+    if (o.campo === campo) o.dir = (o.dir === 'desc' ? 'asc' : 'desc');
+    else { o.campo = campo; o.dir = campo === 'nombre' ? 'asc' : 'desc'; }
+    wListaRender();
+}
+
+function wListaIrAFicha(playerId) {
+    wVistaCambiar('fichas');
+    const card = document.querySelector('.wreg-card[data-player-id="' + playerId + '"]');
+    if (card) {
+        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        card.style.outline = '2px solid #7c3aed';
+        setTimeout(function() { card.style.outline = ''; }, 1600);
+    }
+}
+
+function wListaRender() {
+    const cont = document.getElementById('wreg-lista');
+    if (!cont) return;
+    const o = window._wListaOrden || (window._wListaOrden = { campo: 'muscular', dir: 'desc' });
+    const filas = wListaLeerCards();
+
+    const conDatos = filas.filter(f => !f.sinDatos);
+    const sinDatos = filas.filter(f => f.sinDatos);
+    const ausentes = filas.filter(f => !f.asistio).length;
+
+    const mul = o.dir === 'desc' ? -1 : 1;
+    conDatos.sort(function(a, b) {
+        if (o.campo === 'nombre') return mul * a.nombre.localeCompare(b.nombre, 'es');
+        const va = a[o.campo], vb = b[o.campo];
+        if (va == null && vb == null) return 0;
+        if (va == null) return 1;
+        if (vb == null) return -1;
+        return mul * (va - vb);
+    });
+    sinDatos.sort(function(a, b) { return a.nombre.localeCompare(b.nombre, 'es'); });
+
+    const COLS = [
+        ['nombre', 'Jugador'], ['sueno', '😴 Sueño'], ['fatiga', '🔋 Fatiga'], ['estres', '🧠 Estrés'],
+        ['muscular', '💪 Daño'], ['horas', '⏱️ Horas'], ['rpe', '🏃 RPE'], ['bienestar', '💚 Bienestar']
+    ];
+    let head = '<tr><th style="padding:8px 6px;text-align:center;font-size:11px;color:#6b7280">Asist.</th>';
+    COLS.forEach(function(c) {
+        const flecha = o.campo === c[0] ? (o.dir === 'desc' ? ' ▼' : ' ▲') : '';
+        const alin = c[0] === 'nombre' ? 'left' : 'center';
+        head += '<th onclick="wListaOrdenar(\'' + c[0] + '\')" style="padding:8px 6px;text-align:' + alin + ';font-size:11px;color:#374151;cursor:pointer;white-space:nowrap;user-select:none">' + c[1] + flecha + '</th>';
+    });
+    head += '</tr>';
+
+    function celda(campo, v, extra) {
+        const txt = (v === null || v === undefined) ? '—' : v;
+        return '<td style="padding:7px 6px;text-align:center;font-weight:700;color:' + wListaColor(campo, v) + '">' + txt + (extra || '') + '</td>';
+    }
+
+    function fila(f, gris) {
+        const asistTxt = f.asistio ? '<span style="color:#10b981;font-weight:700">✓</span>'
+            : '<span style="color:#dc2626;font-weight:700">✗</span>' + (f.motivo ? '<div style="font-size:10px;color:#9ca3af">' + f.motivo + '</div>' : '');
+        const badge = f.sinDatos ? ' <span style="background:#f3f4f6;color:#9ca3af;border-radius:999px;padding:1px 8px;font-size:10px;font-weight:700">Sin datos</span>' : '';
+        const grupoTxt = (f.muscular != null && f.muscular >= 4 && f.grupo) ? '<div style="font-size:10px;color:#ea580c;font-weight:600">' + f.grupo + '</div>' : '';
+        return '<tr onclick="wListaIrAFicha(\'' + f.id + '\')" style="border-top:1px solid #f3f4f6;cursor:pointer;' + (gris ? 'opacity:0.55;background:#fafafa' : '') + '">' +
+            '<td style="padding:7px 6px;text-align:center">' + asistTxt + '</td>' +
+            '<td style="padding:7px 6px;font-weight:600;color:#1f2937;font-size:13px;white-space:nowrap">' + f.nombre + badge + '</td>' +
+            celda('sueno', f.sueno) + celda('fatiga', f.fatiga) + celda('estres', f.estres) +
+            celda('muscular', f.muscular, grupoTxt) + celda('horas', f.horas) + celda('rpe', f.rpe) + celda('bienestar', f.bienestar) +
+            '</tr>';
+    }
+
+    let cuerpo = '';
+    conDatos.forEach(function(f) { cuerpo += fila(f, false); });
+    sinDatos.forEach(function(f) { cuerpo += fila(f, true); });
+
+    cont.innerHTML =
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;font-size:12px;font-weight:600">' +
+            '<span style="background:#d1fae5;color:#065f46;border-radius:999px;padding:3px 10px">✅ ' + conDatos.length + ' con datos</span>' +
+            '<span style="background:#f3f4f6;color:#6b7280;border-radius:999px;padding:3px 10px">⚠️ ' + sinDatos.length + ' sin datos</span>' +
+            '<span style="background:#fee2e2;color:#991b1b;border-radius:999px;padding:3px 10px">✗ ' + ausentes + ' ausentes</span>' +
+        '</div>' +
+        '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;background:#fff;font-size:13px">' +
+            '<thead style="background:#f9fafb">' + head + '</thead><tbody>' + cuerpo + '</tbody>' +
+        '</table></div>' +
+        '<p style="font-size:11px;color:#9ca3af;margin-top:8px">Clic en una cabecera para ordenar · Clic en una fila para abrir su ficha</p>';
 }
 
 function wActualizar(input, campo) {
