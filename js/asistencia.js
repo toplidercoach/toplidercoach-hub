@@ -451,7 +451,8 @@ async function abrirModalAsistenciaSesion(sesionId) {
         const barraVistas = '<style>.wvista-btn{background:#f3f4f6;border:1px solid #d1d5db;color:#374151;border-radius:8px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer}.wvista-btn.activo{background:#7c3aed;border-color:#7c3aed;color:#fff}</style>' +
             '<div style="display:flex;gap:8px;margin-bottom:12px">' +
             '<button type="button" class="wvista-btn activo" data-v="lista" onclick="wVistaCambiar(\'lista\')">▤ Lista</button>' +
-            '<button type="button" class="wvista-btn" data-v="fichas" onclick="wVistaCambiar(\'fichas\')">▦ Fichas</button></div>';
+            '<button type="button" class="wvista-btn" data-v="fichas" onclick="wVistaCambiar(\'fichas\')">▦ Fichas</button>' +
+            '<button type="button" class="wvista-btn" style="margin-left:auto" onclick="wListaPDF()">📄 PDF</button></div>';
         document.getElementById('modal-asistencia-jugadores').innerHTML = durBar + barraVistas + '<div id="wreg-lista"></div><div id="wreg-fichas" style="display:none">' + html + '</div>';
         document.querySelectorAll('.wreg-card').forEach(c => wCalcularIndices(c));
         document.getElementById('wreg-fichas').addEventListener('input', function(e) {
@@ -675,6 +676,70 @@ function wListaRender() {
             '<thead style="background:#f9fafb">' + head + '</thead><tbody>' + cuerpo + '</tbody>' +
         '</table></div>' +
         '<p style="font-size:11px;color:#9ca3af;margin-top:8px">Clic en una cabecera para ordenar · Clic en una fila para abrir su ficha</p>';
+}
+
+function wListaPDF() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const o = window._wListaOrden || { campo: 'muscular', dir: 'desc' };
+    const filas = wListaLeerCards();
+    const conDatos = filas.filter(f => !f.sinDatos);
+    const sinDatos = filas.filter(f => f.sinDatos);
+    const mul = o.dir === 'desc' ? -1 : 1;
+    conDatos.sort(function(a, b) {
+        if (o.campo === 'nombre') return mul * a.nombre.localeCompare(b.nombre, 'es');
+        const va = a[o.campo], vb = b[o.campo];
+        if (va == null && vb == null) return 0;
+        if (va == null) return 1;
+        if (vb == null) return -1;
+        return mul * (va - vb);
+    });
+    sinDatos.sort(function(a, b) { return a.nombre.localeCompare(b.nombre, 'es'); });
+    const todas = conDatos.concat(sinDatos);
+    const nombreSesion = (document.getElementById('asistencia-sesion-nombre') || {}).textContent || 'Sesion';
+    const fechaSesion = (document.getElementById('asistencia-sesion-fecha') || {}).textContent || '';
+    doc.setFontSize(15); doc.setFont('helvetica', 'bold'); doc.setTextColor(15, 23, 42);
+    doc.text('Registro de asistencia y bienestar', 14, 16);
+    doc.setFontSize(11); doc.setFont('helvetica', 'normal'); doc.setTextColor(75, 85, 99);
+    doc.text(nombreSesion + ' - ' + fechaSesion, 14, 23);
+    doc.setFontSize(9);
+    doc.text(conDatos.length + ' con datos  ·  ' + sinDatos.length + ' sin datos  ·  ' + filas.filter(f => !f.asistio).length + ' ausentes', 14, 29);
+    const body = todas.map(function(f) {
+        const v = function(x) { return (x === null || x === undefined) ? '-' : String(x); };
+        return [
+            f.asistio ? 'Si' : ('No' + (f.motivo ? ' (' + f.motivo + ')' : '')),
+            f.nombre + (f.sinDatos ? ' (sin datos)' : ''),
+            v(f.sueno), v(f.fatiga), v(f.estres),
+            v(f.muscular) + ((f.muscular != null && f.muscular >= 4 && f.grupo) ? ' ' + f.grupo : ''),
+            v(f.horas), v(f.rpe), v(f.bienestar)
+        ];
+    });
+    doc.autoTable({
+        startY: 34,
+        head: [['Asist.', 'Jugador', 'Sueño', 'Fatiga', 'Estrés', 'Daño', 'Horas', 'RPE', 'Bienestar']],
+        body: body,
+        theme: 'grid',
+        styles: { fontSize: 8.5, cellPadding: 2, halign: 'center' },
+        headStyles: { fillColor: [124, 58, 237], textColor: 255, fontStyle: 'bold' },
+        columnStyles: { 1: { halign: 'left', fontStyle: 'bold' } },
+        didParseCell: function(data) {
+            if (data.section !== 'body') return;
+            const f = todas[data.row.index];
+            if (!f) return;
+            if (f.sinDatos) { data.cell.styles.textColor = [156, 163, 175]; return; }
+            const mapa = { 2: ['sueno', f.sueno], 3: ['fatiga', f.fatiga], 4: ['estres', f.estres], 5: ['muscular', f.muscular], 7: ['rpe', f.rpe], 8: ['bienestar', f.bienestar] };
+            const m = mapa[data.column.index];
+            if (m && m[1] != null) {
+                const hex = wListaColor(m[0], m[1]);
+                data.cell.styles.textColor = [parseInt(hex.substr(1, 2), 16), parseInt(hex.substr(3, 2), 16), parseInt(hex.substr(5, 2), 16)];
+                data.cell.styles.fontStyle = 'bold';
+            }
+            if (data.column.index === 0) data.cell.styles.textColor = f.asistio ? [16, 185, 129] : [220, 38, 38];
+        }
+    });
+    doc.setFontSize(7); doc.setTextColor(156, 163, 175);
+    doc.text('TopLiderCoach HUB  |  toplidercoach.com', 14, doc.internal.pageSize.getHeight() - 8);
+    doc.save('Asistencia_' + nombreSesion.replace(/[^a-zA-Z0-9 ]/g, '').replace(/\s+/g, '_') + '.pdf');
 }
 
 function wActualizar(input, campo) {
