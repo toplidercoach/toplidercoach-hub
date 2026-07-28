@@ -202,6 +202,10 @@ function mostrarFormulario(jugador, sesion) {
                 <div class="item-label">⏱️ Horas de sueño</div>
                 <input type="number" class="num-field" id="n-horas" placeholder="Ej: 8" step="0.5" min="0" max="16">
             </div>
+            <div class="item">
+                <div class="item-label">⚖️ Peso de hoy (kg)</div>
+                <input type="number" class="num-field" id="n-peso" placeholder="Ej: 74.5" step="0.1" min="30" max="150">
+            </div>
             <button class="btn-enviar" id="btn-enviar" onclick="enviar('${jugador.id}','${sesion.id}')">Enviar mi registro</button>
             <div class="plazo">Tu hora de envío queda registrada automáticamente</div>
         </div>
@@ -226,9 +230,14 @@ async function enviar(jugadorId, sesionId) {
     if (enviando) return;
     const muscVal = parseInt(document.getElementById('r-musc').value);
     const horas = parseFloat(document.getElementById('n-horas').value);
+    const peso = parseFloat(document.getElementById('n-peso').value);
 
     if (muscVal >= 4 && !document.getElementById('s-grupo').value) {
         alert('Por favor, indica qué grupo muscular tienes afectado.');
+        return;
+    }
+    if (isNaN(peso)) {
+        alert('Por favor, indica tu peso de hoy.');
         return;
     }
 
@@ -244,6 +253,7 @@ async function enviar(jugadorId, sesionId) {
         estado_muscular: muscVal,
         grupo_muscular: muscVal >= 4 ? document.getElementById('s-grupo').value : null,
         horas_sueno: isNaN(horas) ? null : horas,
+        peso: isNaN(peso) ? null : peso,
         registrado_por: 'jugador'
     };
 
