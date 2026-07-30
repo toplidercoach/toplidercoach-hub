@@ -477,6 +477,18 @@ function ejRenderSVG() {
         const textColor = ['yellow','white','atletico','juventus'].includes(p.color) ? '#1e293b' : '#ffffff';
         const fillAttr = tc.striped ? `url(#stp-${p.id})` : tc.fill;
 
+        if (p.soloTexto) {
+            const _stName = (p.name || '').split(' ')[0];
+            const _stFs = 12 * scale;
+            const _stW = Math.max(30, _stName.length * _stFs * 0.62);
+            html += `<g data-id="${p.id}" data-type="player" transform="translate(${p.x},${p.y})" style="cursor:move">
+            <rect x="${-_stW/2}" y="${-_stFs*0.75}" width="${_stW}" height="${_stFs*1.5}" fill="transparent"/>
+            <text text-anchor="middle" dominant-baseline="central" x="1" y="1" fill="#000" opacity="0.55" font-size="${_stFs}" font-weight="700" font-family="system-ui" style="pointer-events:none">${_stName}</text>
+            <text text-anchor="middle" dominant-baseline="central" fill="${tc.fill}" font-size="${_stFs}" font-weight="700" font-family="system-ui" style="pointer-events:none">${_stName}</text>
+            ${sel ? `<rect x="${-_stW/2-4}" y="${-_stFs*0.75-4}" width="${_stW+8}" height="${_stFs*1.5+8}" fill="none" stroke="#22c55e" stroke-width="1.5" stroke-dasharray="4 2" rx="4" style="pointer-events:none"/>` : ''}
+        </g>`;
+            continue;
+        }
         var _hasPhoto = !!p.photo;
         html += `<g data-id="${p.id}" data-type="player" transform="translate(${p.x},${p.y})" style="cursor:move">
             <ellipse cx="${r*0.18}" cy="${r*0.62}" rx="${r*0.92}" ry="${r*0.42}" fill="rgba(0,0,0,0.30)" style="pointer-events:none"/>
@@ -740,9 +752,9 @@ if (ejP.activeTool === 'connect') { if (!isBackground && el) { var _cid = parseI
             ejP.players.push({
                 id, x: pos.x, y: pos.y, color,
                 scale, number: p.number, name: p.name,
-                photo: ejP._plantillaLabel === 'nofoto' ? null : (p.photo || null),
-                showNumber: ejP._plantillaLabel !== 'name',
-                showName: ejP._plantillaLabel === 'name' || ejP._plantillaLabel === 'both' || ejP._plantillaLabel === 'nofoto',
+                photo: (ejP._plantillaLabel === 'nofoto' || ejP._plantillaLabel === 'solotexto') ? null : (p.photo || null),
+                showNumber: ejP._plantillaLabel !== 'name' && ejP._plantillaLabel !== 'solotexto',
+                showName: ejP._plantillaLabel === 'name' || ejP._plantillaLabel === 'both' || ejP._plantillaLabel === 'nofoto' || ejP._plantillaLabel === 'solotexto', soloTexto: ejP._plantillaLabel === 'solotexto',
                 hasVest: false, vestColor: ejP.vestColor
             });
             ejP._plantillaMode = false;
@@ -2219,8 +2231,8 @@ ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin
         <div style="background:#0b1220;border:1px solid #2f405c;border-radius:8px;padding:8px">
             <div style="font-size:10px;color:#64748b;margin-bottom:4px;text-transform:uppercase">${ejP._plantillaEsRival ? '🛡️ Plantilla rival' : 'Mi plantilla'} — clic para colocar</div>
             <div style="display:flex;gap:4px;margin-bottom:6px">
-                ${['num','name','both','nofoto'].map(opt => {
-                    const lbl = opt==='num'?'Nº':opt==='name'?'Nombre':opt==='both'?'Nº+Nombre':'Sin foto';
+                ${['num','name','both','nofoto','solotexto'].map(opt => {
+                    const lbl = opt==='num'?'Nº':opt==='name'?'Nombre':opt==='both'?'Nº+Nombre':opt==='nofoto'?'Sin foto':'Solo texto';
                     const active = (ejP._plantillaLabel||'num') === opt;
                     return `<button onclick="ejP._plantillaLabel='${opt}';ejRenderToolbar()" style="flex:1;padding:3px;font-size:9px;border-radius:4px;border:1px solid ${active?'#3b82f6':'#334155'};background:${active?'#1e3a5f':'transparent'};color:${active?'#93c5fd':'#64748b'};cursor:pointer">${lbl}</button>`;
                 }).join('')}
