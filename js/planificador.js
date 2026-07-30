@@ -616,7 +616,7 @@ if (!sesionEditandoId) {
 
 if (typeof scGuardarConceptos === 'function') { await scGuardarConceptos(sesionId, !!sesionEditandoId); }
                 showToast(sesionEditandoId ? 'Sesión actualizada correctamente' : 'Sesión guardada correctamente');
-                limpiarSesion();
+                sesionEditandoId = sesionId; // Permanecer en la sesión tras guardar (Nueva Sesion = empezar de cero)
                 
             } catch (error) {
                 showToast('Error al guardar: ' + error.message);
