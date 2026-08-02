@@ -1214,6 +1214,7 @@ function ejProyCoachId() {
 let ejProyActual = null;
 let ejProyItems = [];
 let ejProyIdx = -1;
+let ejProyFaseCargadaId = null; // id de la fase cuyo contenido esta en la pizarra (para autoguardado)
 
 function ejProyPanel() {
     let p = document.getElementById('ej-proy-panel');
@@ -1249,6 +1250,7 @@ function ejProyPanel() {
 }
 
 async function ejProyListar() {
+    ejProyAutoguardar();
     ejProyActual = null; ejProyItems = []; ejProyIdx = -1;
     const body = document.getElementById('ej-proy-body');
     body.innerHTML = 'Cargando...';
@@ -1279,6 +1281,7 @@ async function ejProyBorrar(id) {
 }
 
 async function ejProyAbrir(id, nombre) {
+    ejProyAutoguardar();
     ejProyActual = { id: id, nombre: nombre };
     const body = document.getElementById('ej-proy-body');
     body.innerHTML = 'Cargando...';
@@ -1323,14 +1326,7 @@ async function ejProyAnadirFase() {
     if (!hayDibujo) { ejToast('La pizarra esta vacia: dibuja la fase antes de anadirla', 'warning'); return; }
     const nombre = prompt('Nombre de la fase:', 'Fase ' + (ejProyItems.length + 1));
     if (nombre === null) return;
-    const bd = {
-        players: ejP.players, lines: ejP.lines,
-        shapes: ejP.shapes, texts: ejP.texts,
-        equipment: ejP.equipment, connections: ejP.connections,
-        fieldType: ejP.fieldType, showCarriles: ejP.showCarriles, showZonas: ejP.showZonas, showRejilla: ejP.showRejilla,
-        animFrames: ejP.animMode ? ejP.frames : [],
-        animMode: ejP.animMode
-    };
+    const bd = ejProyBoardDataActual();
     let thumb = null;
     const svgEl = document.getElementById('ej-svg');
     if (svgEl) {
@@ -1342,6 +1338,9 @@ async function ejProyAnadirFase() {
     const { error } = await supabaseClient.from('pizarra_proyecto_items')
         .insert({ proyecto_id: ejProyActual.id, nombre: (nombre.trim() || 'Fase ' + (ejProyItems.length + 1)), board_data: bd, thumbnail_svg: thumb, orden: ejProyItems.length });
     if (error) { ejToast('Error: ' + error.message, 'error'); return; }
+    // El dibujo actual pertenece ahora a la fase recien creada: desvincular la anterior
+    // para que ejProyAbrir no autoguarde esta variante sobre la fase de origen
+    ejProyFaseCargadaId = null;
     ejProyAbrir(ejProyActual.id, ejProyActual.nombre);
 }
 
@@ -1446,8 +1445,48 @@ async function ejProyPDF() {
     ejToast('PDF del proyecto descargado');
 }
 
+// Construye el board_data del dibujo actual (mismo formato que Anadir fase)
+function ejProyBoardDataActual() {
+    return {
+        players: ejP.players, lines: ejP.lines,
+        shapes: ejP.shapes, texts: ejP.texts,
+        equipment: ejP.equipment, connections: ejP.connections,
+        fieldType: ejP.fieldType, showCarriles: ejP.showCarriles, showZonas: ejP.showZonas, showRejilla: ejP.showRejilla,
+        animFrames: ejP.animMode ? ejP.frames : [],
+        animMode: ejP.animMode
+    };
+}
+
+// Autoguardado de fase: si el dibujo actual pertenece a una fase y ha cambiado,
+// lo persiste (memoria + BD + miniatura) antes de navegar a otro sitio
+function ejProyAutoguardar() {
+    if (ejProyIdx < 0 || !ejProyItems[ejProyIdx]) return;
+    const it = ejProyItems[ejProyIdx];
+    if (!it.board_data || it.id !== ejProyFaseCargadaId) return;
+    // Nunca autoguardar una pizarra vacia (protege la fase si se limpio el dibujo)
+    const hayDibujo = ejP.players.length > 0 || ejP.lines.length > 0 || ejP.shapes.length > 0 || ejP.equipment.length > 0 || ejP.texts.length > 0;
+    if (!hayDibujo) return;
+    const bd = ejProyBoardDataActual();
+    if (JSON.stringify(bd) === JSON.stringify(it.board_data)) return; // sin cambios
+    let thumb = it.thumbnail_svg || null;
+    const svgEl = document.getElementById('ej-svg');
+    if (svgEl) {
+        thumb = new XMLSerializer().serializeToString(svgEl)
+            .replace(/width="[^"]*"/, 'width="100%"')
+            .replace(/height="[^"]*"/, 'height="100%"');
+        thumb = ejComprimirThumbSVG(thumb);
+    }
+    it.board_data = JSON.parse(JSON.stringify(bd));
+    it.thumbnail_svg = thumb;
+    supabaseClient.from('pizarra_proyecto_items')
+        .update({ board_data: it.board_data, thumbnail_svg: thumb })
+        .eq('id', it.id)
+        .then(function(res) { if (res && res.error) ejToast('No se pudo autoguardar la fase: ' + res.error.message, 'error'); });
+}
+
 function ejProyIr(i) {
     if (i < 0 || i >= ejProyItems.length) return;
+    ejProyAutoguardar();
     ejProyIdx = i;
     const it = ejProyItems[i];
     if (it.board_data) { ejProyCargarFase(it); }
@@ -1456,7 +1495,10 @@ function ejProyIr(i) {
 }
 
 function ejProyCargarFase(it) {
-    const bd = it.board_data;
+    // Copia profunda: la pizarra no debe compartir referencias con la copia
+    // en memoria de la fase (si no, la deteccion de cambios del autoguardado falla)
+    const bd = JSON.parse(JSON.stringify(it.board_data));
+    ejProyFaseCargadaId = it.id;
     ejFrameStop();
     ejSaveHistory();
     ejP.players = bd.players || [];
@@ -1513,6 +1555,7 @@ document.addEventListener('keydown', function(e) {
 function ejNuevaPizarra() {
     ejConfirm('¿Limpiar la pizarra y empezar desde cero?', () => {
     ejSaveHistory();
+    ejProyFaseCargadaId = null; // el dibujo nuevo ya no pertenece a ninguna fase
     ejP.players = []; ejP.lines = []; ejP.shapes = []; ejP.texts = []; ejP.equipment = []; ejP.connections = [];
     ejP.selectedId = null; ejP.playerCounts = {}; ejP.nextId = 1;
     ejFrameStop();
@@ -3718,6 +3761,7 @@ async function ejBancoCargar(id) {
 
         // 1. Parar animación si estaba reproduciéndose
         ejFrameStop();
+        ejProyFaseCargadaId = null; // la pizarra pasa a mostrar un ejercicio del banco
 
         // 1b. Limpiar media del ejercicio anterior
         window.ejThumbnailPendiente = null;
