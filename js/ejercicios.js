@@ -453,12 +453,22 @@ function ejRenderSVG() {
         const tsize = t.size || 16;
         const tweight = t.bold ? 700 : 500;
         const tcolor = t.color || '#ffffff';
-        const approxW = (String(t.text).length * tsize * 0.56) + 16;
-        const boxH = tsize + 12;
+        const tlines = String(t.text).split('\n');
+        const lineH = tsize * 1.3;
+        const maxLen = tlines.reduce(function(m, l){ return Math.max(m, l.length); }, 1);
+        const approxW = (maxLen * tsize * 0.56) + 16;
+        const boxH = (tlines.length - 1) * lineH + tsize + 12;
+        const tfont = t.font || 'system-ui, sans-serif';
+        const tspans = function(dx, dy) {
+            return tlines.map(function(l, i) {
+                const ly = (i - (tlines.length - 1) / 2) * lineH + dy;
+                return `<tspan x="${dx}" y="${ly}">${ejEscXml(l)}</tspan>`;
+            }).join('');
+        };
         html += `<g data-id="${t.id}" data-type="text" transform="translate(${t.x},${t.y})" style="cursor:move">
             ${t.bg ? `<rect x="${-approxW/2}" y="${-boxH/2}" width="${approxW}" height="${boxH}" rx="5" fill="rgba(15,23,42,0.82)" stroke="${tcolor}" stroke-width="1.2"/>` : ''}
-            ${!t.bg ? `<text text-anchor="middle" dominant-baseline="central" x="1.2" y="2" fill="#000" opacity="0.35" font-size="${tsize}" font-weight="${tweight}" font-family="${t.font || 'system-ui, sans-serif'}" style="pointer-events:none">${t.text}</text>` : ''}
-            <text text-anchor="middle" dominant-baseline="central" fill="${tcolor}" font-size="${tsize}" font-weight="${tweight}" font-family="${t.font || 'system-ui, sans-serif'}">${t.text}</text>
+            ${!t.bg ? `<text text-anchor="middle" dominant-baseline="central" fill="#000" opacity="0.35" font-size="${tsize}" font-weight="${tweight}" font-family="${tfont}" style="pointer-events:none">${tspans(1.2, 2)}</text>` : ''}
+            <text text-anchor="middle" dominant-baseline="central" fill="${tcolor}" font-size="${tsize}" font-weight="${tweight}" font-family="${tfont}">${tspans(0, 0)}</text>
             ${sel ? `<rect x="${-approxW/2-4}" y="${-boxH/2-4}" width="${approxW+8}" height="${boxH+8}" fill="none" stroke="#22c55e" stroke-width="1.5" stroke-dasharray="4 2" rx="5" style="pointer-events:none"/>` : ''}
         </g>`;
     }
@@ -792,7 +802,7 @@ return;
 
     // Herramienta texto
     if (ejP.activeTool === 'text' && isBackground) {
-        ejPrompt('Introduce el texto:', 'Texto', function(text) {
+        ejPromptTexto('Introduce el texto:', 'Texto', function(text) {
             if (text) {
                 ejSaveHistory();
                 const id = ejP.nextId++;
@@ -2472,7 +2482,7 @@ function ejEditarTexto(id) {
     var tid = id != null ? id : ejP.selectedId;
     var t = ejP.texts.find(function(x){ return x.id === tid; });
     if (!t) return;
-    ejPrompt('Editar texto:', t.text, function(nuevo) {
+    ejPromptTexto('Editar texto:', t.text, function(nuevo) {
         if (nuevo != null) {
             ejSaveHistory();
             t.text = nuevo;
@@ -4668,6 +4678,26 @@ function ejPrompt(msg, valorInicial, onAceptar) {
     overlay.querySelector('#ejp-cancel').onclick = function() { overlay.remove(); };
     overlay.querySelector('#ejp-ok').onclick = function() { var v = input.value.trim(); overlay.remove(); if (v) onAceptar(v); };
     input.addEventListener('keydown', function(e) { if (e.key === 'Enter') { var v = input.value.trim(); overlay.remove(); if (v) onAceptar(v); } });
+}
+
+// Escapa caracteres especiales para insertar texto de usuario dentro del SVG
+function ejEscXml(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// Modal de texto multilinea para la herramienta Texto de la pizarra
+function ejPromptTexto(msg, valorInicial, onAceptar) {
+    var overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:99998;display:flex;align-items:center;justify-content:center;';
+    overlay.innerHTML = '<div style="background:#1e293b;border:1px solid #334155;border-radius:12px;padding:28px 32px;max-width:420px;width:90%;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.6)"><p style="color:#f1f5f9;font-size:15px;margin:0 0 12px">' + msg + '</p><textarea id="ejpt-input" rows="3" style="width:100%;padding:8px 12px;background:#0f172a;border:1px solid #475569;color:#fff;border-radius:6px;font-size:14px;box-sizing:border-box;resize:vertical;font-family:inherit;line-height:1.4"></textarea><div style="color:#64748b;font-size:11px;margin:6px 0 16px">Enter = nueva l\u00ednea \u00b7 Ctrl+Enter = aceptar</div><div style="display:flex;gap:12px;justify-content:center"><button id="ejpt-cancel" style="padding:9px 22px;border-radius:7px;border:1px solid #475569;background:transparent;color:#94a3b8;cursor:pointer;font-size:14px">Cancelar</button><button id="ejpt-ok" style="padding:9px 22px;border-radius:7px;border:none;background:#3b82f6;color:#fff;cursor:pointer;font-size:14px;font-weight:600">Aceptar</button></div></div>';
+    document.body.appendChild(overlay);
+    var input = overlay.querySelector('#ejpt-input');
+    input.value = valorInicial || '';
+    input.focus(); input.select();
+    function aceptar() { var v = input.value.replace(/\s+$/, ''); overlay.remove(); if (v) onAceptar(v); }
+    overlay.querySelector('#ejpt-cancel').onclick = function() { overlay.remove(); };
+    overlay.querySelector('#ejpt-ok').onclick = aceptar;
+    input.addEventListener('keydown', function(e) { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); aceptar(); } });
 }
 
 function ejToast(msg, tipo) {
