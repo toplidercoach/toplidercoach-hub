@@ -380,7 +380,7 @@ async function abrirModalAsistenciaSesion(sesionId) {
             });
 
             html += `
-                <div class="wreg-card" data-player-id="${j.player_id}" data-sin-datos="${(asist.sueno != null || asist.rpe != null) ? '0' : '1'}">
+                <div class="wreg-card" data-player-id="${j.player_id}" data-sin-datos="${(asist.sueno != null || asist.rpe != null) ? '0' : '1'}" data-reg-por="${asist.registrado_por || ''}" data-reg-en="${asist.registrado_en || ''}">
                     <div class="wreg-top">
                         <div class="wreg-nombre">${j.shirt_number || '?'}. ${j.name}</div>
                         <button type="button" class="toggle-asistio ${asistio ? 'si' : 'no'}" onclick="toggleAsistencia(this)">
@@ -540,7 +540,8 @@ async function guardarAsistenciaSesion() {
                 const d = parseInt((document.getElementById('w-duracion-real') || {}).value);
                 return isNaN(d) ? null : d;
             })(),
-            registrado_por: 'staff'
+            registrado_por: (row.dataset.regPor === 'jugador') ? 'jugador' : 'staff',
+            registrado_en: (row.dataset.regPor === 'jugador' && row.dataset.regEn) ? row.dataset.regEn : new Date().toISOString()
         });
     });
     try {
@@ -578,8 +579,10 @@ function wListaLeerCards() {
             estres: sinDatos ? null : Number(card.querySelector('.w-estres').value),
             muscular: sinDatos ? null : Number(card.querySelector('.w-muscular').value),
             horas: sinDatos ? null : (parseFloat(card.querySelector('.w-horas').value) || null),
+            peso: (function(){ const pi = card.querySelector('.peso-input'); return pi ? (parseFloat(pi.value) || null) : null; })(),
             rpe: (sinDatos || rpeInp.dataset.set !== '1') ? null : Number(rpeInp.value),
-            grupo: card.querySelector('.w-grupo').value || ''
+            grupo: card.querySelector('.w-grupo').value || '',
+            envio: (card.dataset.regPor === 'jugador' && card.dataset.regEn) ? new Date(card.dataset.regEn).getTime() : null
         };
         f.bienestar = (f.sueno != null) ? Number(((f.sueno + f.fatiga + f.estres) / 3).toFixed(1)) : null;
         filas.push(f);
@@ -589,6 +592,7 @@ function wListaLeerCards() {
 
 function wListaColor(campo, v) {
     if (v === null || v === undefined || isNaN(v)) return '#9ca3af';
+    if (campo === 'peso') return '#1f2937';
     if (campo === 'muscular') return v <= 3 ? '#10b981' : v <= 5 ? '#d97706' : v <= 7 ? '#ea580c' : '#dc2626';
     if (campo === 'rpe') return v >= 8 ? '#ea580c' : v >= 6 ? '#d97706' : '#3b82f6';
     return v >= 7 ? '#10b981' : v >= 5 ? '#d97706' : '#dc2626';
@@ -634,7 +638,7 @@ function wListaRender() {
 
     const COLS = [
         ['nombre', 'Jugador'], ['sueno', '😴 Sueño'], ['fatiga', '🔋 Fatiga'], ['estres', '🧠 Estrés'],
-        ['muscular', '💪 Daño'], ['horas', '⏱️ Horas'], ['rpe', '🏃 RPE'], ['bienestar', '💚 Bienestar']
+        ['muscular', '💪 Daño'], ['horas', '⏱️ Horas'], ['peso', '⚖️ Peso'], ['rpe', '🏃 RPE'], ['bienestar', '💚 Bienestar'], ['envio', '🕐 Envío']
     ];
     let head = '<tr><th style="padding:8px 6px;text-align:center;font-size:11px;color:#6b7280">Asist.</th>';
     COLS.forEach(function(c) {
@@ -649,6 +653,18 @@ function wListaRender() {
         return '<td style="padding:7px 6px;text-align:center;font-weight:700;color:' + wListaColor(campo, v) + '">' + txt + (extra || '') + '</td>';
     }
 
+    function horaEnvio(millis) {
+        if (millis == null) return null;
+        const d = new Date(millis);
+        return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+    }
+
+    function celdaEnvio(f) {
+        const h = horaEnvio(f.envio);
+        if (h === null) return '<td style="padding:7px 6px;text-align:center;color:#9ca3af">—</td>';
+        return '<td style="padding:7px 6px;text-align:center;font-weight:600;color:#1f2937">' + h + '</td>';
+    }
+
     function fila(f, gris) {
         const asistTxt = f.asistio ? '<span style="color:#10b981;font-weight:700">✓</span>'
             : '<span style="color:#dc2626;font-weight:700">✗</span>' + (f.motivo ? '<div style="font-size:10px;color:#9ca3af">' + f.motivo + '</div>' : '');
@@ -658,7 +674,7 @@ function wListaRender() {
             '<td style="padding:7px 6px;text-align:center">' + asistTxt + '</td>' +
             '<td style="padding:7px 6px;font-weight:600;color:#1f2937;font-size:13px;white-space:nowrap">' + f.nombre + badge + '</td>' +
             celda('sueno', f.sueno) + celda('fatiga', f.fatiga) + celda('estres', f.estres) +
-            celda('muscular', f.muscular, grupoTxt) + celda('horas', f.horas) + celda('rpe', f.rpe) + celda('bienestar', f.bienestar) +
+            celda('muscular', f.muscular, grupoTxt) + celda('horas', f.horas) + celda('peso', f.peso) + celda('rpe', f.rpe) + celda('bienestar', f.bienestar) + celdaEnvio(f) +
             '</tr>';
     }
 
@@ -711,12 +727,13 @@ function wListaPDF() {
             f.nombre + (f.sinDatos ? ' (sin datos)' : ''),
             v(f.sueno), v(f.fatiga), v(f.estres),
             v(f.muscular) + ((f.muscular != null && f.muscular >= 4 && f.grupo) ? ' ' + f.grupo : ''),
-            v(f.horas), v(f.rpe), v(f.bienestar)
+            v(f.horas), v(f.peso), v(f.rpe), v(f.bienestar),
+            (function() { if (f.envio == null) return '-'; const d = new Date(f.envio); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); })()
         ];
     });
     doc.autoTable({
         startY: 34,
-        head: [['Asist.', 'Jugador', 'Sueño', 'Fatiga', 'Estrés', 'Daño', 'Horas', 'RPE', 'Bienestar']],
+        head: [['Asist.', 'Jugador', 'Sueño', 'Fatiga', 'Estrés', 'Daño', 'Horas', 'Peso', 'RPE', 'Bienestar', 'Envío']],
         body: body,
         theme: 'grid',
         styles: { fontSize: 8.5, cellPadding: 2, halign: 'center' },
@@ -727,7 +744,7 @@ function wListaPDF() {
             const f = todas[data.row.index];
             if (!f) return;
             if (f.sinDatos) { data.cell.styles.textColor = [156, 163, 175]; return; }
-            const mapa = { 2: ['sueno', f.sueno], 3: ['fatiga', f.fatiga], 4: ['estres', f.estres], 5: ['muscular', f.muscular], 7: ['rpe', f.rpe], 8: ['bienestar', f.bienestar] };
+            const mapa = { 2: ['sueno', f.sueno], 3: ['fatiga', f.fatiga], 4: ['estres', f.estres], 5: ['muscular', f.muscular], 8: ['rpe', f.rpe], 9: ['bienestar', f.bienestar] };
             const m = mapa[data.column.index];
             if (m && m[1] != null) {
                 const hex = wListaColor(m[0], m[1]);

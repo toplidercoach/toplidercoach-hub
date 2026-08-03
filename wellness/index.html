@@ -127,6 +127,21 @@ async function init() {
     }
 
     const sesion = sesiones[0];
+    window._sesionWellness = sesion.id;
+
+    // Comprobar si ya envio hoy: va ANTES del plazo, para que pueda
+    // anadir el peso mas tarde aunque el plazo del wellness haya cerrado
+    const yaRegPre = sesion.registro || null;
+    if (yaRegPre && yaRegPre.registrado_por === 'jugador' && yaRegPre.sueno !== null) {
+        const faltaPeso = (yaRegPre.peso === null || yaRegPre.peso === undefined);
+        pintar(`
+            <div class="card"><div class="saludo">Hola, ${jugador.name} 👋</div>
+            <div class="sesion-info">${sesion.name}</div></div>
+            <div class="card"><div class="ok-box"><div class="ico">✅</div><div class="txt">Ya enviaste tu registro de hoy</div><div class="sub">Gracias. Nos vemos en el entrenamiento.</div></div></div>
+            ${faltaPeso ? cajaPesoHTML() : ''}
+        `);
+        return;
+    }
 
     // Comprobar plazo (30 min antes de la hora, si hay hora)
     if (sesion.session_time) {
@@ -142,18 +157,6 @@ async function init() {
             `);
             return;
         }
-    }
-
-    // Comprobar si ya envió hoy (viene en el contexto)
-    const yaReg = sesion.registro || null;
-
-    if (yaReg && yaReg.registrado_por === 'jugador' && yaReg.sueno !== null) {
-        pintar(`
-            <div class="card"><div class="saludo">Hola, ${jugador.name} 👋</div>
-            <div class="sesion-info">${sesion.name}</div></div>
-            <div class="card"><div class="ok-box"><div class="ico">✅</div><div class="txt">Ya enviaste tu registro de hoy</div><div class="sub">Gracias. Nos vemos en el entrenamiento.</div></div></div>
-        `);
-        return;
     }
 
     mostrarFormulario(jugador, sesion);
@@ -203,7 +206,7 @@ function mostrarFormulario(jugador, sesion) {
                 <input type="number" class="num-field" id="n-horas" placeholder="Ej: 8" step="0.5" min="0" max="16">
             </div>
             <div class="item">
-                <div class="item-label">⚖️ Peso de hoy (kg)</div>
+                <div class="item-label">⚖️ Peso de hoy (kg) <span style="color:#64748b;font-weight:400;font-size:12px">opcional · puedes añadirlo después</span></div>
                 <input type="number" class="num-field" id="n-peso" placeholder="Ej: 74.5" step="0.1" min="30" max="150">
             </div>
             <button class="btn-enviar" id="btn-enviar" onclick="enviar('${jugador.id}','${sesion.id}')">Enviar mi registro</button>
@@ -236,11 +239,6 @@ async function enviar(jugadorId, sesionId) {
         alert('Por favor, indica qué grupo muscular tienes afectado.');
         return;
     }
-    if (isNaN(peso)) {
-        alert('Por favor, indica tu peso de hoy.');
-        return;
-    }
-
     enviando = true;
     const btn = document.getElementById('btn-enviar');
     btn.disabled = true;
@@ -253,9 +251,9 @@ async function enviar(jugadorId, sesionId) {
         estado_muscular: muscVal,
         grupo_muscular: muscVal >= 4 ? document.getElementById('s-grupo').value : null,
         horas_sueno: isNaN(horas) ? null : horas,
-        peso: isNaN(peso) ? null : peso,
         registrado_por: 'jugador'
     };
+    if (!isNaN(peso)) registro.peso = peso;
 
     // Guardado seguro via funcion-token (valida token, sesion de hoy y actua solo sobre su fila)
     const { data: res, error: errRpc } = await sb.rpc('fn_token_guardar_wellness', {
@@ -271,7 +269,41 @@ async function enviar(jugadorId, sesionId) {
         return;
     }
 
-    pintar(`<div class="card"><div class="ok-box"><div class="ico">✅</div><div class="txt">¡Registro enviado!</div><div class="sub">Gracias. Que tengas buen entrenamiento.</div></div></div>`);
+    pintar(`
+        <div class="card"><div class="ok-box"><div class="ico">✅</div><div class="txt">¡Registro enviado!</div><div class="sub">Gracias. Que tengas buen entrenamiento.</div></div></div>
+        ${isNaN(peso) ? cajaPesoHTML() : ''}
+    `);
+}
+
+// Caja para anadir el peso despues de haber enviado el wellness
+function cajaPesoHTML() {
+    return `
+        <div class="card" id="caja-peso-post">
+            <div style="font-weight:700;color:#e2e8f0;margin-bottom:4px">⚖️ ¿Quieres añadir tu peso de hoy?</div>
+            <div style="font-size:13px;color:#94a3b8;margin-bottom:10px">Es opcional. Si te pesas más tarde, vuelve a abrir este enlace y lo guardas aquí.</div>
+            <input type="number" class="num-field" id="n-peso-post" placeholder="Ej: 74.5" step="0.1" min="30" max="150">
+            <button class="btn-enviar" id="btn-peso-post" style="margin-top:10px" onclick="guardarPesoSuelto()">Guardar peso</button>
+        </div>
+    `;
+}
+
+async function guardarPesoSuelto() {
+    const peso = parseFloat(document.getElementById('n-peso-post').value);
+    if (isNaN(peso)) { alert('Escribe tu peso en kg (ej: 74.5)'); return; }
+    const btn = document.getElementById('btn-peso-post');
+    btn.disabled = true;
+    btn.textContent = 'Guardando...';
+    const { data: res, error: errRpc } = await sb.rpc('fn_token_guardar_wellness', {
+        p_token: window._tokenWellness, p_sesion_id: window._sesionWellness, p_datos: { peso: peso }
+    });
+    const error = errRpc || (res && res.ok ? null : { message: (res && res.error) || 'No se pudo guardar' });
+    if (error) {
+        btn.disabled = false;
+        btn.textContent = 'Guardar peso';
+        alert('Error al guardar: ' + error.message);
+        return;
+    }
+    document.getElementById('caja-peso-post').innerHTML = '<div style="text-align:center;color:#10b981;font-weight:700;padding:10px 0">✅ Peso guardado (' + peso + ' kg). ¡Gracias!</div>';
 }
 
 init();
