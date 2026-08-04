@@ -292,7 +292,7 @@ async function cargarInsightsDashboard() {
     row.innerHTML = '<div class="dash-ins"><div class="dash-ins-t">🔥 Racha (últimos 5)</div><div class="dash-racha" id="dash-ins-racha"><span style="background:#e5e7eb;color:#9ca3af">-</span></div></div>' +
         '<div class="dash-ins"><div class="dash-ins-t">🚦 Estado de cargas (ACWR)</div><div id="dash-ins-cargas" style="font-size:12px;color:#9ca3af">Calculando...</div><span class="dash-ins-link" onclick="dashIrACargas()">Ver panel de cargas →</span></div>' +
         '<div class="dash-ins"><div class="dash-ins-t">💪 Carga equipo · 7 días</div><div class="dash-ins-big" id="dash-ins-carga7">-</div><div class="dash-ins-sub" id="dash-ins-carga7-sub">media UA por jugador</div></div>' +
-        '<div class="dash-ins"><div class="dash-ins-t">🎂 Próximos cumpleaños</div><div id="dash-ins-cumples" style="font-size:12px;color:#9ca3af">-</div></div>';
+        '<div class="dash-ins"><div class="dash-ins-t" style="display:flex;justify-content:space-between;align-items:center;gap:6px">🎂 Próximos cumpleaños <button onclick="dashCumplesPDF()" style="background:#26215C;color:#fff;border:none;border-radius:6px;padding:3px 9px;font-size:11px;cursor:pointer;font-weight:700">📄 PDF</button></div><div id="dash-ins-cumples" style="font-size:12px;color:#9ca3af">-</div></div>';
 
     // Racha: ultimos 5 partidos con resultado
     try {
@@ -363,11 +363,11 @@ async function cargarInsightsDashboard() {
             let prox = new Date(hoy.getFullYear(), b.getMonth(), b.getDate());
             if (prox < hoy) prox = new Date(hoy.getFullYear() + 1, b.getMonth(), b.getDate());
             const dias = Math.round((prox - hoy) / 86400000);
-            if (dias <= 30) lista.push({ n: j.name, dias: dias, edad: prox.getFullYear() - b.getFullYear() });
+            lista.push({ n: j.name, dias: dias, edad: prox.getFullYear() - b.getFullYear() });
         });
         lista.sort((a, b) => a.dias - b.dias);
         const el = document.getElementById('dash-ins-cumples');
-        if (!lista.length) { el.innerHTML = '<span style="font-size:12px;color:#9ca3af">Ninguno en 30 días</span>'; }
+        if (!lista.length) { el.innerHTML = '<span style="font-size:12px;color:#9ca3af">Sin fechas de nacimiento</span>'; }
         else {
             el.innerHTML = lista.slice(0, 3).map(c => '<div class="dash-cumple">🎂 <b>' + c.n + '</b> · ' + (c.dias === 0 ? '¡HOY!' : 'en ' + c.dias + ' día' + (c.dias === 1 ? '' : 's')) + ' (' + c.edad + ')</div>').join('');
         }
@@ -389,3 +389,62 @@ cargarDashboard = async function() {
     await _cargarDashboardOriginal();
     cargarInsightsDashboard();
 };
+// --- PDF de cumpleaños (solo nueva incorporación y en propiedad) ---
+async function dashCumplesPDF() {
+    try {
+        const { data: jugs } = await supabaseClient
+            .from('players')
+            .select('id, name, shirt_number, birth_date, acquisition')
+            .eq('club_id', clubId)
+            .in('acquisition', ['nueva_incorporacion', 'propiedad'])
+            .not('birth_date', 'is', null);
+
+        let lista = jugs || [];
+        if (typeof seasonId !== 'undefined' && seasonId) {
+            const { data: sps } = await supabaseClient
+                .from('season_players')
+                .select('player_id, shirt_number')
+                .eq('season_id', seasonId);
+            const mapa = {};
+            (sps || []).forEach(sp => { mapa[sp.player_id] = sp; });
+            lista = lista.filter(j => mapa[j.id]);
+            lista.forEach(j => { if (mapa[j.id] && mapa[j.id].shirt_number) j.shirt_number = mapa[j.id].shirt_number; });
+        }
+
+        if (!lista.length) { showToast('No hay jugadores de nueva incorporación o en propiedad con fecha de nacimiento', 'warning'); return; }
+
+        const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+        const filas = lista.map(function(j) {
+            const b = new Date(j.birth_date + 'T12:00:00');
+            let prox = new Date(hoy.getFullYear(), b.getMonth(), b.getDate());
+            if (prox < hoy) prox = new Date(hoy.getFullYear() + 1, b.getMonth(), b.getDate());
+            const dias = Math.round((prox - hoy) / 86400000);
+            return {
+                dorsal: j.shirt_number || '-',
+                nombre: j.name,
+                nac: b.toLocaleDateString('es-ES'),
+                cumple: prox.toLocaleDateString('es-ES'),
+                dias: dias,
+                edad: prox.getFullYear() - b.getFullYear(),
+                origen: j.acquisition === 'propiedad' ? 'En propiedad' : 'Nueva incorporación'
+            };
+        }).sort(function(a, b) { return a.dias - b.dias; });
+
+        const doc = new jspdf.jsPDF();
+        doc.setFontSize(16); doc.setTextColor(30, 41, 59);
+        doc.text('Cumpleaños de la plantilla', 14, 18);
+        doc.setFontSize(10); doc.setTextColor(100, 116, 139);
+        doc.text('Ordenado por próximo cumpleaños · ' + new Date().toLocaleDateString('es-ES'), 14, 25);
+        doc.autoTable({
+            startY: 30,
+                      head: [['Dorsal', 'Jugador', 'Nacimiento', 'Próximo cumpleaños', 'Cumple']],
+                      body: filas.map(function(f) { return [f.dorsal, f.nombre, f.nac, f.cumple, f.edad]; }),
+            styles: { fontSize: 9, textColor: [30, 41, 59] },
+            headStyles: { fillColor: [0, 0, 0], textColor: [255, 255, 255] }
+        });
+        doc.save('cumpleanos_plantilla.pdf');
+    } catch (e) {
+        console.error('Error generando PDF de cumpleaños:', e);
+        showToast('Error al generar el PDF: ' + e.message, 'error');
+    }
+}
