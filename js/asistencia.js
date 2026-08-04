@@ -217,7 +217,19 @@ async function cargarAsistenciaRango() {
         }
         
         const { data: sesiones, error: errSes } = await querySesiones;
-        asisFiltrarCelebradas(sesiones);
+        // Contar sesiones celebradas O con asistencia ya registrada (aunque no haya llegado su hora)
+        var idsRango = (sesiones || []).map(s => s.id);
+        var idsConRegistros = {};
+        if (idsRango.length > 0) {
+            const { data: regPrevios } = await supabaseClient
+                .from('asistencia_sesiones')
+                .select('sesion_id')
+                .in('sesion_id', idsRango);
+            (regPrevios || []).forEach(r => { idsConRegistros[r.sesion_id] = true; });
+        }
+        for (var i = (sesiones || []).length - 1; i >= 0; i--) {
+            if (!asisSesionYaCelebrada(sesiones[i]) && !idsConRegistros[sesiones[i].id]) sesiones.splice(i, 1);
+        }
         
         if (errSes) throw errSes;
         
