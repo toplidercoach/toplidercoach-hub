@@ -1889,7 +1889,7 @@ async function cargarMisEjerciciosBiblioteca() {
             .select('id, name, category, tema, difficulty, duration_min, players_count, thumbnail_svg')
             .or((typeof cmState !== 'undefined' && cmState.activo && typeof clubId !== 'undefined' && clubId) ? ('club_id.eq.' + clubId + ',coach_id.eq.' + String(usuario.id)) : ('coach_id.eq.' + String(usuario.id)))
             .order('created_at', { ascending: false })
-            .limit(50);
+            .limit(1000);
         
         if (error) throw error;
         
