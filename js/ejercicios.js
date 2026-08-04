@@ -3593,7 +3593,7 @@ async function ejBancoLoad() {
             
             .or(window.ejClubId ? ('club_id.eq.' + window.ejClubId + ',coach_id.eq.' + String(window.ejCoachId)) : ('coach_id.eq.' + String(window.ejCoachId)))
             .order('created_at', { ascending: false })
-            .limit(200);
+            .limit(1000);
         if (error) throw error;
         ejEditandoId = null;
         ejBancoCache = data || [];
@@ -3644,7 +3644,7 @@ function ejBancoRender(list) {
     const grid = document.getElementById('ej-banco-grid');
     if (!grid) return;
 
-    var MAX = 100;
+    var MAX = 1000;
     if (list.length > MAX) list = list.slice(0, MAX);
     var countEl = document.getElementById('ej-banco-count');
     if (countEl) countEl.textContent = list.length + ' ejercicio' + (list.length !== 1 ? 's' : '');
