@@ -3589,21 +3589,52 @@ async function ejBancoLoad() {
     try {
         const { data, error } = await supabaseClient
             .from('custom_exercises')
-            .select('id,name,category,age_group,difficulty,duration_min,players_count,game_phase,field_width,field_length,eii,objectives,description,variants,coach_notes,materials,thumbnail_svg,animation_url,tema,num_goalkeepers')
+            .select('id,name,category,age_group,difficulty,duration_min,players_count,game_phase,field_width,field_length,eii,objectives,description,variants,coach_notes,materials,animation_url,tema,num_goalkeepers')
             
             .or(window.ejClubId ? ('club_id.eq.' + window.ejClubId + ',coach_id.eq.' + String(window.ejCoachId)) : ('coach_id.eq.' + String(window.ejCoachId)))
             .order('created_at', { ascending: false })
             .limit(1000);
         if (error) throw error;
         ejEditandoId = null;
-        ejBancoCache = data || [];
+         ejBancoCache = data || [];
         ejBancoRender(ejBancoCache);
+        ejBancoCargarThumbs();
     } catch(err) {
         const grid = document.getElementById('ej-banco-grid');
         if (grid) grid.innerHTML = `<div style="color:#ef4444">Error: ${err.message}</div>`;
     }
 }
 
+async function ejBancoCargarThumbs() {
+    var pendientes = ejBancoCache.filter(function(e){ return e.thumbnail_svg === undefined; });
+    var LOTE = 5;
+    for (var i = 0; i < pendientes.length; i += LOTE) {
+        var grupo = pendientes.slice(i, i + LOTE);
+        var ids = grupo.map(function(e){ return e.id; });
+        try {
+            var res = await supabaseClient.from('custom_exercises').select('id,thumbnail_svg').in('id', ids);
+            if (res.error) continue;
+            var mapa = {};
+            (res.data || []).forEach(function(r){ mapa[r.id] = r.thumbnail_svg || null; });
+            grupo.forEach(function(e){ e.thumbnail_svg = (mapa[e.id] !== undefined) ? mapa[e.id] : null; });
+            var grid = document.getElementById('ej-banco-grid');
+            if (!grid) return;
+            grupo.forEach(function(e){
+                var img = grid.querySelector('img[data-ej-id="' + e.id + '"]');
+                if (!img) return;
+                if (e.thumbnail_svg) {
+                    try {
+                        if (e.thumbnail_svg.startsWith('data:')) { img.src = e.thumbnail_svg; }
+                        else { img.src = URL.createObjectURL(new Blob([e.thumbnail_svg], {type:'image/svg+xml'})); }
+                    } catch(err2) {}
+                } else {
+                    var cont = img.parentElement;
+                    if (cont) cont.innerHTML = '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#475569;font-size:11px">sin dibujo</div>';
+                }
+            });
+        } catch(err) {}
+    }
+}
 function ejLimpiarFiltros() {
     ['ej-search','ej-filter-jug','ej-filter-port','ej-filter-dur'].forEach(id => {
         const el = document.getElementById(id); if (el) el.value = '';
@@ -3671,9 +3702,9 @@ function ejBancoRender(list) {
             tagsHTML += '<span style="font-size:10px;color:#94a3b8;background:#1e293b;padding:1px 6px;border-radius:4px">' + tags[t] + '</span>';
         }
 
-        var thumbHTML;
-        if (e.thumbnail_svg) {
-            thumbHTML = '<img data-svg-idx="' + idx + '" style="width:100%;height:100%;object-fit:cover;display:block;background:#0f4c2a" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" loading="lazy"/>';
+           var thumbHTML;
+        if (e.thumbnail_svg !== null) {
+            thumbHTML = '<img data-ej-id="' + e.id + '" style="width:100%;height:100%;object-fit:cover;display:block;background:#0f4c2a" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" loading="lazy"/>';
         } else {
             thumbHTML = '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#475569;font-size:11px">sin dibujo</div>';
         }
@@ -3699,11 +3730,11 @@ grid.innerHTML = html;
 
     // Convertir SVGs a Blob URLs
     setTimeout(function() {
-        var imgs = grid.querySelectorAll('img[data-svg-idx]');
+                var imgs = grid.querySelectorAll('img[data-ej-id]');
         for (var i = 0; i < imgs.length; i++) {
             var img = imgs[i];
-            var svgIdx = parseInt(img.getAttribute('data-svg-idx'));
-            var ex = list[svgIdx];
+            var ejId = img.getAttribute('data-ej-id');
+            var ex = ejBancoCache.find(function(x){ return String(x.id) === ejId; });
             if (ex && ex.thumbnail_svg) {
                 try {
                     if (ex.thumbnail_svg.startsWith('data:')) {
