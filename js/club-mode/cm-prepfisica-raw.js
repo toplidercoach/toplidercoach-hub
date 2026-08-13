@@ -1,15 +1,18 @@
-// ========== CM-PREPFISICA-RAW.JS - Analisis avanzado del JSON crudo del GPS ==========
+// ========== CM-PREPFISICA-RAW.JS (v2) - Analisis avanzado del JSON crudo del GPS ==========
 // Procesa en el navegador el JSON de 10 Hz del dispositivo (velocidad en NUDOS)
 // y guarda solo el resultado destilado (~10 KB) en extra_metrics.raw de la fila
 // del jugador en cm_pf_gps_player_data. El JSON crudo NO se almacena.
+// v2: seleccion multi-archivo con AUTO-EMPAREJADO POR HUELLA DE DATOS: compara
+// la Vmax y la distancia de cada JSON con las metricas del CSV ya importadas
+// y propone el jugador con nivel de confianza (los chalecos rotan entre
+// jugadores, asi que no se puede memorizar dispositivo->jugador).
 // Calcula: mapa de calor orientado por PCA, curva de intensidad (m/min por
-// minuto), MDP (peor pasaje de 1'/3'/5') y listado de sprints con minuto,
-// duracion, metros y velocidad pico.
+// minuto), MDP (peor pasaje de 1'/3'/5') y listado de sprints.
 // Se engancha al informe de sesion (cm-prepfisica-sesion.js) con un boton
 // "JSON crudo". Cargar DESPUES de cm-prepfisica-sesion.js.
 
 var cmPfRaw = {
-    archivos: {},     // player_id -> File pendiente de procesar
+    lote: [],         // [{nombre, analisis, rowId (asignado), conf}]
     charts: []
 };
 
@@ -45,49 +48,56 @@ var CMPFRAW_ROWS = 27;
     }, 300);
 })();
 
-// ---------- Gestor: asignar archivos a jugadores ----------
+// ---------- Gestor: multi-archivo + auto-emparejado por huella ----------
+function cmPfRawFilasSesion() {
+    return cmPfSes2.allData.filter(function (d) { return d.segment_name === cmPfSes2.segmento; });
+}
+
 function cmPfRawAbrirGestor() {
     cmPfRawCerrarGestor();
-    cmPfRaw.archivos = {};
-
-    var filas = cmPfSes2.allData.filter(function (d) { return d.segment_name === cmPfSes2.segmento; });
+    cmPfRaw.lote = [];
 
     var ov = document.createElement('div');
     ov.id = 'cmpfraw-gestor';
     ov.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.75);z-index:9600;display:flex;justify-content:center;align-items:flex-start;padding:30px;overflow-y:auto';
     ov.onclick = function (e) { if (e.target === ov) cmPfRawCerrarGestor(); };
 
-    var lista = '';
-    filas.forEach(function (d) {
-        var p = cmPfSes2.playerMap[d.player_id] || {};
-        var tiene = d.extra_metrics && d.extra_metrics.raw;
-        lista += '<div class="cmpfraw-fila" id="cmpfraw-fila-' + d.id + '">' +
-            '<div style="flex:1;min-width:140px"><b>' + (p.name || 'Jugador') + '</b>' +
-                '<span class="cmpfraw-estado" id="cmpfraw-estado-' + d.id + '">' +
-                (tiene ? '<span style="color:#4ade80">con analisis</span>' : '<span style="color:#64748b">sin analisis</span>') +
-                '</span></div>' +
-            '<input type="file" accept=".json" style="color:#94a3b8;font-size:11px;max-width:220px" onchange="cmPfRawAsignar(\'' + d.id + '\', this)">' +
-            (tiene ? '<button class="cmpfses2-vbtn" onclick="cmPfRawVer(\'' + d.id + '\')">Ver</button>' : '') +
-        '</div>';
+    // Jugadores que ya tienen analisis guardado (acceso directo a "Ver")
+    var conAnalisis = '';
+    cmPfRawFilasSesion().forEach(function (d) {
+        if (d.extra_metrics && d.extra_metrics.raw) {
+            var p = cmPfSes2.playerMap[d.player_id] || {};
+            conAnalisis += '<span class="cmpfraw-verchip" onclick="cmPfRawVer(\'' + d.id + '\')">' + (p.name || 'Jugador') + '</span>';
+        }
     });
+    if (conAnalisis) {
+        conAnalisis = '<div style="margin-top:10px"><div style="color:#94a3b8;font-size:11px;margin-bottom:6px">Con analisis guardado (clic para ver):</div>' + conAnalisis + '</div>';
+    }
 
     ov.innerHTML =
     '<style>' +
-        '.cmpfraw-modal{background:#0f172a;border-radius:14px;width:100%;max-width:640px;max-height:90vh;overflow-y:auto;border:1px solid #14b8a6;padding:22px}' +
+        '.cmpfraw-modal{background:#0f172a;border-radius:14px;width:100%;max-width:720px;max-height:90vh;overflow-y:auto;border:1px solid #14b8a6;padding:22px}' +
         '.cmpfraw-modal h3{color:#e2e8f0;font-size:17px;margin:0}' +
-        '.cmpfraw-fila{display:flex;align-items:center;gap:10px;background:#1e293b;border-radius:8px;padding:10px 12px;margin-top:8px;flex-wrap:wrap;color:#e2e8f0;font-size:13px}' +
-        '.cmpfraw-estado{margin-left:8px;font-size:11px}' +
+        '.cmpfraw-fila{display:flex;align-items:center;gap:10px;background:#1e293b;border-radius:8px;padding:10px 12px;margin-top:8px;flex-wrap:wrap;color:#e2e8f0;font-size:12px}' +
+        '.cmpfraw-fila select{background:#0f172a;border:1px solid #334155;color:#e2e8f0;padding:4px 6px;border-radius:5px;font-size:12px;max-width:190px}' +
+        '.cmpfraw-conf{padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700}' +
+        '.cmpfraw-conf.alta{background:#052e16;color:#86efac}' +
+        '.cmpfraw-conf.media{background:#451a03;color:#fcd34d}' +
+        '.cmpfraw-conf.baja{background:#450a0a;color:#fca5a5}' +
+        '.cmpfraw-verchip{display:inline-block;background:#0f3d3e;color:#14b8a6;padding:4px 10px;border-radius:12px;font-size:11px;margin:0 6px 6px 0;cursor:pointer}' +
     '</style>' +
     '<div class="cmpfraw-modal">' +
         '<div style="display:flex;justify-content:space-between;align-items:center">' +
             '<h3>Analisis avanzado (JSON del dispositivo)</h3>' +
             '<button style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer" onclick="cmPfRawCerrarGestor()">x</button>' +
         '</div>' +
-        '<p style="color:#94a3b8;font-size:12px;margin:6px 0 10px">Asigna a cada jugador su archivo JSON crudo (uno por dispositivo). Se procesa en tu navegador y solo se guarda el resultado; el archivo de 8 MB no se sube. Con analisis guardado, pulsa "Ver" para el mapa de calor, la curva de intensidad, el MDP y los sprints.</p>' +
-        lista +
+        '<p style="color:#94a3b8;font-size:12px;margin:6px 0 10px">Selecciona TODOS los archivos JSON de la sesion a la vez. Se procesan en tu navegador y el sistema propone a que jugador pertenece cada uno comparando su Vmax y su distancia con los datos ya importados del CSV (los chalecos rotan, por eso se empareja por los datos y no por el aparato). Revisa las propuestas y guarda.</p>' +
+        '<input type="file" accept=".json" multiple style="color:#e2e8f0;font-size:13px" onchange="cmPfRawSeleccion(this)">' +
+        '<div id="cmpfraw-resultado"></div>' +
+        conAnalisis +
         '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px">' +
             '<button class="cmpfses2-vbtn" onclick="cmPfRawCerrarGestor()">Cerrar</button>' +
-            '<button class="cmpfses2-vbtn act" id="cmpfraw-procesar" onclick="cmPfRawProcesarTodos()">Procesar y guardar</button>' +
+            '<button class="cmpfses2-vbtn act" id="cmpfraw-guardar" onclick="cmPfRawGuardarTodos()" style="display:none">Guardar analisis</button>' +
         '</div>' +
     '</div>';
     document.body.appendChild(ov);
@@ -98,51 +108,117 @@ function cmPfRawCerrarGestor() {
     if (ov) ov.remove();
 }
 
-function cmPfRawAsignar(rowId, input) {
-    if (input.files && input.files[0]) {
-        cmPfRaw.archivos[rowId] = input.files[0];
-        var e = document.getElementById('cmpfraw-estado-' + rowId);
-        if (e) e.innerHTML = '<span style="color:#fbbf24">pendiente de procesar</span>';
-    }
-}
+async function cmPfRawSeleccion(input) {
+    var files = input.files;
+    if (!files || !files.length) return;
+    var cont = document.getElementById('cmpfraw-resultado');
+    cmPfRaw.lote = [];
 
-async function cmPfRawProcesarTodos() {
-    var ids = Object.keys(cmPfRaw.archivos);
-    if (ids.length === 0) { if (typeof showToast === 'function') showToast('No has asignado ningun archivo'); return; }
-    var btn = document.getElementById('cmpfraw-procesar');
-    if (btn) { btn.disabled = true; btn.textContent = 'Procesando...'; }
-
-    var ok = 0, fallos = 0;
-    for (var i = 0; i < ids.length; i++) {
-        var rowId = ids[i];
-        var est = document.getElementById('cmpfraw-estado-' + rowId);
+    // 1) Procesar todos los archivos
+    for (var i = 0; i < files.length; i++) {
+        if (cont) cont.innerHTML = '<p style="color:#fbbf24;font-size:12px;margin-top:10px">Procesando ' + (i + 1) + ' de ' + files.length + ': ' + files[i].name + '...</p>';
         try {
-            if (est) est.innerHTML = '<span style="color:#fbbf24">procesando...</span>';
-            var texto = await cmPfRawLeer(cmPfRaw.archivos[rowId]);
-            var datos = JSON.parse(texto);
-            var analisis = cmPfRawProcesar(datos);
-
-            // Merge en extra_metrics de la fila (sin pisar lo del importador CSV)
-            var fila = null;
-            cmPfSes2.allData.forEach(function (d) { if (d.id === rowId) fila = d; });
-            var extra = (fila && fila.extra_metrics) ? JSON.parse(JSON.stringify(fila.extra_metrics)) : {};
-            extra.raw = analisis;
-
-            var r = await supabaseClient.from('cm_pf_gps_player_data')
-                .update({ extra_metrics: extra }).eq('id', rowId);
-            if (r.error) throw r.error;
-
-            if (fila) fila.extra_metrics = extra;  // refrescar en memoria
-            if (est) est.innerHTML = '<span style="color:#4ade80">con analisis</span>';
-            ok++;
+            var texto = await cmPfRawLeer(files[i]);
+            var analisis = cmPfRawProcesar(JSON.parse(texto));
+            cmPfRaw.lote.push({ nombre: files[i].name, analisis: analisis, rowId: '', conf: 'baja', error: null });
         } catch (e) {
-            if (est) est.innerHTML = '<span style="color:#f87171">error: ' + (e.message || e) + '</span>';
-            fallos++;
+            cmPfRaw.lote.push({ nombre: files[i].name, analisis: null, rowId: '', conf: 'baja', error: (e.message || String(e)) });
         }
     }
-    if (btn) { btn.disabled = false; btn.textContent = 'Procesar y guardar'; }
+
+    // 2) Auto-emparejar por huella (Vmax + distancia) contra las filas del CSV
+    var filas = cmPfRawFilasSesion();
+    var pares = [];
+    cmPfRaw.lote.forEach(function (l, li) {
+        if (!l.analisis) return;
+        filas.forEach(function (f) {
+            var vCsv = f.max_speed_kmh !== null ? parseFloat(f.max_speed_kmh) : null;
+            var dCsv = f.total_distance_m !== null ? parseFloat(f.total_distance_m) : null;
+            if (vCsv === null || dCsv === null || dCsv === 0) return;
+            var dV = Math.abs(l.analisis.vmax_kmh - vCsv);
+            var dD = Math.abs(l.analisis.dist_m - dCsv) / dCsv;
+            pares.push({ li: li, rowId: f.id, dV: dV, dD: dD, score: dV * 2 + dD * 20 });
+        });
+    });
+    // Asignacion greedy: mejores parejas primero, sin repetir archivo ni jugador
+    pares.sort(function (a, b) { return a.score - b.score; });
+    var usadoArchivo = {}, usadoFila = {};
+    pares.forEach(function (par) {
+        if (usadoArchivo[par.li] || usadoFila[par.rowId]) return;
+        usadoArchivo[par.li] = true;
+        usadoFila[par.rowId] = true;
+        cmPfRaw.lote[par.li].rowId = par.rowId;
+        cmPfRaw.lote[par.li].conf = (par.dV <= 0.5 && par.dD <= 0.15) ? 'alta' : (par.dV <= 1.5 ? 'media' : 'baja');
+    });
+
+    cmPfRawRenderLote();
+}
+
+function cmPfRawRenderLote() {
+    var cont = document.getElementById('cmpfraw-resultado');
+    if (!cont) return;
+    var filas = cmPfRawFilasSesion();
+
+    var h = '';
+    cmPfRaw.lote.forEach(function (l, li) {
+        if (l.error) {
+            h += '<div class="cmpfraw-fila"><div style="flex:1"><b>' + l.nombre + '</b></div><span class="cmpfraw-conf baja">error: ' + l.error + '</span></div>';
+            return;
+        }
+        var opts = '<option value="">-- No guardar --</option>';
+        filas.forEach(function (f) {
+            var p = cmPfSes2.playerMap[f.player_id] || {};
+            var sel = l.rowId === f.id ? ' selected' : '';
+            var vCsv = f.max_speed_kmh !== null ? parseFloat(f.max_speed_kmh) : '-';
+            opts += '<option value="' + f.id + '"' + sel + '>' + (p.name || 'Jugador') + ' (Vmax ' + vCsv + ')</option>';
+        });
+        h += '<div class="cmpfraw-fila">' +
+            '<div style="flex:1;min-width:170px"><b>' + l.nombre + '</b><br>' +
+                '<span style="color:#94a3b8;font-size:11px">' + Math.round(l.analisis.dist_m) + ' m &middot; Vmax ' + l.analisis.vmax_kmh + ' km/h &middot; ' + l.analisis.duracion_min + ' min</span></div>' +
+            '<select onchange="cmPfRaw.lote[' + li + '].rowId=this.value">' + opts + '</select>' +
+            '<span class="cmpfraw-conf ' + l.conf + '">' + (l.rowId ? 'confianza ' + l.conf : 'sin propuesta') + '</span>' +
+        '</div>';
+    });
+
+    cont.innerHTML = h;
+    var btn = document.getElementById('cmpfraw-guardar');
+    if (btn) btn.style.display = cmPfRaw.lote.some(function (l) { return l.analisis; }) ? '' : 'none';
+}
+
+async function cmPfRawGuardarTodos() {
+    var pendientes = cmPfRaw.lote.filter(function (l) { return l.analisis && l.rowId; });
+    if (!pendientes.length) { if (typeof showToast === 'function') showToast('No hay asignaciones que guardar'); return; }
+
+    // Evitar dos archivos apuntando al mismo jugador
+    var vistos = {};
+    for (var i = 0; i < pendientes.length; i++) {
+        if (vistos[pendientes[i].rowId]) {
+            if (typeof showToast === 'function') showToast('Hay dos archivos asignados al mismo jugador, revisa las propuestas', 'error');
+            return;
+        }
+        vistos[pendientes[i].rowId] = true;
+    }
+
+    var btn = document.getElementById('cmpfraw-guardar');
+    if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
+    var ok = 0, fallos = 0;
+    for (var j = 0; j < pendientes.length; j++) {
+        var l = pendientes[j];
+        try {
+            var fila = null;
+            cmPfSes2.allData.forEach(function (d) { if (d.id === l.rowId) fila = d; });
+            var extra = (fila && fila.extra_metrics) ? JSON.parse(JSON.stringify(fila.extra_metrics)) : {};
+            extra.raw = l.analisis;
+            var r = await supabaseClient.from('cm_pf_gps_player_data')
+                .update({ extra_metrics: extra }).eq('id', l.rowId);
+            if (r.error) throw r.error;
+            if (fila) fila.extra_metrics = extra;
+            ok++;
+        } catch (e) { fallos++; }
+    }
+    if (btn) { btn.disabled = false; btn.textContent = 'Guardar analisis'; }
     if (typeof showToast === 'function') showToast(ok + ' analisis guardados' + (fallos ? ' (' + fallos + ' con error)' : ''));
-    if (ok > 0) cmPfRawAbrirGestor(); // re-render con botones "Ver"
+    if (ok > 0) cmPfRawAbrirGestor();
 }
 
 function cmPfRawLeer(file) {
@@ -258,10 +334,17 @@ function cmPfRawProcesar(data) {
         }
     });
 
+    var distTotal = 0;
+    for (var di = 0; di < distSeg.length; di++) distTotal += (distSeg[di] || 0);
+    var vmaxKmh = 0;
+    pts.forEach(function (p) { var vk = p.v * CMPFRAW_KNOTS; if (vk > vmaxKmh) vmaxKmh = vk; });
+
     return {
-        version: 1,
+        version: 2,
         muestras: pts.length,
         duracion_min: Math.round((pts[pts.length - 1].t - t0) / 60 * 10) / 10,
+        dist_m: Math.round(distTotal),
+        vmax_kmh: Math.round(vmaxKmh * 10) / 10,
         campo: { largo: Math.round(x2 - x1), ancho: Math.round(y2 - y1) },
         heatmap: { cols: CMPFRAW_COLS, rows: CMPFRAW_ROWS, cells: grid },
         serie_mmin: serie,
