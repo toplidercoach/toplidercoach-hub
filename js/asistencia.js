@@ -392,7 +392,7 @@ async function abrirModalAsistenciaSesion(sesionId) {
             });
 
             html += `
-                <div class="wreg-card" data-player-id="${j.player_id}" data-sin-datos="${(asist.sueno != null || asist.rpe != null) ? '0' : '1'}" data-reg-por="${asist.registrado_por || ''}" data-reg-en="${asist.registrado_en || ''}">
+                <div class="wreg-card" data-player-id="${j.player_id}" data-sin-datos="${(asist.sueno != null || asist.rpe != null) ? '0' : '1'}" data-reg-por="${asist.registrado_por || ''}" data-reg-en="${asist.registrado_en || ''}" data-rpe-en="${asist.rpe_registrado_en || ''}">
                     <div class="wreg-top">
                         <div class="wreg-nombre">${j.shirt_number || '?'}. ${j.name}</div>
                         <button type="button" class="toggle-asistio ${asistio ? 'si' : 'no'}" onclick="toggleAsistencia(this)">
@@ -553,7 +553,8 @@ async function guardarAsistenciaSesion() {
                 return isNaN(d) ? null : d;
             })(),
             registrado_por: (row.dataset.regPor === 'jugador') ? 'jugador' : 'staff',
-            registrado_en: (row.dataset.regPor === 'jugador' && row.dataset.regEn) ? row.dataset.regEn : new Date().toISOString()
+            registrado_en: (row.dataset.regPor === 'jugador' && row.dataset.regEn) ? row.dataset.regEn : new Date().toISOString(),
+            rpe_registrado_en: row.dataset.rpeEn || null
         });
     });
     try {
@@ -594,7 +595,8 @@ function wListaLeerCards() {
             peso: (function(){ const pi = card.querySelector('.peso-input'); return pi ? (parseFloat(pi.value) || null) : null; })(),
             rpe: (sinDatos || rpeInp.dataset.set !== '1') ? null : Number(rpeInp.value),
             grupo: card.querySelector('.w-grupo').value || '',
-            envio: (card.dataset.regPor === 'jugador' && card.dataset.regEn) ? new Date(card.dataset.regEn).getTime() : null
+            envio: (card.dataset.regPor === 'jugador' && card.dataset.regEn) ? new Date(card.dataset.regEn).getTime() : null,
+            rpeEnvio: card.dataset.rpeEn ? new Date(card.dataset.rpeEn).getTime() : null
         };
         f.bienestar = (f.sueno != null) ? Number(((f.sueno + f.fatiga + f.estres) / 3).toFixed(1)) : null;
         filas.push(f);
@@ -682,11 +684,12 @@ function wListaRender() {
             : '<span style="color:#dc2626;font-weight:700">✗</span>' + (f.motivo ? '<div style="font-size:10px;color:#9ca3af">' + f.motivo + '</div>' : '');
         const badge = f.sinDatos ? ' <span style="background:#f3f4f6;color:#9ca3af;border-radius:999px;padding:1px 8px;font-size:10px;font-weight:700">Sin datos</span>' : '';
         const grupoTxt = (f.muscular != null && f.muscular >= 4 && f.grupo) ? '<div style="font-size:10px;color:#ea580c;font-weight:600">' + f.grupo + '</div>' : '';
+        const rpeHoraTxt = (f.rpe != null && f.rpeEnvio != null) ? '<div style="font-size:10px;color:#7c3aed;font-weight:600">' + horaEnvio(f.rpeEnvio) + '</div>' : '';
         return '<tr onclick="wListaIrAFicha(\'' + f.id + '\')" style="border-top:1px solid #f3f4f6;cursor:pointer;' + (gris ? 'opacity:0.55;background:#fafafa' : '') + '">' +
             '<td style="padding:7px 6px;text-align:center">' + asistTxt + '</td>' +
             '<td style="padding:7px 6px;font-weight:600;color:#1f2937;font-size:13px;white-space:nowrap">' + f.nombre + badge + '</td>' +
             celda('sueno', f.sueno) + celda('fatiga', f.fatiga) + celda('estres', f.estres) +
-            celda('muscular', f.muscular, grupoTxt) + celda('horas', f.horas) + celda('peso', f.peso) + celda('rpe', f.rpe) + celda('bienestar', f.bienestar) + celdaEnvio(f) +
+            celda('muscular', f.muscular, grupoTxt) + celda('horas', f.horas) + celda('peso', f.peso) + celda('rpe', f.rpe, rpeHoraTxt) + celda('bienestar', f.bienestar) + celdaEnvio(f) +
             '</tr>';
     }
 
@@ -739,7 +742,7 @@ function wListaPDF() {
             f.nombre + (f.sinDatos ? ' (sin datos)' : ''),
             v(f.sueno), v(f.fatiga), v(f.estres),
             v(f.muscular) + ((f.muscular != null && f.muscular >= 4 && f.grupo) ? ' ' + f.grupo : ''),
-            v(f.horas), v(f.peso), v(f.rpe), v(f.bienestar),
+            v(f.horas), v(f.peso), v(f.rpe) + ((f.rpe != null && f.rpeEnvio != null) ? (function() { const d = new Date(f.rpeEnvio); return ' (' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0') + ')'; })() : ''), v(f.bienestar),
             (function() { if (f.envio == null) return '-'; const d = new Date(f.envio); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); })()
         ];
     });
