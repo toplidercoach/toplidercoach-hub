@@ -1877,6 +1877,43 @@ function cambiarFuenteBiblioteca(fuente, btn) {
     }
 }
 
+async function planifCargarThumbsBiblioteca(ids) {
+    const LOTE = 4;
+    for (let i = 0; i < ids.length; i += LOTE) {
+        const grupo = ids.slice(i, i + LOTE);
+        try {
+            const { data, error } = await supabaseClient
+                .from('custom_exercises')
+                .select('id, thumbnail_svg')
+                .in('id', grupo);
+            if (error || !data) continue;
+            data.forEach(function(ej) {
+                if (!ej.thumbnail_svg) return;
+                var thumbSrc = '';
+                try {
+                    if (ej.thumbnail_svg.startsWith('data:')) {
+                        thumbSrc = ej.thumbnail_svg;
+                    } else {
+                        var blob = new Blob([ej.thumbnail_svg], {type: 'image/svg+xml'});
+                        thumbSrc = URL.createObjectURL(blob);
+                    }
+                } catch(e) { return; }
+                var img = document.querySelector('#lista-ejercicios img[data-ejid="' + ej.id + '"]');
+                if (img) img.src = thumbSrc;
+                var card = img ? img.closest('.ejercicio-card') : null;
+                var btn = card ? card.querySelector('.btn-agregar') : null;
+                if (btn) {
+                    try {
+                        var d = JSON.parse(btn.getAttribute('data-ejercicio').replace(/&#39;/g, "'"));
+                        d.imagen = thumbSrc;
+                        btn.setAttribute('data-ejercicio', JSON.stringify(d).replace(/'/g, '&#39;'));
+                    } catch(e) {}
+                }
+            });
+        } catch(e) {}
+    }
+}
+
 async function cargarMisEjerciciosBiblioteca() {
     const lista = document.getElementById('lista-ejercicios');
     const pag = document.getElementById('paginacion-ejercicios');
@@ -1886,7 +1923,7 @@ async function cargarMisEjerciciosBiblioteca() {
     try {
         const { data, error } = await supabaseClient
             .from('custom_exercises')
-            .select('id, name, category, tema, difficulty, duration_min, players_count, thumbnail_svg')
+            .select('id, name, category, tema, difficulty, duration_min, players_count')
             .or((typeof cmState !== 'undefined' && cmState.activo && typeof clubId !== 'undefined' && clubId) ? ('club_id.eq.' + clubId + ',coach_id.eq.' + String(usuario.id)) : ('coach_id.eq.' + String(usuario.id)))
             .order('created_at', { ascending: false })
             .limit(1000);
@@ -1898,6 +1935,7 @@ async function cargarMisEjerciciosBiblioteca() {
             return;
         }
         
+        setTimeout(function(){ planifCargarThumbsBiblioteca(data.map(function(ej){ return ej.id; })); }, 50);
         lista.innerHTML = data.map(ej => {
             var thumbSrc = '';
             
@@ -1928,7 +1966,7 @@ async function cargarMisEjerciciosBiblioteca() {
             }).replace(/'/g, "&#39;");
             
             return '<div class="ejercicio-card" onclick="seleccionarMiEjercicio(\'' + ej.id + '\')">' +
-                '<img src="' + (thumbSrc || 'https://via.placeholder.com/80x60?text=Sin+img') + '" alt="" style="border-radius:6px">' +
+                '<img data-ejid="' + ej.id + '" src="' + (thumbSrc || 'https://via.placeholder.com/80x60?text=Cargando') + '" alt="" style="border-radius:6px">' +
                 '<div class="info">' +
                     '<div class="titulo">' + ej.name + '</div>' +
                     '<div class="tags">' + tags.join('') + '</div>' +
