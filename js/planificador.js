@@ -2926,7 +2926,7 @@ function mvRender() {
             '<div style="flex:1;display:flex;gap:3vw;padding:2vh 3vw;min-height:0;align-items:stretch">' +
                 '<div style="flex:1.4;display:flex;align-items:center;justify-content:center;background:#111827;border-radius:14px;overflow:hidden">' +
                     (sl.imagen
-                        ? '<img src="' + sl.imagen + '" style="max-width:100%;max-height:100%;object-fit:contain">'
+                        ? '<img src="' + sl.imagen + '" onclick="mvZoomImagen()" title="Ampliar" style="max-width:100%;max-height:100%;object-fit:contain;cursor:zoom-in">'
                         : '<span style="color:#334155;font-size:2.4vh">Sin imagen</span>') +
                 '</div>' +
                 '<div style="flex:1;display:flex;flex-direction:column;justify-content:center;min-width:0">' +
@@ -2951,8 +2951,29 @@ function mvMover(d) {
     mvRender();
 }
 
+function mvZoomImagen() {
+    const ov = document.getElementById('mv-overlay');
+    const sl = mvSlides[mvIdx];
+    if (!ov || !sl || !sl.imagen) return;
+    if (document.getElementById('mv-zoom')) return;
+    const z = document.createElement('div');
+    z.id = 'mv-zoom';
+    z.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;background:rgba(3,6,15,.96);display:flex;align-items:center;justify-content:center;cursor:zoom-out;z-index:10';
+    z.innerHTML =
+        '<img src="' + sl.imagen + '" style="width:96%;height:92%;object-fit:contain">' +
+        '<span style="position:absolute;top:2vh;right:2vw;color:#94a3b8;font-size:2vh;background:#1f2937;padding:6px 14px;border-radius:10px">Clic o Esc para cerrar</span>';
+    z.addEventListener('click', mvZoomCerrar);
+    ov.appendChild(z);
+}
+
+function mvZoomCerrar() {
+    const z = document.getElementById('mv-zoom');
+    if (z) z.remove();
+}
+
 function mvTeclado(e) {
     if (!document.getElementById('mv-overlay')) return;
+    if (e.key === 'Escape' && document.getElementById('mv-zoom')) { e.preventDefault(); mvZoomCerrar(); return; }
     if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') { e.preventDefault(); mvMover(1); }
     else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); mvMover(-1); }
     else if (e.key === 'Escape') { mvCerrar(); }
