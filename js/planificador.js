@@ -88,6 +88,11 @@ registrarSubTab('planificador', 'calendario', cargarCalendarioUnificado);
         var jugadoresSeleccionados = [];
         var gpsAsignaciones = {};
         var gpsColapsado = false;
+
+        // Modo Club: recargar jugadores al cambiar el equipo del selector
+        document.addEventListener('cmTeamChanged', function() {
+            try { cargarJugadoresSesion(); } catch (e) { console.error(e); }
+        });
         
         async function cargarJugadoresSesion() {
             const grid = document.getElementById('jugadores-sesion-grid');
@@ -98,11 +103,16 @@ registrarSubTab('planificador', 'calendario', cargarCalendarioUnificado);
             }
             
             try {
-               const { data: jugadores, error } = await supabaseClient
+               let qJug = supabaseClient
                     .from('season_players')
                     .select('id, player_id, shirt_number, players(id, name, photo_url, position)')
-                    .eq('season_id', seasonId)
-                    .order('shirt_number');
+                    .eq('season_id', seasonId);
+                // Modo Club: filtrar por el equipo seleccionado en el header
+                if (typeof cmState !== 'undefined' && cmState.activo && cmState.equipoSeleccionado) {
+                    // Del equipo seleccionado O sin equipo asignado (datos historicos de clubes de un solo equipo)
+                    qJug = qJug.or('team_id.eq.' + cmState.equipoSeleccionado.id + ',team_id.is.null');
+                }
+                const { data: jugadores, error } = await qJug.order('shirt_number');
                 
                 if (error) throw error;
                 

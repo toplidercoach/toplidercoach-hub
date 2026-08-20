@@ -236,11 +236,15 @@ registrarSubTab('config', 'datos', cargarDatosClub);
             lista.innerHTML = '<div class="loading">Cargando...</div>';
             
             try {
-                const { data, error } = await supabaseClient
+                let qPlantilla = supabaseClient
                     .from('season_players')
                     .select('id, player_id, shirt_number, players(id, name, status, position, position_detail, position_secondary, is_sub23, acquisition, photo_url, birth_date, height_cm, weight_kg, dominant_foot)')
-                    .eq('season_id', tempId)
-                    .order('shirt_number');
+                    .eq('season_id', tempId);
+                // Modo Club: solo el equipo seleccionado (o jugadores sin equipo, datos historicos)
+                if (typeof cmState !== 'undefined' && cmState.activo && cmState.equipoSeleccionado) {
+                    qPlantilla = qPlantilla.or('team_id.eq.' + cmState.equipoSeleccionado.id + ',team_id.is.null');
+                }
+                const { data, error } = await qPlantilla.order('shirt_number');
                 
                 if (error) throw error;
                 
@@ -623,11 +627,16 @@ return `
                 await supabaseClient.from('season_players').update({ shirt_number: parseInt(dorsal) }).eq('id', jugadorEditando.spId);
             } else {
                 const { data: newPlayer } = await supabaseClient.from('players').insert(playerData).select().single();
-                await supabaseClient.from('season_players').insert({
+                const spNuevo = {
                     season_id: tempId,
                     player_id: newPlayer.id,
                     shirt_number: parseInt(dorsal)
-                });
+                };
+                // Modo Club: asignar el jugador nuevo al equipo seleccionado
+                if (typeof cmState !== 'undefined' && cmState.activo && cmState.equipoSeleccionado) {
+                    spNuevo.team_id = cmState.equipoSeleccionado.id;
+                }
+                await supabaseClient.from('season_players').insert(spNuevo);
             }
             
             cerrarModalJugador();
@@ -640,7 +649,15 @@ return `
             await supabaseClient.from('season_players').delete().eq('id', spId);
             cargarPlantilla();
         }
-        // ========== VIDEO DEL PARTIDO ==========
+        // Modo Club: recargar plantilla al cambiar el equipo del selector
+document.addEventListener('cmTeamChanged', function() {
+    try {
+        var tempSel = document.getElementById('plantilla-temporada');
+        if (tempSel && tempSel.value && typeof cargarPlantilla === 'function') cargarPlantilla();
+    } catch (e) { console.error(e); }
+});
+
+// ========== VIDEO DEL PARTIDO ==========
 // Añadir estas funciones en la sección de JavaScript
 
 // Detectar plataforma del video
@@ -673,11 +690,14 @@ async function generarPDFPlantilla() {
     const tempId = document.getElementById('plantilla-temporada').value;
     if (!tempId) { showToast('Selecciona una temporada'); return; }
     
-    const { data, error } = await supabaseClient
+    let qPdf = supabaseClient
         .from('season_players')
         .select('shirt_number, players(name, position, birth_date, dominant_foot, height_cm, weight_kg, phone, email, status, document_number, federation_license)')
-        .eq('season_id', tempId)
-        .order('shirt_number');
+        .eq('season_id', tempId);
+    if (typeof cmState !== 'undefined' && cmState.activo && cmState.equipoSeleccionado) {
+        qPdf = qPdf.or('team_id.eq.' + cmState.equipoSeleccionado.id + ',team_id.is.null');
+    }
+    const { data, error } = await qPdf.order('shirt_number');
     
     if (error || !data || data.length === 0) {
         showToast('No hay jugadores en la plantilla');

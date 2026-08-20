@@ -255,6 +255,9 @@ function cmIdentidad() {
     return null;
 }
 window.cmIdentidad = cmIdentidad;
+// Exponer el estado del Club Mode a los modulos del HUB (planificador, miclub, ...)
+// cm-core se carga en ambito aislado: sin esta linea, cmState no es visible fuera.
+window.cmState = cmState;
 
 function cmPuedeVer(modulo) {
     if (!cmState.activo) return true; // Coach autonomo -> ve todo lo suyo
