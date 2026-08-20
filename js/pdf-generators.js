@@ -617,16 +617,19 @@ async function dibujarJugadorCardCompacta(doc, jugador, x, y, ancho, alto, color
         doc.ellipse(cx, cy + 4, 5, 3, 'F');
     }
     
-    // Dorsal (badge pequeño arriba derecha)
+    // Dorsal (badge grande arriba derecha, estilo chapa)
     if (jugador.dorsal) {
-        const dorsalX = x + ancho - 10;
+        const badgeW = 13, badgeH = 9.5;
+        const dorsalX = x + ancho - badgeW - 1;
         const dorsalY = y + 1;
         doc.setFillColor(...colorAccento);
-        doc.roundedRect(dorsalX, dorsalY, 9, 6, 1, 1, 'F');
+        doc.setDrawColor(255, 255, 255);
+        doc.setLineWidth(0.5);
+        doc.roundedRect(dorsalX, dorsalY, badgeW, badgeH, 2.5, 2.5, 'FD');
         doc.setTextColor(255, 255, 255);
-        doc.setFontSize(5);
+        doc.setFontSize(13);
         doc.setFont('helvetica', 'bold');
-        doc.text(String(jugador.dorsal), dorsalX + 4.5, dorsalY + 4.2, { align: 'center' });
+        doc.text(String(jugador.dorsal), dorsalX + badgeW / 2, dorsalY + 7.1, { align: 'center' });
     }
     
     // Nombre (abajo centrado)
