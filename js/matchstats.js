@@ -6,6 +6,8 @@ let fichaJugadorActual = null;
 let escudoRivalUrl = null;
 let slotVacioIdx = null;
 let slotsTitularesMap = [];
+let gpsPartido = {};
+let gpsPartidoColapsado = false;
 
 // Registro en navegación
 registrarModulo('matchstats', cargarPartidos);
@@ -294,6 +296,7 @@ document.getElementById('video-preview-container').style.display = 'none';
             titularesPartido = [];
             slotsTitularesMap = [];
             slotVacioIdx = null;
+            gpsPartido = {};
             
             await cargarConvocatoria();
             
@@ -334,6 +337,9 @@ if (p.convocados && Array.isArray(p.convocados)) {
 if (p.titulares && Array.isArray(p.titulares)) {
     titularesPartido = p.titulares.map(t => String(t.id));
 }
+
+// Cargar asignacion de GPS
+gpsPartido = (p.gps && typeof p.gps === 'object' && !Array.isArray(p.gps)) ? p.gps : {};
                     
                     // Restaurar mapa de slots guardado o forzar reconstrucción
                     if (p.alineacion_slots && Array.isArray(p.alineacion_slots) && p.alineacion_slots.length > 0) {
@@ -587,6 +593,7 @@ function renderizarConvocatoria() {
             
             actualizarContadorConvocados();
             renderizarAlineacion();
+            renderizarGpsPartido();
         }
         
      function toggleConvocado(spId) {
@@ -1020,7 +1027,8 @@ function renderizarConvocatoria() {
                 convocados: convocadosData,
                 titulares: titularesData,
                 suplentes: suplentesData,
-                alineacion_slots: slotsTitularesMap || []
+                alineacion_slots: slotsTitularesMap || [],
+                gps: gpsPartidoParaGuardar()
             };
             console.log('Datos a guardar:', JSON.stringify(partidoData, null, 2));
             const partidoId = document.getElementById('partido-id').value;
@@ -1996,4 +2004,251 @@ function rgbaToHex(rgba) {
     var g = parseInt(m[1]).toString(16).padStart(2, '0');
     var b = parseInt(m[2]).toString(16).padStart(2, '0');
     return '#' + r + g + b;
+}
+
+// ========== ASIGNACION DE GPS DEL PARTIDO (vestuario) ==========
+function gpsPartidoEnsureSeccion() {
+    var grid = document.getElementById('convocatoria-grid');
+    if (!grid) return null;
+    var sec = document.getElementById('gpsp-seccion');
+    if (!sec) {
+        sec = document.createElement('div');
+        sec.id = 'gpsp-seccion';
+        sec.style.cssText = 'margin-top:12px;border:1.5px solid #e5e7eb;border-radius:12px;background:#fff;overflow:hidden;';
+        grid.insertAdjacentElement('afterend', sec);
+    }
+    return sec;
+}
+
+function gpsPartidoSeleccionados() {
+    return plantillaPartido.filter(function(sp) {
+        return convocadosPartido.includes(String(sp.id));
+    }).sort(function(a, b) {
+        return (parseInt(a.shirt_number) || 999) - (parseInt(b.shirt_number) || 999);
+    });
+}
+
+function gpsPartidoParaGuardar() {
+    var out = {};
+    gpsPartidoSeleccionados().forEach(function(sp) {
+        var v = (gpsPartido[String(sp.id)] || '').trim();
+        if (v) out[String(sp.id)] = v;
+    });
+    return out;
+}
+
+function renderizarGpsPartido() {
+    var sec = gpsPartidoEnsureSeccion();
+    if (!sec) return;
+    var lista = gpsPartidoSeleccionados();
+    if (lista.length === 0) { sec.style.display = 'none'; sec.innerHTML = ''; return; }
+    sec.style.display = 'block';
+
+    var filas = lista.map(function(sp) {
+        var j = sp.players || {};
+        var val = gpsPartido[String(sp.id)] || '';
+        return '<div style="display:flex;align-items:center;gap:8px;padding:5px 10px;border-bottom:1px solid #f3f4f6;">' +
+            '<span style="flex-shrink:0;font-size:11px;font-weight:800;color:#26215C;min-width:22px;text-align:center;">' + (sp.shirt_number || '?') + '</span>' +
+            '<span style="flex:1;min-width:0;font-size:12px;color:#1f2937;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + (j.name || 'Sin nombre') + '</span>' +
+            '<input type="text" class="gpsp-input" data-spid="' + sp.id + '" value="' + String(val).replace(/"/g, '&quot;') + '" placeholder="GPS" maxlength="12" ' +
+            'style="flex-shrink:0;width:70px;padding:4px 6px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:12px;font-weight:700;text-align:center;color:#26215C;">' +
+            '</div>';
+    }).join('');
+
+    sec.innerHTML =
+        '<div id="gpsp-header" style="display:flex;align-items:center;gap:8px;padding:9px 12px;background:#f5f3ff;cursor:pointer;flex-wrap:wrap;">' +
+            '<span style="font-size:12px;font-weight:800;color:#7c3aed;letter-spacing:0.04em;">ASIGNACI\u00d3N DE GPS</span>' +
+            '<span id="gpsp-contador" style="font-size:11px;color:#6b7280;"></span>' +
+            '<span style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;">' +
+                '<button type="button" id="gpsp-btn-auto" style="font-size:11px;padding:4px 9px;border:1px solid #ddd6fe;background:#fff;border-radius:8px;cursor:pointer;color:#6b21a8;font-weight:600;">Auto 1,2,3...</button>' +
+                '<button type="button" id="gpsp-btn-ultima" style="font-size:11px;padding:4px 9px;border:1px solid #ddd6fe;background:#fff;border-radius:8px;cursor:pointer;color:#6b21a8;font-weight:600;">Copiar \u00faltima sesi\u00f3n</button>' +
+                '<button type="button" id="gpsp-btn-limpiar" style="font-size:11px;padding:4px 9px;border:1px solid #e5e7eb;background:#fff;border-radius:8px;cursor:pointer;color:#6b7280;">Limpiar</button>' +
+                '<button type="button" id="gpsp-btn-pdf" style="font-size:11px;padding:4px 9px;border:none;background:#7c3aed;border-radius:8px;cursor:pointer;color:#fff;font-weight:700;">PDF vestuario</button>' +
+            '</span>' +
+        '</div>' +
+        '<div id="gpsp-body" style="display:' + (gpsPartidoColapsado ? 'none' : 'block') + ';max-height:260px;overflow-y:auto;">' + filas + '</div>';
+
+    sec.querySelector('#gpsp-header').addEventListener('click', function(e) {
+        if (e.target.tagName === 'BUTTON') return;
+        gpsPartidoColapsado = !gpsPartidoColapsado;
+        document.getElementById('gpsp-body').style.display = gpsPartidoColapsado ? 'none' : 'block';
+    });
+    sec.querySelectorAll('.gpsp-input').forEach(function(inp) {
+        inp.addEventListener('input', function() {
+            var v = this.value.trim();
+            if (v) { gpsPartido[this.dataset.spid] = v; } else { delete gpsPartido[this.dataset.spid]; }
+            gpsPartidoRefrescar();
+        });
+        inp.addEventListener('click', function(e) { e.stopPropagation(); });
+    });
+    sec.querySelector('#gpsp-btn-auto').addEventListener('click', function() {
+        var n = 1;
+        gpsPartidoSeleccionados().forEach(function(sp) { gpsPartido[String(sp.id)] = String(n++); });
+        renderizarGpsPartido();
+    });
+    sec.querySelector('#gpsp-btn-ultima').addEventListener('click', gpsPartidoCopiarUltimaSesion);
+    sec.querySelector('#gpsp-btn-limpiar').addEventListener('click', function() {
+        gpsPartido = {};
+        renderizarGpsPartido();
+    });
+    sec.querySelector('#gpsp-btn-pdf').addEventListener('click', gpsPartidoGenerarPDF);
+
+    gpsPartidoRefrescar();
+}
+
+function gpsPartidoRefrescar() {
+    var sec = document.getElementById('gpsp-seccion');
+    if (!sec) return;
+    var inputs = sec.querySelectorAll('.gpsp-input');
+    var conteo = {};
+    inputs.forEach(function(inp) {
+        var v = inp.value.trim().toUpperCase();
+        if (v) conteo[v] = (conteo[v] || 0) + 1;
+    });
+    var asignados = 0;
+    inputs.forEach(function(inp) {
+        var v = inp.value.trim().toUpperCase();
+        if (v) asignados++;
+        var dup = v && conteo[v] > 1;
+        inp.style.borderColor = dup ? '#dc2626' : '#e5e7eb';
+        inp.style.background = dup ? '#fef2f2' : '#fff';
+    });
+    var cont = document.getElementById('gpsp-contador');
+    if (cont) cont.textContent = asignados + '/' + inputs.length + ' con GPS';
+}
+
+function gpsPartidoHayDuplicados() {
+    var vals = [];
+    gpsPartidoSeleccionados().forEach(function(sp) {
+        var v = (gpsPartido[String(sp.id)] || '').trim().toUpperCase();
+        if (v) vals.push(v);
+    });
+    return vals.length !== new Set(vals).size;
+}
+
+async function gpsPartidoCopiarUltimaSesion() {
+    try {
+        var res = await supabaseClient
+            .from('training_sessions')
+            .select('id, session_date, players')
+            .eq('club_id', clubId)
+            .order('session_date', { ascending: false })
+            .limit(15);
+        if (res.error) throw res.error;
+        var origen = null;
+        var sesiones = res.data || [];
+        for (var i = 0; i < sesiones.length; i++) {
+            var ps = sesiones[i].players;
+            if (Array.isArray(ps) && ps.some(function(j) { return j && j.gps; })) { origen = sesiones[i]; break; }
+        }
+        if (!origen) { showToast('No hay ninguna sesi\u00f3n con GPS asignados'); return; }
+        var mapa = {};
+        origen.players.forEach(function(j) { if (j && j.player_id && j.gps) mapa[j.player_id] = j.gps; });
+        var aplicados = 0;
+        gpsPartidoSeleccionados().forEach(function(sp) {
+            if (mapa[sp.player_id]) { gpsPartido[String(sp.id)] = mapa[sp.player_id]; aplicados++; }
+        });
+        renderizarGpsPartido();
+        showToast('Copiados ' + aplicados + ' GPS de la sesi\u00f3n del ' + (origen.session_date || ''));
+    } catch (e) {
+        console.error('Error copiando GPS:', e);
+        showToast('Error al copiar la \u00faltima asignaci\u00f3n');
+    }
+}
+
+async function gpsPartidoGenerarPDF() {
+    var lista = gpsPartidoSeleccionados().filter(function(sp) { return gpsPartido[String(sp.id)]; });
+    if (lista.length === 0) { showToast('Asigna al menos un GPS antes de generar el PDF'); return; }
+    if (gpsPartidoHayDuplicados()) { showToast('Hay n\u00fameros de GPS duplicados, rev\u00edsalos antes del PDF'); return; }
+
+    lista.sort(function(a, b) {
+        var va = String(gpsPartido[String(a.id)]), vb = String(gpsPartido[String(b.id)]);
+        var na = parseInt(va, 10), nb = parseInt(vb, 10);
+        if (!isNaN(na) && !isNaN(nb)) return na - nb;
+        return va.localeCompare(vb, 'es', { numeric: true });
+    });
+
+    var clubNombre = '';
+    try {
+        var rc = await supabaseClient.from('clubs').select('name').eq('id', clubId).single();
+        clubNombre = (rc.data && rc.data.name) || '';
+    } catch (e) {}
+
+    var rival = (document.getElementById('partido-rival').value || '').trim();
+    var fechaVal = document.getElementById('partido-fecha').value;
+    var horaVal = (document.getElementById('partido-hora').value || '').slice(0, 5);
+    var fechaTxt = '';
+    if (fechaVal) {
+        var d = new Date(fechaVal + 'T12:00:00');
+        fechaTxt = d.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    }
+
+    var doc = new window.jspdf.jsPDF('p', 'mm', 'a4');
+    var W = 210, margen = 15;
+
+    function cabecera() {
+        doc.setFillColor(38, 33, 92);
+        doc.rect(0, 0, W, 26, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(17);
+        doc.setFont(undefined, 'bold');
+        doc.text('ASIGNACI\u00d3N DE GPS \u00b7 PARTIDO', margen, 12);
+        doc.setFontSize(10);
+        doc.setFont(undefined, 'normal');
+        var sub = [clubNombre, rival ? 'vs ' + rival : '', fechaTxt, horaVal].filter(Boolean).join('  |  ');
+        doc.text(sub || ' ', margen, 20);
+        doc.setTextColor(0, 0, 0);
+    }
+
+    var altoFila = 11;
+    var y;
+    function cabeceraTabla() {
+        doc.setFillColor(124, 58, 237);
+        doc.rect(margen, y, W - margen * 2, 9, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(11);
+        doc.setFont(undefined, 'bold');
+        doc.text('GPS', margen + 6, y + 6.3);
+        doc.text('DORSAL', margen + 32, y + 6.3);
+        doc.text('JUGADOR', margen + 60, y + 6.3);
+        doc.text('POS', W - margen - 24, y + 6.3);
+        doc.setTextColor(0, 0, 0);
+        y += 9;
+    }
+
+    cabecera();
+    y = 34;
+    cabeceraTabla();
+
+    lista.forEach(function(sp, i) {
+        if (y + altoFila > 285) {
+            doc.addPage();
+            cabecera();
+            y = 34;
+            cabeceraTabla();
+        }
+        if (i % 2 === 0) {
+            doc.setFillColor(245, 243, 255);
+            doc.rect(margen, y, W - margen * 2, altoFila, 'F');
+        }
+        var j = sp.players || {};
+        doc.setFontSize(15);
+        doc.setFont(undefined, 'bold');
+        doc.setTextColor(124, 58, 237);
+        doc.text(String(gpsPartido[String(sp.id)]), margen + 6, y + 7.6);
+        doc.setTextColor(0, 0, 0);
+        doc.setFontSize(12);
+        doc.text(String(sp.shirt_number || '-'), margen + 36, y + 7.4);
+        doc.setFont(undefined, 'normal');
+        doc.text(String(j.name || 'Sin nombre').substring(0, 30), margen + 60, y + 7.4);
+        doc.setFontSize(9);
+        doc.text(String(j.position || '').substring(0, 16), W - margen - 24, y + 7.2);
+        y += altoFila;
+    });
+
+    doc.setFontSize(8);
+    doc.setTextColor(150, 150, 150);
+    doc.text('TopLiderCoach', margen, 292);
+
+    doc.save('GPS_partido_' + (fechaVal || 'fecha') + '.pdf');
 }
