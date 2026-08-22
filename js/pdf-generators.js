@@ -793,37 +793,37 @@ async function dibujarJugadorCardCompacta(doc, jugador, x, y, ancho, alto, color
         }
         
 
-// ============================================================
-// PDF HOJA DE PARTIDO
+// PDF HOJA DE PARTIDO (v2: 11 reservas, estadio, resultado y firmas en un folio)
 // ============================================================
 async function generarPDFHojaPartido() {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
-    
+
     const rival = document.getElementById('partido-rival').value || 'Rival';
     const fecha = document.getElementById('partido-fecha').value;
-    const hora = document.getElementById('partido-hora').value || '';
+    const horaRaw = document.getElementById('partido-hora').value || '';
+    const hora = horaRaw ? horaRaw.slice(0, 5) : '';   // sin segundos: 19:00
     const competicion = document.getElementById('partido-competicion').value || '';
     const jornada = document.getElementById('partido-jornada').value || '';
+    const estadio = document.getElementById('partido-estadio') ? (document.getElementById('partido-estadio').value || '') : '';
     const localidad = document.getElementById('partido-localidad').value;
     const esLocal = localidad === 'home';
-    
+
     const { data: club } = await supabaseClient
         .from('clubs')
         .select('name, logo_url')
         .eq('id', clubId)
         .single();
-    
+
     const miNombre = club?.name || 'Mi Equipo';
     const miEscudo = club?.logo_url || null;
     const rivalEscudo = escudoRivalUrl || null;
-    
+
     const equipoLocal = esLocal ? miNombre : rival;
     const equipoVisitante = esLocal ? rival : miNombre;
     const escudoLocalUrl = esLocal ? miEscudo : rivalEscudo;
     const escudoVisitanteUrl = esLocal ? rivalEscudo : miEscudo;
-    
-    // Obtener titulares y suplentes
+
     const titulares = plantillaPartido
         .filter(sp => titularesPartido.includes(String(sp.id)))
         .sort((a, b) => (a.shirt_number || 99) - (b.shirt_number || 99));
@@ -832,221 +832,207 @@ async function generarPDFHojaPartido() {
     const suplentes = convocados
         .filter(sp => !titularesPartido.includes(String(sp.id)))
         .sort((a, b) => (a.shirt_number || 99) - (b.shirt_number || 99));
-    
-   const fechaFormateada = fecha ? new Date(fecha + 'T12:00:00').toLocaleDateString('es-ES', {
-    day: '2-digit', month: '2-digit', year: 'numeric'
-}) : '';
-    
-    // ===== HEADER =====
-    doc.setFontSize(16);
+
+    const fechaFormateada = fecha ? new Date(fecha + 'T12:00:00').toLocaleDateString('es-ES', {
+        weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric'
+    }) : '';
+
+    const NAVY = [30, 41, 59];
+    const VERDE = [5, 150, 105];
+    const GRISF = [246, 248, 250];
+
+    // ===== BANDA SUPERIOR =====
+    doc.setFillColor(...NAVY);
+    doc.rect(0, 0, 210, 20, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(15);
+    doc.setFont('helvetica', 'bold');
+    doc.text('HOJA DE PARTIDO', 105, 9, { align: 'center' });
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(180, 195, 220);
+    const subCab = [competicion, jornada].filter(Boolean).join('  ·  ');
+    doc.text(subCab || ' ', 105, 15.5, { align: 'center' });
+    doc.setFillColor(...VERDE);
+    doc.rect(0, 20, 210, 1.2, 'F');
+
+    // ===== ZONA EQUIPOS =====
+    if (escudoLocalUrl) { try { doc.addImage(escudoLocalUrl, 'PNG', 28, 23.5, 17, 17); } catch (e) {} }
+    if (escudoVisitanteUrl) { try { doc.addImage(escudoVisitanteUrl, 'PNG', 165, 23.5, 17, 17); } catch (e) {} }
+    doc.setFontSize(9.5);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(30, 30, 30);
-    doc.text('HOJA DE PARTIDO', 105, 15, { align: 'center' });
-    
-    if (jornada) {
-        doc.setFontSize(10);
-        doc.setFont('helvetica', 'bold');
-        doc.text(jornada, 105, 22, { align: 'center' });
-    }
-    
-    // Hora grande
+    doc.text(equipoLocal, 36.5, 44.5, { align: 'center', maxWidth: 55 });
+    doc.text(equipoVisitante, 173.5, 44.5, { align: 'center', maxWidth: 55 });
     if (hora) {
-        doc.setFontSize(22);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(5, 150, 105);
-        doc.text(hora, 105, 33, { align: 'center' });
+        doc.setFontSize(21);
+        doc.setTextColor(...VERDE);
+        doc.text(hora, 105, 31, { align: 'center' });
     }
-    
-    // Fecha
-    doc.setFontSize(9);
+    doc.setFontSize(8.5);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(100, 100, 100);
-    doc.text(fechaFormateada, 105, 38, { align: 'center' });
-    
-    // Escudos
-    if (escudoLocalUrl) {
-        try { doc.addImage(escudoLocalUrl, 'PNG', 35, 18, 18, 18); } catch(e) {}
+    doc.text(fechaFormateada, 105, 36.5, { align: 'center' });
+    if (estadio) {
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(30, 30, 30);
+        doc.text(estadio, 105, 41.5, { align: 'center', maxWidth: 70 });
     }
-    if (escudoVisitanteUrl) {
-        try { doc.addImage(escudoVisitanteUrl, 'PNG', 157, 18, 18, 18); } catch(e) {}
-    }
-    
-    // Nombres equipos
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(30, 30, 30);
-    doc.text(equipoLocal, 44, 40, { align: 'center' });
-    doc.text(equipoVisitante, 166, 40, { align: 'center' });
-    
-    let y = 46;
-    
-    // ===== TABLAS DE ALINEACIÓN =====
+
+    let y = 48;
+
+    // ===== TABLAS DE ALINEACION (11 titulares + 11 reservas) =====
     const anchoTabla = 93;
     const xIzq = 8;
     const xDer = 109;
-    const altoCab = 7;
-    const altoFila = 6;
-    const maxFilas = 18;
-    
-    // Datos de nuestro equipo (titulares + suplentes)
+    const altoCab = 6;
+    const altoFila = 5.2;
+    const maxFilas = 22;
+
     const miEquipo = [...titulares, ...suplentes].map(sp => ({
         dorsal: sp.shirt_number || '',
         nombre: sp.players?.name || ''
     }));
-    
-    // Dibujar cabecera tabla
+
     function dibujarCabecera(x, yC) {
-        doc.setFillColor(50, 50, 50);
+        doc.setFillColor(...NAVY);
         doc.rect(x, yC, anchoTabla, altoCab, 'F');
         doc.setTextColor(255, 255, 255);
         doc.setFontSize(6);
         doc.setFont('helvetica', 'bold');
-        doc.text('Nº', x + 5, yC + 5, { align: 'center' });
-        doc.text('NOMBRE', x + 28, yC + 5, { align: 'center' });
-        // Iconos de eventos
-        doc.setFontSize(7);
-        doc.text('M', x + 55, yC + 5, { align: 'center' });
-        doc.text('G', x + 64, yC + 5, { align: 'center' });
-        doc.text('TA', x + 73, yC + 5, { align: 'center' });
-        doc.text('TR', x + 82, yC + 5, { align: 'center' });
+        doc.text('N', x + 5, yC + 4.2, { align: 'center' });
+        doc.text('NOMBRE', x + 30, yC + 4.2, { align: 'center' });
+        doc.text('M', x + 55, yC + 4.2, { align: 'center' });
+        doc.text('G', x + 64, yC + 4.2, { align: 'center' });
+        doc.text('TA', x + 73, yC + 4.2, { align: 'center' });
+        doc.text('TR', x + 82, yC + 4.2, { align: 'center' });
     }
-    
+
     function dibujarFilas(x, yStart, datos) {
         for (let i = 0; i < maxFilas; i++) {
             const yF = yStart + (i * altoFila);
-            // Fondo alterno
             if (i % 2 === 0) {
-                doc.setFillColor(248, 248, 248);
+                doc.setFillColor(...GRISF);
                 doc.rect(x, yF, anchoTabla, altoFila, 'F');
             }
-            // Bordes
-            doc.setDrawColor(210, 210, 210);
+            doc.setDrawColor(215, 219, 225);
             doc.setLineWidth(0.2);
             doc.rect(x, yF, anchoTabla, altoFila, 'S');
-            // Líneas verticales de columnas
             doc.line(x + 10, yF, x + 10, yF + altoFila);
             doc.line(x + 50, yF, x + 50, yF + altoFila);
             doc.line(x + 59, yF, x + 59, yF + altoFila);
             doc.line(x + 68, yF, x + 68, yF + altoFila);
             doc.line(x + 77, yF, x + 77, yF + altoFila);
-            
             if (datos && datos[i]) {
                 doc.setTextColor(30, 30, 30);
-                doc.setFontSize(7);
+                doc.setFontSize(6.8);
                 doc.setFont('helvetica', 'bold');
-                doc.text(String(datos[i].dorsal), x + 5, yF + 4.3, { align: 'center' });
+                doc.text(String(datos[i].dorsal), x + 5, yF + 3.8, { align: 'center' });
                 doc.setFont('helvetica', 'normal');
-                doc.text(datos[i].nombre, x + 12, yF + 4.3);
+                doc.text(datos[i].nombre, x + 12, yF + 3.8, { maxWidth: 37 });
             }
         }
     }
-    
-    // Separador titulares/suplentes
+
     function dibujarSeparador(x, yS, numTitulares) {
         if (numTitulares > 0 && numTitulares < maxFilas) {
             const ySep = yS + (numTitulares * altoFila);
-            doc.setDrawColor(5, 150, 105);
-            doc.setLineWidth(0.8);
+            doc.setDrawColor(...VERDE);
+            doc.setLineWidth(0.9);
             doc.line(x, ySep, x + anchoTabla, ySep);
         }
     }
-    
-    // Tabla izquierda (local)
+
     dibujarCabecera(xIzq, y);
     const yFilas = y + altoCab;
     const datosLocal = esLocal ? miEquipo : [];
     dibujarFilas(xIzq, yFilas, datosLocal);
-    if (esLocal) dibujarSeparador(xIzq, yFilas, titulares.length);
-    
-    // Tabla derecha (visitante)
+    dibujarSeparador(xIzq, yFilas, esLocal ? (titulares.length || 11) : 11);
+
     dibujarCabecera(xDer, y);
     const datosVisitante = esLocal ? [] : miEquipo;
     dibujarFilas(xDer, yFilas, datosVisitante);
-    if (!esLocal) dibujarSeparador(xDer, yFilas, titulares.length);
-    
-    y = yFilas + (maxFilas * altoFila) + 8;
-    
+    dibujarSeparador(xDer, yFilas, !esLocal ? (titulares.length || 11) : 11);
+
+    y = yFilas + (maxFilas * altoFila) + 5;
+
     // ===== SUSTITUCIONES =====
-    doc.setFontSize(10);
+    doc.setFontSize(9.5);
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(30, 30, 30);
+    doc.setTextColor(...NAVY);
     doc.text('SUSTITUCIONES', 105, y, { align: 'center' });
-    y += 4;
-    
-    const altoSubCab = 6;
-    const altoSubFila = 7;
+    y += 2.5;
+
+    const altoSubCab = 5.5;
+    const altoSubFila = 6.2;
     const numSubs = 5;
-    
-    function dibujarTablaSustituciones(x, ySub) {
-        // Cabecera
-        doc.setFillColor(50, 50, 50);
-        doc.rect(x, ySub, anchoTabla, altoSubCab, 'F');
+    const numGoles = 4;
+
+    function tablaTresColumnas(x, yT, filas, c1, c2, c3) {
+        doc.setFillColor(...NAVY);
+        doc.rect(x, yT, anchoTabla, altoSubCab, 'F');
         doc.setTextColor(255, 255, 255);
         doc.setFontSize(6);
         doc.setFont('helvetica', 'bold');
-        doc.text('MIN', x + 10, ySub + 4.3, { align: 'center' });
-        doc.text('SALE', x + 38, ySub + 4.3, { align: 'center' });
-        doc.text('ENTRA', x + 73, ySub + 4.3, { align: 'center' });
-        
-        const ySubFilas = ySub + altoSubCab;
-        for (let i = 0; i < numSubs; i++) {
-            const yR = ySubFilas + (i * altoSubFila);
+        doc.text(c1, x + 10, yT + 3.9, { align: 'center' });
+        doc.text(c2, x + 38, yT + 3.9, { align: 'center' });
+        doc.text(c3, x + 73, yT + 3.9, { align: 'center' });
+        const yF0 = yT + altoSubCab;
+        for (let i = 0; i < filas; i++) {
+            const yR = yF0 + (i * altoSubFila);
             if (i % 2 === 0) {
-                doc.setFillColor(248, 248, 248);
+                doc.setFillColor(...GRISF);
                 doc.rect(x, yR, anchoTabla, altoSubFila, 'F');
             }
-            doc.setDrawColor(210, 210, 210);
+            doc.setDrawColor(215, 219, 225);
             doc.setLineWidth(0.2);
             doc.rect(x, yR, anchoTabla, altoSubFila, 'S');
             doc.line(x + 20, yR, x + 20, yR + altoSubFila);
             doc.line(x + 56, yR, x + 56, yR + altoSubFila);
         }
+        return yF0 + (filas * altoSubFila);
     }
-    
-    dibujarTablaSustituciones(xIzq, y);
-    dibujarTablaSustituciones(xDer, y);
-    
-    y += altoSubCab + (numSubs * altoSubFila) + 8;
-    
-    // ===== GOLES / ASISTENTES =====
-    doc.setFontSize(10);
+
+    tablaTresColumnas(xIzq, y, numSubs, 'MIN', 'SALE', 'ENTRA');
+    y = tablaTresColumnas(xDer, y, numSubs, 'MIN', 'SALE', 'ENTRA') + 5;
+
+    // ===== GOLES / ASISTENTES (4 filas) =====
+    doc.setFontSize(9.5);
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(30, 30, 30);
+    doc.setTextColor(...NAVY);
     doc.text('GOLES / ASISTENTES', 105, y, { align: 'center' });
-    y += 4;
-    
-    function dibujarTablaGoles(x, yGol) {
-        doc.setFillColor(50, 50, 50);
-        doc.rect(x, yGol, anchoTabla, altoSubCab, 'F');
-        doc.setTextColor(255, 255, 255);
-        doc.setFontSize(6);
-        doc.setFont('helvetica', 'bold');
-        doc.text('MIN', x + 10, yGol + 4.3, { align: 'center' });
-        doc.text('AUTOR', x + 38, yGol + 4.3, { align: 'center' });
-        doc.text('ASISTENTE', x + 73, yGol + 4.3, { align: 'center' });
-        
-        const yGolFilas = yGol + altoSubCab;
-        for (let i = 0; i < numSubs; i++) {
-            const yR = yGolFilas + (i * altoSubFila);
-            if (i % 2 === 0) {
-                doc.setFillColor(248, 248, 248);
-                doc.rect(x, yR, anchoTabla, altoSubFila, 'F');
-            }
-            doc.setDrawColor(210, 210, 210);
-            doc.setLineWidth(0.2);
-            doc.rect(x, yR, anchoTabla, altoSubFila, 'S');
-            doc.line(x + 20, yR, x + 20, yR + altoSubFila);
-            doc.line(x + 56, yR, x + 56, yR + altoSubFila);
-        }
-    }
-    
-    dibujarTablaGoles(xIzq, y);
-    dibujarTablaGoles(xDer, y);
-    
+    y += 2.5;
+    tablaTresColumnas(xIzq, y, numGoles, 'MIN', 'AUTOR', 'ASISTENTE');
+    y = tablaTresColumnas(xDer, y, numGoles, 'MIN', 'AUTOR', 'ASISTENTE') + 6;
+
+    // ===== RESULTADO FINAL + FIRMAS =====
+    doc.setDrawColor(200, 205, 212);
+    doc.setLineWidth(0.3);
+    doc.roundedRect(xIzq, y, 58, 22, 2, 2, 'S');
+    doc.roundedRect(144, y, 58, 22, 2, 2, 'S');
+    doc.setFontSize(6.2);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(120, 126, 134);
+    doc.text('FIRMA DELEGADO/ENTRENADOR LOCAL', 37, y + 4, { align: 'center' });
+    doc.text('FIRMA DELEGADO/ENTRENADOR VISITANTE', 173, y + 4, { align: 'center' });
+
+    doc.setFontSize(8);
+    doc.setTextColor(...NAVY);
+    doc.text('RESULTADO FINAL', 105, y + 3.5, { align: 'center' });
+    doc.setDrawColor(...NAVY);
+    doc.setLineWidth(0.5);
+    doc.roundedRect(86, y + 6, 15, 14, 1.5, 1.5, 'S');
+    doc.roundedRect(109, y + 6, 15, 14, 1.5, 1.5, 'S');
+    doc.setFontSize(13);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(160, 166, 174);
+    doc.text('-', 105, y + 15, { align: 'center' });
+
     // ===== FOOTER =====
     doc.setFontSize(6);
+    doc.setFont('helvetica', 'normal');
     doc.setTextColor(170, 170, 170);
     doc.text('Generado con TopLiderCoach HUB', 105, 292, { align: 'center' });
-    
+
     doc.save(`hoja_partido_${rival.replace(/\s+/g, '_')}_${fecha || 'partido'}.pdf`);
 }
