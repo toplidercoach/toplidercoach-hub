@@ -2129,6 +2129,8 @@ function cambiarFuenteBiblioteca(fuente, btn) {
     const filtrosBiblioteca = document.getElementById('filtros-biblioteca');
     if (filtrosToggle) filtrosToggle.style.display = fuente === 'tlc' ? '' : 'none';
     if (filtrosBiblioteca) filtrosBiblioteca.style.display = fuente === 'tlc' ? '' : 'none';
+    const filtrosMis = document.getElementById('filtros-mis-ejercicios');
+    if (filtrosMis) filtrosMis.style.display = fuente === 'tlc' ? 'none' : '';
     
     if (fuente === 'tlc') {
         cargarEjercicios(1);
@@ -2137,7 +2139,11 @@ function cambiarFuenteBiblioteca(fuente, btn) {
     }
 }
 
+let misEjerciciosCache = [];
+let misEjerciciosThumbs = {};
+
 async function planifCargarThumbsBiblioteca(ids) {
+    ids = ids.filter(function(id){ return !(id in misEjerciciosThumbs); });
     const LOTE = 4;
     for (let i = 0; i < ids.length; i += LOTE) {
         const grupo = ids.slice(i, i + LOTE);
@@ -2158,6 +2164,7 @@ async function planifCargarThumbsBiblioteca(ids) {
                         thumbSrc = URL.createObjectURL(blob);
                     }
                 } catch(e) { return; }
+                misEjerciciosThumbs[ej.id] = thumbSrc;
                 var img = document.querySelector('#lista-ejercicios img[data-ejid="' + ej.id + '"]');
                 if (img) img.src = thumbSrc;
                 var card = img ? img.closest('.ejercicio-card') : null;
@@ -2183,7 +2190,7 @@ async function cargarMisEjerciciosBiblioteca() {
     try {
         const { data, error } = await supabaseClient
             .from('custom_exercises')
-            .select('id, name, category, tema, difficulty, duration_min, players_count')
+            .select('id, name, category, tema, difficulty, duration_min, players_count, game_phase')
             .or((typeof cmState !== 'undefined' && cmState.activo && typeof clubId !== 'undefined' && clubId) ? ('club_id.eq.' + clubId + ',coach_id.eq.' + String(usuario.id)) : ('coach_id.eq.' + String(usuario.id)))
             .order('created_at', { ascending: false })
             .limit(1000);
@@ -2195,9 +2202,24 @@ async function cargarMisEjerciciosBiblioteca() {
             return;
         }
         
-        setTimeout(function(){ planifCargarThumbsBiblioteca(data.map(function(ej){ return ej.id; })); }, 50);
-        lista.innerHTML = data.map(ej => {
-            var thumbSrc = '';
+        misEjerciciosCache = data;
+        construirFiltrosMisEjercicios(data);
+        renderMisEjercicios(data);
+    } catch(err) {
+        lista.innerHTML = '<p style="color:red;">Error: ' + err.message + '</p>';
+    }
+}
+
+function renderMisEjercicios(data) {
+    var lista = document.getElementById('lista-ejercicios');
+    if (!lista) return;
+    if (!data.length) {
+        lista.innerHTML = '<p style="text-align:center;color:#9ca3af;padding:20px;">Ningún ejercicio coincide con los filtros.</p>';
+        return;
+    }
+    setTimeout(function(){ planifCargarThumbsBiblioteca(data.map(function(ej){ return ej.id; })); }, 50);
+    lista.innerHTML = data.map(ej => {
+            var thumbSrc = misEjerciciosThumbs[ej.id] || '';
             
             if (ej.thumbnail_svg) {
                 try {
@@ -2235,9 +2257,56 @@ async function cargarMisEjerciciosBiblioteca() {
             '</div>';
         }).join('');
         
-    } catch(err) {
-        lista.innerHTML = '<p style="color:red;">Error: ' + err.message + '</p>';
+}
+
+function construirFiltrosMisEjercicios(data) {
+    var lista = document.getElementById('lista-ejercicios');
+    var barra = document.getElementById('filtros-mis-ejercicios');
+    if (!barra) {
+        barra = document.createElement('div');
+        barra.id = 'filtros-mis-ejercicios';
+        lista.parentNode.insertBefore(barra, lista);
     }
+    barra.style.display = '';
+    var temas = ['Calentamiento','Cambios de orientación','Centros laterales','Contraataque','Defensa en bloque bajo','Defensa en inferioridad','Duelos','Finalización','Físico-Técnico','Juego de posición','Juego interior','Juegos Lúdicos','Partidos','Porteros','Posesiones','Presión','Press perdida','Progresión en el juego','Rondos','Ruedas de pases','Salida de balón','Tercer hombre','Trabajo táctico','Transiciones','Técnica individual'];
+    var fases = ['Organización ofensiva','Organización defensiva','Transición ataque','Transición defensa','Balón parado'];
+    data.forEach(function(e){
+        if (e.tema && temas.indexOf(e.tema) === -1) temas.push(e.tema);
+        if (e.game_phase && fases.indexOf(e.game_phase) === -1) fases.push(e.game_phase);
+    });
+    var st = 'padding:6px 8px;font-size:12px;border:1px solid #d1d5db;border-radius:6px;background:white;color:#374151';
+    barra.innerHTML =
+        '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;align-items:center">' +
+            '<input type="text" id="mis-filtro-nombre" placeholder="🔍 Buscar por nombre..." oninput="filtrarMisEjercicios()" style="flex:1;min-width:130px;' + st + '">' +
+            '<input type="number" id="mis-filtro-jug" placeholder="Nº jug" min="1" oninput="filtrarMisEjercicios()" style="width:75px;' + st + '">' +
+            '<select id="mis-filtro-tema" onchange="filtrarMisEjercicios()" style="' + st + ';cursor:pointer">' +
+                '<option value="">Tema (todos)</option>' + temas.map(function(t){ return '<option>' + t + '</option>'; }).join('') +
+            '</select>' +
+            '<select id="mis-filtro-fase" onchange="filtrarMisEjercicios()" style="' + st + ';cursor:pointer">' +
+                '<option value="">Fase (todas)</option>' + fases.map(function(f){ return '<option>' + f + '</option>'; }).join('') +
+            '</select>' +
+            '<button onclick="limpiarFiltrosMisEjercicios()" style="padding:6px 10px;font-size:12px;border:1px solid #7c3aed;color:#7c3aed;background:white;border-radius:6px;cursor:pointer;font-weight:600">Limpiar</button>' +
+        '</div>';
+}
+
+function filtrarMisEjercicios() {
+    var q = (document.getElementById('mis-filtro-nombre')?.value || '').toLowerCase();
+    var jug = parseInt(document.getElementById('mis-filtro-jug')?.value) || 0;
+    var tema = document.getElementById('mis-filtro-tema')?.value || '';
+    var fase = document.getElementById('mis-filtro-fase')?.value || '';
+    var filtrados = misEjerciciosCache.filter(function(e){
+        return (!q || (e.name || '').toLowerCase().indexOf(q) !== -1) &&
+               (!jug || e.players_count == jug) &&
+               (!tema || e.tema === tema) &&
+               (!fase || e.game_phase === fase);
+    });
+    renderMisEjercicios(filtrados);
+}
+
+function limpiarFiltrosMisEjercicios() {
+    ['mis-filtro-nombre','mis-filtro-jug'].forEach(function(id){ var el = document.getElementById(id); if (el) el.value = ''; });
+    ['mis-filtro-tema','mis-filtro-fase'].forEach(function(id){ var el = document.getElementById(id); if (el) el.selectedIndex = 0; });
+    renderMisEjercicios(misEjerciciosCache);
 }
 
 function seleccionarMiEjercicio(id) {
