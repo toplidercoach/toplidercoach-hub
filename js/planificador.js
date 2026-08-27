@@ -2825,6 +2825,25 @@ async function calPdfSemanaGenerar() {
             .order('session_date');
         var sesiones = res.data || [];
 
+        var qP = supabaseClient
+            .from('matches')
+            .select('opponent, match_date, kick_off_time, competition, home_away')
+            .eq('club_id', clubId)
+            .gte('match_date', desde)
+            .lte('match_date', hasta)
+            .order('match_date');
+        if (seasonId) qP = qP.eq('season_id', seasonId);
+        var resP = await qP;
+        var partidos = resP.data || [];
+
+        var resM = await supabaseClient
+            .from('calendario_marcadores')
+            .select('fecha, tipo, nota')
+            .eq('club_id', clubId)
+            .gte('fecha', desde)
+            .lte('fecha', hasta);
+        var marcadores = resM.data || [];
+
         var doc = new window.jspdf.jsPDF('p', 'mm', 'a4');
         var nombreClub = (clubData && clubData.name) ? clubData.name : 'Club';
         var MESES_S = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
@@ -2850,18 +2869,23 @@ async function calPdfSemanaGenerar() {
         dias.forEach(function(dia, idx) {
             var key = fISO(dia);
             var delDia = sesiones.filter(function(s) { return s.session_date === key; });
-            var alto = Math.max(24, 14 + delDia.length * 10);
+            var parDia = partidos.filter(function(p) { return p.match_date === key; });
+            var marDia = marcadores.filter(function(m) { return m.fecha === key; });
+            var totalLineas = delDia.length + parDia.length + marDia.length;
+            var alto = Math.max(24, 14 + totalLineas * 10);
 
             if (y + alto > 285) { doc.addPage(); y = 20; }
 
-            if (delDia.length) {
+            if (totalLineas) {
                 doc.setFillColor(241, 245, 249);
             } else {
                 doc.setFillColor(250, 250, 252);
             }
             doc.roundedRect(14, y, 182, alto, 3, 3, 'F');
 
-            if (delDia.length) {
+            if (parDia.length) {
+                doc.setFillColor(245, 158, 11);
+            } else if (totalLineas) {
                 doc.setFillColor(124, 58, 237);
             } else {
                 doc.setFillColor(203, 213, 225);
@@ -2873,7 +2897,7 @@ async function calPdfSemanaGenerar() {
             doc.setFontSize(11);
             doc.text(DIAS_S[idx] + ' ' + dia.getDate(), 22, y + 9);
 
-            if (!delDia.length) {
+            if (!totalLineas) {
                 doc.setFont('helvetica', 'normal');
                 doc.setFontSize(10);
                 doc.setTextColor(148, 163, 184);
@@ -2888,6 +2912,22 @@ async function calPdfSemanaGenerar() {
                     doc.setFont('helvetica', 'normal');
                     doc.setTextColor(30, 41, 59);
                     doc.text(String(s.name || 'Sesion'), 48, ly);
+                    ly += 10;
+                });
+                parDia.forEach(function(p) {
+                    doc.setFont('helvetica', 'bold');
+                    doc.setFontSize(12);
+                    doc.setTextColor(217, 119, 6);
+                    doc.text(p.kick_off_time ? String(p.kick_off_time).substring(0, 5) : '--:--', 22, ly);
+                    doc.text('PARTIDO vs ' + String(p.opponent || '') + (p.home_away === 'home' ? ' (Local)' : ' (Visitante)') + (p.competition ? ' - ' + p.competition : ''), 48, ly);
+                    ly += 10;
+                });
+                marDia.forEach(function(m) {
+                    var nombresM = { descanso: 'Descanso', voluntario: 'Entrenamiento voluntario', viaje: 'Viaje / concentracion', otro: 'Otro' };
+                    doc.setFont('helvetica', 'italic');
+                    doc.setFontSize(10);
+                    doc.setTextColor(100, 116, 139);
+                    doc.text((m.tipo === 'otro' && m.nota) ? String(m.nota) : (nombresM[m.tipo] || String(m.tipo || '')), 22, ly);
                     ly += 10;
                 });
             }
