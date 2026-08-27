@@ -720,6 +720,7 @@ registrarSubTab('planificador', 'calendario', cargarCalendarioUnificado);
                             </div>
                             <button onclick="event.stopPropagation(); moverEjercicio('${seccion}', ${idx}, -1)" title="Subir" ${idx === 0 ? 'disabled' : ''} style="background:#e5e7eb; border:none; border-radius:4px; padding:4px 8px; cursor:${idx === 0 ? 'not-allowed' : 'pointer'}; opacity:${idx === 0 ? '0.3' : '1'}; font-size:11px; color:#374151; margin-right:2px;">▲</button>
                             <button onclick="event.stopPropagation(); moverEjercicio('${seccion}', ${idx}, 1)" title="Bajar" ${idx === totalEnSeccion - 1 ? 'disabled' : ''} style="background:#e5e7eb; border:none; border-radius:4px; padding:4px 8px; cursor:${idx === totalEnSeccion - 1 ? 'not-allowed' : 'pointer'}; opacity:${idx === totalEnSeccion - 1 ? '0.3' : '1'}; font-size:11px; color:#374151; margin-right:4px;">▼</button>
+                            <button onclick="event.stopPropagation(); editarTituloSesion('${seccion}', ${idx})" title="Editar titulo solo en esta sesion" style="background:#fef3c7;color:#b45309;border:1px solid #fcd34d;border-radius:6px;margin-right:2px;">✏️</button>
                             <button onclick="event.stopPropagation(); eqAbrirModal('${seccion}', ${idx})" title="Montar equipos" style="background:#ede9fe;color:#7c3aed;border:1px solid #c4b5fd;border-radius:6px;margin-right:4px;">👥${ej.equipos && ej.equipos.series ? ' ' + ej.equipos.series.length : ''}</button>
                             <button onclick="event.stopPropagation(); quitarEjercicio('${seccion}', ${idx})">Quitar</button>
                         </div>
@@ -748,6 +749,17 @@ registrarSubTab('planificador', 'calendario', cargarCalendarioUnificado);
             if (!minutos || minutos < 1) { showToast('Indica los minutos del bloque'); return; }
             sesion[bloqueLibreSeccion].push({ tipo: 'libre', id: null, titulo: titulo, duracion: minutos, notas: notas, imagen: '', objetivo: '' });
             cerrarModalBloqueLibre();
+            renderizarSesion();
+        }
+
+        function editarTituloSesion(seccion, idx) {
+            const ej = sesion[seccion][idx];
+            if (!ej) return;
+            const nuevo = prompt('Titulo para esta sesion (el ejercicio del banco no cambia):', ej.titulo || '');
+            if (nuevo === null) return;
+            const limpio = nuevo.trim();
+            if (!limpio) { showToast('El titulo no puede quedar vacio', 'warning'); return; }
+            ej.titulo = limpio;
             renderizarSesion();
         }
 
