@@ -2265,7 +2265,7 @@ function impCalInyectarBoton() {
     var bar = document.createElement('div');
     bar.id = 'btn-importar-cal';
     bar.style.cssText = 'margin:0 0 10px;text-align:right';
-    bar.innerHTML = '<button onclick="impCalAbrir()" style="padding:8px 14px;background:#ede9fe;color:#6d28d9;border:1px solid #c4b5fd;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600">\ud83d\udce5 Importar calendario</button>';
+    bar.innerHTML = '<button onclick="clasifAbrir()" style="padding:8px 14px;background:#fef3c7;color:#b45309;border:1px solid #fcd34d;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;margin-right:8px">\ud83c\udfc6 Clasificaci\u00f3n</button><button onclick="impCalAbrir()" style="padding:8px 14px;background:#ede9fe;color:#6d28d9;border:1px solid #c4b5fd;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600">\ud83d\udce5 Importar calendario</button>';
     lista.parentNode.insertBefore(bar, lista);
 }
 
@@ -2406,40 +2406,214 @@ function impCalRenderPreview() {
         '</tr>';
     }).join('');
     prev.innerHTML = '<div style="max-height:320px;overflow-y:auto;border:1px solid #e5e7eb;border-radius:8px"><table style="width:100%;border-collapse:collapse"><thead><tr style="background:#f9fafb;position:sticky;top:0"><th style="text-align:left;padding:8px;font-size:12px;color:#6b7280">Jor</th><th style="text-align:left;padding:8px;font-size:12px;color:#6b7280">Fecha</th><th style="text-align:left;padding:8px;font-size:12px;color:#6b7280">Rival</th><th style="text-align:left;padding:8px;font-size:12px;color:#6b7280">Campo</th><th></th></tr></thead><tbody>' + filas + '</tbody></table></div>' +
-        '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:14px"><span style="font-size:13px;color:#6b7280">' + nuevos + ' partidos nuevos \u00b7 ' + (mios.length - nuevos) + ' omitidos</span>' +
-        '<button onclick="impCalImportar()" ' + (nuevos ? '' : 'disabled ') + 'style="padding:10px 18px;background:' + (nuevos ? '#16a34a' : '#d1d5db') + ';color:#fff;border:none;border-radius:8px;cursor:' + (nuevos ? 'pointer' : 'not-allowed') + ';font-size:14px;font-weight:700">Crear ' + nuevos + ' partidos</button></div>';
+        '<label style="display:flex;align-items:center;gap:8px;margin-top:12px;font-size:13px;color:#374151;cursor:pointer"><input type="checkbox" id="impcal-guardar-grupo" checked> Guardar el calendario completo del grupo para la Clasificaci\u00f3n</label>' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px"><span style="font-size:13px;color:#6b7280">' + nuevos + ' partidos nuevos \u00b7 ' + (mios.length - nuevos) + ' ya existen</span>' +
+        '<button onclick="impCalImportar()" style="padding:10px 18px;background:#16a34a;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:700">Importar</button></div>';
 }
 
 async function impCalImportar() {
     var equipo = document.getElementById('impcal-equipo').value;
     if (!equipo) return;
+    var chkGrupo = document.getElementById('impcal-guardar-grupo');
+    var guardarGrupo = !!(chkGrupo && chkGrupo.checked);
     var mios = impCal.fixtures.filter(function(f) {
         return (f.local === equipo || f.visitante === equipo) && impCal.fechasExistentes.indexOf(f.fecha) === -1;
     });
-    if (!mios.length) return;
-    var inserts = mios.map(function(f) {
-        var esLocal = f.local === equipo;
-        return {
-            club_id: clubId,
-            season_id: seasonId,
-            opponent: esLocal ? f.visitante : f.local,
-            match_date: f.fecha,
-            home_away: esLocal ? 'home' : 'away',
-            competition: impCal.compName,
-            round: 'Jornada ' + f.jornada,
-            formato_juego: 11,
-            formacion: '4-3-3'
-        };
-    });
     try {
-        var r = await supabaseClient.from('matches').insert(inserts);
-        if (r.error) { showToast('Error: ' + r.error.message, 'error'); return; }
-        showToast(inserts.length + ' partidos creados', 'success');
+        var creados = 0;
+        if (mios.length) {
+            var inserts = mios.map(function(f) {
+                var esLocal = f.local === equipo;
+                return {
+                    club_id: clubId,
+                    season_id: seasonId,
+                    opponent: esLocal ? f.visitante : f.local,
+                    match_date: f.fecha,
+                    home_away: esLocal ? 'home' : 'away',
+                    competition: impCal.compName,
+                    round: 'Jornada ' + f.jornada,
+                    formato_juego: 11,
+                    formacion: '4-3-3'
+                };
+            });
+            var r = await supabaseClient.from('matches').insert(inserts);
+            if (r.error) { showToast('Error: ' + r.error.message, 'error'); return; }
+            creados = inserts.length;
+        }
+        var msgGrupo = '';
+        if (guardarGrupo) msgGrupo = await impCalGuardarGrupo(equipo);
+        showToast((creados ? creados + ' partidos creados' : 'Sin partidos nuevos') + (msgGrupo ? ' \u00b7 ' + msgGrupo : ''), 'success');
         var mo = document.getElementById('impcal-modal');
         if (mo) mo.remove();
         cargarPartidos();
     } catch (e) {
         showToast('Error al importar: ' + e.message, 'error');
     }
+}
+
+async function impCalGuardarGrupo(equipo) {
+    var ex = await supabaseClient.from('competitions').select('id')
+        .eq('club_id', clubId).eq('season_id', seasonId).eq('name', impCal.compName).limit(1);
+    if (ex.error) throw ex.error;
+    if (ex.data && ex.data.length) return 'la clasificaci\u00f3n ya exist\u00eda (resultados conservados)';
+    var rc = await supabaseClient.from('competitions')
+        .insert({ club_id: clubId, season_id: seasonId, name: impCal.compName, my_team: equipo, teams: impCal.equipos })
+        .select('id').single();
+    if (rc.error) throw rc.error;
+    var cid = rc.data.id;
+    var rows = impCal.fixtures.map(function(f) {
+        return { competition_id: cid, jornada: f.jornada, match_date: f.fecha, home_team: f.local, away_team: f.visitante };
+    });
+    for (var i = 0; i < rows.length; i += 100) {
+        var r = await supabaseClient.from('competition_fixtures').insert(rows.slice(i, i + 100));
+        if (r.error) throw r.error;
+    }
+    return 'clasificaci\u00f3n guardada (' + rows.length + ' partidos del grupo)';
+}
+
+// ========== CLASIFICACION DE LA COMPETICION ==========
+var clasif = { comp: null, fixtures: [], jornada: 1 };
+
+async function clasifAbrir() {
+    if (!seasonId) { showToast('Configura una temporada activa en Mi Club', 'warning'); return; }
+    var rc = await supabaseClient.from('competitions').select('*')
+        .eq('club_id', clubId).eq('season_id', seasonId)
+        .order('created_at', { ascending: false }).limit(1);
+    if (rc.error) { showToast('Error: ' + rc.error.message, 'error'); return; }
+    if (!rc.data || !rc.data.length) { showToast('Primero importa un calendario con la opci\u00f3n de clasificaci\u00f3n marcada', 'warning'); return; }
+    clasif.comp = rc.data[0];
+    var rf = await supabaseClient.from('competition_fixtures').select('*')
+        .eq('competition_id', clasif.comp.id).order('jornada').order('id');
+    if (rf.error) { showToast('Error: ' + rf.error.message, 'error'); return; }
+    clasif.fixtures = rf.data || [];
+    var maxJ = clasif.fixtures.reduce(function(m, f) { return Math.max(m, f.jornada); }, 1);
+    var j = maxJ;
+    for (var k = 1; k <= maxJ; k++) {
+        var fs = clasif.fixtures.filter(function(f) { return f.jornada === k; });
+        if (fs.some(function(f) { return f.home_goals === null || f.away_goals === null; })) { j = k; break; }
+    }
+    clasif.jornada = j;
+    var prev = document.getElementById('clasif-modal');
+    if (prev) prev.remove();
+    var ov = document.createElement('div');
+    ov.id = 'clasif-modal';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px';
+    ov.innerHTML = '<div style="background:#fff;border-radius:14px;max-width:1150px;width:100%;max-height:92vh;display:flex;flex-direction:column;overflow:hidden">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 22px;border-bottom:1px solid #e5e7eb;gap:10px"><div style="font-size:16px;font-weight:700;color:#111827;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">\ud83c\udfc6 ' + impCalEsc(clasif.comp.name) + '</div><button onclick="document.getElementById(\'clasif-modal\').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#6b7280;flex-shrink:0">\u2715</button></div>' +
+        '<div id="clasif-body" style="padding:18px 22px;overflow-y:auto;display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start"></div>' +
+    '</div>';
+    document.body.appendChild(ov);
+    clasifRender();
+}
+
+function clasifRender() {
+    var body = document.getElementById('clasif-body');
+    if (!body) return;
+    var maxJ = clasif.fixtures.reduce(function(m, f) { return Math.max(m, f.jornada); }, 1);
+    var opts = '';
+    for (var k = 1; k <= maxJ; k++) opts += '<option value="' + k + '"' + (k === clasif.jornada ? ' selected' : '') + '>Jornada ' + k + '</option>';
+    var fj = clasif.fixtures.filter(function(f) { return f.jornada === clasif.jornada; });
+    var fecha = fj.length && fj[0].match_date ? new Date(fj[0].match_date + 'T12:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
+    var inSt = 'width:44px;padding:6px 4px;text-align:center;font-size:14px;border:1px solid #d1d5db;border-radius:6px';
+    var filas = fj.map(function(f) {
+        var esMio = f.home_team === clasif.comp.my_team || f.away_team === clasif.comp.my_team;
+        return '<div style="display:flex;align-items:center;gap:6px;padding:7px 8px;border-radius:8px' + (esMio ? ';background:#fef3c7' : '') + '">' +
+            '<div style="flex:1;text-align:right;font-size:13px;color:#111827;' + (f.home_team === clasif.comp.my_team ? 'font-weight:700' : '') + '">' + impCalEsc(f.home_team) + '</div>' +
+            '<input type="number" min="0" id="cg-h-' + f.id + '" value="' + (f.home_goals === null ? '' : f.home_goals) + '" style="' + inSt + '">' +
+            '<span style="color:#9ca3af">-</span>' +
+            '<input type="number" min="0" id="cg-a-' + f.id + '" value="' + (f.away_goals === null ? '' : f.away_goals) + '" style="' + inSt + '">' +
+            '<div style="flex:1;font-size:13px;color:#111827;' + (f.away_team === clasif.comp.my_team ? 'font-weight:700' : '') + '">' + impCalEsc(f.away_team) + '</div>' +
+        '</div>';
+    }).join('');
+    body.innerHTML =
+        '<div style="flex:1;min-width:380px;max-width:520px">' +
+            '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">' +
+                '<select onchange="clasifCambiarJornada(this.value)" style="padding:8px 10px;font-size:14px;border:1px solid #d1d5db;border-radius:8px;font-weight:600">' + opts + '</select>' +
+                '<span style="font-size:13px;color:#6b7280">' + fecha + '</span>' +
+            '</div>' +
+            '<div style="border:1px solid #e5e7eb;border-radius:10px;padding:6px">' + filas + '</div>' +
+            '<button onclick="clasifGuardarJornada()" style="margin-top:12px;width:100%;padding:11px;background:#16a34a;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:700">Guardar resultados de la jornada</button>' +
+        '</div>' +
+        '<div style="flex:1.4;min-width:420px">' + clasifTablaHtml() + '</div>';
+}
+
+function clasifCambiarJornada(v) {
+    clasif.jornada = parseInt(v);
+    clasifRender();
+}
+
+async function clasifGuardarJornada() {
+    var fj = clasif.fixtures.filter(function(f) { return f.jornada === clasif.jornada; });
+    var cambios = [];
+    for (var i = 0; i < fj.length; i++) {
+        var f = fj[i];
+        var hEl = document.getElementById('cg-h-' + f.id);
+        var aEl = document.getElementById('cg-a-' + f.id);
+        if (!hEl || !aEl) continue;
+        var h = hEl.value === '' ? null : parseInt(hEl.value);
+        var a = aEl.value === '' ? null : parseInt(aEl.value);
+        if ((h === null) !== (a === null)) { showToast('Hay un marcador a medias en ' + f.home_team + ' - ' + f.away_team, 'warning'); return; }
+        if (h !== f.home_goals || a !== f.away_goals) cambios.push({ f: f, h: h, a: a });
+    }
+    if (!cambios.length) { showToast('No hay cambios que guardar'); return; }
+    try {
+        for (var c = 0; c < cambios.length; c++) {
+            var r = await supabaseClient.from('competition_fixtures')
+                .update({ home_goals: cambios[c].h, away_goals: cambios[c].a })
+                .eq('id', cambios[c].f.id);
+            if (r.error) throw r.error;
+            cambios[c].f.home_goals = cambios[c].h;
+            cambios[c].f.away_goals = cambios[c].a;
+        }
+        showToast('Resultados guardados', 'success');
+        clasifRender();
+    } catch (e) {
+        showToast('Error al guardar: ' + e.message, 'error');
+    }
+}
+
+function clasifTablaHtml() {
+    var equipos = clasif.comp.teams || [];
+    var st = {};
+    equipos.forEach(function(e) { st[e] = { eq: e, pj: 0, pg: 0, pe: 0, pp: 0, gf: 0, gc: 0 }; });
+    clasif.fixtures.forEach(function(f) {
+        if (f.home_goals === null || f.away_goals === null) return;
+        var h = st[f.home_team], a = st[f.away_team];
+        if (!h || !a) return;
+        h.pj++; a.pj++;
+        h.gf += f.home_goals; h.gc += f.away_goals;
+        a.gf += f.away_goals; a.gc += f.home_goals;
+        if (f.home_goals > f.away_goals) { h.pg++; a.pp++; }
+        else if (f.home_goals < f.away_goals) { a.pg++; h.pp++; }
+        else { h.pe++; a.pe++; }
+    });
+    var tabla = equipos.map(function(e) {
+        var s = st[e];
+        s.dg = s.gf - s.gc;
+        s.pts = s.pg * 3 + s.pe;
+        return s;
+    }).sort(function(x, y) {
+        return (y.pts - x.pts) || (y.dg - x.dg) || (y.gf - x.gf) || x.eq.localeCompare(y.eq);
+    });
+    var filas = tabla.map(function(s, i) {
+        var esMio = s.eq === clasif.comp.my_team;
+        return '<tr style="border-bottom:1px solid #f3f4f6' + (esMio ? ';background:#fef3c7;font-weight:700' : '') + '">' +
+            '<td style="padding:6px 8px;font-size:13px;color:#6b7280;text-align:center">' + (i + 1) + '</td>' +
+            '<td style="padding:6px 8px;font-size:13px;color:#111827">' + impCalEsc(s.eq) + '</td>' +
+            '<td style="padding:6px 4px;font-size:13px;text-align:center">' + s.pj + '</td>' +
+            '<td style="padding:6px 4px;font-size:13px;text-align:center;color:#166534">' + s.pg + '</td>' +
+            '<td style="padding:6px 4px;font-size:13px;text-align:center;color:#92400e">' + s.pe + '</td>' +
+            '<td style="padding:6px 4px;font-size:13px;text-align:center;color:#991b1b">' + s.pp + '</td>' +
+            '<td style="padding:6px 4px;font-size:13px;text-align:center">' + s.gf + '</td>' +
+            '<td style="padding:6px 4px;font-size:13px;text-align:center">' + s.gc + '</td>' +
+            '<td style="padding:6px 4px;font-size:13px;text-align:center">' + (s.dg > 0 ? '+' : '') + s.dg + '</td>' +
+            '<td style="padding:6px 8px;font-size:14px;text-align:center;font-weight:800;color:#111827">' + s.pts + '</td>' +
+        '</tr>';
+    }).join('');
+    var th = 'padding:8px 4px;font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;text-align:center';
+    return '<div style="border:1px solid #e5e7eb;border-radius:10px;overflow:hidden"><table style="width:100%;border-collapse:collapse"><thead><tr style="background:#f9fafb">' +
+        '<th style="' + th + '">#</th><th style="' + th + ';text-align:left">Equipo</th><th style="' + th + '">PJ</th><th style="' + th + '">PG</th><th style="' + th + '">PE</th><th style="' + th + '">PP</th><th style="' + th + '">GF</th><th style="' + th + '">GC</th><th style="' + th + '">DG</th><th style="' + th + '">PTS</th>' +
+        '</tr></thead><tbody>' + filas + '</tbody></table></div>' +
+        '<div style="font-size:12px;color:#9ca3af;margin-top:8px">Criterios de orden: puntos, diferencia de goles, goles a favor. (El desempate oficial por enfrentamiento directo no se aplica.)</div>';
 }
 
