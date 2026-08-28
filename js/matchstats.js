@@ -146,6 +146,7 @@ function limpiarFiltroPartidos() {
         
         async function cargarPartidos() {
             const lista = document.getElementById('lista-partidos');
+            impCalInyectarBoton();
             lista.innerHTML = '<div class="loading">Cargando partidos...</div>';
             
             try {
@@ -2252,3 +2253,193 @@ async function gpsPartidoGenerarPDF() {
 
     doc.save('GPS_partido_' + (fechaVal || 'fecha') + '.pdf');
 }
+
+
+// ========== IMPORTADOR DE CALENDARIO DE COMPETICION ==========
+var impCal = { fixtures: [], equipos: [], compName: '', fechasExistentes: [] };
+
+function impCalInyectarBoton() {
+    if (document.getElementById('btn-importar-cal')) return;
+    var lista = document.getElementById('lista-partidos');
+    if (!lista || !lista.parentNode) return;
+    var bar = document.createElement('div');
+    bar.id = 'btn-importar-cal';
+    bar.style.cssText = 'margin:0 0 10px;text-align:right';
+    bar.innerHTML = '<button onclick="impCalAbrir()" style="padding:8px 14px;background:#ede9fe;color:#6d28d9;border:1px solid #c4b5fd;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600">\ud83d\udce5 Importar calendario</button>';
+    lista.parentNode.insertBefore(bar, lista);
+}
+
+function impCalAbrir() {
+    if (!seasonId) { showToast('Configura una temporada activa en Mi Club antes de importar', 'warning'); return; }
+    var prev = document.getElementById('impcal-modal');
+    if (prev) prev.remove();
+    var ov = document.createElement('div');
+    ov.id = 'impcal-modal';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px';
+    ov.innerHTML = '<div style="background:#fff;border-radius:14px;max-width:760px;width:100%;max-height:90vh;display:flex;flex-direction:column;overflow:hidden">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 22px;border-bottom:1px solid #e5e7eb"><div style="font-size:17px;font-weight:700;color:#111827">\ud83d\udce5 Importar calendario de competici\u00f3n</div><button onclick="document.getElementById(\'impcal-modal\').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#6b7280">\u2715</button></div>' +
+        '<div id="impcal-body" style="padding:20px 22px;overflow-y:auto">' +
+            '<p style="margin:0 0 12px;color:#374151;font-size:14px">Sube el calendario oficial de tu federaci\u00f3n (archivo Word/HTML descargado de la web federativa). Se detectar\u00e1n los equipos y las jornadas, y podr\u00e1s revisar todo antes de crear nada.</p>' +
+            '<input type="file" id="impcal-file" accept=".doc,.html,.htm" onchange="impCalLeerArchivo(this)" style="font-size:14px">' +
+            '<div id="impcal-resultado" style="margin-top:16px"></div>' +
+        '</div>' +
+    '</div>';
+    document.body.appendChild(ov);
+}
+
+function impCalLeerArchivo(input) {
+    if (!input.files || !input.files.length) return;
+    var f = input.files[0];
+    var reader = new FileReader();
+    reader.onload = function(ev) {
+        try {
+            var buf = ev.target.result;
+            var head = new TextDecoder('latin1').decode(buf.slice(0, 4096)).toLowerCase();
+            var charset = 'utf-8';
+            var m = head.match(/charset\s*=\s*["']?([\w-]+)/);
+            if (m) charset = m[1];
+            var html = '';
+            try { html = new TextDecoder(charset).decode(buf); }
+            catch (e) { html = new TextDecoder('utf-8').decode(buf); }
+            impCalParsear(html);
+        } catch (err) {
+            console.error('impCalLeerArchivo:', err);
+            document.getElementById('impcal-resultado').innerHTML = '<p style="color:#dc2626;font-size:14px">No se pudo leer el archivo: ' + err.message + '</p>';
+        }
+    };
+    reader.readAsArrayBuffer(f);
+}
+
+async function impCalParsear(html) {
+    var res = document.getElementById('impcal-resultado');
+    res.innerHTML = '<p style="color:#6b7280;font-size:14px">Analizando calendario...</p>';
+    var doc = new DOMParser().parseFromString(html, 'text/html');
+    var texto = doc.body ? doc.body.textContent : '';
+
+    // Equipos participantes: "1.-Nombre (codigo)"
+    impCal.equipos = [];
+    var reEq = /\d+\s*\.\-\s*(.+?)\s*\(\d+\)/g, mEq;
+    while ((mEq = reEq.exec(texto)) !== null) {
+        var nom = mEq[1].replace(/\s+/g, ' ').trim();
+        if (nom && impCal.equipos.indexOf(nom) === -1) impCal.equipos.push(nom);
+    }
+
+    // Nombre de la competicion: linea que contiene GRUPO
+    impCal.compName = 'Liga';
+    var mComp = texto.match(/([^\n\r|]{5,80}GRUPO\s*[\w]+)/i);
+    if (mComp) impCal.compName = mComp[1].replace(/\s+/g, ' ').trim();
+
+    // Jornadas y enfrentamientos recorriendo las filas en orden
+    impCal.fixtures = [];
+    var vistos = {};
+    var jornadaActual = null, fechaActual = null;
+    var reJ = /Jornada\s+(\d+)\s*\((\d{2})-(\d{2})-(\d{4})\)/;
+    var filas = doc.querySelectorAll('tr');
+    filas.forEach(function(tr) {
+        var t = (tr.textContent || '').replace(/\s+/g, ' ').trim();
+        var mJ = t.match(reJ);
+        if (mJ) {
+            jornadaActual = parseInt(mJ[1]);
+            fechaActual = mJ[4] + '-' + mJ[3] + '-' + mJ[2];
+            return;
+        }
+        if (!jornadaActual) return;
+        var celdas = Array.prototype.slice.call(tr.querySelectorAll('td')).map(function(td) {
+            return (td.textContent || '').replace(/\s+/g, ' ').trim();
+        }).filter(function(x) { return x !== ''; });
+        var i = celdas.indexOf('-');
+        if (i > 0 && i < celdas.length - 1) {
+            var local = celdas[i - 1], visitante = celdas[i + 1];
+            if (local.length < 3 || visitante.length < 3) return;
+            if (impCal.equipos.indexOf(local) === -1 || impCal.equipos.indexOf(visitante) === -1) return;
+            var key = jornadaActual + '|' + local + '|' + visitante;
+            if (vistos[key]) return;
+            vistos[key] = true;
+            impCal.fixtures.push({ jornada: jornadaActual, fecha: fechaActual, local: local, visitante: visitante });
+        }
+    });
+
+    if (!impCal.fixtures.length || !impCal.equipos.length) {
+        res.innerHTML = '<p style="color:#dc2626;font-size:14px">No se ha reconocido el formato del calendario. Comprueba que es el archivo oficial de la federaci\u00f3n (Word/HTML con jornadas tipo "Jornada 1 (06-09-2026)").</p>';
+        return;
+    }
+
+    // Fechas con partido ya creado en esta temporada (para omitir duplicados)
+    impCal.fechasExistentes = [];
+    try {
+        var ex = await supabaseClient.from('matches').select('match_date').eq('club_id', clubId).eq('season_id', seasonId);
+        impCal.fechasExistentes = (ex.data || []).map(function(p) { return p.match_date; });
+    } catch (e) {}
+
+    var jornadas = impCal.fixtures.reduce(function(mx, f) { return Math.max(mx, f.jornada); }, 0);
+    res.innerHTML = '<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:10px 14px;font-size:14px;color:#166534;margin-bottom:14px">\u2714 Detectado: <b>' + impCalEsc(impCal.compName) + '</b> \u00b7 ' + impCal.equipos.length + ' equipos \u00b7 ' + jornadas + ' jornadas \u00b7 ' + impCal.fixtures.length + ' partidos</div>' +
+        '<label style="font-size:13px;font-weight:600;color:#374151">\u00bfCu\u00e1l es tu equipo?</label><br>' +
+        '<select id="impcal-equipo" onchange="impCalRenderPreview()" style="margin-top:6px;padding:8px 10px;font-size:14px;border:1px solid #d1d5db;border-radius:8px;max-width:100%"><option value="">-- Selecciona --</option>' +
+        impCal.equipos.map(function(e) { return '<option>' + impCalEsc(e) + '</option>'; }).join('') +
+        '</select>' +
+        '<div id="impcal-preview" style="margin-top:14px"></div>';
+}
+
+function impCalEsc(s) {
+    return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function impCalRenderPreview() {
+    var equipo = document.getElementById('impcal-equipo').value;
+    var prev = document.getElementById('impcal-preview');
+    if (!equipo) { prev.innerHTML = ''; return; }
+    var mios = impCal.fixtures.filter(function(f) { return f.local === equipo || f.visitante === equipo; });
+    if (!mios.length) { prev.innerHTML = '<p style="color:#dc2626;font-size:14px">No hay partidos de ese equipo en el calendario.</p>'; return; }
+    var nuevos = 0;
+    var filas = mios.map(function(f, i) {
+        var esLocal = f.local === equipo;
+        var rival = esLocal ? f.visitante : f.local;
+        var existe = impCal.fechasExistentes.indexOf(f.fecha) !== -1;
+        if (!existe) nuevos++;
+        var fFmt = new Date(f.fecha + 'T12:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit' });
+        return '<tr style="border-bottom:1px solid #f3f4f6' + (existe ? ';opacity:.45' : '') + '">' +
+            '<td style="padding:6px 8px;font-size:13px;color:#6b7280">J' + f.jornada + '</td>' +
+            '<td style="padding:6px 8px;font-size:13px">' + fFmt + '</td>' +
+            '<td style="padding:6px 8px;font-size:13px;font-weight:600;color:#111827">' + impCalEsc(rival) + '</td>' +
+            '<td style="padding:6px 8px;font-size:12px;color:' + (esLocal ? '#166534' : '#92400e') + '">' + (esLocal ? 'Local' : 'Visitante') + '</td>' +
+            '<td style="padding:6px 8px;font-size:12px;color:#9ca3af">' + (existe ? 'Ya existe \u00b7 se omite' : '') + '</td>' +
+        '</tr>';
+    }).join('');
+    prev.innerHTML = '<div style="max-height:320px;overflow-y:auto;border:1px solid #e5e7eb;border-radius:8px"><table style="width:100%;border-collapse:collapse"><thead><tr style="background:#f9fafb;position:sticky;top:0"><th style="text-align:left;padding:8px;font-size:12px;color:#6b7280">Jor</th><th style="text-align:left;padding:8px;font-size:12px;color:#6b7280">Fecha</th><th style="text-align:left;padding:8px;font-size:12px;color:#6b7280">Rival</th><th style="text-align:left;padding:8px;font-size:12px;color:#6b7280">Campo</th><th></th></tr></thead><tbody>' + filas + '</tbody></table></div>' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:14px"><span style="font-size:13px;color:#6b7280">' + nuevos + ' partidos nuevos \u00b7 ' + (mios.length - nuevos) + ' omitidos</span>' +
+        '<button onclick="impCalImportar()" ' + (nuevos ? '' : 'disabled ') + 'style="padding:10px 18px;background:' + (nuevos ? '#16a34a' : '#d1d5db') + ';color:#fff;border:none;border-radius:8px;cursor:' + (nuevos ? 'pointer' : 'not-allowed') + ';font-size:14px;font-weight:700">Crear ' + nuevos + ' partidos</button></div>';
+}
+
+async function impCalImportar() {
+    var equipo = document.getElementById('impcal-equipo').value;
+    if (!equipo) return;
+    var mios = impCal.fixtures.filter(function(f) {
+        return (f.local === equipo || f.visitante === equipo) && impCal.fechasExistentes.indexOf(f.fecha) === -1;
+    });
+    if (!mios.length) return;
+    var inserts = mios.map(function(f) {
+        var esLocal = f.local === equipo;
+        return {
+            club_id: clubId,
+            season_id: seasonId,
+            opponent: esLocal ? f.visitante : f.local,
+            match_date: f.fecha,
+            home_away: esLocal ? 'home' : 'away',
+            competition: impCal.compName,
+            round: 'Jornada ' + f.jornada,
+            formato_juego: 11,
+            formacion: '4-3-3'
+        };
+    });
+    try {
+        var r = await supabaseClient.from('matches').insert(inserts);
+        if (r.error) { showToast('Error: ' + r.error.message, 'error'); return; }
+        showToast(inserts.length + ' partidos creados', 'success');
+        var mo = document.getElementById('impcal-modal');
+        if (mo) mo.remove();
+        cargarPartidos();
+    } catch (e) {
+        showToast('Error al importar: ' + e.message, 'error');
+    }
+}
+
