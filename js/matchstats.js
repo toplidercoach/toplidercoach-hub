@@ -2279,8 +2279,8 @@ function impCalAbrir() {
     ov.innerHTML = '<div style="background:#fff;border-radius:14px;max-width:760px;width:100%;max-height:90vh;display:flex;flex-direction:column;overflow:hidden">' +
         '<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 22px;border-bottom:1px solid #e5e7eb"><div style="font-size:17px;font-weight:700;color:#111827">\ud83d\udce5 Importar calendario de competici\u00f3n</div><button onclick="document.getElementById(\'impcal-modal\').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#6b7280">\u2715</button></div>' +
         '<div id="impcal-body" style="padding:20px 22px;overflow-y:auto">' +
-            '<p style="margin:0 0 12px;color:#374151;font-size:14px">Sube el calendario oficial de tu federaci\u00f3n (archivo Word/HTML descargado de la web federativa). Se detectar\u00e1n los equipos y las jornadas, y podr\u00e1s revisar todo antes de crear nada.</p>' +
-            '<input type="file" id="impcal-file" accept=".doc,.html,.htm" onchange="impCalLeerArchivo(this)" style="font-size:14px">' +
+            '<p style="margin:0 0 12px;color:#374151;font-size:14px">Sube el calendario oficial de tu federaci\u00f3n en Word, HTML o PDF. Se detectar\u00e1n los equipos y las jornadas (con ayuda de la IA si el formato no es el est\u00e1ndar), y podr\u00e1s revisar todo antes de crear nada.</p>' +
+            '<input type="file" id="impcal-file" accept=".doc,.html,.htm,.pdf" onchange="impCalLeerArchivo(this)" style="font-size:14px">' +
             '<div id="impcal-resultado" style="margin-top:16px"></div>' +
         '</div>' +
     '</div>';
@@ -2290,10 +2290,17 @@ function impCalAbrir() {
 function impCalLeerArchivo(input) {
     if (!input.files || !input.files.length) return;
     var f = input.files[0];
+    var esPdf = /\.pdf$/i.test(f.name) || f.type === 'application/pdf';
     var reader = new FileReader();
-    reader.onload = function(ev) {
+    reader.onload = async function(ev) {
         try {
             var buf = ev.target.result;
+            if (esPdf) {
+                document.getElementById('impcal-resultado').innerHTML = '<p style="color:#6b7280;font-size:14px">Leyendo PDF...</p>';
+                var texto = await impCalLeerPdf(buf);
+                await impCalProcesarTexto(texto);
+                return;
+            }
             var head = new TextDecoder('latin1').decode(buf.slice(0, 4096)).toLowerCase();
             var charset = 'utf-8';
             var m = head.match(/charset\s*=\s*["']?([\w-]+)/);
@@ -2301,7 +2308,7 @@ function impCalLeerArchivo(input) {
             var html = '';
             try { html = new TextDecoder(charset).decode(buf); }
             catch (e) { html = new TextDecoder('utf-8').decode(buf); }
-            impCalParsear(html);
+            await impCalParsear(html);
         } catch (err) {
             console.error('impCalLeerArchivo:', err);
             document.getElementById('impcal-resultado').innerHTML = '<p style="color:#dc2626;font-size:14px">No se pudo leer el archivo: ' + err.message + '</p>';
@@ -2360,10 +2367,15 @@ async function impCalParsear(html) {
     });
 
     if (!impCal.fixtures.length || !impCal.equipos.length) {
-        res.innerHTML = '<p style="color:#dc2626;font-size:14px">No se ha reconocido el formato del calendario. Comprueba que es el archivo oficial de la federaci\u00f3n (Word/HTML con jornadas tipo "Jornada 1 (06-09-2026)").</p>';
+        var textoPlano = doc.body ? doc.body.textContent : html;
+        await impCalProcesarTexto(textoPlano);
         return;
     }
+    await impCalFinalizarParseo();
+}
 
+async function impCalFinalizarParseo() {
+    var res = document.getElementById('impcal-resultado');
     // Fechas con partido ya creado en esta temporada (para omitir duplicados)
     impCal.fechasExistentes = [];
     try {
@@ -2615,5 +2627,165 @@ function clasifTablaHtml() {
         '<th style="' + th + '">#</th><th style="' + th + ';text-align:left">Equipo</th><th style="' + th + '">PJ</th><th style="' + th + '">PG</th><th style="' + th + '">PE</th><th style="' + th + '">PP</th><th style="' + th + '">GF</th><th style="' + th + '">GC</th><th style="' + th + '">DG</th><th style="' + th + '">PTS</th>' +
         '</tr></thead><tbody>' + filas + '</tbody></table></div>' +
         '<div style="font-size:12px;color:#9ca3af;margin-top:8px">Criterios de orden: puntos, diferencia de goles, goles a favor. (El desempate oficial por enfrentamiento directo no se aplica.)</div>';
+}
+
+
+// ---- Fase 2 del importador: PDF y formatos no estandar (IA) ----
+
+async function impCalProcesarTexto(texto) {
+    if (impCalParsearTextoPlano(texto)) { await impCalFinalizarParseo(); return; }
+    await impCalParsearConIA(texto);
+}
+
+function impCalParsearTextoPlano(texto) {
+    var equipos = [];
+    var reEq = /\d+\s*\.\-\s*(.+?)\s*\(\d+\)/g, mEq;
+    while ((mEq = reEq.exec(texto)) !== null) {
+        var nom = mEq[1].replace(/\s+/g, ' ').trim();
+        if (nom && equipos.indexOf(nom) === -1) equipos.push(nom);
+    }
+    if (equipos.length < 4) return false;
+    var reJ = /Jornada\s+(\d+)\s*\((\d{2})-(\d{2})-(\d{4})\)/;
+    var fixtures = [], vistos = {}, jA = null, fA = null;
+    texto.split(/\r?\n/).forEach(function(l) {
+        l = l.replace(/\s+/g, ' ').trim();
+        var mJ = l.match(reJ);
+        if (mJ) { jA = parseInt(mJ[1]); fA = mJ[4] + '-' + mJ[3] + '-' + mJ[2]; return; }
+        if (!jA) return;
+        var mF = l.match(/^(.+?)\s+-\s+(.+)$/);
+        if (!mF) return;
+        var local = mF[1].trim(), visitante = mF[2].trim();
+        if (equipos.indexOf(local) === -1 || equipos.indexOf(visitante) === -1) return;
+        var key = jA + '|' + local + '|' + visitante;
+        if (vistos[key]) return;
+        vistos[key] = true;
+        fixtures.push({ jornada: jA, fecha: fA, local: local, visitante: visitante });
+    });
+    if (!fixtures.length) return false;
+    impCal.equipos = equipos;
+    impCal.fixtures = fixtures;
+    impCal.compName = 'Liga';
+    var mComp = texto.match(/([^\n\r|]{5,80}GRUPO\s*[\w]+)/i);
+    if (mComp) impCal.compName = mComp[1].replace(/\s+/g, ' ').trim();
+    return true;
+}
+
+function impCalCargarPdfJs() {
+    return new Promise(function(resolve, reject) {
+        if (window.pdfjsLib) { resolve(); return; }
+        var s = document.createElement('script');
+        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+        s.onload = function() {
+            window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+            resolve();
+        };
+        s.onerror = function() { reject(new Error('No se pudo cargar el lector de PDF')); };
+        document.head.appendChild(s);
+    });
+}
+
+async function impCalLeerPdf(buf) {
+    await impCalCargarPdfJs();
+    var pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+    var texto = '';
+    for (var p = 1; p <= pdf.numPages; p++) {
+        var page = await pdf.getPage(p);
+        var tc = await page.getTextContent();
+        var lineas = [], linea = [], lastY = null;
+        tc.items.forEach(function(it) {
+            if (!it.str) return;
+            var y = it.transform[5];
+            if (lastY !== null && Math.abs(y - lastY) > 3) { lineas.push(linea.join(' ')); linea = []; }
+            linea.push(it.str);
+            lastY = y;
+        });
+        if (linea.length) lineas.push(linea.join(' '));
+        texto += lineas.join('\n') + '\n';
+    }
+    return texto;
+}
+
+async function impCalGroqJson(systemPrompt, userText, maxTokens) {
+    var response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+            'Authorization': 'Bearer ' + CONFIG.GROQ_API_KEY,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            model: 'openai/gpt-oss-120b',
+            messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: userText }
+            ],
+            temperature: 0,
+            max_tokens: maxTokens || 3000
+        })
+    });
+    if (!response.ok) throw new Error('Error en la API de IA (' + response.status + ')');
+    var data = await response.json();
+    var txt = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
+    txt = txt.replace(/```json/gi, '').replace(/```/g, '').trim();
+    var a = txt.indexOf('['), o = txt.indexOf('{');
+    var ini = (a === -1) ? o : (o === -1 ? a : Math.min(a, o));
+    if (ini > 0) txt = txt.substring(ini);
+    var fin = Math.max(txt.lastIndexOf(']'), txt.lastIndexOf('}'));
+    if (fin !== -1) txt = txt.substring(0, fin + 1);
+    return JSON.parse(txt);
+}
+
+function impCalTrocearTexto(texto) {
+    var partes = texto.split(/(?=Jornada\s+\d+\s*\()/);
+    var trozos = [], actual = '';
+    partes.forEach(function(p) {
+        if (actual && (actual.length + p.length) > 5500) { trozos.push(actual); actual = ''; }
+        actual += p;
+    });
+    if (actual.trim()) trozos.push(actual);
+    return trozos;
+}
+
+async function impCalParsearConIA(texto) {
+    var res = document.getElementById('impcal-resultado');
+    if (typeof CONFIG === 'undefined' || !CONFIG.GROQ_API_KEY) {
+        res.innerHTML = '<p style="color:#dc2626;font-size:14px">No se ha reconocido el formato del calendario y el an\u00e1lisis con IA no est\u00e1 disponible.</p>';
+        return;
+    }
+    res.innerHTML = '<div style="background:#eff6ff;border:1px solid #93c5fd;border-radius:8px;padding:10px 14px;font-size:14px;color:#1e40af">\ud83e\udd16 El formato no es el est\u00e1ndar. Analizando con IA...<div id="impcal-ia-progreso" style="font-size:12px;color:#3b82f6;margin-top:6px"></div></div>';
+    var prog = function(t) { var el = document.getElementById('impcal-ia-progreso'); if (el) el.textContent = t; };
+    try {
+        prog('Detectando competici\u00f3n y equipos...');
+        var meta = await impCalGroqJson(
+            'Eres un extractor de datos de calendarios de futbol. Del texto del usuario, extrae el nombre de la competicion y la lista COMPLETA de equipos participantes. Responde SOLO con JSON valido, sin explicaciones ni markdown, con este formato exacto: {"competicion":"...","equipos":["...","..."]}',
+            texto.substring(0, 6000), 1500);
+        var equipos = (meta.equipos || []).map(function(e) { return String(e).replace(/\s+/g, ' ').trim(); }).filter(function(e, i, arr) { return e.length > 2 && arr.indexOf(e) === i; });
+        if (equipos.length < 4) throw new Error('no se detectaron los equipos participantes');
+        var trozos = impCalTrocearTexto(texto);
+        var fixtures = [], vistos = {};
+        for (var i = 0; i < trozos.length; i++) {
+            prog('Extrayendo partidos... bloque ' + (i + 1) + ' de ' + trozos.length);
+            var arr = await impCalGroqJson(
+                'Eres un extractor de datos de calendarios de futbol. Del texto del usuario, extrae TODOS los enfrentamientos con su jornada y fecha. Usa EXACTAMENTE los nombres de equipo de esta lista (ignora cualquier otro texto como equipaciones, campos o direcciones): ' + JSON.stringify(equipos) + '. Responde SOLO con un array JSON valido, sin explicaciones ni markdown: [{"jornada":1,"fecha":"YYYY-MM-DD","local":"...","visitante":"..."}]. Si el bloque no contiene partidos, responde [].',
+                trozos[i], 4000);
+            (Array.isArray(arr) ? arr : []).forEach(function(fx) {
+                if (!fx || equipos.indexOf(fx.local) === -1 || equipos.indexOf(fx.visitante) === -1) return;
+                var j = parseInt(fx.jornada);
+                if (!j || j < 1 || j > 60) return;
+                var fecha = (typeof fx.fecha === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(fx.fecha)) ? fx.fecha : null;
+                var key = j + '|' + fx.local + '|' + fx.visitante;
+                if (vistos[key]) return;
+                vistos[key] = true;
+                fixtures.push({ jornada: j, fecha: fecha, local: fx.local, visitante: fx.visitante });
+            });
+        }
+        if (!fixtures.length) throw new Error('no se reconocieron partidos');
+        impCal.equipos = equipos;
+        impCal.fixtures = fixtures;
+        impCal.compName = (meta.competicion || 'Liga').substring(0, 80);
+        await impCalFinalizarParseo();
+    } catch (e) {
+        console.error('impCalParsearConIA:', e);
+        res.innerHTML = '<p style="color:#dc2626;font-size:14px">No se pudo interpretar el calendario (' + impCalEsc(e.message) + '). Prueba con el archivo Word/HTML oficial de la federaci\u00f3n.</p>';
+    }
 }
 
