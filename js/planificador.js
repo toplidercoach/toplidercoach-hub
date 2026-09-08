@@ -903,7 +903,7 @@ if (typeof scGuardarConceptos === 'function') { await scGuardarConceptos(sesionI
                 const fechaHasta = document.getElementById('filtro-sesion-hasta').value;
                 
                 let query = supabaseClient
-                    .from('training_sessions')
+                    .from('training_sessions_lista')
                     .select('*')
                     .eq('club_id', clubId);
                 
