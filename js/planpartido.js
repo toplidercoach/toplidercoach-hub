@@ -104,13 +104,13 @@ function ppRenderCampo(slots,lineup,jug,size){
         var gk=s.lineIdx===0;
         h+='<div style="position:absolute;left:'+s.x+'%;top:'+s.y+'%;transform:translate(-50%,-50%);text-align:center;z-index:2;min-width:70px">';
         if(tieneJugadores){
-            h+='<div style="display:flex;flex-direction:column;align-items:center;gap:2px">';
+            h+='<div style="display:flex;flex-direction:row;flex-wrap:wrap;justify-content:center;align-items:flex-start;gap:4px">';
             asignados.forEach(function(pi){
                 var p=(pi!==undefined&&pi!==null&&jug[pi])?jug[pi]:null;
                 if(!p)return;
                 var bg=gk?'linear-gradient(135deg,#d97706,#b45309)':'linear-gradient(135deg,#2563eb,#1d4ed8)';
-                h+='<div'+(click?' onclick="ppAbrirSelectorSlot(\''+s.slotId+'\')"':'')+' onmouseenter="ppShowTooltip(event,'+pi+')" onmouseleave="ppHideTooltip()" style="background:'+bg+';padding:3px 10px;border-radius:6px;font-size:11px;font-weight:700;color:#fff;white-space:nowrap;cursor:'+(click?'pointer':'default')+';border:1px solid rgba(255,255,255,0.25);max-width:100px;overflow:hidden;text-overflow:ellipsis;box-shadow:0 2px 8px rgba(0,0,0,0.4);letter-spacing:0.3px;transition:transform 0.15s;text-shadow:0 1px 2px rgba(0,0,0,0.3)" onmouseenter="this.style.transform=\'scale(1.08)\';ppShowTooltip(event,'+pi+')" onmouseleave="this.style.transform=\'scale(1)\';ppHideTooltip()">';
-                h+=(p.photo?'<img src="'+p.photo+'" style="width:16px;height:16px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:2px">':'')+(p.number?p.number+'. ':'')+ppEsc(p.name.split(' ').pop());
+                var cs=size==='big'?56:40,fs=size==='big'?12:9;h+='<div'+(click?' onclick="ppAbrirSelectorSlot(\''+s.slotId+'\')"':'')+' style="display:flex;flex-direction:column;align-items:center;width:'+(cs+16)+'px;cursor:'+(click?'pointer':'default')+';transition:transform 0.15s" onmouseenter="this.style.transform=\'scale(1.08)\';ppShowTooltip(event,'+pi+')" onmouseleave="this.style.transform=\'scale(1)\';ppHideTooltip()">';
+                h+='<div style="position:relative;width:'+cs+'px;height:'+cs+'px"><div style="width:100%;height:100%;border-radius:50%;background:'+bg+';border:2px solid rgba(255,255,255,0.85);box-shadow:0 2px 8px rgba(0,0,0,0.45);overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:'+Math.round(cs*0.42)+'px;font-weight:800;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,0.4)">'+(p.photo?'<img src="'+p.photo+'" style="width:100%;height:100%;object-fit:cover">':(p.number||'?'))+'</div>'+(p.photo&&p.number?'<div style="position:absolute;right:-4px;bottom:-2px;min-width:16px;height:16px;padding:0 3px;border-radius:8px;background:#0f172a;border:1px solid rgba(255,255,255,0.6);color:#fbbf24;font-size:9px;font-weight:800;display:flex;align-items:center;justify-content:center">'+p.number+'</div>':'')+'</div><div style="margin-top:3px;background:rgba(15,23,42,0.85);color:#fff;font-size:'+fs+'px;font-weight:700;padding:1px 6px;border-radius:4px;max-width:'+(cs+20)+'px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center">'+ppEsc(p.name.split(' ').pop())+'</div>';
                 h+='</div>';
             });
             h+='</div>';
