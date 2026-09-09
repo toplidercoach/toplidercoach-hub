@@ -2633,8 +2633,44 @@ function clasifTablaHtml() {
 // ---- Fase 2 del importador: PDF y formatos no estandar (IA) ----
 
 async function impCalProcesarTexto(texto) {
-    if (impCalParsearTextoPlano(texto)) { await impCalFinalizarParseo(); return; }
+    var rfef = impCalParsearRfef(texto);
+    if (rfef) { impCal.equipos = rfef.equipos; impCal.fixtures = rfef.fixtures; impCal.compName = rfef.compName; await impCalFinalizarParseo(); return; }
+    if (impCalParsearTextoPlano(texto.replace(/ \| /g, ' '))) { await impCalFinalizarParseo(); return; }
     await impCalParsearConIA(texto);
+}
+
+ // Formato RFEF (fenix): 'Jornada N (dd/mm/aaaa)' y lineas 'Local | Visitante' (separador insertado por impCalLeerPdf)
+function impCalParsearRfef(texto) {
+    var reJ = /Jornada\s+(\d+)\s*\((\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})\)/;
+    var fixtures = [], conteo = {}, jA = null, fA = null;
+    texto.split(/\r?\n/).forEach(function(l) {
+        l = l.replace(/\s+/g, ' ').trim();
+        var mJ = l.match(reJ);
+        if (mJ) { jA = parseInt(mJ[1]); fA = mJ[4] + '-' + ('0' + mJ[3]).slice(-2) + '-' + ('0' + mJ[2]).slice(-2); return; }
+        if (!jA || l.indexOf(' | ') === -1) return;
+        var partes = l.split(' | ').map(function(s) { return s.trim(); }).filter(function(s) { return s.length > 2; });
+        if (partes.length !== 2) return;
+        if (/\d{2}\/\d{2}\/\d{4}/.test(l)) return;
+        fixtures.push({ jornada: jA, fecha: fA, local: partes[0], visitante: partes[1] });
+        conteo[partes[0]] = (conteo[partes[0]] || 0) + 1;
+        conteo[partes[1]] = (conteo[partes[1]] || 0) + 1;
+    });
+    var equipos = Object.keys(conteo).filter(function(e) { return conteo[e] >= 2; }).sort();
+    if (equipos.length < 4) return false;
+    var vistos = {};
+    fixtures = fixtures.filter(function(f) {
+        if (equipos.indexOf(f.local) === -1 || equipos.indexOf(f.visitante) === -1) return false;
+        var key = f.jornada + '|' + f.local + '|' + f.visitante;
+        if (vistos[key]) return false;
+        vistos[key] = true;
+        return true;
+    });
+    if (fixtures.length < equipos.length) return false;
+    var nombre = 'Liga';
+    var mT = texto.match(/^(?!Real Federaci)([^\n|]{4,60}(Federaci[o\u00f3]n|Divisi[o\u00f3]n|Liga|Preferente|Regional)[^\n|]{0,30})$/im);
+    var mG = texto.match(/GRUPO\s*[\w]+/i);
+    if (mT || mG) nombre = ((mT ? mT[1].trim() + ' ' : '') + (mG ? mG[0].trim() : '')).trim();
+    return { equipos: equipos, fixtures: fixtures, compName: nombre.substring(0, 80) };
 }
 
 function impCalParsearTextoPlano(texto) {
@@ -2691,13 +2727,15 @@ async function impCalLeerPdf(buf) {
     for (var p = 1; p <= pdf.numPages; p++) {
         var page = await pdf.getPage(p);
         var tc = await page.getTextContent();
-        var lineas = [], linea = [], lastY = null;
+        var lineas = [], linea = [], lastY = null, lastFinX = null;
         tc.items.forEach(function(it) {
-            if (!it.str) return;
-            var y = it.transform[5];
-            if (lastY !== null && Math.abs(y - lastY) > 3) { lineas.push(linea.join(' ')); linea = []; }
-            linea.push(it.str);
+            if (!it.str || !it.str.trim()) return;
+            var y = it.transform[5], x = it.transform[4];
+            if (lastY !== null && Math.abs(y - lastY) > 3) { lineas.push(linea.join(' ')); linea = []; lastFinX = null; }
+            if (lastFinX !== null && x - lastFinX > 25) linea.push('|');
+            linea.push(it.str.trim());
             lastY = y;
+            lastFinX = x + it.width;
         });
         if (linea.length) lineas.push(linea.join(' '));
         texto += lineas.join('\n') + '\n';
