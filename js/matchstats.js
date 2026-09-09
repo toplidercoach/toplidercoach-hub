@@ -2706,22 +2706,32 @@ async function impCalLeerPdf(buf) {
 }
 
 async function impCalGroqJson(systemPrompt, userText, maxTokens) {
-    var response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-            'Authorization': 'Bearer ' + CONFIG.GROQ_API_KEY,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            model: 'openai/gpt-oss-120b',
-            messages: [
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: userText }
-            ],
-            temperature: 0,
-            max_tokens: maxTokens || 3000
-        })
-    });
+    var response = null;
+    for (var intento = 0; intento < 6; intento++) {
+        response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Authorization': 'Bearer ' + CONFIG.GROQ_API_KEY,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                model: 'openai/gpt-oss-120b',
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: userText }
+                ],
+                temperature: 0,
+                max_tokens: maxTokens || 3000
+            })
+        });
+        if (response.status !== 429 && response.status < 500) break;
+        var ra = parseFloat(response.headers.get('retry-after')) || 0;
+        var espera = Math.min(65000, Math.max(ra * 1000 + 500, 4000 * Math.pow(2, intento)));
+        var elp = document.getElementById('impcal-ia-progreso');
+        if (elp) elp.textContent = 'La IA est\u00e1 saturada, reintentando en ' + Math.round(espera / 1000) + ' s...';
+        await new Promise(function(r) { setTimeout(r, espera); });
+    }
+    if (response.status === 429) throw new Error('la IA ha alcanzado su l\u00edmite de uso, espera unos minutos y vuelve a intentarlo');
     if (!response.ok) throw new Error('Error en la API de IA (' + response.status + ')');
     var data = await response.json();
     var txt = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
