@@ -85,11 +85,20 @@ async function cargarPanelCargas(contenedorId) {
 
         let asis = [];
         if (ids.length > 0) {
-            const { data } = await supabaseClient
-                .from('asistencia_sesiones')
-                .select('sesion_id, jugador_id, asistio, rpe, duracion_real, sueno, fatiga, estres, estado_muscular')
-                .in('sesion_id', ids);
-            asis = data || [];
+            // Supabase devuelve max 1000 filas por consulta: paginar para clubes con mucho historial
+            let desdeFila = 0;
+            while (true) {
+                const { data } = await supabaseClient
+                    .from('asistencia_sesiones')
+                    .select('sesion_id, jugador_id, asistio, rpe, duracion_real, sueno, fatiga, estres, estado_muscular')
+                    .in('sesion_id', ids)
+                    .order('sesion_id')
+                    .range(desdeFila, desdeFila + 999);
+                const pagina = data || [];
+                asis = asis.concat(pagina);
+                if (pagina.length < 1000) break;
+                desdeFila += 1000;
+            }
         }
 
         const jugIds = [...new Set(asis.map(a => a.jugador_id))];
