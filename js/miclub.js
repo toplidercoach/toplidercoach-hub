@@ -579,7 +579,11 @@ return `
             }
             
             const tempId = document.getElementById('plantilla-temporada').value;
-            
+             // Anti doble clic: evita crear el mismo jugador varias veces
+            if (guardarJugador._busy) return;
+            guardarJugador._busy = true;
+            setTimeout(function() { guardarJugador._busy = false; }, 8000);
+
             let photoUrl = null;
             const fotoInput = document.getElementById('jugador-foto-input');
             if (fotoInput.files.length > 0) {
@@ -625,11 +629,29 @@ return `
             if (jugadorEditando) {
                 await supabaseClient.from('players').update(playerData).eq('id', jugadorEditando.playerId);
                 await supabaseClient.from('season_players').update({ shirt_number: parseInt(dorsal) }).eq('id', jugadorEditando.spId);
-            } else {
-                const { data: newPlayer } = await supabaseClient.from('players').insert(playerData).select().single();
+           } else {
+                // Evitar duplicados: si ya existe un jugador con ese nombre en el club, reutilizar su ficha (conserva historial)
+                const normNombre = function(s) { return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim(); };
+                const { data: existentes } = await supabaseClient.from('players').select('id, name').eq('club_id', clubId);
+                const dup = (existentes || []).find(function(p) { return normNombre(p.name) === normNombre(nombre); });
+                let playerId = null;
+                if (dup) {
+                    const { data: yaEnTemp } = await supabaseClient.from('season_players').select('id').eq('season_id', tempId).eq('player_id', dup.id).limit(1);
+                    if (yaEnTemp && yaEnTemp.length) { guardarJugador._busy = false; showToast('"' + dup.name + '" ya est\u00e1 en esta plantilla', 'warning'); return; }
+                    if (await showConfirm('Ya existe "' + dup.name + '" en tu club con historial (asistencias, RPE, partidos). \u00bfQuieres recuperarlo en esta temporada en lugar de crear una ficha nueva? Recomendado para no perder sus datos.')) {
+                        const soloRellenos = {};
+                        Object.keys(playerData).forEach(function(k) { if (playerData[k] !== '' && playerData[k] !== null && playerData[k] !== undefined) soloRellenos[k] = playerData[k]; });
+                        await supabaseClient.from('players').update(soloRellenos).eq('id', dup.id);
+                        playerId = dup.id;
+                    }
+                }
+                if (!playerId) {
+                    const { data: newPlayer } = await supabaseClient.from('players').insert(playerData).select().single();
+                    playerId = newPlayer.id;
+                }
                 const spNuevo = {
                     season_id: tempId,
-                    player_id: newPlayer.id,
+                    player_id: playerId,
                     shirt_number: parseInt(dorsal)
                 };
                 // Modo Club: asignar el jugador nuevo al equipo seleccionado
@@ -641,6 +663,7 @@ return `
             
             cerrarModalJugador();
             cargarPlantilla();
+        guardarJugador._busy = false;
             showToast('Jugador guardado');
         }
         
