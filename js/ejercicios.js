@@ -2660,7 +2660,7 @@ function ejBuildFicha() {
         <!-- MEDIA: MINIATURA + VÍDEO -->
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;background:#0f172a;border:1px solid #1e3a5f;border-radius:10px;overflow:hidden;margin-bottom:16px">
             <div style="padding:14px 16px;border-right:1px solid #1e3a5f">
-                <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">🎨 Miniatura</div>
+                <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">🎨 Miniatura <button onclick="document.getElementById('ej-img-file').click()" style="float:right;padding:2px 8px;background:#7c3aed;border:none;color:#fff;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;text-transform:none;letter-spacing:0">📷 Subir imagen</button><input type="file" id="ej-img-file" accept="image/*" style="display:none" onchange="ejSubirImagenFicha(this)"></div>;
                 <div id="ej-ficha-thumb" style="width:100%;height:200px;border-radius:8px;background:#1e3a5f;display:flex;align-items:center;justify-content:center;overflow:hidden">
                     <span style="color:#475569;font-size:11px">Dibuja en la pizarra y pulsa "Usar en ficha"</span>
                 </div>
@@ -2776,7 +2776,7 @@ function ejBuildFicha() {
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px">
                 <div class="ej-field">
                     <label>Nº porteros</label>
-                    <input type="number" id="ej-porteros" min="0" max="4" placeholder="0">
+                    <input type="number" id="ej-porteros" min="0" max="4" placeholder="0"><label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:12px;cursor:pointer;text-transform:none"><input type="checkbox" id="ej-es-portero" onchange="ejTogglePortero()"> 🧤 Específico de porteros</label><select id="ej-subcat-portero" style="display:none;margin-top:4px;width:100%"><option value="">-- Subcategoría --</option><option>Activación</option><option>Táctico</option><option>Coordinación</option><option>Juego aéreo</option><option>Juego de pies</option><option>Lúdico</option><option>Aspectos técnicos</option><option>Fuerza explosiva</option><option>Velocidad de reacción</option><option>Fuerza resistencia</option></select>
                 </div>
                 <div class="ej-field">
                     <label>Espacio (ancho × largo)</label>
@@ -2833,6 +2833,37 @@ function ejBuildFicha() {
         <div id="ej-ficha-msg" style="margin-top:8px"></div>
     </div>`;
 }
+function ejSubirImagenFicha(input) {
+    var file = input && input.files && input.files[0];
+    if (!file) return;
+    if (file.size > 8 * 1024 * 1024) { ejToast('Imagen demasiado grande (máx. 8 MB)', 'warning'); input.value = ''; return; }
+    var reader = new FileReader();
+    reader.onload = function(ev) {
+        var img = new Image();
+        img.onload = function() {
+            var canvas = document.createElement('canvas');
+            canvas.width = 800; canvas.height = 500;
+            var ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(0, 0, 800, 500);
+            var esc = Math.min(800 / img.width, 500 / img.height);
+            var w = Math.round(img.width * esc), h = Math.round(img.height * esc);
+            ctx.drawImage(img, Math.round((800 - w) / 2), Math.round((500 - h) / 2), w, h);
+            var dataUrl = canvas.toDataURL('image/png');
+            window.ejThumbnailPendiente = dataUrl;
+            window._ejPdfThumbData = dataUrl;
+            ejActualizarFichaMedia();
+            var msg = document.getElementById('ej-ficha-msg');
+            if (msg) msg.innerHTML = '<span style="color:#a855f7">📷 Imagen cargada — se guardará con el ejercicio</span>';
+            setTimeout(function(){ if (msg) msg.innerHTML = ''; }, 3000);
+        };
+        img.onerror = function() { ejToast('No se pudo leer la imagen', 'error'); };
+        img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+    input.value = '';
+}
+
 function ejCapturarMiniatura() {
     const svgEl = document.getElementById('ej-svg');
     if (!svgEl) { ejToast('Ve a la Pizarra y dibuja primero', 'warning'); return; }
@@ -3453,6 +3484,8 @@ let thumbnailSvg = window.ejThumbnailPendiente || null;
         materials:   document.getElementById('ej-material')?.value || null,
         tema:        document.getElementById('ej-tema')?.value || null,
         num_goalkeepers: parseInt(document.getElementById('ej-porteros')?.value) || null,
+        es_portero: !!document.getElementById('ej-es-portero')?.checked,
+        subcategoria_portero: (document.getElementById('ej-es-portero')?.checked ? document.getElementById('ej-subcat-portero')?.value : null) || null,
         board_data:  (ejP.players.length > 0 || ejP.lines.length > 0 || ejP.shapes.length > 0 || ejP.equipment.length > 0 || ejP.texts.length > 0) ? {
             players: ejP.players, lines: ejP.lines,
             shapes: ejP.shapes, texts: ejP.texts,
@@ -3502,6 +3535,14 @@ let thumbnailSvg = window.ejThumbnailPendiente || null;
     }
 }
 
+function ejTogglePortero() {
+    var chk = document.getElementById('ej-es-portero');
+    var sel = document.getElementById('ej-subcat-portero');
+    if (!chk || !sel) return;
+    sel.style.display = chk.checked ? 'block' : 'none';
+    if (!chk.checked) sel.selectedIndex = 0;
+}
+
 function ejLimpiarFicha() {
     ejEditandoId = null;
     ['ej-nombre','ej-objetivos','ej-descripcion','ej-variantes','ej-notas','ej-material',
@@ -3509,7 +3550,8 @@ function ejLimpiarFicha() {
         const el = document.getElementById(id);
         if (el) el.value = '';
     });
-    ['ej-categoria','ej-edad','ej-dificultad','ej-fase','ej-tema'].forEach(id => {
+    var chkP = document.getElementById('ej-es-portero'); if (chkP) chkP.checked = false; ejTogglePortero();
+    ['ej-categoria','ej-edad','ej-dificultad','ej-fase','ej-tema','ej-subcat-portero'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.selectedIndex = 0;
     });
@@ -3570,8 +3612,11 @@ function ejBuildBanco() {
                     <option>Transición ataque</option><option>Transición defensa</option><option>Balón parado</option>
                 </select>
                 <input type="number" id="ej-filter-jug" placeholder="Jugadores" min="1" max="30" oninput="ejBancoSearch()" style="width:75px;padding:4px 8px;font-size:11px;background:#1e293b;border:1px solid #334155;color:#cbd5e1;border-radius:6px">
+                <select id="ej-filter-gk" onchange="ejBancoSearch()" style="padding:4px 8px;font-size:11px;background:#1e293b;border:1px solid #334155;color:#cbd5e1;border-radius:6px;cursor:pointer"><option value="">🧤 Todos ▾</option><option value="si">Solo porteros</option><option value="no">Sin porteros</option></select>
+                <select id="ej-filter-gksub" onchange="ejBancoSearch()" style="padding:4px 8px;font-size:11px;background:#1e293b;border:1px solid #334155;color:#cbd5e1;border-radius:6px;cursor:pointer"><option value="">Subcat. portero ▾</option><option>Activación</option><option>Táctico</option><option>Coordinación</option><option>Juego aéreo</option><option>Juego de pies</option><option>Lúdico</option><option>Aspectos técnicos</option><option>Fuerza explosiva</option><option>Velocidad de reacción</option><option>Fuerza resistencia</option></select>
                 <input type="number" id="ej-filter-port" placeholder="Porteros" min="0" max="4" oninput="ejBancoSearch()" style="width:70px;padding:4px 8px;font-size:11px;background:#1e293b;border:1px solid #334155;color:#cbd5e1;border-radius:6px">
                 <input type="number" id="ej-filter-dur" placeholder="Min." min="1" oninput="ejBancoSearch()" style="width:55px;padding:4px 8px;font-size:11px;background:#1e293b;border:1px solid #334155;color:#cbd5e1;border-radius:6px">
+                <button onclick="document.getElementById('ej-import-file').click()" style="padding:4px 10px;font-size:11px;background:#7c3aed;border:none;color:#fff;border-radius:6px;cursor:pointer;white-space:nowrap">📥 Importar JSON</button><input type="file" id="ej-import-file" accept=".json,application/json" style="display:none" onchange="ejImportarJSON(this)">
                 <button onclick="ejLimpiarFiltros()" style="padding:4px 10px;font-size:11px;background:#334155;border:none;color:#94a3b8;border-radius:6px;cursor:pointer;white-space:nowrap">✕ Limpiar</button>
             </div>
         </div>
@@ -3589,7 +3634,7 @@ async function ejBancoLoad() {
     try {
         const { data, error } = await supabaseClient
             .from('custom_exercises')
-            .select('id,name,category,age_group,difficulty,duration_min,players_count,game_phase,field_width,field_length,eii,objectives,description,variants,coach_notes,materials,animation_url,tema,num_goalkeepers')
+            .select('id,name,category,age_group,difficulty,duration_min,players_count,game_phase,field_width,field_length,eii,objectives,description,variants,coach_notes,materials, animation_url,tema,num_goalkeepers,es_portero,subcategoria_portero')
             
             .or(window.ejClubId ? ('club_id.eq.' + window.ejClubId + ',coach_id.eq.' + String(window.ejCoachId)) : ('coach_id.eq.' + String(window.ejCoachId)))
             .order('created_at', { ascending: false })
@@ -3635,11 +3680,40 @@ async function ejBancoCargarThumbs() {
         } catch(err) {}
     }
 }
+async function ejImportarJSON(input) {
+    var file = input && input.files && input.files[0];
+    if (!file) return;
+    input.value = '';
+    var lista;
+    try { lista = JSON.parse(await file.text()); } catch(e) { ejToast('El archivo no es un JSON válido', 'error'); return; }
+    if (!Array.isArray(lista) || !lista.length) { ejToast('El JSON no contiene ejercicios', 'warning'); return; }
+    var PERMITIDOS = ['name','description','objectives','variants','coach_notes','materials','category','tema','age_group','difficulty','game_phase','duration_min','players_count','num_goalkeepers','field_width','field_length','es_portero','subcategoria_portero','thumbnail_svg','source'];
+    ejConfirm('Se van a importar ' + lista.length + ' ejercicios a tu banco. ¿Continuar?', async function() {
+        var LOTE = 10, ok = 0, fallos = 0;
+        var countEl = document.getElementById('ej-banco-count');
+        for (var i = 0; i < lista.length; i += LOTE) {
+            var filas = lista.slice(i, i + LOTE).map(function(e) {
+                var fila = { coach_id: window.ejCoachId || null, club_id: window.ejClubId || null };
+                PERMITIDOS.forEach(function(k) { if (e[k] !== undefined) fila[k] = e[k]; });
+                if (!fila.name) fila.name = 'Ejercicio importado';
+                if (!fila.source) fila.source = 'import';
+                return fila;
+            });
+            var res = await supabaseClient.from('custom_exercises').insert(filas);
+            if (res.error) { fallos += filas.length; console.warn('Lote fallido', i, res.error.message); }
+            else ok += filas.length;
+            if (countEl) countEl.textContent = 'Importando ' + Math.min(i + LOTE, lista.length) + ' / ' + lista.length + '...';
+        }
+        ejToast('Importados ' + ok + ' ejercicios' + (fallos ? ' · ' + fallos + ' fallidos (ver consola)' : ''), fallos ? 'warning' : 'success');
+        ejBancoLoad();
+    });
+}
+
 function ejLimpiarFiltros() {
     ['ej-search','ej-filter-jug','ej-filter-port','ej-filter-dur'].forEach(id => {
         const el = document.getElementById(id); if (el) el.value = '';
     });
-    ['ej-filter-tema','ej-filter-cat','ej-filter-edad','ej-filter-dif','ej-filter-fase'].forEach(id => {
+    ['ej-filter-tema','ej-filter-cat','ej-filter-edad','ej-filter-dif','ej-filter-fase','ej-filter-gk','ej-filter-gksub'].forEach(id => {
         const el = document.getElementById(id); if (el) el.selectedIndex = 0;
     });
     ejBancoSearch();
@@ -3654,6 +3728,8 @@ function ejBancoSearch() {
     const fase = document.getElementById('ej-filter-fase')?.value || '';
     const jug  = parseInt(document.getElementById('ej-filter-jug')?.value) || 0;
     const port = parseInt(document.getElementById('ej-filter-port')?.value) || 0;
+    const gk    = document.getElementById('ej-filter-gk')?.value || '';
+    const gksub = document.getElementById('ej-filter-gksub')?.value || '';
     const dur  = parseInt(document.getElementById('ej-filter-dur')?.value) || 0;
     const filtered = ejBancoCache.filter(e =>
         (!q    || e.name?.toLowerCase().includes(q)) &&
@@ -3664,6 +3740,8 @@ function ejBancoSearch() {
         (!fase || e.game_phase === fase) &&
         (!jug  || e.players_count == jug) &&
         (!port || e.num_goalkeepers == port) &&
+        (!gk    || (gk === 'si' ? e.es_portero === true : !e.es_portero)) &&
+        (!gksub || e.subcategoria_portero === gksub) &&
         (!dur  || e.duration_min == dur)
     );
     const countEl = document.getElementById('ej-banco-count');
@@ -3773,6 +3851,8 @@ async function ejVerFicha(id) {
         set('ej-material', data.materials);
         set('ej-tema', data.tema);
         set('ej-porteros', data.num_goalkeepers);
+        var chkA = document.getElementById('ej-es-portero'); if (chkA) chkA.checked = !!data.es_portero; ejTogglePortero();
+        set('ej-subcat-portero', data.subcategoria_portero);
         set('ej-ancho', data.field_width);
         set('ej-largo', data.field_length);
         ejCalcEII();
@@ -3875,7 +3955,9 @@ async function ejBancoCargar(id) {
         setVal('ej-notas', data.coach_notes);
         setVal('ej-material', data.materials);
         setVal('ej-tema', data.tema);
-        setVal('ej-porteros', data.num_goalkeepers);
+         setVal('ej-porteros', data.num_goalkeepers);
+        var chkB = document.getElementById('ej-es-portero'); if (chkB) chkB.checked = !!data.es_portero; ejTogglePortero();
+        setVal('ej-subcat-portero', data.subcategoria_portero);
         setVal('ej-ancho', data.field_width);
         setVal('ej-largo', data.field_length);
         ejCalcEII();
@@ -4011,7 +4093,7 @@ function ejAbrirModal(id) {
     // Insertar SVG de forma segura (evita romper el template si contiene backticks)
     if (e.thumbnail_svg) {
         const svgContainer = document.getElementById('ej-modal-svg-container');
-        if (svgContainer) svgContainer.innerHTML = e.thumbnail_svg;
+        if (svgContainer) svgContainer.innerHTML = (e.thumbnail_svg.trim().indexOf('data:') === 0) ? '<img src="' + e.thumbnail_svg.trim() + '" style="width:100%;height:100%;object-fit:contain;display:block">' : e.thumbnail_svg;
     }
 
     // Eventos de botones via addEventListener (sin problemas de escapado)
