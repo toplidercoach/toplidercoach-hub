@@ -700,12 +700,12 @@ registrarSubTab('planificador', 'calendario', cargarCalendarioUnificado);
         function renderizarSesion() {
             let duracionTotal = 0;
             
-            ['previo', 'calentamiento', 'principal', 'enfriamiento', 'postcampo'].forEach(seccion => {
+            ['previo', 'calentamiento', 'principal', 'enfriamiento', 'postcampo', 'porteros'].forEach(seccion => {
                 const lista = document.getElementById(`lista-${seccion}`);
                 const tiempo = document.getElementById(`tiempo-${seccion}`);
                 
                 const totalMin = sesion[seccion].reduce((sum, ej) => sum + (ej.duracion || 0), 0);
-                duracionTotal += totalMin;
+                if (seccion !== 'porteros') duracionTotal += totalMin;
                 tiempo.textContent = `${totalMin} min`;
                 
                 if (sesion[seccion].length === 0) {
@@ -782,7 +782,7 @@ registrarSubTab('planificador', 'calendario', cargarCalendarioUnificado);
             sesionEditandoId = null;
             const ahora = new Date();
 const fechaHoy = ahora.getFullYear() + '-' + String(ahora.getMonth() + 1).padStart(2, '0') + '-' + String(ahora.getDate()).padStart(2, '0');
-sesion = { nombre: '', fecha: fechaHoy, previo: [], calentamiento: [], principal: [], enfriamiento: [], postcampo: [] };
+sesion = { nombre: '', fecha: fechaHoy, previo: [], calentamiento: [], principal: [], enfriamiento: [], postcampo: [], porteros: [] };
             document.getElementById('sesion-nombre').value = '';
             document.getElementById('sesion-fecha').value = sesion.fecha;
             document.getElementById('sesion-hora').value = '';
@@ -836,6 +836,7 @@ sesion = { nombre: '', fecha: fechaHoy, previo: [], calentamiento: [], principal
                     cool_down: sesion.enfriamiento,
                     pre_field_work: sesion.previo,
                     post_field_work: sesion.postcampo,
+                    gk_work: sesion.porteros,
                     players: obtenerJugadoresParaGuardar(),
                     fase: (typeof window._scFase !== 'undefined' ? window._scFase : null)
                 };
@@ -927,6 +928,8 @@ if (typeof scGuardarConceptos === 'function') { await scGuardarConceptos(sesionI
                     const enf = s.cool_down || [];
                     const pre = s.pre_field_work || [];
                     const post = s.post_field_work || [];
+                    const gk = s.gk_work || [];
+                    const tGk = gk.reduce((sum, ej) => sum + (ej.duracion || 0), 0);
                     const tPre = pre.reduce((sum, ej) => sum + (ej.duracion || 0), 0);
                     const tPost = post.reduce((sum, ej) => sum + (ej.duracion || 0), 0);
                     
@@ -1000,6 +1003,14 @@ if (typeof scGuardarConceptos === 'function') { await scGuardarConceptos(sesionI
                                             <span class="sc-phase-data"><strong>${enf.length}</strong> ej · ${tEnf} min</span>
                                         </div>
                                     </div>
+                                    ${gk.length ? `
+                                    <div class="sc-phase" style="border-left-color:#0e7490;">
+                                        <div class="sc-phase-bar" style="background:#0e7490;"></div>
+                                        <div class="sc-phase-info">
+                                            <span class="sc-phase-name">🧤 Porteros</span>
+                                            <span class="sc-phase-data"><strong>${gk.length}</strong> ej · ${tGk} min</span>
+                                        </div>
+                                    </div>` : ''}
                                     ${post.length ? `
                                     <div class="sc-phase" style="border-left-color:#64748b;">
                                         <div class="sc-phase-bar" style="background:#64748b;"></div>
@@ -1020,6 +1031,7 @@ if (typeof scGuardarConceptos === 'function') { await scGuardarConceptos(sesionI
                                         <button class="sc-btn sc-btn-cargar" onclick="cargarSesionEnEditor('${s.id}')" title="Cargar">✏️</button>
                                         <button class="sc-btn sc-btn-asistencia" onclick="abrirModalAsistenciaSesion('${s.id}')" title="Asistencia">📋</button>
                                         <button class="sc-btn sc-btn-pdf" onclick="abrirModalPDFSesion('${s.id}')" title="PDF">📄</button>
+                                        ${gk.length ? `<button class="sc-btn" style="background:#0e7490;" onclick="exportarSesionPDF('${s.id}', true, false, true)" title="PDF porteros">🧤</button>` : ''}
                                         <button class="sc-btn sc-btn-eliminar" onclick="eliminarSesion('${s.id}')" title="Eliminar">🗑️</button>
                                     </div>
                                 </div>
@@ -1059,7 +1071,8 @@ if (typeof scGuardarConceptos === 'function') { await scGuardarConceptos(sesionI
                     calentamiento: data.warm_up || [],
                     principal: data.main_part || [],
                     enfriamiento: data.cool_down || [],
-                    postcampo: data.post_field_work || []
+                    postcampo: data.post_field_work || [],
+                    porteros: data.gk_work || []
                 };
                 
                 // Campos principales
@@ -1118,7 +1131,7 @@ function descargarPDFSesion(conTitulos) {
     cerrarModalPDFSesion();
     exportarSesionPDF(sesionPDFId, conTitulos, hojaPorEjercicio);
 }
-async function exportarSesionPDF(id, conTitulos = true, hojaPorEjercicio = false) {
+async function exportarSesionPDF(id, conTitulos = true, hojaPorEjercicio = false, soloPorteros = false) {
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
             
@@ -1169,7 +1182,7 @@ async function exportarSesionPDF(id, conTitulos = true, hojaPorEjercicio = false
             doc.setTextColor(255, 255, 255);
             doc.setFontSize(16);
             doc.setFont('helvetica', 'bold');
-            doc.text(s.name.toUpperCase(), tituloX, 10);
+            doc.text(s.name.toUpperCase() + (soloPorteros ? ' - PORTEROS' : ''), tituloX, 10);
             
             // Nombre del club
             if (club && club.name) {
@@ -1189,7 +1202,7 @@ async function exportarSesionPDF(id, conTitulos = true, hojaPorEjercicio = false
             if (s.match_day) headerInfo.push(`MD: ${s.match_day}`);
             if (s.num_players) headerInfo.push(`Jugadores: ${s.num_players}`);
             if (s.team_category) headerInfo.push(`Equipo: ${s.team_category}`);
-            headerInfo.push(`Duracion: ${duracionTotal} min`);
+            headerInfo.push('Duracion: ' + (soloPorteros ? (s.gk_work || []).reduce((sum, e) => sum + (e.duracion || 0), 0) : duracionTotal) + ' min');
             
             doc.text(headerInfo.join('   |   '), tituloX, 24);
             
@@ -1324,6 +1337,7 @@ if (s.players && s.players.length > 0) {
                 { nombre: 'TRABAJO POST-CAMPO', datos: s.post_field_work || [], color: [100, 116, 139] }
             ];
             
+            if (soloPorteros) secciones.splice(0, secciones.length, { nombre: 'TRABAJO DE PORTEROS', datos: s.gk_work || [], color: [14, 116, 144] });
             // Recuperar miniaturas de ejercicios propios que se guardaron sin imagen
             for (const sec of secciones) {
                 for (const ej of sec.datos) {
@@ -1526,7 +1540,7 @@ if (s.players && s.players.length > 0) {
                 doc.text('TopLiderCoach.com', 105, 292, { align: 'center' });
             }
             
-            doc.save(`sesion_${s.name.replace(/\s+/g, '_')}.pdf`);
+            doc.save(`sesion_${s.name.replace(/\s+/g, '_')}${soloPorteros ? '_porteros' : ''}.pdf`);
         }
             
           
@@ -2977,7 +2991,8 @@ async function abrirModoVestuario(id) {
             { nombre: 'Calentamiento', datos: s.warm_up || [], color: '#f97316' },
             { nombre: 'Parte principal', datos: s.main_part || [], color: '#2563eb' },
             { nombre: 'Parte final', datos: s.cool_down || [], color: '#16a34a' },
-            { nombre: 'Trabajo post-campo', datos: s.post_field_work || [], color: '#64748b' }
+            { nombre: 'Trabajo post-campo', datos: s.post_field_work || [], color: '#64748b' },
+            { nombre: 'Porteros', datos: s.gk_work || [], color: '#0e7490' }
         ];
 
         // Recuperar miniaturas que se guardaron sin imagen (mismo patron que el PDF)

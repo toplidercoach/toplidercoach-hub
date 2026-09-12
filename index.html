@@ -476,6 +476,15 @@
                                 </div>
                                 <div id="lista-postcampo"></div>
                             </div>
+
+                            <!-- Porteros (no suma al total de la sesion) -->
+                            <div class="seccion-ejercicios">
+                                <div class="seccion-header" style="background:linear-gradient(135deg,#0e7490,#155e75);">
+                                    <span>🧤 Porteros</span>
+                                    <span style="display:flex;align-items:center;gap:8px;"><button onclick="abrirModalBloqueLibre('porteros')" title="Anadir bloque libre" style="background:rgba(255,255,255,0.25);border:none;border-radius:6px;color:inherit;padding:2px 8px;cursor:pointer;font-size:12px;">+ Bloque</button><span id="tiempo-porteros">0 min</span></span>
+                                </div>
+                                <div id="lista-porteros"></div>
+                            </div>
                         </div>
                     </div>
                     
@@ -1698,6 +1707,7 @@
                     <button class="btn-primary" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);" onclick="seleccionarSeccion('principal')">Parte Principal</button>
                     <button class="btn-primary" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);" onclick="seleccionarSeccion('enfriamiento')">Parte Final</button>
                     <button class="btn-primary" style="background: linear-gradient(135deg, #64748b 0%, #475569 100%);" onclick="seleccionarSeccion('postcampo')">Trabajo post-campo</button>
+                    <button class="btn-primary" style="background: linear-gradient(135deg, #0e7490 0%, #155e75 100%);" onclick="seleccionarSeccion('porteros')">🧤 Porteros</button>
                 </div>
             </div>
         </div>
