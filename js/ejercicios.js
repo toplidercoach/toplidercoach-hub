@@ -1315,7 +1315,9 @@ function ejProyPintar() {
             (thumb ? '<img src="' + thumb + '" style="width:100%;height:64px;object-fit:contain;border-radius:6px;background:#14532d">' : '<div style="height:64px;background:#14532d;border-radius:6px"></div>') +
             '<div style="font-size:10px;color:#cbd5e1;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (i + 1) + '. ' + nombreItem + '</div>' +
             '<button onclick="event.stopPropagation();ejProyRenombrar(\'' + it.id + '\')" title="Renombrar fase" style="position:absolute;top:4px;right:26px;background:rgba(0,0,0,.5);border:none;color:#93c5fd;border-radius:4px;cursor:pointer;font-size:11px">✎</button>' +
-            '<button onclick="event.stopPropagation();ejProyQuitar(\'' + it.id + '\')" title="Quitar del proyecto" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,.5);border:none;color:#f87171;border-radius:4px;cursor:pointer;font-size:11px">✕</button></div>';
+            '<button onclick="event.stopPropagation();ejProyQuitar(\'' + it.id + '\')" title="Quitar del proyecto" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,.5);border:none;color:#f87171;border-radius:4px;cursor:pointer;font-size:11px">✕</button>' +
+            (i > 0 ? '<button onclick="event.stopPropagation();ejProyMover(\'' + it.id + '\',-1)" title="Mover antes" style="position:absolute;top:4px;left:4px;background:rgba(0,0,0,.5);border:none;color:#e2e8f0;border-radius:4px;cursor:pointer;font-size:11px">◀</button>' : '') +
+            (i < ejProyItems.length - 1 ? '<button onclick="event.stopPropagation();ejProyMover(\'' + it.id + '\',1)" title="Mover despues" style="position:absolute;top:4px;left:26px;background:rgba(0,0,0,.5);border:none;color:#e2e8f0;border-radius:4px;cursor:pointer;font-size:11px">▶</button>' : '') + '</div>';
     }).join('') + '</div>';
     body.innerHTML = html;
 }
@@ -1356,6 +1358,21 @@ async function ejProyRenombrar(itemId) {
     if (error) { ejToast('Error: ' + error.message, 'error'); return; }
     it.nombre = limpio;
     ejProyPintar();
+}
+
+async function ejProyMover(itemId, dir) {
+    const i = ejProyItems.findIndex(function(x) { return x.id === itemId; });
+    const j = i + dir;
+    if (i < 0 || j < 0 || j >= ejProyItems.length) return;
+    const tmp = ejProyItems[i]; ejProyItems[i] = ejProyItems[j]; ejProyItems[j] = tmp;
+    if (ejProyIdx === i) ejProyIdx = j; else if (ejProyIdx === j) ejProyIdx = i;
+    ejProyPintar();
+    for (let k = 0; k < ejProyItems.length; k++) {
+        if (ejProyItems[k].orden === k) continue;
+        ejProyItems[k].orden = k;
+        const { error } = await supabaseClient.from('pizarra_proyecto_items').update({ orden: k }).eq('id', ejProyItems[k].id);
+        if (error) { ejToast('Error al guardar el orden: ' + error.message, 'error'); return; }
+    }
 }
 
 async function ejProyQuitar(itemId) {
