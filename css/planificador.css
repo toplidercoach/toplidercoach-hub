@@ -1009,13 +1009,16 @@
             color: #64748b;
         }
         
-        .sc-actions {
+                .sc-actions {
             display: flex;
             gap: 5px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
         }
         
         .sc-btn {
             width: 32px;
+            flex-shrink: 0;
             height: 32px;
             border: none;
             border-radius: 8px;
