@@ -83,6 +83,16 @@ async function cargarPanelCargas(contenedorId) {
         (sesiones || []).forEach(s => { sesMap[s.id] = s; });
         const ids = (sesiones || []).map(s => s.id);
 
+        // Partidos del rango: cuentan como carga (RPE × minutos jugados, 90 si no se indica)
+        const { data: partidos } = await supabaseClient
+            .from('matches')
+            .select('id, match_date')
+            .eq('club_id', clubId)
+            .gte('match_date', desde)
+            .lte('match_date', hoy);
+        (partidos || []).forEach(p => { sesMap[p.id] = { id: p.id, session_date: p.match_date, duration_minutes: 90 }; });
+        const idsPartidos = (partidos || []).map(p => p.id);
+
         let asis = [];
         if (ids.length > 0) {
             // Supabase devuelve max 1000 filas por consulta: paginar para clubes con mucho historial
@@ -99,6 +109,14 @@ async function cargarPanelCargas(contenedorId) {
                 if (pagina.length < 1000) break;
                 desdeFila += 1000;
             }
+        }
+
+        if (idsPartidos.length > 0) {
+            const { data: asisP } = await supabaseClient
+                .from('asistencia_partidos')
+                .select('partido_id, jugador_id, asistio, rpe, duracion_real, sueno, fatiga, estres, estado_muscular')
+                .in('partido_id', idsPartidos);
+            (asisP || []).forEach(a => { a.sesion_id = a.partido_id; asis.push(a); });
         }
 
         const jugIds = [...new Set(asis.map(a => a.jugador_id))];
