@@ -258,6 +258,7 @@ if (hasta) {
                                 <div class="mc-actions">
                                     <button class="mc-btn mc-btn-ver" onclick="verPartido('${p.id}')">👁️ Ver</button>
                                     <button class="mc-btn mc-btn-editar" onclick="editarPartido('${p.id}')">✏️ Editar</button>
+                                    <button class="mc-btn mc-btn-stats" onclick="abrirModalAsistenciaSesion('${p.id}', true)">💚 Wellness</button>
                                     <button class="mc-btn mc-btn-stats" onclick="abrirModalResultado('${p.id}')">📊 Stats</button>
                                     <button class="mc-btn mc-btn-eliminar" onclick="eliminarPartido('${p.id}')">🗑️</button>
                                 </div>
