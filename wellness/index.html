@@ -114,7 +114,7 @@ async function init() {
     }
     const jugador = ctx.jugador;
     window._tokenWellness = token;
-    const sesiones = ctx.sesiones || [];
+           const sesiones = (ctx.partidos || []).filter(p => p.convocado).concat(ctx.sesiones || []);
 
     if (!sesiones || sesiones.length === 0) {
         pintar(`
@@ -128,6 +128,7 @@ async function init() {
 
     const sesion = sesiones[0];
     window._sesionWellness = sesion.id;
+    window._tipoWellness = sesion.tipo || 'sesion';
 
     // Comprobar si ya envio hoy: va ANTES del plazo, para que pueda
     // anadir el peso mas tarde aunque el plazo del wellness haya cerrado
@@ -148,7 +149,18 @@ async function init() {
         const [hh, mm] = sesion.session_time.split(':');
         const horaSesion = new Date();
         horaSesion.setHours(parseInt(hh), parseInt(mm), 0, 0);
-        const limite = new Date(horaSesion.getTime() - 30*60000);
+        const esPartido = sesion.tipo === 'partido';
+        // Sesion: cierra 30 min antes. Partido: abre 8h antes y cierra 2h antes (igual que fn_token_guardar_wellness_partido)
+        const limite = new Date(horaSesion.getTime() - (esPartido ? 120 : 30)*60000);
+        const apertura = esPartido ? new Date(horaSesion.getTime() - 480*60000) : null;
+        if (apertura && new Date() < apertura) {
+            pintar(`
+                <div class="card"><div class="saludo">Hola, ${jugador.name} 👋</div>
+                <div class="sesion-info">${sesion.name} · ${sesion.session_time.slice(0,5)}h</div></div>
+                <div class="card"><div class="estado-msg"><div class="ico">⏳</div><div class="txt">Todavía no puedes rellenar el wellness del partido.<br><small>Podrás enviarlo desde las ${formatoHora(apertura)} hasta las ${formatoHora(limite)}.</small></div></div></div>
+            `);
+            return;
+        }
         if (new Date() > limite) {
             pintar(`
                 <div class="card"><div class="saludo">Hola, ${jugador.name} 👋</div>
@@ -256,9 +268,7 @@ async function enviar(jugadorId, sesionId) {
     if (!isNaN(peso)) registro.peso = peso;
 
     // Guardado seguro via funcion-token (valida token, sesion de hoy y actua solo sobre su fila)
-    const { data: res, error: errRpc } = await sb.rpc('fn_token_guardar_wellness', {
-        p_token: window._tokenWellness, p_sesion_id: sesionId, p_datos: registro
-    });
+       const { data: res, error: errRpc } = await rpcGuardarWellness(registro);
     let error = errRpc || (res && res.ok ? null : { message: (res && res.error) || 'No se pudo guardar' });
 
     if (error) {
@@ -293,9 +303,7 @@ async function guardarPesoSuelto() {
     const btn = document.getElementById('btn-peso-post');
     btn.disabled = true;
     btn.textContent = 'Guardando...';
-    const { data: res, error: errRpc } = await sb.rpc('fn_token_guardar_wellness', {
-        p_token: window._tokenWellness, p_sesion_id: window._sesionWellness, p_datos: { peso: peso }
-    });
+    const { data: res, error: errRpc } = await rpcGuardarWellness({ peso: peso });
     const error = errRpc || (res && res.ok ? null : { message: (res && res.error) || 'No se pudo guardar' });
     if (error) {
         btn.disabled = false;
@@ -305,7 +313,14 @@ async function guardarPesoSuelto() {
     }
     document.getElementById('caja-peso-post').innerHTML = '<div style="text-align:center;color:#10b981;font-weight:700;padding:10px 0">✅ Peso guardado (' + peso + ' kg). ¡Gracias!</div>';
 }
-
+// Llama a la funcion de sesion o de partido segun lo que se este rellenando
+function rpcGuardarWellness(datos) {
+    const esPartido = window._tipoWellness === 'partido';
+    return sb.rpc(esPartido ? 'fn_token_guardar_wellness_partido' : 'fn_token_guardar_wellness',
+        esPartido
+            ? { p_token: window._tokenWellness, p_partido_id: window._sesionWellness, p_datos: datos }
+            : { p_token: window._tokenWellness, p_sesion_id: window._sesionWellness, p_datos: datos });
+}
 init();
 </script>
 </body>
