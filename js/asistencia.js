@@ -346,14 +346,16 @@ async function cargarAsistenciaRango() {
 }
 
 // ========== MODAL ASISTENCIA SESIÓN (sin cambios funcionales) ==========
-async function abrirModalAsistenciaSesion(sesionId) {
+async function abrirModalAsistenciaSesion(sesionId, esPartido) {
+    window.asisEsPartido = !!esPartido;
     sesionAsistenciaActual = sesionId;
     document.getElementById('modal-asistencia-sesion').style.display = 'flex';
     document.getElementById('modal-asistencia-jugadores').innerHTML = '<p style="text-align:center;color:#9ca3af;">Cargando...</p>';
     
     try {
         const { data: sesion } = await supabaseClient
-            .from('training_sessions').select('*').eq('id', sesionId).single();
+            .from(window.asisEsPartido ? 'matches' : 'training_sessions').select('*').eq('id', sesionId).single();
+        if (window.asisEsPartido) { sesion.name = 'Partido vs ' + (sesion.opponent || ''); sesion.session_date = sesion.match_date; sesion.players = sesion.convocados || []; sesion.duration_minutes = 90; }
         
         document.getElementById('asistencia-sesion-nombre').textContent = sesion.name;
         document.getElementById('asistencia-sesion-fecha').textContent = new Date(sesion.session_date + 'T12:00:00').toLocaleDateString('es-ES');
@@ -365,7 +367,7 @@ async function abrirModalAsistenciaSesion(sesionId) {
         }
         
         const { data: asistencias } = await supabaseClient
-            .from('asistencia_sesiones').select('*').eq('sesion_id', sesionId);
+            .from(window.asisEsPartido ? 'asistencia_partidos' : 'asistencia_sesiones').select('*').eq(window.asisEsPartido ? 'partido_id' : 'sesion_id', sesionId);
         
         const asistenciasMap = {};
         (asistencias || []).forEach(a => { asistenciasMap[a.jugador_id] = a; });
@@ -531,7 +533,7 @@ async function guardarAsistenciaSesion() {
         const asistio = row.querySelector('.toggle-asistio').classList.contains('si');
         const muscVal = parseInt(row.querySelector('.w-muscular').value);
         registros.push({
-            sesion_id: sesionAsistenciaActual,
+            [window.asisEsPartido ? 'partido_id' : 'sesion_id']: sesionAsistenciaActual,
             jugador_id: row.dataset.playerId,
             asistio: asistio,
             motivo_ausencia: asistio ? null : (row.querySelector('.motivo-select').value || null),
@@ -558,8 +560,9 @@ async function guardarAsistenciaSesion() {
         });
     });
     try {
-        await supabaseClient.from('asistencia_sesiones').delete().eq('sesion_id', sesionAsistenciaActual);
-        const { error } = await supabaseClient.from('asistencia_sesiones').insert(registros);
+        const asisTabla = window.asisEsPartido ? 'asistencia_partidos' : 'asistencia_sesiones';
+        await supabaseClient.from(asisTabla).delete().eq(window.asisEsPartido ? 'partido_id' : 'sesion_id', sesionAsistenciaActual);
+        const { error } = await supabaseClient.from(asisTabla).insert(registros);
         if (error) throw error;
         showToast('Asistencia y wellness guardados correctamente');
         cerrarModalAsistenciaSesion();
