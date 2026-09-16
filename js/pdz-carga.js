@@ -45,13 +45,19 @@ async function pdzCargaMicro(periodo) {
 
     try {
         // 1. Plantilla de la temporada
-        var { data: plantilla } = await supabaseClient
+        var idTemporada = (typeof seasonId !== 'undefined' && seasonId) ? seasonId : null;
+        if (!idTemporada) {
+            var { data: temp } = await supabaseClient.from('seasons').select('id').eq('club_id', clubId).eq('is_active', true).single();
+            idTemporada = temp ? temp.id : null;
+        }
+        var { data: plantilla, error: errPl } = await supabaseClient
             .from('season_players')
-            .select('player_id, shirt_number, position, players(id, name)')
-            .eq('season_id', seasonId);
+            .select('player_id, players(id, name)')
+            .eq('season_id', idTemporada);
+        if (errPl) console.error('Plantilla carga micro:', errPl);
         var jugadores = (plantilla || []).filter(function(sp) { return sp.players; }).map(function(sp) {
-            return { id: sp.player_id, nombre: sp.players.name, dorsal: sp.shirt_number, pos: sp.position };
-        }).sort(function(a, b) { return (a.dorsal || 99) - (b.dorsal || 99); });
+            return { id: sp.player_id, nombre: sp.players.name, dorsal: '', pos: '' };
+        }).sort(function(a, b) { return (a.nombre || '').localeCompare(b.nombre || '', 'es'); });
 
         // 2. Sesiones y RPE de jugadores
         var { data: sesiones } = await supabaseClient
