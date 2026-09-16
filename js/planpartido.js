@@ -37,6 +37,63 @@ var PP_OUR_SECTIONS = [
     {id:'consignas',title:'Consignas principales / Resumen',color:'#a855f7'}
 ];
 
+// === CONFRONTACION: fase del rival <-> apartado del plan propio ===
+var PP_PAIR_DEFAULT = [
+    {re:/ofensiva.*saque/i, id:'df_reinicios'},
+    {re:/ofensiva.*inicio/i, id:'df_presion'},
+    {re:/ofensiva.*posicional/i, id:'df_medio'},
+    {re:/ofensiva.*finaliz/i, id:'df_bajo'},
+    {re:/transici.*ataque.*defensa/i, id:'tr_df_of'},
+    {re:/defensiva.*saque/i, id:'of_reinicios'},
+    {re:/defensiva.*presi/i, id:'of_construccion'},
+    {re:/defensiva.*bloque medio/i, id:'of_posesion'},
+    {re:/defensiva.*(bloque bajo|posicional)/i, id:'of_finalizacion'},
+    {re:/transici.*defensa.*ataque/i, id:'tr_of_df'},
+    {re:/otros/i, id:'consignas'}
+];
+function ppPairDe(fase){
+    if(fase.pair==='none')return null;
+    if(fase.pair)return fase.pair;
+    for(var i=0;i<PP_PAIR_DEFAULT.length;i++){if(PP_PAIR_DEFAULT[i].re.test(fase.title||''))return PP_PAIR_DEFAULT[i].id}
+    return null;
+}
+function ppSeccionPropia(id){for(var i=0;i<PP_OUR_SECTIONS.length;i++){if(PP_OUR_SECTIONS[i].id===id)return PP_OUR_SECTIONS[i]}return null}
+function ppMediaMini(media,soloLectura){
+    if(!media||!media.length)return '';
+    var h='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">';
+    media.forEach(function(m){
+        if(m.type==='image'&&m.url)h+='<a href="'+ppEsc(m.url)+'" target="_blank" title="'+ppEsc(m.title||'')+'"><img src="'+ppEsc(m.url)+'" style="width:72px;height:50px;object-fit:cover;border-radius:4px;border:1px solid #334155"></a>';
+        else if(m.url)h+='<a href="'+ppEsc(m.url)+'" target="_blank" style="display:inline-flex;align-items:center;justify-content:center;width:72px;height:50px;background:#0f172a;border:1px solid #334155;border-radius:4px;color:#94a3b8;font-size:18px;text-decoration:none" title="'+ppEsc(m.title||'Video')+'">🎬</a>';
+    });
+    return h+'</div>';
+}
+function ppRenderConfront(){
+    var fases=ppGetFases();var our=ppGetOurPhases();
+    var ta='width:100%;padding:8px 10px;background:#0f172a;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-size:13px;resize:vertical;font-family:inherit';
+    var h='<div style="background:#0f172a;border:1px solid #1e3a5f;border-radius:12px;padding:20px"><h3 style="margin:0 0 6px;color:#e2e8f0;font-size:16px">⚔️ Confrontacion: ellos vs nosotros</h3><p style="margin:0 0 16px;font-size:12px;color:#64748b">Cada fase del rival frente a nuestra respuesta. Se edita aqui mismo y se guarda en las pestanas Fases y Plan Tactico. Cambia la pareja con el desplegable de cada fila.</p>';
+    h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:8px"><div style="font-size:12px;font-weight:700;color:#f87171;text-transform:uppercase;letter-spacing:.5px">🔴 Rival: '+ppEsc((pp.partidoActual&&pp.partidoActual.opponent)||'')+'</div><div style="font-size:12px;font-weight:700;color:#4ade80;text-transform:uppercase;letter-spacing:.5px">🟢 Nosotros</div></div>';
+    var usadas={};
+    fases.forEach(function(f,i){
+        var pid=ppPairDe(f);var sec=pid?ppSeccionPropia(pid):null;if(sec)usadas[sec.id]=true;
+        var od=sec?(our[sec.id]||{notes:'',media:[]}):null;
+        var sel='<select onchange="ppGuardarPair('+i+',this.value)" style="background:#0f172a;border:1px solid #334155;color:#94a3b8;border-radius:6px;font-size:11px;padding:3px 6px;max-width:100%"><option value="none"'+(!sec?' selected':'')+'>— Sin pareja —</option>';
+        PP_OUR_SECTIONS.forEach(function(s){if(s.type==='title'){sel+='<optgroup label="'+ppEsc(s.label)+'">';return}sel+='<option value="'+s.id+'"'+(sec&&sec.id===s.id?' selected':'')+'>'+ppEsc(s.title)+'</option>'});
+        sel+='</select>';
+        h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;align-items:stretch">';
+        h+='<div style="background:#1e293b;border-left:4px solid #ef4444;border-radius:0 8px 8px 0;padding:12px"><div style="font-size:13px;font-weight:600;color:#e2e8f0;margin-bottom:8px">'+ppEsc(f.title)+'</div><textarea rows="4" placeholder="Que hace el rival..." onchange="ppGuardarFase('+i+',this.value)" style="'+ta+'">'+ppEsc(f.notes)+'</textarea>'+ppMediaMini(f.media)+'</div>';
+        if(sec)h+='<div style="background:#1e293b;border-left:4px solid #22c55e;border-radius:0 8px 8px 0;padding:12px"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px"><div style="font-size:13px;font-weight:600;color:#e2e8f0">'+ppEsc(sec.title)+'</div>'+sel+'</div><textarea rows="4" placeholder="Que hacemos nosotros..." onchange="ppGuardarOurFase(\''+sec.id+'\',this.value)" style="'+ta+'">'+ppEsc(od.notes)+'</textarea>'+ppMediaMini(od.media)+'</div>';
+        else h+='<div style="background:#0f172a;border:1px dashed #334155;border-radius:8px;padding:12px;display:flex;flex-direction:column;justify-content:center;gap:8px"><div style="font-size:12px;color:#64748b;text-align:center">Sin respuesta emparejada</div>'+sel+'</div>';
+        h+='</div>';
+    });
+    var sueltas=PP_OUR_SECTIONS.filter(function(s){return !s.type&&!usadas[s.id]&&our[s.id]&&our[s.id].notes});
+    if(sueltas.length){
+        h+='<div style="margin-top:16px;font-size:12px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px">Apartados propios sin fase rival enfrente</div>';
+        sueltas.forEach(function(s){h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px"><div></div><div style="background:#1e293b;border-left:4px solid #22c55e;border-radius:0 8px 8px 0;padding:12px"><div style="font-size:13px;font-weight:600;color:#e2e8f0;margin-bottom:8px">'+ppEsc(s.title)+'</div><textarea rows="3" onchange="ppGuardarOurFase(\''+s.id+'\',this.value)" style="'+ta+'">'+ppEsc(our[s.id].notes)+'</textarea></div></div>'});
+    }
+    return h+'</div>';
+}
+async function ppGuardarPair(i,secId){var f=ppGetFases();f[i].pair=secId||'none';if(await ppGuardarFasesArray(f))ppMostrarTab('confront')}
+
 var PP_ABP_ROLES_OF = ['remate','ejecuta','rechace','atras','en_corto'];
 var PP_ABP_ROLES_OF_LABELS = {remate:'Remate',ejecuta:'Ejecuta',rechace:'Rechace',atras:'Atras',en_corto:'En corto'};
 var PP_ABP_ROLES_DF = ['palo','corta','al_saque','zona','rechace','arriba'];
@@ -334,9 +391,9 @@ function ppRenderStatusBadge(){var b=document.getElementById('pp-status-badge');
 async function ppCambiarEstado(v){if(!pp.planActual)return;try{await supabaseClient.from('match_plans').update({status:v,updated_at:new Date().toISOString()}).eq('id',pp.planActual.id);pp.planActual.status=v;ppRenderStatusBadge();showToast('Estado: '+v)}catch(e){showToast('Error: '+e.message)}}
 
 // === TABS ===
-function ppRenderContenido(){var c=document.getElementById('pp-contenido');if(!c)return;ppRenderStatusBadge();c.innerHTML=ppRenderCabecera()+'<div id="pp-tabs" style="display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap">'+ppTabBtn('scouting','🔍 Scouting Rival',true)+ppTabBtn('jugadores','👤 Jugadores Rival',false)+ppTabBtn('fases','⚽ Fases del Juego Rival',false)+ppTabBtn('tactica','⚔️ Plan Tactico Propio',false)+ppTabBtn('abp','🎯 ABPs',false)+ppTabBtn('semana','📅 Integracion en Semana',false)+'</div><div id="pp-tab-content"></div>';ppMostrarTab('scouting')}
+function ppRenderContenido(){var c=document.getElementById('pp-contenido');if(!c)return;ppRenderStatusBadge();c.innerHTML=ppRenderCabecera()+'<div id="pp-tabs" style="display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap">'+ppTabBtn('scouting','🔍 Scouting Rival',true)+ppTabBtn('jugadores','👤 Jugadores Rival',false)+ppTabBtn('fases','⚽ Fases del Juego Rival',false)+ppTabBtn('tactica','⚔️ Plan Tactico Propio',false)+ppTabBtn('confront','🆚 Confrontacion',false)+ppTabBtn('abp','🎯 ABPs',false)+ppTabBtn('semana','📅 Integracion en Semana',false)+'</div><div id="pp-tab-content"></div>';ppMostrarTab('scouting')}
 function ppTabBtn(id,l,a){return '<button onclick="ppMostrarTab(\''+id+'\')" id="pp-tab-'+id+'" style="padding:8px 16px;border-radius:8px;border:1px solid '+(a?'#3b82f6':'#334155')+';background:'+(a?'#1e3a5f':'#0f172a')+';color:'+(a?'#93c5fd':'#9ca3af')+';font-size:13px;font-weight:600;cursor:pointer">'+l+'</button>'}
-function ppMostrarTab(t){['scouting','jugadores','fases','tactica','abp','semana'].forEach(function(x){var b=document.getElementById('pp-tab-'+x);if(b){var a=x===t;b.style.borderColor=a?'#3b82f6':'#334155';b.style.background=a?'#1e3a5f':'#0f172a';b.style.color=a?'#93c5fd':'#9ca3af'}});var area=document.getElementById('pp-tab-content');if(!area)return;if(t==='scouting')area.innerHTML=ppRenderScouting();else if(t==='jugadores')area.innerHTML=ppRenderJugadores();else if(t==='fases')area.innerHTML=ppRenderFases();else if(t==='tactica')area.innerHTML=ppRenderTactica();else if(t==='abp')area.innerHTML=ppRenderABPs();else if(t==='semana'){area.innerHTML='<div style="text-align:center;padding:30px;color:#64748b">Cargando...</div>';ppCargarSemana()}else if(t==='contenido')area.innerHTML=ppRenderContenidos()}
+function ppMostrarTab(t){['scouting','jugadores','fases','tactica','confront','abp','semana'].forEach(function(x){var b=document.getElementById('pp-tab-'+x);if(b){var a=x===t;b.style.borderColor=a?'#3b82f6':'#334155';b.style.background=a?'#1e3a5f':'#0f172a';b.style.color=a?'#93c5fd':'#9ca3af'}});var area=document.getElementById('pp-tab-content');if(!area)return;if(t==='scouting')area.innerHTML=ppRenderScouting();else if(t==='jugadores')area.innerHTML=ppRenderJugadores();else if(t==='fases')area.innerHTML=ppRenderFases();else if(t==='tactica')area.innerHTML=ppRenderTactica();else if(t==='confront')area.innerHTML=ppRenderConfront();else if(t==='confront')area.innerHTML=ppRenderConfront();else if(t==='abp')area.innerHTML=ppRenderABPs();else if(t==='semana'){area.innerHTML='<div style="text-align:center;padding:30px;color:#64748b">Cargando...</div>';ppCargarSemana()}else if(t==='contenido')area.innerHTML=ppRenderContenidos()}
 
 // === TAB: SCOUTING ===
 function ppRenderScouting(){var p=pp.planActual;return '<div style="background:#0f172a;border:1px solid #1e3a5f;border-radius:12px;padding:20px"><h3 style="margin:0 0 16px;color:#e2e8f0;font-size:16px">🔍 Scouting del rival</h3><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px"><div><label style="font-size:12px;color:#9ca3af;display:block;margin-bottom:4px">Formacion</label>'+ppSelectFormacion('pp-rf',p.rival_formation,"ppGuardarCampo(\'rival_formation\',this.value);setTimeout(function(){ppMostrarTab(\'scouting\')},200)")+'</div><div><label style="font-size:12px;color:#9ca3af;display:block;margin-bottom:4px">Estilo</label><input type="text" value="'+ppEsc(p.rival_style)+'" onchange="ppGuardarCampo(\'rival_style\',this.value)" placeholder="Ej: Juego directo..." style="width:100%;padding:8px 12px;background:#1e293b;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-size:14px"></div></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px"><div><label style="font-size:12px;color:#9ca3af;display:block;margin-bottom:4px">💪 Fuertes</label><textarea onchange="ppGuardarCampo(\'rival_strengths\',this.value)" rows="4" style="width:100%;padding:8px 12px;background:#1e293b;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-size:13px;resize:vertical">'+ppEsc(p.rival_strengths)+'</textarea></div><div><label style="font-size:12px;color:#9ca3af;display:block;margin-bottom:4px">📉 Debiles</label><textarea onchange="ppGuardarCampo(\'rival_weaknesses\',this.value)" rows="4" style="width:100%;padding:8px 12px;background:#1e293b;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-size:13px;resize:vertical">'+ppEsc(p.rival_weaknesses)+'</textarea></div></div>'+ppRenderRecientes()+ppRenderAlineacion()+'</div>'}
