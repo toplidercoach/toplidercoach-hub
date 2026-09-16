@@ -1238,7 +1238,26 @@ function renderizarConvocatoria() {
             const tablaBody = document.getElementById('stats-tabla-body');
             
             // Resumen partidos
-            const { data: partidos } = await supabaseClient.from('matches').select('*').eq('season_id', tempId).not('result', 'is', null);
+             const { data: partidosTodos } = await supabaseClient.from('matches').select('*').eq('season_id', tempId).not('result', 'is', null);
+
+            // Desplegable de competición (se crea junto al de temporada la primera vez)
+            let selComp = document.getElementById('stats-competicion');
+            const selTemp = document.getElementById('stats-temporada');
+            if (!selComp && selTemp) {
+                selComp = document.createElement('select');
+                selComp.id = 'stats-competicion';
+                selComp.style.cssText = selTemp.style.cssText || '';
+                selComp.style.marginRight = '8px';
+                selComp.onchange = cargarEstadisticas;
+                selTemp.parentNode.insertBefore(selComp, selTemp);
+            }
+            const compActual = selComp ? selComp.value : '';
+            if (selComp) {
+                const comps = [...new Set((partidosTodos || []).map(p => p.competition).filter(Boolean))].sort();
+                selComp.innerHTML = '<option value="">Todas las competiciones</option>' + comps.map(c => `<option value="${c}"${c === compActual ? ' selected' : ''}>${c}</option>`).join('');
+            }
+            const compSel = selComp ? selComp.value : '';
+            const partidos = (partidosTodos || []).filter(p => !compSel || p.competition === compSel);
             
             const victorias = partidos?.filter(p => p.result === 'win').length || 0;
             const empates = partidos?.filter(p => p.result === 'draw').length || 0;
@@ -1257,11 +1276,12 @@ function renderizarConvocatoria() {
             // Stats por jugador
             const { data: stats } = await supabaseClient
                 .from('match_player_stats')
-                .select('*, players(id, name, position, photo_url), matches!inner(season_id)')
+                .select('*, players(id, name, position, photo_url), matches!inner(season_id, competition)')
                 .eq('matches.season_id', tempId);
+            const statsFiltrados = (stats || []).filter(s => !compSel || (s.matches && s.matches.competition === compSel));
             
             const jugadorStats = {};
-            (stats || []).forEach(s => {
+            statsFiltrados.forEach(s => {
                 const pid = s.player_id;
                 if (!jugadorStats[pid]) {
                     jugadorStats[pid] = { player: s.players, pj: 0, min: 0, goles: 0, asist: 0, ta: 0, tr: 0 };
