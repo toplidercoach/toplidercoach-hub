@@ -62,8 +62,8 @@ function ppMediaMini(media,soloLectura){
     if(!media||!media.length)return '';
     var h='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">';
     media.forEach(function(m){
-        if(m.type==='image'&&m.url)h+='<a href="'+ppEsc(m.url)+'" target="_blank" title="'+ppEsc(m.title||'')+'"><img src="'+ppEsc(m.url)+'" style="width:72px;height:50px;object-fit:cover;border-radius:4px;border:1px solid #334155"></a>';
-        else if(m.url)h+='<a href="'+ppEsc(m.url)+'" target="_blank" style="display:inline-flex;align-items:center;justify-content:center;width:72px;height:50px;background:#0f172a;border:1px solid #334155;border-radius:4px;color:#94a3b8;font-size:18px;text-decoration:none" title="'+ppEsc(m.title||'Video')+'">🎬</a>';
+        if(m.type==='image'&&m.url)h+='<img src="'+ppEsc(m.url)+'" title="'+ppEsc(m.title||'')+'" onclick="ppMostrarVisor(this.src)" style="width:72px;height:50px;object-fit:cover;border-radius:4px;border:1px solid #334155;cursor:pointer">';
+        else if(m.url)h+='<a href="'+m.url+'" target="_blank" style="display:inline-flex;align-items:center;justify-content:center;width:72px;height:50px;background:#0f172a;border:1px solid #334155;border-radius:4px;color:#94a3b8;font-size:18px;text-decoration:none" title="'+ppEsc(m.title||'Video')+'">🎬</a>';
     });
     return h+'</div>';
 }
