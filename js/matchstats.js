@@ -661,7 +661,19 @@ function renderizarConvocatoria() {
             '5-4-1': [
                 {x:50,y:90,tipo:'POR'},{x:10,y:70,tipo:'DEF'},{x:30,y:74,tipo:'DEF'},{x:50,y:74,tipo:'DEF'},{x:70,y:74,tipo:'DEF'},{x:90,y:70,tipo:'DEF'},
                 {x:15,y:45,tipo:'MED'},{x:38,y:45,tipo:'MED'},{x:62,y:45,tipo:'MED'},{x:85,y:45,tipo:'MED'},
-                {x:50,y:18,tipo:'DEL'}
+                 {x:50,y:18,tipo:'DEL'}
+            ],
+            '3-2-4-1': [
+                {x:50,y:90,tipo:'POR'},{x:25,y:72,tipo:'DEF'},{x:50,y:72,tipo:'DEF'},{x:75,y:72,tipo:'DEF'},
+                {x:35,y:56,tipo:'MED'},{x:65,y:56,tipo:'MED'},
+                {x:12,y:36,tipo:'MED'},{x:38,y:36,tipo:'MED'},{x:62,y:36,tipo:'MED'},{x:88,y:36,tipo:'MED'},
+                {x:50,y:15,tipo:'DEL'}
+            ],
+            '3-1-5-1': [
+                {x:50,y:90,tipo:'POR'},{x:25,y:72,tipo:'DEF'},{x:50,y:72,tipo:'DEF'},{x:75,y:72,tipo:'DEF'},
+                {x:50,y:58,tipo:'MED'},
+                {x:10,y:40,tipo:'MED'},{x:30,y:40,tipo:'MED'},{x:50,y:40,tipo:'MED'},{x:70,y:40,tipo:'MED'},{x:90,y:40,tipo:'MED'},
+                {x:50,y:15,tipo:'DEL'}
             ]
         };
 
