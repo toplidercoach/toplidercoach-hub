@@ -2337,7 +2337,7 @@ function filtrarMisEjercicios() {
     var gksub = (gk === 'si' && gksubEl) ? gksubEl.value : '';
     var filtrados = misEjerciciosCache.filter(function(e){
         return (!q || (e.name || '').toLowerCase().indexOf(q) !== -1) &&
-               (!jug || e.players_count == jug) &&
+               (!jug || (gk === 'si' ? (!e.players_count || e.players_count <= jug) : e.players_count == jug)) &&
                (!tema || e.tema === tema) &&
                (!fase || e.game_phase === fase) &&
                (gk === '' || (gk === 'si' ? e.es_portero === true : !e.es_portero)) &&
