@@ -2214,12 +2214,23 @@ async function cargarMisEjerciciosBiblioteca() {
     if (pag) pag.innerHTML = '';
     
     try {
-        const { data, error } = await supabaseClient
-            .from('custom_exercises')
-            .select('id, name, category, tema, difficulty, duration_min, players_count, game_phase, es_portero, subcategoria_portero')
-            .or((typeof cmState !== 'undefined' && cmState.activo && typeof clubId !== 'undefined' && clubId) ? ('club_id.eq.' + clubId + ',coach_id.eq.' + String(usuario.id)) : ('coach_id.eq.' + String(usuario.id)))
-            .order('created_at', { ascending: false })
-            .limit(1000);
+        // Carga por páginas de 1000 (Supabase no devuelve más por petición)
+        const filtroOr = (typeof cmState !== 'undefined' && cmState.activo && typeof clubId !== 'undefined' && clubId) ? ('club_id.eq.' + clubId + ',coach_id.eq.' + String(usuario.id)) : ('coach_id.eq.' + String(usuario.id));
+        let data = [], error = null, desde = 0;
+        const PAG = 1000;
+        while (true) {
+            const res = await supabaseClient
+                .from('custom_exercises')
+                .select('id, name, category, tema, difficulty, duration_min, players_count, game_phase, es_portero, subcategoria_portero')
+                .or(filtroOr)
+                .order('created_at', { ascending: false })
+                .order('id', { ascending: true })
+                .range(desde, desde + PAG - 1);
+            if (res.error) { error = res.error; break; }
+            data = data.concat(res.data || []);
+            if (!res.data || res.data.length < PAG) break;
+            desde += PAG;
+        }
         
         if (error) throw error;
         

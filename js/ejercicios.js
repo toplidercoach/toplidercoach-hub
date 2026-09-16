@@ -3655,10 +3655,25 @@ async function ejBancoLoad() {
             
             .or(window.ejClubId ? ('club_id.eq.' + window.ejClubId + ',coach_id.eq.' + String(window.ejCoachId)) : ('coach_id.eq.' + String(window.ejCoachId)))
             .order('created_at', { ascending: false })
-            .limit(1000);
+            .order('id', { ascending: true })
+            .range(0, 999);
         if (error) throw error;
         ejEditandoId = null;
-         ejBancoCache = data || [];
+        // Páginas siguientes (Supabase devuelve como mucho 1000 filas por petición)
+        let ejTodos = data || [], ejDesde = 1000;
+        while (ejTodos.length === ejDesde) {
+            const ejPag = await supabaseClient
+                .from('custom_exercises')
+                .select('id,name,category,age_group,difficulty,duration_min,players_count,game_phase,field_width,field_length,eii,objectives,description,variants,coach_notes,materials, animation_url,tema,num_goalkeepers,es_portero,subcategoria_portero')
+                .or(window.ejClubId ? ('club_id.eq.' + window.ejClubId + ',coach_id.eq.' + String(window.ejCoachId)) : ('coach_id.eq.' + String(window.ejCoachId)))
+                .order('created_at', { ascending: false })
+                .order('id', { ascending: true })
+                .range(ejDesde, ejDesde + 999);
+            if (ejPag.error) break;
+            ejTodos = ejTodos.concat(ejPag.data || []);
+            ejDesde += 1000;
+        }
+        ejBancoCache = ejTodos;
         ejBancoRender(ejBancoCache);
         ejBancoCargarThumbs();
     } catch(err) {
