@@ -126,6 +126,19 @@ async function pdzCargaMicro(periodo) {
             }
         } catch (eGps) { console.warn('GPS no disponible:', eGps); }
 
+        // Puente club_players (Club Mode) -> players (HUB): por legacy_player_id y, si no, por nombre
+        if (gpsRows.length > 0) {
+            var { data: cps } = await supabaseClient.from('club_players').select('id, name, legacy_player_id').eq('club_id', clubId);
+            var idsPlantilla = {}, porNombre = {};
+            jugadores.forEach(function(j) { idsPlantilla[j.id] = true; porNombre[pdzCgNorm(j.nombre)] = j.id; });
+            var puente = {};
+            (cps || []).forEach(function(cp) {
+                if (cp.legacy_player_id && idsPlantilla[cp.legacy_player_id]) puente[cp.id] = cp.legacy_player_id;
+                else if (porNombre[pdzCgNorm(cp.name)]) puente[cp.id] = porNombre[pdzCgNorm(cp.name)];
+            });
+            gpsRows.forEach(function(r) { if (!idsPlantilla[r.player_id] && puente[r.player_id]) r.player_id = puente[r.player_id]; });
+        }
+
         // ---------- Calculo por jugador y dia ----------
         var fechasPartido = {};
         partidos.forEach(function(p) { fechasPartido[p.match_date] = p.opponent || 'Partido'; });
@@ -177,7 +190,7 @@ async function pdzCargaMicro(periodo) {
         gpsRows.forEach(function(r) {
             var k = r.session_id + '|' + r.player_id;
             if (!porSesJug[k]) porSesJug[k] = { total: null, segs: [] };
-            if (!r.segment_name) porSesJug[k].total = r; else porSesJug[k].segs.push(r);
+                if (!r.segment_name || String(r.segment_name).trim().toUpperCase() === 'TOTAL') porSesJug[k].total = r; else porSesJug[k].segs.push(r);
         });
         Object.keys(porSesJug).forEach(function(k) {
             var partes = k.split('|');
@@ -302,6 +315,10 @@ function pdzCgRender() {
         + ' El % es respecto a la media del partido del propio jugador en este periodo.</div>';
 
     cont.innerHTML = html;
+}
+
+function pdzCgNorm(s) {
+    return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
 }
 
 function pdzCgFmt(v, dec) {
