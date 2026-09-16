@@ -298,9 +298,11 @@ async function pdzMostrarDetalle(id) {
         (tagsHtml ? '<div style="margin-bottom:12px"><div style="font-size:11px;color:#9ca3af;margin-bottom:6px">Foco</div><div style="display:flex;flex-wrap:wrap;gap:4px">' + tagsHtml + '</div></div>' : '') +
         hijosHtml +
         '<div id="pdz-sesiones-periodo" style="margin-top:16px"><div style="color:#64748b;font-size:12px">Cargando sesiones del periodo...</div></div>' +
+        '<div id="pdz-carga-periodo" style="margin-top:16px"></div>' +
     '</div>';
     detalleArea.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     pdzCargarSesionesPeriodo(periodo);
+    if (typeof pdzCargaMicro === 'function') pdzCargaMicro(periodo);
 }
 
 // =============================================
