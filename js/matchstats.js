@@ -1294,15 +1294,25 @@ function renderizarConvocatoria() {
                 jugadorStats[pid].tr += s.red_cards || 0;
             });
             
-            const ordenados = Object.values(jugadorStats).sort((a, b) => b.goles - a.goles);
+            window.statsJugCache = Object.values(jugadorStats);
+            if (!window.statsOrden) window.statsOrden = { col: 'goles', dir: 'desc' };
+            statsActivarOrdenCabeceras(tablaBody);
+            const ordenados = statsOrdenar(window.statsJugCache);
             
             if (ordenados.length === 0) {
                 tablaBody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#9ca3af;">No hay estadisticas</td></tr>';
             } else {
-               tablaBody.innerHTML = ordenados.map(j => {
-    const inicial = j.player?.name?.charAt(0) || '?';
-    const playerId = j.player?.id;
-    return `
+               tablaBody.innerHTML = ordenados.map(statsFilaHtml).join('');
+            }
+        }
+
+        // ---- Orden de la tabla de jugadores ----
+        const STATS_COLS = ['nombre', 'pj', 'min', 'goles', 'asist', 'ta', 'tr'];
+
+        function statsFilaHtml(j) {
+            const inicial = j.player?.name?.charAt(0) || '?';
+            const playerId = j.player?.id;
+            return `
         <tr onclick="abrirFichaJugador('${playerId}')" style="cursor: pointer;" title="Ver ficha completa">
             <td>
                 <div class="jugador-cell">
@@ -1321,10 +1331,40 @@ function renderizarConvocatoria() {
             <td>${j.asist}</td>
             <td>${j.ta}</td>
             <td>${j.tr}</td>
-        </tr>
-    `;
-}).join('');
-            }
+        </tr>`;
+        }
+
+        function statsOrdenar(lista) {
+            const o = window.statsOrden || { col: 'goles', dir: 'desc' };
+            const m = o.dir === 'asc' ? 1 : -1;
+            return lista.slice().sort((a, b) => {
+                if (o.col === 'nombre') return m * (a.player?.name || '').localeCompare(b.player?.name || '', 'es');
+                return m * ((a[o.col] || 0) - (b[o.col] || 0)) || (b.goles - a.goles);
+            });
+        }
+
+        function statsActivarOrdenCabeceras(tablaBody) {
+            const tabla = tablaBody && tablaBody.closest('table');
+            if (!tabla) return;
+            const ths = tabla.querySelectorAll('thead th');
+            ths.forEach((th, i) => {
+                const col = STATS_COLS[i];
+                if (!col) return;
+                if (!th.dataset.ordenBase) th.dataset.ordenBase = th.textContent.trim();
+                const o = window.statsOrden;
+                th.textContent = th.dataset.ordenBase + (o && o.col === col ? (o.dir === 'asc' ? ' ▲' : ' ▼') : '');
+                th.style.cursor = 'pointer';
+                th.title = 'Ordenar';
+                th.onclick = function() {
+                    if (window.statsOrden && window.statsOrden.col === col) {
+                        window.statsOrden.dir = window.statsOrden.dir === 'desc' ? 'asc' : 'desc';
+                    } else {
+                        window.statsOrden = { col: col, dir: col === 'nombre' ? 'asc' : 'desc' };
+                    }
+                    statsActivarOrdenCabeceras(tablaBody);
+                    tablaBody.innerHTML = statsOrdenar(window.statsJugCache || []).map(statsFilaHtml).join('');
+                };
+            });
         }
         // ========== FICHA JUGADOR ==========
 
