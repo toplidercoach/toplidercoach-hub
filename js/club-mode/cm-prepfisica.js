@@ -665,7 +665,8 @@ async function cmPfCargarSesiones() {
             h += '<div class="cmpf-gps-card" onclick="cmPfVerSesionCompleta(\'' + s.id + '\')">';
             h += '<div style="display:flex;justify-content:space-between;align-items:center">';
             h += '<div class="title">' + cmPfFormatFecha(s.session_date) + ' ' + tipo + ' ' + titulo + '</div>';
-            h += '<span style="color:#64748b;font-size:12px">' + n + ' jugadores' + (s.duration_min ? ' · ' + s.duration_min + 'min' : '') + '</span></div>';
+            h += '<span style="color:#64748b;font-size:12px">' + n + ' jugadores' + (s.duration_min ? ' · ' + s.duration_min + 'min' : '') + '</span>';
+            h += '<span style="margin-left:10px;white-space:nowrap"><button onclick="event.stopPropagation();cmPfEditarSesion(\'' + s.id + '\')" title="Editar sesion" style="background:#1e293b;border:1px solid #334155;color:#cbd5e1;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:12px;margin-right:4px">✏️</button><button onclick="event.stopPropagation();cmPfEliminarSesion(\'' + s.id + '\')" title="Eliminar sesion" style="background:#1e293b;border:1px solid #7f1d1d;color:#fca5a5;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:12px">🗑</button></span></div>';
             if (ejNombre) h += '<div style="color:#a78bfa;font-size:11px;margin-top:2px">Ejercicio: ' + ejNombre + '</div>';
             if (n > 0) {
                 h += '<div class="meta" style="margin-top:6px">';
@@ -680,6 +681,54 @@ async function cmPfCargarSesiones() {
         });
         cont.innerHTML = h;
     } catch(e) { console.error('cmPfCargarSesiones:', e); cont.innerHTML = '<div class="cmpf-empty"><p>Error</p></div>'; }
+}
+
+// ---- Editar / eliminar sesion GPS ----
+async function cmPfEditarSesion(sessionId) {
+    var prev = document.getElementById('cmpf-edit-ses-overlay'); if (prev) prev.remove();
+    var r = await supabaseClient.from('cm_pf_gps_sessions').select('*').eq('id', sessionId).single();
+    var s = r.data; if (!s) { showToast('Sesion no encontrada', 'error'); return; }
+    var inp = 'width:100%;padding:8px 10px;background:#0f172a;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-size:13px';
+    var lab = 'font-size:11px;color:#9ca3af;display:block;margin-bottom:4px';
+    var ov = document.createElement('div'); ov.id = 'cmpf-edit-ses-overlay';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+    ov.onclick = function(e) { if (e.target === ov) ov.remove(); };
+    ov.innerHTML = '<div style="background:#0f172a;border:1px solid #1e3a5f;border-radius:14px;max-width:520px;width:100%;padding:20px;color:#e2e8f0">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><h3 style="margin:0;font-size:15px">✏️ Editar sesion GPS</h3><button onclick="document.getElementById(\'cmpf-edit-ses-overlay\').remove()" style="background:none;border:none;color:#9ca3af;font-size:20px;cursor:pointer">×</button></div>'
+        + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">'
+        + '<div><label style="' + lab + '">Fecha</label><input type="date" id="cmpf-es-fecha" value="' + (s.session_date || '') + '" style="' + inp + '"></div>'
+        + '<div><label style="' + lab + '">Tipo</label><select id="cmpf-es-tipo" style="' + inp + '"><option value="training"' + (s.session_type !== 'match' ? ' selected' : '') + '>Entreno</option><option value="match"' + (s.session_type === 'match' ? ' selected' : '') + '>Partido</option></select></div>'
+        + '<div><label style="' + lab + '">Titulo</label><input type="text" id="cmpf-es-titulo" value="' + (s.title || '').replace(/"/g, '&quot;') + '" style="' + inp + '"></div>'
+        + '<div><label style="' + lab + '">Rival (si es partido)</label><input type="text" id="cmpf-es-rival" value="' + (s.opponent || '').replace(/"/g, '&quot;') + '" style="' + inp + '"></div>'
+        + '<div><label style="' + lab + '">Duracion (min)</label><input type="number" id="cmpf-es-dur" value="' + (s.duration_min || '') + '" min="1" style="' + inp + '"></div>'
+        + '</div>'
+        + '<div style="margin-bottom:14px"><label style="' + lab + '">Notas</label><textarea id="cmpf-es-notas" rows="3" style="' + inp + ';resize:vertical">' + (s.notes || '').replace(/</g, '&lt;') + '</textarea></div>'
+        + '<div style="display:flex;justify-content:flex-end;gap:8px"><button onclick="document.getElementById(\'cmpf-edit-ses-overlay\').remove()" style="padding:8px 14px;border-radius:8px;border:1px solid #334155;background:#1e293b;color:#cbd5e1;cursor:pointer">Cancelar</button><button onclick="cmPfGuardarEdicionSesion(\'' + s.id + '\')" style="padding:8px 14px;border-radius:8px;border:none;background:#14b8a6;color:#0f172a;font-weight:700;cursor:pointer">Guardar</button></div></div>';
+    document.body.appendChild(ov);
+}
+async function cmPfGuardarEdicionSesion(sessionId) {
+    var v = function(id) { var e = document.getElementById(id); return e ? e.value : ''; };
+    var fecha = v('cmpf-es-fecha'); if (!fecha) { showToast('La fecha es obligatoria', 'error'); return; }
+    var dur = parseInt(v('cmpf-es-dur'));
+    var upd = { session_date: fecha, session_type: v('cmpf-es-tipo'), title: v('cmpf-es-titulo').trim() || null, opponent: v('cmpf-es-rival').trim() || null, duration_min: isNaN(dur) ? null : dur, notes: v('cmpf-es-notas').trim() || null, updated_at: new Date().toISOString() };
+    try {
+        var r = await supabaseClient.from('cm_pf_gps_sessions').update(upd).eq('id', sessionId);
+        if (r.error) throw r.error;
+        var ov = document.getElementById('cmpf-edit-ses-overlay'); if (ov) ov.remove();
+        showToast('Sesion actualizada', 'success');
+        cmPfCargarSesiones();
+    } catch (e) { showToast('Error: ' + e.message, 'error'); }
+}
+async function cmPfEliminarSesion(sessionId) {
+    if (!confirm('¿Eliminar esta sesion GPS y los datos de todos sus jugadores? Se archiva y deja de contar en informes y cargas.')) return;
+    try {
+        var r1 = await supabaseClient.from('cm_pf_gps_player_data').update({ archived: true, archived_at: new Date().toISOString() }).eq('session_id', sessionId);
+        if (r1.error) throw r1.error;
+        var r2 = await supabaseClient.from('cm_pf_gps_sessions').update({ archived: true, archived_at: new Date().toISOString() }).eq('id', sessionId);
+        if (r2.error) throw r2.error;
+        showToast('Sesion eliminada', 'success');
+        cmPfCargarSesiones();
+    } catch (e) { showToast('Error: ' + e.message, 'error'); }
 }
 
 async function cmPfVerSesionCompleta(sessionId) {
