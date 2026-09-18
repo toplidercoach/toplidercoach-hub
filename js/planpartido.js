@@ -2049,7 +2049,7 @@ async function ppGenerarDossierPDF(){
     var hasOur=!hayConfront&&PP_OUR_SECTIONS.some(function(s){return s.id&&ourPh[s.id]&&(ourPh[s.id].notes||(ourPh[s.id].media&&ourPh[s.id].media.length))});if(hasOur||(!hayConfront&&plan.our_formation))idx.push('Plan táctico propio');
     if(hayConfront)idx.push('Confrontación: ellos vs nosotros');
     var abp=ppGetAbpCards();if(abp.length)idx.push('Acciones a balón parado ('+abp.length+')');
-    var wm=plan.weekly_map||{},ob=plan.weekly_objectives||[];var dias=ppCalcularSemana();var hasWeek=ob.length||dias.some(function(d){return wm[d.md]});if(hasWeek)idx.push('Integración en la semana');
+    var wm=plan.weekly_map||{},ob=plan.weekly_objectives||[];var dias=ppCalcularSemana();var hasWeek=false;
     font(8,'bold',C.acc);doc.text('CONTENIDO',MG+20,222);
     font(9,'normal',C.ink);idx.forEach(function(t,i){doc.text((i+1)+'.  '+t,MG+20,230+i*6)});
     fill(C.dark);doc.rect(0,H-22,W,22,'F');fill(C.acc);doc.rect(0,H-22,W,1,'F');
@@ -2325,32 +2325,6 @@ async function ppGenerarDossierPDF(){
             else{var marcas=(c.marcas||[]).filter(function(m){return m.rival_idx||m.propio_id});if(marcas.length)rol('Marcas:',marcas.map(function(m){return (m.rival_idx?ppAbpPlayerName(m.rival_idx,jugR):'?')+' → '+(m.propio_id?ppAbpPlayerName(m.propio_id,jugP):'?')}).join('   |   '));PP_ABP_ROLES_DF.forEach(function(r){var pls=c['df_'+r]||[];if(pls.length)rol(PP_ABP_ROLES_DF_LABELS[r]+':',pls.map(function(pid){return ppAbpPlayerName(pid,jugP)}).join(', '))});if(c.df_barrera&&c.df_barrera.length)rol('Barrera:',c.df_barrera.map(function(pid){return ppAbpPlayerName(pid,jugP)}).join(', '))}
             if(c.explicacion){y+=1;para(c.explicacion,{size:8.5,indent:4,after:2})}
             y+=6;
-        }
-    }
-
-    // =============================================
-    // 6. INTEGRACION EN LA SEMANA
-    // =============================================
-    if(hasWeek){
-        newPage();section('Integración en la semana',C.acc);
-        var cw=CW/7;doc.setFontSize(6.5);
-        var orient=dias.map(function(d){return doc.splitTextToSize(String(wm[d.md]||''),cw-3)});
-        var maxL=Math.max(1,Math.max.apply(null,orient.map(function(o){return o.length})));var cellH=Math.min(60,4+maxL*2.9);
-        dias.forEach(function(d,i){var x=MG+i*cw;var esMD=d.md==='MD';fill(esMD?C.acc:C.dark);doc.rect(x,y,cw,11,'F');font(7.5,'bold',C.white);doc.text(d.md,x+cw/2,y+4.5,{align:'center'});font(6.5,'normal',esMD?C.dark:[203,213,225]);doc.text(d.dayName+' '+d.dayNum+'/'+d.month,x+cw/2,y+8.8,{align:'center'});
-            stroke(C.line);doc.setLineWidth(0.3);fill(esMD?[255,251,235]:C.white);doc.rect(x,y+11,cw,cellH,'FD');font(6.5,'normal',[50,50,60]);orient[i].forEach(function(ln,k){if(k*2.9+4<cellH)doc.text(ln,x+1.5,y+11+3.5+k*2.9)})});
-        y+=11+cellH+8;
-        if(ob.length){
-            sub('OBJETIVOS DE LA SEMANA ('+ob.length+')',C.dark);
-            ob.forEach(function(o,i){
-                var cont=PP_CONTENIDOS.find(function(cc){return cc.id===o.contenido});var cc=cont?hex(cont.color):C.gray;
-                checkSpace(12);fill(cc);doc.circle(MG+3.5,y+3,3,'F');font(7.5,'bold',C.white);doc.text(String(i+1),MG+3.5,y+4.1,{align:'center'});
-                font(9.5,'bold',C.dark);var ol=doc.splitTextToSize(o.text||'',CW-12);doc.text(ol[0]||'',MG+10,y+4.2);y+=6;for(var oi=1;oi<ol.length;oi++){checkSpace(4);doc.text(ol[oi],MG+10,y+2);y+=4}
-                var m2=[];if(cont)m2.push(cont.label);if(o.session_day)m2.push(o.session_day);if(o.ejercicios&&o.ejercicios.length)m2.push(o.ejercicios.length+' ejercicio'+(o.ejercicios.length>1?'s':''));
-                if(m2.length){font(7,'normal',C.gray);doc.text(m2.join('  |  '),MG+10,y+2);y+=4.5}
-                if(o.notas)para(o.notas,{size:8,style:'italic',indent:10,color:C.gray,after:1});
-                (o.ejercicios||[]).forEach(function(ej){checkSpace(4);font(7.5,'normal',C.purple);doc.text('›  '+ej.name+(ej.category?' ('+ej.category+')':''),MG+12,y+2.5);y+=4});
-                y+=3;
-            });
         }
     }
 
