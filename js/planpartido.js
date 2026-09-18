@@ -1123,6 +1123,71 @@ if(plan.rival_strengths||plan.rival_weaknesses){
 }
 
 // =============================================
+// ---- Campo dibujado en PDF (rival o propio) ----
+function pdfCampo(cx,cy,cw,ch,slots,resolver,color,titulo){
+    doc.setFillColor(22,101,52);doc.roundedRect(cx,cy,cw,ch,2,2,'F');
+    doc.setDrawColor(255,255,255);doc.setLineWidth(0.35);
+    doc.rect(cx+2,cy+2,cw-4,ch-4);
+    doc.line(cx+2,cy+ch/2,cx+cw-2,cy+ch/2);
+    doc.circle(cx+cw/2,cy+ch/2,ch*0.08,'S');
+    var aw=cw*0.5,ah=ch*0.13;
+    doc.rect(cx+(cw-aw)/2,cy+2,aw,ah);doc.rect(cx+(cw-aw)/2,cy+ch-2-ah,aw,ah);
+    var r=Math.max(2.4,Math.min(4.6,cw*0.045));
+    var fs=Math.max(4,Math.min(6.5,cw*0.062));
+    (slots||[]).forEach(function(s){
+        var jugs=resolver(s)||[];
+        var n=jugs.length;if(!n)return;
+        var px=cx+cw*s.x/100,py=cy+ch*s.y/100;
+        for(var k=0;k<n;k++){
+            var j=jugs[k];var ox=(k-(n-1)/2)*(r*2.3);
+            doc.setFillColor(color[0],color[1],color[2]);doc.setDrawColor(255,255,255);doc.setLineWidth(0.3);
+            doc.circle(px+ox,py,r,'FD');
+            doc.setTextColor(255,255,255);doc.setFontSize(fs);doc.setFont('helvetica','bold');
+            doc.text(String(j.number||''),px+ox,py+fs*0.12,{align:'center'});
+            doc.setFontSize(fs*0.85);doc.setFont('helvetica','normal');
+            var nm=String(j.name||'');var partes=nm.trim().split(' ');nm=partes.length>1?partes[partes.length-1]:nm;
+            if(nm.length>11)nm=nm.substring(0,10)+'.';
+            doc.text(nm,px+ox,py+r+fs*0.42,{align:'center'});
+        }
+    });
+    if(titulo){doc.setFontSize(6.5);doc.setFont('helvetica','bold');doc.setTextColor(255,255,255);doc.text(titulo,cx+cw/2,cy+ch-3.2,{align:'center'})}
+}
+
+// =============================================
+// ALINEACION PREVISTA DEL RIVAL + ULTIMOS PARTIDOS
+// =============================================
+var jgL=plan.rival_players||[];
+var slotsPrev=ppParseFormacion(plan.rival_formation);
+var luPrev=ppMigrarLineup((plan.weekly_map&&plan.weekly_map.rival_lineup)||{});
+var tienePrev=slotsPrev&&Object.keys(luPrev).some(function(k){return luPrev[k]&&luPrev[k].length});
+if(tienePrev){
+    checkSpace(112);
+    subHeader('ALINEACION PREVISTA — '+plan.rival_formation,cRed);
+    var cwP=90,chP=100;
+    pdfCampo(MG+(CW-cwP)/2,y,cwP,chP,slotsPrev,function(s){return (luPrev[s.slotId]||[]).map(function(i){return jgL[i]}).filter(Boolean)},cRed,'');
+    y+=chP+6;
+}
+var recPdf=(plan.weekly_map&&plan.weekly_map.rival_recent)||[];
+recPdf=recPdf.filter(function(r){return r.formation&&ppParseFormacion(r.formation)}).slice(0,3);
+if(recPdf.length){
+    checkSpace(90);
+    subHeader('ULTIMOS PARTIDOS DEL RIVAL',cRed);
+    var gap=4,cwR=(CW-gap*(recPdf.length-1))/recPdf.length,chR=Math.min(78,cwR*1.15);
+    recPdf.forEach(function(r,i){
+        var cx=MG+i*(cwR+gap);
+        var luR=ppMigrarLineup(r.lineup||{});
+        pdfCampo(cx,y,cwR,chR,ppParseFormacion(r.formation),function(s){return (luR[s.slotId]||[]).map(function(k){return jgL[k]}).filter(Boolean)},cRed,r.formation);
+        doc.setFontSize(7.5);doc.setFont('helvetica','bold');doc.setTextColor(cDark[0],cDark[1],cDark[2]);
+        var tit=(r.opponent?'vs '+r.opponent:'Partido '+(i+1))+(r.resultado?'  '+r.resultado:'');
+        doc.text(doc.splitTextToSize(tit,cwR)[0],cx+cwR/2,y+chR+4,{align:'center'});
+        doc.setFontSize(6.5);doc.setFont('helvetica','normal');doc.setTextColor(cGray[0],cGray[1],cGray[2]);
+        var sub=[r.fecha?r.fecha.split('-').reverse().join('/'):'',r.local==='visitante'?'Visitante':'Local'].filter(Boolean).join(' · ');
+        doc.text(sub,cx+cwR/2,y+chR+8,{align:'center'});
+    });
+    y+=chR+12;
+}
+
+// =============================================
 // JUGADORES
 // =============================================
 var jg=plan.rival_players||[];
@@ -1188,11 +1253,137 @@ if(jg.length){
 }
 
 // =============================================
+// NUESTRO PLAN: ALINEACION PROBABLE + CONVOCATORIA
+// =============================================
+var fPropia=String(par.formacion||'').trim();
+if(fPropia&&!/^1-/.test(fPropia))fPropia='1-'+fPropia;
+var slotsProp=ppParseFormacion(fPropia);
+var alSlots=Array.isArray(par.alineacion_slots)?par.alineacion_slots:[];
+var convo=Array.isArray(par.convocados)?par.convocados:[];
+var titu=Array.isArray(par.titulares)?par.titulares:[];
+var supl=Array.isArray(par.suplentes)?par.suplentes:[];
+var tieneAl=slotsProp&&alSlots.some(Boolean);
+if(tieneAl||convo.length){
+    newPage();miniHeader();y=26;
+    sectionHeader('NUESTRO PLAN'+(par.formacion?' — '+par.formacion:''),cBlue);
+    if(tieneAl){
+        var cwO=100,chO=110;
+        pdfCampo(MG+(CW-cwO)/2,y,cwO,chO,slotsProp,function(s){
+            var idx=slotsProp.indexOf(s);var pid=alSlots[idx];if(!pid)return[];
+            var j=(pp.plantilla||[]).find(function(x){return String(x.id)===String(pid)});
+            if(!j){var t=titu.find(function(x){return String(x.id)===String(pid)});if(t)j={number:t.shirt_number,name:t.name}}
+            return j?[j]:[];
+        },cBlue,'');
+        y+=chO+8;
+    }
+    if(convo.length){
+        var noConv=(pp.plantilla||[]).filter(function(p){return !convo.some(function(c){return String(c.id)===String(p.id)})});
+        var cols=[{t:'TITULARES ('+titu.length+')',c:cGreen,l:titu},{t:'SUPLENTES ('+supl.length+')',c:cAccent,l:supl},{t:'NO CONVOCADOS ('+noConv.length+')',c:cGray,l:noConv}];
+        var gapC=4,cwC=(CW-gapC*2)/3;
+        var maxN=Math.max.apply(null,cols.map(function(c){return c.l.length}));
+        checkSpace(12+maxN*4.2);
+        var y0=y;
+        cols.forEach(function(col,i){
+            var cx=MG+i*(cwC+gapC);var yy=y0;
+            doc.setFillColor(col.c[0],col.c[1],col.c[2]);doc.roundedRect(cx,yy,cwC,6,1.5,1.5,'F');
+            doc.setTextColor(255,255,255);doc.setFontSize(7.5);doc.setFont('helvetica','bold');doc.text(col.t,cx+3,yy+4.2);
+            yy+=9;
+            col.l.forEach(function(p,k){
+                var num=p.shirt_number!==undefined?p.shirt_number:p.number;
+                doc.setFillColor(k%2===0?241:255,k%2===0?245:255,k%2===0?249:255);doc.rect(cx,yy-3,cwC,4.2,'F');
+                doc.setFontSize(7.5);doc.setFont('helvetica','bold');doc.setTextColor(col.c[0],col.c[1],col.c[2]);
+                doc.text(num?String(num):'-',cx+2,yy);
+                doc.setFont('helvetica','normal');doc.setTextColor(40,40,50);
+                doc.text(doc.splitTextToSize(String(p.name||''),cwC-12)[0],cx+9,yy);
+                yy+=4.2;
+            });
+        });
+        y=y0+9+maxN*4.2+6;
+    }
+}
+
+// =============================================
+// CONFRONTACION: FASE RIVAL vs PLAN PROPIO
+// =============================================
+var pdfConfrontDone=false;
+(function(){
+    var fasesC=ppGetFases();var ourC=ppGetOurPhases();
+    var pares=[];var usadasC={};
+    fasesC.forEach(function(f){
+        var pid=(typeof ppPairDe==='function')?ppPairDe(f):null;
+        var sec=pid?ppSeccionPropia(pid):null;
+        var od=sec?(ourC[sec.id]||{}):null;
+        var tieneR=!!(f.notes||(f.media&&f.media.length));
+        var tieneN=!!(od&&(od.notes||(od.media&&od.media.length)));
+        if(sec)usadasC[sec.id]=true;
+        if(tieneR||tieneN)pares.push({f:f,sec:sec,od:od});
+    });
+    var sueltasC=PP_OUR_SECTIONS.filter(function(s){return !s.type&&!usadasC[s.id]&&ourC[s.id]&&(ourC[s.id].notes||(ourC[s.id].media&&ourC[s.id].media.length))});
+    if(!pares.some(function(p){return p.sec}))return;
+    pdfConfrontDone=true;
+    pdfConfrontPares=pares;pdfConfrontSueltas=sueltasC;
+})();
+var pdfConfrontPares,pdfConfrontSueltas;
+if(pdfConfrontDone){
+    newPage();miniHeader();y=26;
+    sectionHeader('CONFRONTACION — ELLOS vs NOSOTROS',cDark);
+    var gapK=4,cwK=(CW-gapK)/2,rxK=MG+cwK+gapK;
+    doc.setFontSize(8);doc.setFont('helvetica','bold');
+    doc.setTextColor(cRed[0],cRed[1],cRed[2]);doc.text('RIVAL: '+String(par.opponent||'').toUpperCase(),MG,y+3);
+    doc.setTextColor(cGreen[0],cGreen[1],cGreen[2]);doc.text('NOSOTROS',rxK,y+3);
+    y+=7;
+    function colTexto(txt,x,w,yy){
+        if(!txt)return yy;
+        doc.setFontSize(8);doc.setFont('helvetica','normal');doc.setTextColor(50,50,50);
+        var lines=doc.splitTextToSize(txt,w-6);
+        lines.forEach(function(ln){doc.text(ln,x+3,yy);yy+=3.6});
+        return yy+1;
+    }
+    async function colImagenes(media,x,w,yy){
+        var imgs=(media||[]).filter(function(m){return m.type==='image'&&m.url&&m.url.length>50}).slice(0,2);
+        for(var ii=0;ii<imgs.length;ii++){
+            try{var sz=await ppGetImgSize(imgs[ii].url);var ratio=sz.w/sz.h;var dw=w-6,dh=dw/ratio;if(dh>48){dh=48;dw=dh*ratio}
+                doc.addImage(imgs[ii].url,'JPEG',x+3,yy,dw,dh);yy+=dh+2}catch(e){}
+        }
+        return yy;
+    }
+    for(var pi=0;pi<pdfConfrontPares.length;pi++){
+        var pr=pdfConfrontPares[pi];
+        var nR=doc.splitTextToSize(pr.f.notes||'',cwK-6).length,nN=doc.splitTextToSize((pr.od&&pr.od.notes)||'',cwK-6).length;
+        var imR=(pr.f.media||[]).filter(function(m){return m.type==='image'}).length?50:0,imN=(pr.od&&pr.od.media||[]).filter(function(m){return m.type==='image'}).length?50:0;
+        var need=12+Math.max(nR*3.6+imR,nN*3.6+imN);
+        checkSpace(Math.min(need,120));
+        var yTop=y;
+        doc.setFillColor(cRed[0],cRed[1],cRed[2]);doc.roundedRect(MG,y,cwK,6,1.5,1.5,'F');
+        doc.setTextColor(255,255,255);doc.setFontSize(8);doc.setFont('helvetica','bold');doc.text(doc.splitTextToSize(pr.f.title,cwK-6)[0],MG+3,y+4.2);
+        doc.setFillColor(pr.sec?cGreen[0]:200,pr.sec?cGreen[1]:200,pr.sec?cGreen[2]:200);doc.roundedRect(rxK,y,cwK,6,1.5,1.5,'F');
+        doc.setTextColor(255,255,255);doc.text(pr.sec?doc.splitTextToSize(pr.sec.title,cwK-6)[0]:'(sin respuesta)',rxK+3,y+4.2);
+        var yR=y+9,yN=y+9;
+        yR=colTexto(pr.f.notes,MG,cwK,yR);yR=await colImagenes(pr.f.media,MG,cwK,yR);
+        if(pr.od){yN=colTexto(pr.od.notes,rxK,cwK,yN);yN=await colImagenes(pr.od.media,rxK,cwK,yN)}
+        y=Math.max(yR,yN)+3;
+        doc.setDrawColor(226,232,240);doc.setLineWidth(0.2);doc.line(MG,y,MG+CW,y);y+=3;
+    }
+    if(pdfConfrontSueltas.length){
+        checkSpace(14);
+        subHeader('OTROS APARTADOS PROPIOS',cGreen);
+        for(var si2=0;si2<pdfConfrontSueltas.length;si2++){
+            var sc=pdfConfrontSueltas[si2];var dd=ourC2(sc.id);
+            checkSpace(12);
+            doc.setFontSize(9);doc.setFont('helvetica','bold');doc.setTextColor(cGreen[0],cGreen[1],cGreen[2]);doc.text(sc.title+':',MG+6,y+3);y+=6;
+            if(dd.notes){textBlock(dd.notes,4)}
+            await addMediaImages(dd.media);
+        }
+    }
+}
+function ourC2(id){var o=ppGetOurPhases();return o[id]||{}}
+
+// =============================================
 // FASES DEL JUEGO RIVAL
 // =============================================
 var fa=plan.tactical_phases||[];
 var fasesConContenido=fa.filter(function(f){return f.notes||(f.media&&f.media.length)});
-if(fasesConContenido.length){
+if(fasesConContenido.length&&!pdfConfrontDone){
     checkSpace(14);
     sectionHeader('FASES DEL JUEGO RIVAL',cDark);
 
@@ -1220,7 +1411,7 @@ var ourPhases=ppGetOurPhases();
 var hasOur=false;
 PP_OUR_SECTIONS.forEach(function(sec){if(sec.id){var d=ourPhases[sec.id];if(d&&(d.notes||(d.media&&d.media.length)))hasOur=true}});
 
-if(hasOur){
+if(hasOur&&!pdfConfrontDone){
     checkSpace(14);
     sectionHeader('PLAN TACTICO PROPIO'+(plan.our_formation?' — '+plan.our_formation:''),cDark);
 
