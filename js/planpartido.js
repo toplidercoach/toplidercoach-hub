@@ -2024,8 +2024,30 @@ async function ppGenerarDossierPDF(){
     var idx=[];
     if(plan.rival_formation||plan.rival_style||plan.rival_strengths||plan.rival_weaknesses)idx.push('Scouting del rival');
     if(jg.length)idx.push('Jugadores rival ('+jg.length+')');
-    var fasesC=(plan.tactical_phases||[]).filter(function(f){return f.notes||(f.media&&f.media.length)});if(fasesC.length)idx.push('Fases del juego rival');
-    var ourPh=ppGetOurPhases();var hasOur=PP_OUR_SECTIONS.some(function(s){return s.id&&ourPh[s.id]&&(ourPh[s.id].notes||(ourPh[s.id].media&&ourPh[s.id].media.length))});if(hasOur||plan.our_formation)idx.push('Plan táctico propio');
+    var fasesC=(plan.tactical_phases||[]).filter(function(f){return f.notes||(f.media&&f.media.length)});
+    var ourPh=ppGetOurPhases();
+    // Nuestro plan (alineacion probable + convocatoria, desde el partido)
+    var fPropia=String(par.formacion||'').trim();if(fPropia&&!/^1-/.test(fPropia))fPropia='1-'+fPropia;
+    var slotsProp=ppParseFormacion(fPropia);
+    var alSlots=Array.isArray(par.alineacion_slots)?par.alineacion_slots:[];
+    var convo=Array.isArray(par.convocados)?par.convocados:[];
+    var titu=Array.isArray(par.titulares)?par.titulares:[];
+    var supl=Array.isArray(par.suplentes)?par.suplentes:[];
+    var tieneAl=!!(slotsProp&&alSlots.some(Boolean));
+    if(tieneAl||convo.length)idx.push('Nuestro plan');
+    // Estado fisico: sesiones de fisioterapia de lunes al dia del partido (solo si Club Mode tiene el modulo)
+    var fisioFilas=[];
+    if(typeof cmFisioEvoCalcular==='function'&&typeof cmFisioEvoLunes==='function'&&par.match_date){try{fisioFilas=await cmFisioEvoCalcular(cmFisioEvoLunes(par.match_date),par.match_date)}catch(e){fisioFilas=[]}}
+    if(fisioFilas.length)idx.push('Estado físico de la semana');
+    // Confrontacion (parejas fase rival <-> apartado propio)
+    var dosPares=[],dosUsadas={};
+    ppGetFases().forEach(function(f){var pid=(typeof ppPairDe==='function')?ppPairDe(f):null;var sec=pid?ppSeccionPropia(pid):null;var od=sec?(ourPh[sec.id]||{}):null;if(sec)dosUsadas[sec.id]=true;var tR=!!(f.notes||(f.media&&f.media.length)),tN=!!(od&&(od.notes||(od.media&&od.media.length)));if(tR||tN)dosPares.push({f:f,sec:sec,od:od})});
+    var dosSueltas=PP_OUR_SECTIONS.filter(function(s){return !s.type&&!dosUsadas[s.id]&&ourPh[s.id]&&(ourPh[s.id].notes||(ourPh[s.id].media&&ourPh[s.id].media.length))});
+    var hayConfront=dosPares.some(function(p){return p.sec});
+    if(hayConfront){fasesC=[]}
+    if(fasesC.length)idx.push('Fases del juego rival');
+    var hasOur=!hayConfront&&PP_OUR_SECTIONS.some(function(s){return s.id&&ourPh[s.id]&&(ourPh[s.id].notes||(ourPh[s.id].media&&ourPh[s.id].media.length))});if(hasOur||(!hayConfront&&plan.our_formation))idx.push('Plan táctico propio');
+    if(hayConfront)idx.push('Confrontación: ellos vs nosotros');
     var abp=ppGetAbpCards();if(abp.length)idx.push('Acciones a balón parado ('+abp.length+')');
     var wm=plan.weekly_map||{},ob=plan.weekly_objectives||[];var dias=ppCalcularSemana();var hasWeek=ob.length||dias.some(function(d){return wm[d.md]});if(hasWeek)idx.push('Integración en la semana');
     font(8,'bold',C.acc);doc.text('CONTENIDO',MG+20,222);
@@ -2066,6 +2088,22 @@ async function ppGenerarDossierPDF(){
             drawPitch(MG+(CW-pw)/2,y,pw,ph,slots,(wm.rival_lineup)||{},fotosRedondas);
             y+=ph+8;
         }
+        // Ultimos partidos del rival (hasta 3)
+        var recD=(wm.rival_recent||[]).filter(function(r){return r.formation&&ppParseFormacion(r.formation)}).slice(0,3);
+        if(recD.length){
+            var gapR=5,pwR=(CW-gapR*(recD.length-1))/recD.length,phR=pwR*105/68;
+            checkSpace(phR+22);
+            sub('Últimos partidos del rival',C.dark);
+            recD.forEach(function(r,i){
+                var rx=MG+i*(pwR+gapR);
+                drawPitch(rx,y,pwR,phR,ppParseFormacion(r.formation),r.lineup||{},fotosRedondas);
+                font(8,'bold',C.dark);var tit=(r.opponent?'vs '+r.opponent:'Partido '+(i+1))+(r.resultado?'   '+r.resultado:'');
+                doc.text(doc.splitTextToSize(tit,pwR)[0],rx+pwR/2,y+phR+4.5,{align:'center'});
+                font(7,'normal',C.gray);var subt=[r.formation,r.fecha?r.fecha.split('-').reverse().join('/'):'',r.local==='visitante'?'Visitante':'Local'].filter(Boolean).join(' · ');
+                doc.text(subt,rx+pwR/2,y+phR+8.5,{align:'center'});
+            });
+            y+=phR+13;
+        }
     }
 
     // =============================================
@@ -2102,6 +2140,141 @@ async function ppGenerarDossierPDF(){
         });
         var sinPos=[];jg.forEach(function(j,i){var en=false;Object.keys(PP_LINEAS).forEach(function(k){if(PP_LINEAS[k].posiciones.indexOf(j.position)>=0)en=true});if(!en)sinPos.push({j:j,i:i})});
         if(sinPos.length){checkSpace(38);sub('SIN POSICIÓN ('+sinPos.length+')',C.gray);for(var k2=0;k2<sinPos.length;k2+=2){var a2=sinPos[k2],b2=sinPos[k2+1];var m1=altoCard(a2.j),m2=b2?altoCard(b2.j):null;var rh2=Math.max(m1.h,m2?m2.h:0);checkSpace(rh2+4);m1.h=rh2;if(m2)m2.h=rh2;card(a2.j,a2.i,MG,y,C.gray,m1);if(b2)card(b2.j,b2.i,MG+colW+6,y,C.gray,m2);y+=rh2+4}}
+    }
+
+    // =============================================
+     // 2b. NUESTRO PLAN (alineacion probable + convocatoria)
+    // =============================================
+    function drawPitchPropio(px,py,pw,ph,slots,slotIds,fotos){
+        fill([22,163,74]);doc.roundedRect(px,py,pw,ph,2,2,'F');
+        fill([21,128,61]);for(var b=0;b<6;b+=2){doc.rect(px,py+ph*b/6,pw,ph/6,'F')}
+        stroke([255,255,255]);doc.setLineWidth(0.35);
+        doc.roundedRect(px,py,pw,ph,2,2,'S');doc.line(px,py+ph/2,px+pw,py+ph/2);doc.circle(px+pw/2,py+ph/2,ph*0.09,'S');
+        var aw=pw*0.55,ah=ph*0.16,gw=pw*0.26,gh=ph*0.06;
+        doc.rect(px+(pw-aw)/2,py,aw,ah,'S');doc.rect(px+(pw-gw)/2,py,gw,gh,'S');
+        doc.rect(px+(pw-aw)/2,py+ph-ah,aw,ah,'S');doc.rect(px+(pw-gw)/2,py+ph-gh,gw,gh,'S');
+        var R=pw*0.045;
+        slots.forEach(function(s,i){
+            var cx=px+pw*s.x/100,cy=py+ph*s.y/100;
+            var pid=slotIds[i]?String(slotIds[i]):null;
+            var p=pid?plantilla.find(function(x){return String(x.id)===pid}):null;
+            if(!p&&pid){var t=titu.find(function(x){return String(x.id)===pid});if(t)p={id:pid,number:t.shirt_number,name:t.name}}
+            if(!p){fill([255,255,255]);doc.setGState&&doc.setGState(new doc.GState({opacity:0.35}));doc.circle(cx,cy,R*0.8,'F');doc.setGState&&doc.setGState(new doc.GState({opacity:1}));return}
+            var bg=s.lineIdx===0?[217,119,6]:[124,58,237];
+            fill([255,255,255]);doc.circle(cx,cy,R+0.6,'F');fill(bg);doc.circle(cx,cy,R,'F');
+            var f=fotos[pid];
+            if(f){try{doc.addImage(f,'PNG',cx-R,cy-R,R*2,R*2);stroke([255,255,255]);doc.setLineWidth(0.5);doc.circle(cx,cy,R,'S')}catch(e){f=null}}
+            if(!f){font(R*2.2,'bold',C.white);doc.text(String(p.number||'?'),cx,cy+R*0.75,{align:'center'})}
+            else if(p.number){fill(C.dark);doc.circle(cx+R*0.75,cy+R*0.75,R*0.45,'F');font(R*1.1,'bold',C.acc);doc.text(String(p.number),cx+R*0.75,cy+R*0.75+R*0.38,{align:'center'})}
+            var nm=nombreCorto(p.name);font(6,'bold',C.white);var tw=doc.getTextWidth(nm)+2.4;fill(C.dark);doc.roundedRect(cx-tw/2,cy+R+0.8,tw,3.6,0.8,0.8,'F');doc.text(nm,cx,cy+R+3.4,{align:'center'});
+        });
+    }
+    if(idx.indexOf('Nuestro plan')>=0){
+        newPage();section('Nuestro plan'+(par.formacion?' — '+par.formacion:''),C.blue);
+        if(tieneAl){
+            var fotosProp={};
+            for(var fp=0;fp<alSlots.length;fp++){var pidF=alSlots[fp]?String(alSlots[fp]):null;if(pidF&&fotosPropias[pidF]){try{fotosProp[pidF]=await ppDossierRound(fotosPropias[pidF])}catch(e){}}}
+            var pwO=100,phO=pwO*105/68;checkSpace(phO+14);
+            sub('Alineación probable — '+par.formacion,C.dark);
+            drawPitchPropio(MG+(CW-pwO)/2,y,pwO,phO,slotsProp,alSlots,fotosProp);
+            y+=phO+8;
+        }
+        if(convo.length){
+            var noConv=plantilla.filter(function(p){return !convo.some(function(c){return String(c.id)===String(p.id)})});
+            var colsC=[{t:'TITULARES ('+titu.length+')',c:C.green,l:titu},{t:'SUPLENTES ('+supl.length+')',c:C.acc,l:supl},{t:'NO CONVOCADOS ('+noConv.length+')',c:C.gray,l:noConv}];
+            var gapC=5,cwC=(CW-gapC*2)/3,maxN=Math.max.apply(null,colsC.map(function(c){return c.l.length}));
+            checkSpace(14+maxN*4.6);
+            var y0=y;
+            colsC.forEach(function(col,i){
+                var cx=MG+i*(cwC+gapC),yy=y0;
+                fill(col.c);doc.roundedRect(cx,yy,cwC,6.5,1.5,1.5,'F');font(8,'bold',C.white);doc.text(col.t,cx+3,yy+4.5);
+                yy+=10;
+                col.l.forEach(function(p,k){
+                    var num=p.shirt_number!==undefined?p.shirt_number:p.number;
+                    if(k%2===0){fill(C.light);doc.rect(cx,yy-3.2,cwC,4.6,'F')}
+                    font(8,'bold',col.c);doc.text(num?String(num):'-',cx+2,yy);
+                    font(8,'normal',[50,50,60]);doc.text(doc.splitTextToSize(String(p.name||''),cwC-13)[0],cx+10,yy);
+                    yy+=4.6;
+                });
+            });
+            y=y0+10+maxN*4.6+6;
+        }
+    }
+
+    // =============================================
+    // 2b-bis. ESTADO FISICO DE LA SEMANA (fisioterapia, lunes -> partido)
+    // =============================================
+    if(fisioFilas.length){
+        newPage();section('Estado físico de la semana',C.red);
+        var fLunes=cmFisioEvoLunes(par.match_date);
+        font(9,'normal',C.gray);doc.text('Sesiones de fisioterapia del lunes '+fLunes.split('-').reverse().slice(0,2).join('/')+' al '+par.match_date.split('-').reverse().slice(0,2).join('/')+' · dolor primera → última sesión (0–10)',MG,y+3);y+=9;
+        var recLabF={apto:'Apto',limitado:'Limitado',no_disponible:'No disponible'},dispLabF={green:'Disponible',amber:'Duda',red:'Baja'},tendLabF={mejora:'Mejora',empeora:'Empeora',estable:'Estable',na:'-'};
+        var nDisp=fisioFilas.filter(function(f){return f.rec==='no_disponible'||f.disponibilidad==='red'}).length;
+        var statsF=[[String(fisioFilas.length),'Jugadores tratados'],[String(fisioFilas.reduce(function(a,f){return a+f.n},0)),'Sesiones'],[String(fisioFilas.filter(function(f){return f.tendencia==='mejora'}).length),'Mejoran'],[String(nDisp),'No disponibles']];
+        var swF=(CW-9)/4;
+        statsF.forEach(function(s,i){var x=MG+i*(swF+3);fill(C.light);doc.roundedRect(x,y,swF,15,2,2,'F');font(13,'bold',C.red);doc.text(s[0],x+swF/2,y+7.5,{align:'center'});font(7.5,'normal',C.gray);doc.text(s[1],x+swF/2,y+12.5,{align:'center'})});
+        y+=21;
+        for(var fi2=0;fi2<fisioFilas.length;fi2++){
+            var f=fisioFilas[fi2];
+            var notaL=f.nota?doc.splitTextToSize(f.nota,CW-30):[];
+            var altoF=17+(f.tecnicas.length?5:0)+(notaL.length?notaL.length*4+5:0);
+            checkSpace(altoF+4);
+            var cF=f.disponibilidad==='red'?C.red:f.disponibilidad==='amber'?C.acc:C.green;
+            fill(C.light);doc.roundedRect(MG,y,CW,altoF,2,2,'F');fill(cF);doc.rect(MG,y,2,altoF,'F');
+            var fotoF=null;try{if(f.photo){var dF=await ppDossierImg(f.photo);if(dF)fotoF=await ppDossierRound(dF)}}catch(e){}
+            if(fotoF){try{doc.addImage(fotoF,'PNG',MG+5,y+3,11,11)}catch(e){fotoF=null}}
+            var xF=MG+(fotoF?19:5);
+            font(11,'bold',C.dark);doc.text(f.name+(f.pos?'  ·  '+f.pos:''),xF,y+7);
+            font(8,'normal',C.gray);doc.text((f.tratamiento?f.tratamiento.title+'  ·  ':'')+f.n+' ses. ('+f.sesiones.map(function(s){return s.session_date.split('-').reverse().slice(0,2).join('/')}).join(', ')+')',xF,y+12);
+            var tcF=f.tendencia==='mejora'?C.green:f.tendencia==='empeora'?C.red:C.acc;
+            font(10,'bold',C.ink);doc.text('Dolor '+(f.primero!==null?f.primero:'-')+' → '+(f.ultimo!==null?f.ultimo:'-'),W-MG-4,y+7,{align:'right'});
+            font(8,'bold',tcF);doc.text(tendLabF[f.tendencia]+(f.disponibilidad?'  ·  '+dispLabF[f.disponibilidad]:'')+(f.rec?'  ·  Fisio: '+recLabF[f.rec]:''),W-MG-4,y+12,{align:'right'});
+            var yyF=y+17;
+            if(f.tecnicas.length){font(7.5,'normal',[20,150,136]);doc.text('Técnicas: '+f.tecnicas.join(', '),xF,yyF);yyF+=5}
+            if(notaL.length){font(7,'bold',C.gray);doc.text('NOTA DEL FISIO PARA EL ENTRENADOR',xF,yyF);yyF+=4;font(8.5,'normal',C.ink);notaL.forEach(function(l){doc.text(l,xF,yyF);yyF+=4})}
+            y+=altoF+4;
+        }
+    }
+
+    // =============================================
+    // 2c. CONFRONTACION: ELLOS vs NOSOTROS
+    // =============================================
+    if(hayConfront){
+        newPage();section('Confrontación: ellos vs nosotros',C.dark);
+        var gapK=5,cwK=(CW-gapK)/2,rxK=MG+cwK+gapK;
+        font(8,'bold',C.red);doc.text('RIVAL: '+rivalNom.toUpperCase(),MG,y+3);
+        font(8,'bold',C.green);doc.text('NOSOTROS: '+miEq.toUpperCase(),rxK,y+3);y+=8;
+        function colTxt(t,x,w,yy){if(!t)return yy;font(8.5,'normal',[50,50,60]);var lns=doc.splitTextToSize(t,w-2);lns.forEach(function(ln){doc.text(ln,x+1,yy);yy+=3.8});return yy+1}
+        async function colImg(media,x,w,yy){
+            var imgs=(media||[]).filter(function(m){return m.type==='image'&&m.url}).slice(0,2);
+            for(var ii=0;ii<imgs.length;ii++){
+                try{var d=await ppDossierImg(imgs[ii].url);if(!d)continue;var sz=await ppGetImgSize(d);var r=sz.w/sz.h;var dw=w-2,dh=dw/r;if(dh>46){dh=46;dw=dh*r}
+                    fill(C.light);stroke(C.line);doc.setLineWidth(0.3);doc.roundedRect(x,yy,w,dh+2,1.5,1.5,'FD');
+                    doc.addImage(d,ppDossierFmt(d),x+(w-dw)/2,yy+1,dw,dh);yy+=dh+4}catch(e){}
+            }
+            return yy;
+        }
+        for(var pk=0;pk<dosPares.length;pk++){
+            var pr=dosPares[pk];
+            var nR=doc.splitTextToSize(pr.f.notes||'',cwK-2).length,nN=doc.splitTextToSize((pr.od&&pr.od.notes)||'',cwK-2).length;
+            var iR=(pr.f.media||[]).some(function(m){return m.type==='image'})?50:0,iN=(pr.od&&(pr.od.media||[]).some(function(m){return m.type==='image'}))?50:0;
+            checkSpace(Math.min(14+Math.max(nR*3.8+iR,nN*3.8+iN),130));
+            fill(C.red);doc.roundedRect(MG,y,cwK,6.5,1.5,1.5,'F');font(8,'bold',C.white);doc.text(doc.splitTextToSize(pr.f.title,cwK-4)[0],MG+2,y+4.5);
+            fill(pr.sec?C.green:C.gray);doc.roundedRect(rxK,y,cwK,6.5,1.5,1.5,'F');font(8,'bold',C.white);doc.text(pr.sec?doc.splitTextToSize(pr.sec.title,cwK-4)[0]:'(sin respuesta)',rxK+2,y+4.5);
+            var yR=y+11,yN=y+11;
+            yR=colTxt(pr.f.notes,MG,cwK,yR);yR=await colImg(pr.f.media,MG,cwK,yR);
+            if(pr.od){yN=colTxt(pr.od.notes,rxK,cwK,yN);yN=await colImg(pr.od.media,rxK,cwK,yN)}
+            y=Math.max(yR,yN)+3;stroke(C.line);doc.setLineWidth(0.3);doc.line(MG,y,W-MG,y);y+=4;
+        }
+        if(dosSueltas.length){
+            checkSpace(16);sub('Otros apartados propios',C.green);
+            for(var sk=0;sk<dosSueltas.length;sk++){
+                var sc=dosSueltas[sk],dd2=ourPh[sc.id]||{};
+                checkSpace(12);font(10,'bold',hex(sc.color));doc.text(sc.title,MG+2,y+4);y+=7;
+                para(dd2.notes,{size:9,indent:2,after:3});
+                await thumbsRow(dd2.media,3,36);
+            }
+        }
     }
 
     // =============================================

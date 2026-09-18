@@ -190,6 +190,7 @@ function cmFisioRenderPanel(container) {
             '<div style="display:flex;gap:8px">' +
                 '<button class="cmfisio-btn cmfisio-btn-secondary cmfisio-btn-sm" id="cmfisio-btn-calendario" onclick="if(typeof cmFisioCalToggleVista===\'function\')cmFisioCalToggleVista()">Calendario</button>' +
                 '<button class="cmfisio-btn cmfisio-btn-primary cmfisio-btn-sm" onclick="cmFisioGenerarInformeDiario()">Informe diario</button>' +
+                '<button class="cmfisio-btn cmfisio-btn-primary cmfisio-btn-sm" onclick="cmFisioInformeSemana()">📈 Evolución semana</button>' +
             '</div>' +
         '</div>' +
         '<div class="cmfisio-stats-bar" id="cmfisio-stats-bar">' +
