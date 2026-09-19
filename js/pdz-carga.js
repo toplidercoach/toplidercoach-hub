@@ -153,7 +153,7 @@ async function pdzCargaMicro(periodo) {
         }
 
         // Entrega 3: perfil de rendimiento en partido (proyectado a 90') y bandas MD de la config
-        var perfil = {}, perfilEquipo = null, bandas = null, tolerancia = 10;
+        var perfil = {}, perfilEquipo = null, bandas = null, tolerancia = 10, minRec = 45;
         try {
             var { data: pf } = await supabaseClient.from('cm_pf_perfil_partido').select('player_id, n_partidos, n_reales, pct_real, total_distance_90, hsr_90, sprint_90, accel_90, decel_90, player_load_90').eq('club_id', clubId);
             var acc = { td: [], hsr: [], sprint: [], accdec: [], pl: [] };
@@ -175,12 +175,23 @@ async function pdzCargaMicro(periodo) {
             Object.keys(acc).forEach(function(k) { perfilEquipo[k] = acc[k].length ? acc[k].reduce(function(a, b) { return a + b; }, 0) / acc[k].length : 0; });
         } catch (ePf) { console.warn('Perfil de partido no disponible:', ePf); }
         try {
-            var { data: cfg } = await supabaseClient.from('cm_pf_gps_config').select('md_bands, md_tolerancia').eq('club_id', clubId).maybeSingle();
-            if (cfg && cfg.md_bands) { bandas = cfg.md_bands; tolerancia = cfg.md_tolerancia || 10; }
+            var { data: cfg } = await supabaseClient.from('cm_pf_gps_config').select('md_bands, md_tolerancia, md_min_recuperacion').eq('club_id', clubId).maybeSingle();
+            if (cfg && cfg.md_bands) { bandas = cfg.md_bands; tolerancia = cfg.md_tolerancia || 10; minRec = cfg.md_min_recuperacion || 45; }
         } catch (eCfg) { console.warn('Config GPS no disponible:', eCfg); }
 
         // Etiqueta MD de cada dia: MD (partido), MD+1 (dia despues), MD-n (dias antes del siguiente partido)
         var fechasMatch = partidos.map(function(p) { return p.match_date; });
+        var fechaPrevia = null;
+        var minPartido = {};
+        try {
+            var { data: ant } = await supabaseClient.from('matches').select('id, match_date').eq('club_id', clubId).lt('match_date', periodo.date_start).order('match_date', { ascending: false }).limit(1);
+            if (ant && ant.length) {
+                fechaPrevia = ant[0].match_date;
+                fechasMatch.push(fechaPrevia);
+                var { data: mpsAnt } = await supabaseClient.from('match_player_stats').select('player_id, minutes_played').eq('match_id', ant[0].id);
+                (mpsAnt || []).forEach(function(x) { if (x.minutes_played !== null && x.minutes_played !== undefined) { if (!minPartido[x.player_id]) minPartido[x.player_id] = {}; minPartido[x.player_id][fechaPrevia] = x.minutes_played; } });
+            }
+        } catch (eAnt) {}
         try {
             var { data: sig } = await supabaseClient.from('matches').select('match_date').eq('club_id', clubId).gt('match_date', periodo.date_end).order('match_date', { ascending: true }).limit(1);
             if (sig && sig.length) fechasMatch.push(sig[0].match_date);
@@ -200,6 +211,7 @@ async function pdzCargaMicro(periodo) {
             var dNext = next === null ? null : Math.round(next / 864e5);
             if (dPrev === 0) mdLabel[f] = 'MD';
             else if (dPrev === 1) mdLabel[f] = 'MD+1';
+            else if (dPrev === 2) mdLabel[f] = 'MD+2';
             else if (dNext !== null && dNext <= 6) mdLabel[f] = 'MD-' + dNext;
             else if (dPrev !== null && dPrev <= 3) mdLabel[f] = 'MD+' + dPrev;
             else mdLabel[f] = '';
@@ -237,7 +249,7 @@ async function pdzCargaMicro(periodo) {
         });
 
         // Interna: partidos. Minutos: match_player_stats > duracion_real > 90. RPE: jugador > staff
-        var mpsMap = {}, minPartido = {};
+        var mpsMap = {};
         mps.forEach(function(m) {
             mpsMap[m.match_id + '|' + m.player_id] = m;
             var p = parMap[m.match_id];
@@ -284,7 +296,7 @@ async function pdzCargaMicro(periodo) {
             c.gpsReal = true;
         });
 
-        pdzCg.datos = { dias: dias, jugadores: jugadores, datos: datos, fechasPartido: fechasPartido, hayGps: gpsRows.length > 0, minPartido: minPartido, gemelos: gemelos, perfil: perfil, perfilEquipo: perfilEquipo, bandas: bandas, tolerancia: tolerancia, mdLabel: mdLabel };
+        pdzCg.datos = { dias: dias, jugadores: jugadores, datos: datos, fechasPartido: fechasPartido, hayGps: gpsRows.length > 0, minPartido: minPartido, gemelos: gemelos, perfil: perfil, perfilEquipo: perfilEquipo, bandas: bandas, tolerancia: tolerancia, minRec: minRec, mdLabel: mdLabel, fechaPrevia: fechaPrevia };
         pdzCgRender();
     } catch (err) {
         console.error('Error carga micro:', err);
@@ -354,12 +366,14 @@ function pdzCgRender() {
         if (!bandas || !esExterna) return null;
         var lab = D.mdLabel[f] || '';
         if (!lab || lab === 'MD') return null;
-        if (lab === 'MD+1' && jid) {
-            var fPrev = null;
-            D.dias.forEach(function(x) { if (D.fechasPartido[x] && x < f) fPrev = x; });
-            var min = fPrev ? (D.minPartido[jid] || {})[fPrev] : undefined;
-            if (min !== undefined && min < 30 && bandas['MD+1C']) return bandas['MD+1C'][m] || null;
+        if (f === diaPost) {
+            if (!jid) return null;
+            var gp = grupoPost(jid, f);
+            if (gp === 'R') return bandas['MD+1'] ? (bandas['MD+1'][m] || null) : null;
+            if (gp === 'C') return bandas['MD+1C'] ? (bandas['MD+1C'][m] || null) : null;
+            return null;
         }
+        if (lab === 'MD+1' || lab === 'MD+2') return null;
         var b = bandas[lab];
         return b ? (b[m] || null) : null;
     }
@@ -371,6 +385,28 @@ function pdzCgRender() {
         return 'rojo';
     }
     var SEM_COLOR = { ok: '#22c55e', ambar: '#f59e0b', rojo: '#ef4444' };
+    // Dia post-partido: primera fecha con etiqueta MD+1/MD+2 y algun dato real de la metrica
+    var diaPost = null;
+    D.dias.forEach(function(f) {
+        if (diaPost) return;
+        var lab = D.mdLabel[f] || '';
+        if (lab !== 'MD+1' && lab !== 'MD+2') return;
+        var hay = D.jugadores.some(function(j) { var c = (D.datos[j.id] || {})[f]; return c && c[m] > 0; });
+        if (hay) diaPost = f;
+    });
+    function fechaPartidoPrevio(f) {
+        var fp = D.fechaPrevia || null;
+        D.dias.forEach(function(x) { if (D.fechasPartido[x] && x < f) fp = x; });
+        return fp;
+    }
+    // 'R' (recuperacion), 'C' (compensatorio) o null si no hay minutos registrados
+    function grupoPost(jid, f) {
+        var fp = fechaPartidoPrevio(f);
+        if (!fp) return null;
+        var min = (D.minPartido[jid] || {})[fp];
+        if (min === undefined || min === null) return null;
+        return min >= (D.minRec || 45) ? 'R' : 'C';
+    }
     // Objetivo en unidades reales: [min,max] = banda% x referencia. Delta = 0 dentro de banda, negativo si falta, positivo si sobra.
     function objetivo(banda, ref) { return (banda && ref > 0) ? [banda[0] / 100 * ref, banda[1] / 100 * ref] : null; }
     function delta(v, obj) { if (!obj) return null; if (v < obj[0]) return v - obj[0]; if (v > obj[1]) return v - obj[1]; return 0; }
@@ -384,7 +420,7 @@ function pdzCgRender() {
         if (d !== null) h += '<div style="font-size:9px;color:' + (d === 0 ? '#22c55e' : (d < 0 ? '#f87171' : '#fbbf24')) + '" title="' + tit + '">' + (d === 0 ? 'ok' : fmtDelta(d)) + '</div>';
         return h;
     }
-    function diaSemana(f) { var lab = D.mdLabel[f] || ''; return /^MD-\d$/.test(lab); }
+    function diaSemana(f) { return !D.fechasPartido[f]; }
 
     // ---- Cabecera: metricas + boton gemelos ----
     var html = '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px">';
@@ -432,8 +468,17 @@ function pdzCgRender() {
         html += '<tr style="background:#0b2a3a;border-top:1px solid #1e3a5f">';
         html += '<td style="padding:5px 10px;color:#38bdf8;font-size:10px;font-weight:600;position:sticky;left:0;background:#0b2a3a">Objetivo equipo</td>';
         D.dias.forEach(function(f) {
-            var obj = objetivo(bandaDe(f, null), refEquipo);
-            html += '<td style="padding:4px 4px;text-align:center;font-size:9px;color:#38bdf8">' + (obj ? pdzCgFmt(obj[0], conf.dec) + '<br>' + pdzCgFmt(obj[1], conf.dec) : '') + '</td>';
+            var cel = '';
+            if (f === diaPost) {
+                var oR = bandas['MD+1'] && bandas['MD+1'][m] ? objetivo(bandas['MD+1'][m], refEquipo) : null;
+                var oC = bandas['MD+1C'] && bandas['MD+1C'][m] ? objetivo(bandas['MD+1C'][m], refEquipo) : null;
+                if (oR) cel += '<span title="Recuperacion (jugaron >= ' + (D.minRec || 45) + ' min)">R ' + pdzCgFmt(oR[0], conf.dec) + '-' + pdzCgFmt(oR[1], conf.dec) + '</span><br>';
+                if (oC) cel += '<span style="color:#fbbf24" title="Compensatorio (jugaron < ' + (D.minRec || 45) + ' min)">C ' + pdzCgFmt(oC[0], conf.dec) + '-' + pdzCgFmt(oC[1], conf.dec) + '</span>';
+            } else {
+                var obj = objetivo(bandaDe(f, null), refEquipo);
+                if (obj) cel = pdzCgFmt(obj[0], conf.dec) + '<br>' + pdzCgFmt(obj[1], conf.dec);
+            }
+            html += '<td style="padding:4px 4px;text-align:center;font-size:9px;color:#38bdf8;white-space:nowrap">' + cel + '</td>';
         });
         var objSem = bandas.SEMANA && bandas.SEMANA[m] ? objetivo(bandas.SEMANA[m], refEquipo) : null;
         html += '<td style="padding:4px 8px;text-align:center;font-size:9px;color:#38bdf8">' + (objSem ? pdzCgFmt(objSem[0], conf.dec) + '<br>' + pdzCgFmt(objSem[1], conf.dec) : '') + '</td>';
@@ -476,6 +521,7 @@ function pdzCgRender() {
                 var banda = bandaDe(f, j.id);
                 sem = semaforo(pctV, banda);
                 pct = pctHtml(pctV, sem, refEs !== 'propia', banda, v, ref);
+                if (f === diaPost) { var gp = grupoPost(j.id, f); pct = '<div style="font-size:8px;color:' + (gp === 'C' ? '#fbbf24' : (gp === 'R' ? '#38bdf8' : '#64748b')) + '">' + (gp === 'C' ? 'COMP.' : (gp === 'R' ? 'RECUP.' : 'sin min.')) + '</div>' + pct; }
                 if (diaSemana(f) && !r.est) { semanaPct += pctV; semanaDias++; semanaVal += v; }
             }
             var titulo = r.est ? 'Estimado por gemelo (' + (gemelo ? gemelo.nombre : '') + ')' : (!esExterna && r.rpe !== null ? 'RPE ' + r.rpe : '');
@@ -537,7 +583,7 @@ function pdzCgRender() {
         if (bandas) {
             var bl = [];
             ['MD-4','MD-3','MD-2','MD-1','MD+1','MD+1C','SEMANA'].forEach(function(k) { if (bandas[k] && bandas[k][m]) bl.push('<span style="color:#38bdf8">' + (k === 'MD+1C' ? 'MD+1 comp.' : k) + '</span> ' + bandas[k][m][0] + '-' + bandas[k][m][1] + '%'); });
-            leyenda += '<br>Semaforo: <span style="color:' + SEM_COLOR.ok + '">●</span> dentro de la banda del dia &middot; <span style="color:' + SEM_COLOR.ambar + '">●</span> hasta ' + tol + ' puntos fuera &middot; <span style="color:' + SEM_COLOR.rojo + '">●</span> mas alla. Bandas (' + conf.label + '): ' + bl.join(' &middot; ') + '. MD+1: recuperacion si jugo >= 60\', compensatorio si jugo < 30\'. Debajo del %: <span style="color:#f87171">−</span> lo que falta / <span style="color:#fbbf24">+</span> lo que sobra respecto al objetivo del dia (pasa el raton para ver el objetivo). SEMANA = suma de todos los dias de entrenamiento antes del partido.';
+            leyenda += '<br>Semaforo: <span style="color:' + SEM_COLOR.ok + '">●</span> dentro de la banda del dia &middot; <span style="color:' + SEM_COLOR.ambar + '">●</span> hasta ' + tol + ' puntos fuera &middot; <span style="color:' + SEM_COLOR.rojo + '">●</span> mas alla. Bandas (' + conf.label + '): ' + bl.join(' &middot; ') + '. Primera sesion tras el partido (MD+1 o MD+2): RECUP. si jugo >= ' + (D.minRec || 45) + '\' (banda recuperacion), COMP. si jugo menos (banda compensatoria), sin semaforo si no hay minutos registrados; ese dia la media del equipo no lleva semaforo porque mezcla los dos grupos. Debajo del %: <span style="color:#f87171">−</span> lo que falta / <span style="color:#fbbf24">+</span> lo que sobra respecto al objetivo del dia (pasa el raton para ver el objetivo). SEMANA = suma de todos los dias de entrenamiento antes del partido.';
         }
     } else {
         leyenda += 'sRPE = RPE del jugador x minutos (sesion: duracion real; partido: minutos jugados). Pasa el raton por una celda para ver el RPE. El % es respecto al partido del propio jugador (>= ' + MIN_PARTIDO_COMPLETO + ' min); si no lo tiene, respecto a la media del equipo (<span style="color:#a78bfa">≈morado</span>).'
