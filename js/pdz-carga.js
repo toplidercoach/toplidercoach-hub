@@ -371,12 +371,20 @@ function pdzCgRender() {
         return 'rojo';
     }
     var SEM_COLOR = { ok: '#22c55e', ambar: '#f59e0b', rojo: '#ef4444' };
-    function pctHtml(pct, sem, esEquipo, banda) {
+    // Objetivo en unidades reales: [min,max] = banda% x referencia. Delta = 0 dentro de banda, negativo si falta, positivo si sobra.
+    function objetivo(banda, ref) { return (banda && ref > 0) ? [banda[0] / 100 * ref, banda[1] / 100 * ref] : null; }
+    function delta(v, obj) { if (!obj) return null; if (v < obj[0]) return v - obj[0]; if (v > obj[1]) return v - obj[1]; return 0; }
+    function fmtDelta(d) { return (d > 0 ? '+' : (d < 0 ? '−' : '')) + pdzCgFmt(Math.abs(d), conf.dec); }
+    function pctHtml(pct, sem, esEquipo, banda, v, ref) {
         var col = sem ? SEM_COLOR[sem] : (esEquipo ? '#a78bfa' : '#94a3b8');
-        var tit = banda ? 'Banda ' + (D.mdLabel ? '' : '') + banda[0] + '-' + banda[1] + '%' : '';
-        return '<div style="font-size:9px;color:' + col + ';font-weight:' + (sem === 'rojo' ? '700' : '400') + '" title="' + tit + '">' + (esEquipo ? '≈' : '') + Math.round(pct) + '%' + (sem ? ' ●' : '') + '</div>';
+        var obj = objetivo(banda, ref);
+        var d = obj ? delta(v, obj) : null;
+        var tit = obj ? 'Objetivo: ' + pdzCgFmt(obj[0], conf.dec) + ' - ' + pdzCgFmt(obj[1], conf.dec) + ' (' + banda[0] + '-' + banda[1] + '% de ' + pdzCgFmt(ref, conf.dec) + ')' : '';
+        var h = '<div style="font-size:9px;color:' + col + ';font-weight:' + (sem === 'rojo' ? '700' : '400') + '" title="' + tit + '">' + (esEquipo ? '≈' : '') + Math.round(pct) + '%' + (sem ? ' ●' : '') + '</div>';
+        if (d !== null) h += '<div style="font-size:9px;color:' + (d === 0 ? '#22c55e' : (d < 0 ? '#f87171' : '#fbbf24')) + '" title="' + tit + '">' + (d === 0 ? 'ok' : fmtDelta(d)) + '</div>';
+        return h;
     }
-    function diaSemana(f) { var lab = D.mdLabel[f] || ''; return /^MD-[1-4]$/.test(lab); }
+    function diaSemana(f) { var lab = D.mdLabel[f] || ''; return /^MD-\d$/.test(lab); }
 
     // ---- Cabecera: metricas + boton gemelos ----
     var html = '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px">';
@@ -419,9 +427,22 @@ function pdzCgRender() {
     html += '<th style="padding:6px 8px;text-align:center;color:#e2e8f0;font-weight:700">Total' + (conSemana ? '<div style="font-size:9px;color:#38bdf8;font-weight:700">SEMANA</div>' : '') + '</th>';
     html += '</tr></thead><tbody>';
 
+    // Fila de objetivo del equipo (banda del dia x referencia de equipo)
+    if (esExterna && bandas && refEquipo > 0) {
+        html += '<tr style="background:#0b2a3a;border-top:1px solid #1e3a5f">';
+        html += '<td style="padding:5px 10px;color:#38bdf8;font-size:10px;font-weight:600;position:sticky;left:0;background:#0b2a3a">Objetivo equipo</td>';
+        D.dias.forEach(function(f) {
+            var obj = objetivo(bandaDe(f, null), refEquipo);
+            html += '<td style="padding:4px 4px;text-align:center;font-size:9px;color:#38bdf8">' + (obj ? pdzCgFmt(obj[0], conf.dec) + '<br>' + pdzCgFmt(obj[1], conf.dec) : '') + '</td>';
+        });
+        var objSem = bandas.SEMANA && bandas.SEMANA[m] ? objetivo(bandas.SEMANA[m], refEquipo) : null;
+        html += '<td style="padding:4px 8px;text-align:center;font-size:9px;color:#38bdf8">' + (objSem ? pdzCgFmt(objSem[0], conf.dec) + '<br>' + pdzCgFmt(objSem[1], conf.dec) : '') + '</td>';
+        html += '</tr>';
+    }
+
     var totalesDia = {}, cuentaDia = {}, semanaEquipoPct = [];
     D.jugadores.forEach(function(j) {
-        var total = 0, diasConDato = 0, algunEst = false, semanaPct = 0, semanaDias = 0;
+        var total = 0, diasConDato = 0, algunEst = false, semanaPct = 0, semanaDias = 0, semanaVal = 0;
         var gemelo = D.gemelos[j.id] ? D.jugadores.find(function(x) { return x.id === D.gemelos[j.id]; }) : null;
         var ref = refPropia[j.id] || 0;
         var refEs = ref > 0 ? 'propia' : (refEquipo > 0 ? 'equipo' : '');
@@ -454,8 +475,8 @@ function pdzCgRender() {
                 var pctV = v / ref * 100;
                 var banda = bandaDe(f, j.id);
                 sem = semaforo(pctV, banda);
-                pct = pctHtml(pctV, sem, refEs !== 'propia', banda);
-                if (diaSemana(f) && !r.est) { semanaPct += pctV; semanaDias++; }
+                pct = pctHtml(pctV, sem, refEs !== 'propia', banda, v, ref);
+                if (diaSemana(f) && !r.est) { semanaPct += pctV; semanaDias++; semanaVal += v; }
             }
             var titulo = r.est ? 'Estimado por gemelo (' + (gemelo ? gemelo.nombre : '') + ')' : (!esExterna && r.rpe !== null ? 'RPE ' + r.rpe : '');
             var estiloEst = r.est ? 'opacity:0.65;font-style:italic;outline:1px dashed #7c3aed;outline-offset:-2px;' : '';
@@ -466,7 +487,10 @@ function pdzCgRender() {
         if (conSemana && semanaDias > 0) {
             var semSemana = semaforo(semanaPct, bandas.SEMANA[m]);
             if (refEs === 'propia') semanaEquipoPct.push(semanaPct);
-            semanaHtml = '<div style="font-size:9px;color:' + (semSemana ? SEM_COLOR[semSemana] : '#94a3b8') + ';font-weight:' + (semSemana === 'rojo' ? '700' : '400') + '" title="Suma del % de MD-4 a MD-1 (' + semanaDias + ' dias). Banda ' + bandas.SEMANA[m][0] + '-' + bandas.SEMANA[m][1] + '%">' + Math.round(semanaPct) + '%' + (semSemana ? ' ●' : '') + '</div>';
+            var objS = objetivo(bandas.SEMANA[m], ref);
+            var dS = delta(semanaVal, objS);
+            semanaHtml = '<div style="font-size:9px;color:' + (semSemana ? SEM_COLOR[semSemana] : '#94a3b8') + ';font-weight:' + (semSemana === 'rojo' ? '700' : '400') + '" title="Suma de los dias de entrenamiento antes del partido (' + semanaDias + '). Objetivo semanal: ' + pdzCgFmt(objS[0], conf.dec) + ' - ' + pdzCgFmt(objS[1], conf.dec) + ' (' + bandas.SEMANA[m][0] + '-' + bandas.SEMANA[m][1] + '%)">' + Math.round(semanaPct) + '%' + (semSemana ? ' ●' : '') + '</div>'
+                + '<div style="font-size:9px;color:' + (dS === 0 ? '#22c55e' : (dS < 0 ? '#f87171' : '#fbbf24')) + '">' + (dS === 0 ? 'ok' : fmtDelta(dS)) + '</div>';
         }
         html += '<td style="padding:5px 8px;text-align:center;color:#e2e8f0;font-weight:700;' + (algunEst ? 'font-style:italic;opacity:0.75' : '') + '">' + (total > 0 ? (algunEst ? '≈' : '') + pdzCgFmt(total, conf.dec) : '—') + (diasConDato > 0 ? '<div style="font-size:9px;color:#64748b;font-weight:400">' + diasConDato + ' d</div>' : '') + semanaHtml + '</td>';
         html += '</tr>';
@@ -475,7 +499,7 @@ function pdzCgRender() {
     // Media del equipo (solo datos reales, nunca estimados) con semaforo contra la banda del dia
     html += '<tr style="border-top:2px solid #334155;background:#1e293b">';
     html += '<td style="padding:6px 10px;color:#94a3b8;font-weight:600;position:sticky;left:0;background:#1e293b">Media equipo</td>';
-    var totalMedia = 0, semanaEq = 0, semanaEqDias = 0;
+    var totalMedia = 0, semanaEq = 0, semanaEqDias = 0, semanaEqVal = 0;
     D.dias.forEach(function(f) {
         var media = cuentaDia[f] ? totalesDia[f] / cuentaDia[f] : 0;
         totalMedia += media;
@@ -484,8 +508,8 @@ function pdzCgRender() {
             var pctV = media / refEquipo * 100;
             var banda = bandaDe(f, null);
             sem = semaforo(pctV, banda);
-            pct = pctHtml(pctV, sem, false, banda);
-            if (diaSemana(f)) { semanaEq += pctV; semanaEqDias++; }
+            pct = pctHtml(pctV, sem, false, banda, media, refEquipo);
+            if (diaSemana(f)) { semanaEq += pctV; semanaEqDias++; semanaEqVal += media; }
         }
         var borde = sem === 'rojo' ? 'box-shadow:inset 0 0 0 2px ' + SEM_COLOR.rojo + ';' : (sem === 'ambar' ? 'box-shadow:inset 0 0 0 1px ' + SEM_COLOR.ambar + ';' : '');
         html += '<td style="padding:5px 4px;text-align:center;' + borde + 'color:' + (media > 0 ? '#e2e8f0' : '#334155') + ';font-weight:600">' + (media > 0 ? pdzCgFmt(media, conf.dec) : '—') + (cuentaDia[f] ? '<div style="font-size:9px;color:#64748b;font-weight:400">' + cuentaDia[f] + ' jug</div>' : '') + pct + '</td>';
@@ -493,7 +517,10 @@ function pdzCgRender() {
     var semanaEqHtml = '';
     if (conSemana && semanaEqDias > 0) {
         var semEq = semaforo(semanaEq, bandas.SEMANA[m]);
-        semanaEqHtml = '<div style="font-size:9px;color:' + (semEq ? SEM_COLOR[semEq] : '#94a3b8') + ';font-weight:' + (semEq === 'rojo' ? '700' : '400') + '" title="Banda semanal ' + bandas.SEMANA[m][0] + '-' + bandas.SEMANA[m][1] + '%">' + Math.round(semanaEq) + '%' + (semEq ? ' ●' : '') + '</div>';
+        var objEqS = objetivo(bandas.SEMANA[m], refEquipo);
+        var dEqS = delta(semanaEqVal, objEqS);
+        semanaEqHtml = '<div style="font-size:9px;color:' + (semEq ? SEM_COLOR[semEq] : '#94a3b8') + ';font-weight:' + (semEq === 'rojo' ? '700' : '400') + '" title="Banda semanal ' + bandas.SEMANA[m][0] + '-' + bandas.SEMANA[m][1] + '%">' + Math.round(semanaEq) + '%' + (semEq ? ' ●' : '') + '</div>'
+            + '<div style="font-size:9px;color:' + (dEqS === 0 ? '#22c55e' : (dEqS < 0 ? '#f87171' : '#fbbf24')) + '">' + (dEqS === 0 ? 'ok' : fmtDelta(dEqS)) + '</div>';
     }
     html += '<td style="padding:5px 8px;text-align:center;color:#e2e8f0;font-weight:700">' + (totalMedia > 0 ? pdzCgFmt(totalMedia, conf.dec) : '—') + semanaEqHtml + '</td>';
     html += '</tr></tbody></table></div>';
@@ -510,7 +537,7 @@ function pdzCgRender() {
         if (bandas) {
             var bl = [];
             ['MD-4','MD-3','MD-2','MD-1','MD+1','MD+1C','SEMANA'].forEach(function(k) { if (bandas[k] && bandas[k][m]) bl.push('<span style="color:#38bdf8">' + (k === 'MD+1C' ? 'MD+1 comp.' : k) + '</span> ' + bandas[k][m][0] + '-' + bandas[k][m][1] + '%'); });
-            leyenda += '<br>Semaforo: <span style="color:' + SEM_COLOR.ok + '">●</span> dentro de la banda del dia &middot; <span style="color:' + SEM_COLOR.ambar + '">●</span> hasta ' + tol + ' puntos fuera &middot; <span style="color:' + SEM_COLOR.rojo + '">●</span> mas alla. Bandas (' + conf.label + '): ' + bl.join(' &middot; ') + '. MD+1: recuperacion si jugo >= 60\', compensatorio si jugo < 30\'. SEMANA = suma del % de MD-4 a MD-1.';
+            leyenda += '<br>Semaforo: <span style="color:' + SEM_COLOR.ok + '">●</span> dentro de la banda del dia &middot; <span style="color:' + SEM_COLOR.ambar + '">●</span> hasta ' + tol + ' puntos fuera &middot; <span style="color:' + SEM_COLOR.rojo + '">●</span> mas alla. Bandas (' + conf.label + '): ' + bl.join(' &middot; ') + '. MD+1: recuperacion si jugo >= 60\', compensatorio si jugo < 30\'. Debajo del %: <span style="color:#f87171">−</span> lo que falta / <span style="color:#fbbf24">+</span> lo que sobra respecto al objetivo del dia (pasa el raton para ver el objetivo). SEMANA = suma de todos los dias de entrenamiento antes del partido.';
         }
     } else {
         leyenda += 'sRPE = RPE del jugador x minutos (sesion: duracion real; partido: minutos jugados). Pasa el raton por una celda para ver el RPE. El % es respecto al partido del propio jugador (>= ' + MIN_PARTIDO_COMPLETO + ' min); si no lo tiene, respecto a la media del equipo (<span style="color:#a78bfa">≈morado</span>).'
