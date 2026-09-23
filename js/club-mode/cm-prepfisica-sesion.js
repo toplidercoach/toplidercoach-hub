@@ -22,8 +22,66 @@ var cmPfSes2 = {
     vsHist: false,             // interruptor comparacion 4 semanas
     hist: {},                  // player_id -> {n, td, mmin, hsr, hsrmin, spr, nspr, vmax, acc, dec}
     histCargado: false,
-    charts: []
+        charts: [],
+    rpe: {},                   // player_id (club_players) -> {rpe, min}
+    rpeCargado: false
 };
+
+// ---------- RPE de la sesion (asistencia_sesiones / asistencia_partidos, cruce por fecha) ----------
+function cmPfSes2Norm(s) {
+    return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+}
+async function cmPfSes2CargarRpe() {
+    try {
+        var ses = cmPfSes2.ses;
+        var pids = [];
+        cmPfSes2.allData.forEach(function (d) { if (pids.indexOf(d.player_id) === -1) pids.push(d.player_id); });
+        var esPartido = ses.session_type === 'match';
+        var asis = [];
+        if (esPartido) {
+            var mr = await supabaseClient.from('matches').select('id').eq('club_id', clubId).eq('match_date', ses.session_date);
+            var mids = (mr.data || []).map(function (m) { return m.id; });
+            if (mids.length) {
+                var ar = await supabaseClient.from('asistencia_partidos').select('jugador_id, asistio, rpe, duracion_real').in('partido_id', mids);
+                (ar.data || []).forEach(function (a) { a.dur_ses = 90; asis.push(a); });
+            }
+        } else {
+            var tr = await supabaseClient.from('training_sessions').select('id, duration_minutes').eq('club_id', clubId).eq('session_date', ses.session_date);
+            var tsMap = {};
+            (tr.data || []).forEach(function (t) { tsMap[t.id] = t.duration_minutes; });
+            var tids = Object.keys(tsMap);
+            if (tids.length) {
+                var as = await supabaseClient.from('asistencia_sesiones').select('sesion_id, jugador_id, asistio, rpe, duracion_real').in('sesion_id', tids);
+                (as.data || []).forEach(function (a) { a.dur_ses = tsMap[a.sesion_id] || null; asis.push(a); });
+            }
+        }
+        cmPfSes2.rpeCargado = true;
+        if (!asis.length) { cmPfSes2Render(); return; }
+
+        // Puente club_players -> players (legacy_player_id, respaldo por nombre)
+        var cp = await supabaseClient.from('club_players').select('id, name, legacy_player_id').in('id', pids);
+        var jugIds = [];
+        asis.forEach(function (a) { if (jugIds.indexOf(a.jugador_id) === -1) jugIds.push(a.jugador_id); });
+        var pr = await supabaseClient.from('players').select('id, name').in('id', jugIds);
+        var porNombre = {};
+        (pr.data || []).forEach(function (p) { porNombre[cmPfSes2Norm(p.name)] = p.id; });
+        var puente = {};   // club_players.id -> players.id
+        (cp.data || []).forEach(function (c) {
+            puente[c.id] = c.legacy_player_id || porNombre[cmPfSes2Norm(c.name)] || null;
+        });
+        var porJugador = {};
+        asis.forEach(function (a) {
+            if (!a.asistio || a.rpe === null || a.rpe === undefined) return;
+            porJugador[a.jugador_id] = { rpe: parseFloat(a.rpe), min: a.duracion_real || a.dur_ses || null };
+        });
+        cmPfSes2.rpe = {};
+        pids.forEach(function (pid) {
+            var pj = puente[pid];
+            if (pj && porJugador[pj]) cmPfSes2.rpe[pid] = porJugador[pj];
+        });
+        cmPfSes2Render();
+    } catch (e) { cmPfSes2.rpeCargado = true; console.warn('[PrepFisica] RPE no disponible:', e); }
+}
 
 var CMPFSES2_HISTKEYS = ['td', 'mmin', 'hsr', 'hsrmin', 'spr', 'nspr', 'vmax', 'acc', 'dec'];
 
@@ -50,9 +108,12 @@ var CMPFSES2_HISTKEYS = ['td', 'mmin', 'hsr', 'hsrmin', 'spr', 'nspr', 'vmax', '
                     cmPfSes2.vsHist = false;
                     cmPfSes2.hist = {};
                     cmPfSes2.histCargado = false;
+                    cmPfSes2.rpe = {};
+                    cmPfSes2.rpeCargado = false;
                     cmPfSes2Render();
                     cmPfSes2CargarReferencias();
                     cmPfSes2CargarHistorico();
+                    cmPfSes2CargarRpe();
                 };
                 console.log('[PrepFisica] Informe de sesion mejorado activo (v3 con historico)');
             }
@@ -161,7 +222,10 @@ var CMPFSES2_COLS = [
     { k: 'vmax',   lbl: 'Vmax',     dec: 1 },
     { k: 'pvmax',  lbl: '%VmaxInd', dec: 0 },
     { k: 'acc',    lbl: 'ACC',      dec: 0 },
-    { k: 'dec',    lbl: 'DEC',      dec: 0 }
+    { k: 'dec',    lbl: 'DEC',      dec: 0 },
+    { k: 'rpe',    lbl: 'RPE',      dec: 0 },
+    { k: 'srpe',   lbl: 'sRPE(UA)', dec: 0 },
+    { k: 'srpekm', lbl: 'UA/km',    dec: 1 }
 ];
 
 function cmPfSes2Filas() {
@@ -179,6 +243,9 @@ function cmPfSes2Filas() {
         var vmax = d.max_speed_kmh !== null ? parseFloat(d.max_speed_kmh) : null;
         var ref = cmPfSes2.vmaxRef[d.player_id] || null;
         var pvmax = (vmax !== null && ref) ? Math.round(vmax / ref * 100) : null;
+        var rpeInfo = cmPfSes2.rpe[d.player_id] || null;
+        var minRpe = rpeInfo ? (rpeInfo.min || min || (cmPfSes2.ses && cmPfSes2.ses.duration_min) || null) : null;
+        var srpe = (rpeInfo && minRpe) ? Math.round(rpeInfo.rpe * minRpe) : null;
 
         filas.push({
             pid: d.player_id,
@@ -189,6 +256,9 @@ function cmPfSes2Filas() {
             spr: d.sprint_distance_m !== null ? parseFloat(d.sprint_distance_m) : null,
             nspr: d.sprint_count !== null ? parseFloat(d.sprint_count) : null,
             vmax: vmax, pvmax: pvmax,
+            rpe: rpeInfo ? rpeInfo.rpe : null,
+            srpe: srpe,
+            srpekm: (srpe !== null && td) ? Math.round(srpe / (td / 1000) * 10) / 10 : null,
             acc: d.accel_count !== null ? parseFloat(d.accel_count) : null,
             dec: d.decel_count !== null ? parseFloat(d.decel_count) : null,
             z: [d.z1_distance_m, d.z2_distance_m, d.z3_distance_m, d.z4_distance_m, d.z5_distance_m]
@@ -246,6 +316,9 @@ function cmPfSes2Chips(filas, stats) {
         }
         if (f.pvmax !== null && f.pvmax >= 95) {
             add('aviso', f.nombre + ': exposicion a velocidad maxima (' + f.pvmax + '% de su Vmax)');
+        }
+        if (cmPfSes2.rpeCargado && f.rpe === null && f.td !== null) {
+            add('alerta', f.nombre + ': GPS sin RPE registrado');
         }
         var dTd = cmPfSes2Delta(f, 'td');
         if (dTd !== null && dTd >= 30) {
@@ -485,7 +558,7 @@ function cmPfSes2HtmlTabla(filas, stats) {
     }
 
     return '<div style="overflow-x:auto"><table class="cmpfses2-tabla"><thead>' + thead + '</thead><tbody>' + tbody + resumen + filasPos + '</tbody></table></div>' +
-        '<div class="cmpfses2-leyenda">Verde/rojo: por encima/debajo de la media del grupo (&plusmn;0,75 desv.tip.) &middot; %VmaxInd: velocidad del dia respecto a la maxima historica del jugador en sesiones anteriores (amarillo &ge;95%; "-" si aun no hay historial previo) &middot; Clic en una cabecera para ordenar' + notaHist + ' &middot; ' + filas.length + ' jugadores en segmento ' + cmPfSes2.segmento + '</div>';
+        '<div class="cmpfses2-leyenda">Verde/rojo: por encima/debajo de la media del grupo (&plusmn;0,75 desv.tip.) &middot; %VmaxInd: velocidad del dia respecto a la maxima historica del jugador en sesiones anteriores (amarillo &ge;95%; "-" si aun no hay historial previo) &middot; Clic en una cabecera para ordenar &middot; sRPE = RPE &times; min (Foster) &middot; UA/km = coste percibido por km recorrido: alto = corri&oacute; poco para lo que le cost&oacute;' + notaHist + ' &middot; ' + filas.length + ' jugadores en segmento ' + cmPfSes2.segmento + '</div>';
 }
 
 // ---------- Vista GRAFICAS ----------
