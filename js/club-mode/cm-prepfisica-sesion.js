@@ -83,6 +83,57 @@ async function cmPfSes2CargarRpe() {
     } catch (e) { cmPfSes2.rpeCargado = true; console.warn('[PrepFisica] RPE no disponible:', e); }
 }
 
+// ---------- Sincronizar minutos GPS -> asistencia_sesiones.duracion_real ----------
+async function cmPfSes2SincronizarMinutos(sessionId, silencioso) {
+    try {
+        var sr = await supabaseClient.from('cm_pf_gps_sessions').select('id, session_date, session_type').eq('id', sessionId).single();
+        var ses = sr.data;
+        if (!ses) return;
+        if (ses.session_type === 'match') { if (!silencioso) showToast('En partidos los minutos van por las estadisticas del partido'); return; }
+
+        var tr = await supabaseClient.from('training_sessions').select('id').eq('club_id', clubId).eq('session_date', ses.session_date);
+        var tids = (tr.data || []).map(function (t) { return t.id; });
+        if (!tids.length) { if (!silencioso) showToast('No hay sesion del planificador el ' + cmPfFormatFecha(ses.session_date), 'warning'); return; }
+
+        var gr = await supabaseClient.from('cm_pf_gps_player_data').select('player_id, duration_min')
+            .eq('session_id', sessionId).eq('segment_name', 'TOTAL').eq('archived', false).not('duration_min', 'is', null);
+        var gps = gr.data || [];
+        if (!gps.length) return;
+        var pids = gps.map(function (g) { return g.player_id; });
+
+        var cp = await supabaseClient.from('club_players').select('id, name, legacy_player_id').in('id', pids);
+        var ar = await supabaseClient.from('asistencia_sesiones').select('sesion_id, jugador_id, duracion_real').in('sesion_id', tids);
+        var asis = ar.data || [];
+        var jugIds = [];
+        asis.forEach(function (a) { if (jugIds.indexOf(a.jugador_id) === -1) jugIds.push(a.jugador_id); });
+        var porNombre = {};
+        if (jugIds.length) {
+            var pr = await supabaseClient.from('players').select('id, name').in('id', jugIds);
+            (pr.data || []).forEach(function (p) { porNombre[cmPfSes2Norm(p.name)] = p.id; });
+        }
+        var puente = {};
+        (cp.data || []).forEach(function (c) { puente[c.id] = c.legacy_player_id || porNombre[cmPfSes2Norm(c.name)] || null; });
+
+        var actualizados = 0, sinFicha = 0, iguales = 0;
+        for (var i = 0; i < gps.length; i++) {
+            var pj = puente[gps[i].player_id];
+            var min = Math.round(parseFloat(gps[i].duration_min));
+            if (!pj || !min) { sinFicha++; continue; }
+            var fila = null;
+            asis.forEach(function (a) { if (a.jugador_id === pj) fila = a; });
+            if (!fila) { sinFicha++; continue; }
+            if (fila.duracion_real === min) { iguales++; continue; }
+            var up = await supabaseClient.from('asistencia_sesiones').update({ duracion_real: min })
+                .eq('sesion_id', fila.sesion_id).eq('jugador_id', pj);
+            if (!up.error) actualizados++;
+        }
+        if (!silencioso || actualizados > 0) {
+            showToast('Minutos GPS -> asistencia: ' + actualizados + ' actualizados' + (iguales ? ', ' + iguales + ' ya estaban' : '') + (sinFicha ? ', ' + sinFicha + ' sin ficha de asistencia aun' : ''));
+        }
+        if (!silencioso && typeof cmPfSes2CargarRpe === 'function' && cmPfSes2.ses && cmPfSes2.ses.id === sessionId) cmPfSes2CargarRpe();
+    } catch (e) { console.warn('[PrepFisica] Sincronizar minutos:', e); if (!silencioso) showToast('Error sincronizando minutos', 'error'); }
+}
+
 var CMPFSES2_HISTKEYS = ['td', 'mmin', 'hsr', 'hsrmin', 'spr', 'nspr', 'vmax', 'acc', 'dec'];
 
 // ---------- Override del render ----------
@@ -441,6 +492,7 @@ function cmPfSes2Render() {
             '<button class="cmpfses2-vbtn' + (cmPfSes2.vista === 'graficas' ? ' act' : '') + '" onclick="cmPfSes2CambiarVista(\'graficas\')">Graficas</button>' +
             (cmPfSes2.vista === 'tabla' ? '<button class="cmpfses2-hbtn' + (cmPfSes2.vsHist ? ' act' : '') + '" onclick="cmPfSes2ToggleHist()" title="Mostrar bajo cada valor la diferencia con la media del jugador en las ultimas 4 semanas (mismo tipo de sesion)">vs 4 sem: ' + (cmPfSes2.vsHist ? 'ON' : 'OFF') + '</button>' : '') +
             '<div style="display:flex;gap:6px;margin-left:auto">' +
+                '<button class="cmpfses2-vbtn" onclick="cmPfSes2SincronizarMinutos(cmPfSes2.ses.id,false)" title="Copiar los minutos del GPS de cada jugador a su ficha de asistencia (duracion real)">Sync min.</button>' +
                 '<button class="cmpfses2-vbtn" onclick="cmPfSes2ExportPdf()">PDF</button>' +
                 '<button class="cmpfses2-vbtn" onclick="cmPfSes2ExportCsv()">CSV</button>' +
             '</div>' +
