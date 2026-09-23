@@ -403,6 +403,7 @@ async function cmPfDevGuardar() {
         showToast(rows.length + ' jugadores importados' + (saltados > 0 ? ' (' + saltados + ' ya existian)' : ''));
         cmPfDevCerrar();
         if (typeof cmPfCargarSesiones === 'function') cmPfCargarSesiones();
+        if (typeof cmPfSes2SincronizarMinutos === 'function') cmPfSes2SincronizarMinutos(sid, true);
     } catch (e) {
         showToast('Error importando: ' + (e.message || e), 'error');
         if (btn) { btn.disabled = false; btn.textContent = 'Importar sesion'; }
