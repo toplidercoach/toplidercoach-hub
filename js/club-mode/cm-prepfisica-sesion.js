@@ -24,7 +24,10 @@ var cmPfSes2 = {
     histCargado: false,
         charts: [],
     rpe: {},                   // player_id (club_players) -> {rpe, min}
-    rpeCargado: false
+       rpeCargado: false,
+    puente: {},                // club_players.id -> players.id
+    base: {},                  // player_id -> {n, media, sd} de UA/km en entrenos de 28 dias
+    baseCargado: false
 };
 
 // ---------- RPE de la sesion (asistencia_sesiones / asistencia_partidos, cruce por fecha) ----------
@@ -65,7 +68,7 @@ async function cmPfSes2CargarRpe() {
         var pr = await supabaseClient.from('players').select('id, name').in('id', jugIds);
         var porNombre = {};
         (pr.data || []).forEach(function (p) { porNombre[cmPfSes2Norm(p.name)] = p.id; });
-        var puente = {};   // club_players.id -> players.id
+                         var puente = cmPfSes2.puente = {};   // club_players.id -> players.id
         (cp.data || []).forEach(function (c) {
             puente[c.id] = c.legacy_player_id || porNombre[cmPfSes2Norm(c.name)] || null;
         });
@@ -80,7 +83,97 @@ async function cmPfSes2CargarRpe() {
             if (pj && porJugador[pj]) cmPfSes2.rpe[pid] = porJugador[pj];
         });
         cmPfSes2Render();
+        cmPfSes2CargarBaseRpe();
     } catch (e) { cmPfSes2.rpeCargado = true; console.warn('[PrepFisica] RPE no disponible:', e); }
+}
+
+// ---------- Linea base individual de UA/km (entrenos con GPS + RPE, 28 dias previos) ----------
+async function cmPfSes2CargarBaseRpe() {
+    try {
+        var ses = cmPfSes2.ses;
+        if (ses.session_type === 'match') { cmPfSes2.baseCargado = true; return; }
+        var pids = Object.keys(cmPfSes2.puente);
+        if (!pids.length) { cmPfSes2.baseCargado = true; return; }
+        var d0 = new Date(ses.session_date + 'T12:00:00');
+        d0.setDate(d0.getDate() - 28);
+        var desde = d0.getFullYear() + '-' + ('0' + (d0.getMonth() + 1)).slice(-2) + '-' + ('0' + d0.getDate()).slice(-2);
+
+        var gs = await supabaseClient.from('cm_pf_gps_sessions').select('id, session_date')
+            .eq('club_id', clubId).eq('session_type', 'training').gte('session_date', desde).lt('session_date', ses.session_date);
+        var fechaGps = {};
+        (gs.data || []).forEach(function (s) { fechaGps[s.id] = s.session_date; });
+        var sids = Object.keys(fechaGps);
+        if (!sids.length) { cmPfSes2.baseCargado = true; cmPfSes2Render(); return; }
+
+        var gd = await supabaseClient.from('cm_pf_gps_player_data').select('player_id, session_id, total_distance_m, duration_min')
+            .in('session_id', sids).in('player_id', pids).eq('segment_name', 'TOTAL').eq('archived', false);
+        var ts = await supabaseClient.from('training_sessions').select('id, session_date, duration_minutes')
+            .eq('club_id', clubId).gte('session_date', desde).lt('session_date', ses.session_date);
+        var tsInfo = {};
+        (ts.data || []).forEach(function (t) { tsInfo[t.id] = t; });
+        var tids = Object.keys(tsInfo);
+        var rpePorFechaJug = {};   // fecha|players.id -> {rpe, durReal, durSes}
+        if (tids.length) {
+            var as = await supabaseClient.from('asistencia_sesiones').select('sesion_id, jugador_id, asistio, rpe, duracion_real').in('sesion_id', tids);
+            (as.data || []).forEach(function (a) {
+                if (!a.asistio || a.rpe === null || a.rpe === undefined) return;
+                var t = tsInfo[a.sesion_id];
+                if (!t) return;
+                rpePorFechaJug[t.session_date + '|' + a.jugador_id] = { rpe: parseFloat(a.rpe), durReal: a.duracion_real || null, durSes: t.duration_minutes || null };
+            });
+        }
+        var acum = {};
+        (gd.data || []).forEach(function (g) {
+            var pj = cmPfSes2.puente[g.player_id];
+            var td = g.total_distance_m !== null ? parseFloat(g.total_distance_m) : null;
+            if (!pj || !td) return;
+            var r = rpePorFechaJug[fechaGps[g.session_id] + '|' + pj];
+            if (!r) return;
+            var min = r.durReal || (g.duration_min ? parseFloat(g.duration_min) : null) || r.durSes;
+            if (!min) return;
+            var uakm = (r.rpe * min) / (td / 1000);
+            if (!acum[g.player_id]) acum[g.player_id] = [];
+            acum[g.player_id].push(uakm);
+        });
+        cmPfSes2.base = {};
+        Object.keys(acum).forEach(function (pid) {
+            var v = acum[pid];
+            var media = v.reduce(function (a, b) { return a + b; }, 0) / v.length;
+            var sd = Math.sqrt(v.reduce(function (a, b) { return a + Math.pow(b - media, 2); }, 0) / v.length);
+            cmPfSes2.base[pid] = { n: v.length, media: media, sd: sd };
+        });
+        cmPfSes2.baseCargado = true;
+        cmPfSes2Render();
+    } catch (e) { cmPfSes2.baseCargado = true; console.warn('[PrepFisica] Linea base UA/km:', e); }
+}
+
+// ---------- Estado interna/externa de un jugador ----------
+// Devuelve {tipo:'fatiga'|'sobrado'|'ok'|null, ind:true|false, txt}
+function cmPfSes2EstadoIE(f, stats) {
+    if (f.srpekm === null || f.srpekm === undefined) return { tipo: null };
+    var b = cmPfSes2.base[f.pid];
+    if (b && b.n >= 3) {
+        var sd = Math.max(b.sd, b.media * 0.08);
+        var z = (f.srpekm - b.media) / sd;
+        var pct = Math.round((f.srpekm / b.media - 1) * 100);
+        var txt = 'UA/km hoy ' + (Math.round(f.srpekm * 10) / 10) + ' vs su media ' + (Math.round(b.media * 10) / 10) + ' (' + (pct >= 0 ? '+' : '') + pct + '%, ' + b.n + ' sesiones)';
+        return { tipo: z >= 1 ? 'fatiga' : (z <= -1 ? 'sobrado' : 'ok'), ind: true, pct: pct, txt: txt };
+    }
+    var s = stats && stats['srpekm'];
+    if (!s || !(s.sd > 0)) return { tipo: null };
+    var zg = (f.srpekm - s.media) / s.sd;
+    return { tipo: zg >= 0.75 ? 'fatiga' : (zg <= -0.75 ? 'sobrado' : 'ok'), ind: false, pct: null,
+        txt: 'Provisional: comparado con el grupo de hoy (aun sin linea base propia, minimo 3 entrenos con RPE y GPS en 28 dias)' };
+}
+function cmPfSes2CeldaIE(f, stats) {
+    var e = cmPfSes2EstadoIE(f, stats);
+    if (!e.tipo) return '<td style="text-align:center;color:#475569">-</td>';
+    var ic = { fatiga: ['&#9888;', '#f87171', 'Posible fatiga: le costo mas de lo normal para lo que corrio'],
+               sobrado: ['&#9889;', '#60a5fa', 'Va sobrado: corrio lo suyo y lo percibio facil (o infravalora el RPE)'],
+               ok: ['&#10003;', '#4ade80', 'Carga interna y externa concuerdan'] }[e.tipo];
+    return '<td style="text-align:center;font-size:15px;color:' + ic[1] + ';opacity:' + (e.ind ? '1' : '.45') + ';cursor:help" title="' + ic[2] + '. ' + e.txt + '">' + ic[0] + '</td>';
+}
+function cmPfSes2Noop() {
 }
 
 // ---------- Sincronizar minutos GPS -> asistencia_sesiones.duracion_real ----------
@@ -161,6 +254,8 @@ var CMPFSES2_HISTKEYS = ['td', 'mmin', 'hsr', 'hsrmin', 'spr', 'nspr', 'vmax', '
                     cmPfSes2.histCargado = false;
                     cmPfSes2.rpe = {};
                     cmPfSes2.rpeCargado = false;
+                    cmPfSes2.base = {};
+                    cmPfSes2.baseCargado = false;
                     cmPfSes2Render();
                     cmPfSes2CargarReferencias();
                     cmPfSes2CargarHistorico();
@@ -368,6 +463,9 @@ function cmPfSes2Chips(filas, stats) {
         if (f.pvmax !== null && f.pvmax >= 95) {
             add('aviso', f.nombre + ': exposicion a velocidad maxima (' + f.pvmax + '% de su Vmax)');
         }
+        var ie = cmPfSes2EstadoIE(f, stats);
+        if (ie.ind && ie.tipo === 'fatiga') add('alerta', f.nombre + ': posible fatiga, coste percibido +' + ie.pct + '% sobre su media');
+        if (ie.ind && ie.tipo === 'sobrado') add('info', f.nombre + ': va sobrado (' + ie.pct + '% respecto a su media)');
         if (cmPfSes2.rpeCargado && f.rpe === null && f.td !== null) {
             add('alerta', f.nombre + ': GPS sin RPE registrado');
         }
@@ -558,13 +656,13 @@ function cmPfSes2HtmlTabla(filas, stats) {
     CMPFSES2_COLS.forEach(function (c) {
         thead += '<th onclick="cmPfSes2Orden(\'' + c.k + '\')" style="cursor:pointer;text-align:right">' + c.lbl + flecha(c.k) + '</th>';
     });
-    thead += '<th>Zonas</th></tr>';
+    thead += '<th style="text-align:center" title="Interna/externa: UA/km de hoy contra la media del propio jugador">I/E</th><th>Zonas</th></tr>';
 
     var tbody = '';
     filas.forEach(function (f) {
         tbody += '<tr><td style="font-weight:600">' + f.nombre + '</td><td style="color:#94a3b8;font-size:11px">' + f.pos + '</td>';
         CMPFSES2_COLS.forEach(function (c) { tbody += celda(f, c); });
-        tbody += barraZonas(f.z) + '</tr>';
+        tbody += cmPfSes2CeldaIE(f, stats) + barraZonas(f.z) + '</tr>';
     });
 
     // Medias por posicion (si hay mas de una posicion con datos)
@@ -585,7 +683,7 @@ function cmPfSes2HtmlTabla(filas, stats) {
                 var st = cmPfSes2Stats(grupo, c.k);
                 filasPos += '<td style="text-align:right">' + (st ? (Math.round(st.media * 10) / 10) : '-') + '</td>';
             });
-            filasPos += '<td></td></tr>';
+            filasPos += '<td></td><td></td></tr>';
         });
     }
 
@@ -599,7 +697,7 @@ function cmPfSes2HtmlTabla(filas, stats) {
             var v = s ? (tipo === 'sd' ? s.sd : s[tipo === 'media' ? 'media' : tipo]) : null;
             resumen += '<td style="text-align:right">' + (v !== null ? (Math.round(v * 10) / 10) : '-') + '</td>';
         });
-        resumen += '<td></td></tr>';
+        resumen += '<td></td><td></td></tr>';
     });
 
     var notaHist = '';
@@ -610,7 +708,7 @@ function cmPfSes2HtmlTabla(filas, stats) {
     }
 
     return '<div style="overflow-x:auto"><table class="cmpfses2-tabla"><thead>' + thead + '</thead><tbody>' + tbody + resumen + filasPos + '</tbody></table></div>' +
-        '<div class="cmpfses2-leyenda">Verde/rojo: por encima/debajo de la media del grupo (&plusmn;0,75 desv.tip.) &middot; %VmaxInd: velocidad del dia respecto a la maxima historica del jugador en sesiones anteriores (amarillo &ge;95%; "-" si aun no hay historial previo) &middot; Clic en una cabecera para ordenar &middot; sRPE = RPE &times; min (Foster) &middot; UA/km = coste percibido por km recorrido: alto = corri&oacute; poco para lo que le cost&oacute;' + notaHist + ' &middot; ' + filas.length + ' jugadores en segmento ' + cmPfSes2.segmento + '</div>';
+        '<div class="cmpfses2-leyenda">Verde/rojo: por encima/debajo de la media del grupo (&plusmn;0,75 desv.tip.) &middot; %VmaxInd: velocidad del dia respecto a la maxima historica del jugador en sesiones anteriores (amarillo &ge;95%; "-" si aun no hay historial previo) &middot; Clic en una cabecera para ordenar &middot; sRPE = RPE &times; min (Foster) &middot; UA/km = coste percibido por km recorrido:  alto = corri&oacute; poco para lo que le cost&oacute; &middot; I/E: &#9888; posible fatiga, &#9889; va sobrado, &#10003; concuerdan (contra la media del propio jugador en 28 d&iacute;as; atenuado = provisional, comparado con el grupo)' + notaHist + ' &middot; ' + filas.length + ' jugadores en segmento ' + cmPfSes2.segmento + '</div>';
 }
 
 // ---------- Vista GRAFICAS ----------
