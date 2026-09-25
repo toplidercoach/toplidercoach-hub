@@ -328,6 +328,7 @@ async function pdzCargarSesionesPeriodo(periodo) {
             return;
         }
 
+        await pdzAplicarRpeJugadores(sesiones);
         var totalSesiones = sesiones.length;
         var totalMinutos = 0;
         var sesionesConRpe = 0;
@@ -362,13 +363,13 @@ async function pdzCargarSesionesPeriodo(periodo) {
         html += pdzMetricCard(totalSesiones > 0 ? Math.round(totalMinutos / totalSesiones) : 0, 'Min/sesion', '#06b6d4');
         html += pdzMetricCard(rpeMedia, 'RPE medio', '#f59e0b');
         html += pdzMetricCard(asistenciaMedia, 'Asistencia', '#10b981');
-        html += pdzMetricCard(acwrInfo.valor, 'ACWR', acwrInfo.color);
+          // ACWR de equipo desactivado: es una metrica individual (ver Cargas RPE por jugador)
         html += '</div>';
 
-        if (acwrInfo.valor !== '—') {
+        if (false) {
             html += '<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#1e293b;border-radius:8px;margin-bottom:16px;border-left:4px solid ' + acwrInfo.color + '"><div style="font-size:20px">' + acwrInfo.emoji + '</div><div><div style="font-size:13px;font-weight:600;color:#e2e8f0">' + acwrInfo.label + '</div><div style="font-size:11px;color:#94a3b8">' + acwrInfo.descripcion + '</div></div></div>';
         } else {
-            html += '<div style="padding:10px 14px;background:#1e293b;border-radius:8px;margin-bottom:16px;border-left:4px solid #475569;font-size:12px;color:#94a3b8">Registra el RPE en tus sesiones para activar el calculo de carga aguda/cronica (ACWR)</div>';
+            html += '';
         }
 
         if (semanasData.length > 1) {
@@ -437,6 +438,25 @@ function pdzDuracionSesion(s) {
 
 function pdzMetricCard(valor, label, color) {
     return '<div style="background:#1e293b;border-radius:8px;padding:10px;text-align:center;border-top:3px solid ' + color + '"><div style="font-size:20px;font-weight:700;color:#e2e8f0">' + valor + '</div><div style="font-size:10px;color:#9ca3af;margin-top:2px">' + label + '</div></div>';
+}
+
+// RPE de los jugadores (asistencia_sesiones): media por sesion. Si una sesion no tiene RPE de jugadores, se conserva el de la sesion.
+async function pdzAplicarRpeJugadores(sesiones) {
+    if (!sesiones || !sesiones.length) return;
+    try {
+        var { data: rpeJug } = await supabaseClient.from('asistencia_sesiones').select('sesion_id, rpe, asistio')
+            .in('sesion_id', sesiones.map(function(s) { return s.id; })).not('rpe', 'is', null);
+        var acumR = {};
+        (rpeJug || []).forEach(function(a) {
+            if (a.asistio === false) return;
+            if (!acumR[a.sesion_id]) acumR[a.sesion_id] = [];
+            acumR[a.sesion_id].push(parseFloat(a.rpe));
+        });
+        sesiones.forEach(function(s) {
+            var v = acumR[s.id];
+            if (v && v.length) s.rpe = Math.round(v.reduce(function(a, b) { return a + b; }, 0) / v.length * 10) / 10;
+        });
+    } catch (eR) { console.warn('RPE jugadores:', eR); }
 }
 
 function pdzCalcularACWR(sesiones) {
@@ -655,6 +675,7 @@ async function pdzObtenerMetricas(periodo) {
 
         if (!sesiones || sesiones.length === 0) return resultado;
 
+        await pdzAplicarRpeJugadores(sesiones);
         resultado.sesiones = sesiones.length;
         var sumaRpe = 0, countRpe = 0, sumaCarga = 0;
 
