@@ -296,7 +296,50 @@ async function pdzCargaMicro(periodo) {
             c.gpsReal = true;
         });
 
-        pdzCg.datos = { dias: dias, jugadores: jugadores, datos: datos, fechasPartido: fechasPartido, hayGps: gpsRows.length > 0, minPartido: minPartido, gemelos: gemelos, perfil: perfil, perfilEquipo: perfilEquipo, bandas: bandas, tolerancia: tolerancia, minRec: minRec, mdLabel: mdLabel, fechaPrevia: fechaPrevia };
+        // ---------- Carga interna/externa: historico de UA/km (28 dias antes del micro + dias del micro) ----------
+        var histIE = {};   // jid -> [{fecha, uakm}]
+        function addIE(jid, fecha, uakm) { if (!histIE[jid]) histIE[jid] = []; histIE[jid].push({ fecha: fecha, uakm: uakm }); }
+        try {
+            var d28 = new Date(periodo.date_start + 'T12:00:00'); d28.setDate(d28.getDate() - 28);
+            var desde28 = pdzCgISO(d28);
+            var { data: gsA } = await supabaseClient.from('cm_pf_gps_sessions').select('id, session_date').eq('club_id', clubId).eq('session_type', 'training').gte('session_date', desde28).lt('session_date', periodo.date_start).or('archived.is.null,archived.eq.false');
+            var fechaGpsA = {}; (gsA || []).forEach(function(s) { fechaGpsA[s.id] = s.session_date; });
+            var sidsA = Object.keys(fechaGpsA);
+            if (sidsA.length) {
+                var { data: gdA } = await supabaseClient.from('cm_pf_gps_player_data').select('session_id, player_id, total_distance_m, duration_min').in('session_id', sidsA).eq('segment_name', 'TOTAL').or('archived.is.null,archived.eq.false');
+                var { data: tsA } = await supabaseClient.from('training_sessions').select('id, session_date, duration_minutes').eq('club_id', clubId).gte('session_date', desde28).lt('session_date', periodo.date_start);
+                var tsInfoA = {}; (tsA || []).forEach(function(t) { tsInfoA[t.id] = t; });
+                var rpeA = {};
+                if (Object.keys(tsInfoA).length) {
+                    var { data: asA } = await supabaseClient.from('asistencia_sesiones').select('sesion_id, jugador_id, asistio, rpe, duracion_real').in('sesion_id', Object.keys(tsInfoA));
+                    (asA || []).forEach(function(a) {
+                        if (a.asistio === false || a.rpe === null || a.rpe === undefined) return;
+                        var t = tsInfoA[a.sesion_id]; if (!t) return;
+                        rpeA[t.session_date + '|' + a.jugador_id] = { rpe: a.rpe, durReal: a.duracion_real || null, durSes: t.duration_minutes || null };
+                    });
+                }
+                (gdA || []).forEach(function(g) {
+                    var jid = idsPlantilla[g.player_id] ? g.player_id : puente[g.player_id];
+                    var td = parseFloat(g.total_distance_m) || 0;
+                    if (!jid || !td) return;
+                    var r = rpeA[fechaGpsA[g.session_id] + '|' + jid]; if (!r) return;
+                    var min = r.durReal || parseFloat(g.duration_min) || r.durSes; if (!min) return;
+                    addIE(jid, fechaGpsA[g.session_id], (r.rpe * min) / (td / 1000));
+                });
+            }
+        } catch (eIE) { console.warn('Historico I/E no disponible:', eIE); }
+        // Dias del propio micro (solo entrenos con GPS real y RPE)
+        Object.keys(datos).forEach(function(jid) {
+            Object.keys(datos[jid]).forEach(function(f) {
+                var c = datos[jid][f];
+                if (fechasPartido[f] || !c.gpsReal || !(c.srpe > 0) || !(c.td > 0)) return;
+                c.uakm = c.srpe / (c.td / 1000);
+                addIE(jid, f, c.uakm);
+            });
+        });
+        Object.keys(histIE).forEach(function(jid) { histIE[jid].sort(function(a, b) { return a.fecha < b.fecha ? -1 : 1; }); });
+
+        pdzCg.datos = { histIE: histIE, dias: dias, jugadores: jugadores, datos: datos, fechasPartido: fechasPartido, hayGps: gpsRows.length > 0, minPartido: minPartido, gemelos: gemelos, perfil: perfil, perfilEquipo: perfilEquipo, bandas: bandas, tolerancia: tolerancia, minRec: minRec, mdLabel: mdLabel, fechaPrevia: fechaPrevia };
         pdzCgRender();
     } catch (err) {
         console.error('Error carga micro:', err);
@@ -422,6 +465,30 @@ function pdzCgRender() {
     }
     function diaSemana(f) { return !D.fechasPartido[f]; }
 
+    // ---- Carga interna/externa: UA/km del dia contra la media del propio jugador (28 dias previos, min 3) ----
+    var IE_ICO = { fatiga: ['⚠', '#f87171', 'Posible fatiga: le costo mas de lo normal para lo que corrio'], sobrado: ['⚡', '#60a5fa', 'Va sobrado: corrio lo suyo y lo percibio facil (o infravalora el RPE)'], ok: ['✓', '#4ade80', 'Carga interna y externa concuerdan'] };
+    var hayIE = false;
+    function estadoIE(jid, f) {
+        var c = (D.datos[jid] || {})[f];
+        if (!c || !(c.uakm > 0)) return null;
+        hayIE = true;
+        var lim = new Date(f + 'T12:00:00'); lim.setDate(lim.getDate() - 28);
+        var desde = pdzCgISO(lim);
+        var prev = (D.histIE[jid] || []).filter(function(x) { return x.fecha < f && x.fecha >= desde; }).map(function(x) { return x.uakm; });
+        if (prev.length < 3) return { tipo: null, n: prev.length, uakm: c.uakm };
+        var media = prev.reduce(function(a, b) { return a + b; }, 0) / prev.length;
+        var sd = Math.sqrt(prev.reduce(function(a, b) { return a + Math.pow(b - media, 2); }, 0) / prev.length);
+        sd = Math.max(sd, media * 0.08);
+        var z = (c.uakm - media) / sd;
+        return { tipo: z >= 1 ? 'fatiga' : (z <= -1 ? 'sobrado' : 'ok'), n: prev.length, uakm: c.uakm, media: media, pct: Math.round((c.uakm / media - 1) * 100) };
+    }
+    function iconoIE(e) {
+        if (!e) return '';
+        if (!e.tipo) return '<span style="position:absolute;top:1px;right:3px;font-size:10px;color:#475569;cursor:help" title="UA/km ' + Math.round(e.uakm) + ' · sin linea base (' + e.n + ' de 3 entrenos previos con GPS y RPE)">·</span>';
+        var ic = IE_ICO[e.tipo];
+        return '<span style="position:absolute;top:1px;right:3px;font-size:10px;color:' + ic[1] + ';cursor:help" title="' + ic[2] + '. UA/km ' + Math.round(e.uakm) + ' vs su media ' + Math.round(e.media) + ' (' + (e.pct >= 0 ? '+' : '') + e.pct + '%, ' + e.n + ' sesiones)">' + ic[0] + '</span>';
+    }
+
     // ---- Cabecera: metricas + boton gemelos ----
     var html = '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px">';
     html += '<div style="font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:0.5px">Carga por jugador y dia</div>';
@@ -487,7 +554,7 @@ function pdzCgRender() {
 
     var totalesDia = {}, cuentaDia = {}, semanaEquipoPct = [];
     D.jugadores.forEach(function(j) {
-        var total = 0, diasConDato = 0, algunEst = false, semanaPct = 0, semanaDias = 0, semanaVal = 0;
+        var total = 0, diasConDato = 0, algunEst = false, semanaPct = 0, semanaDias = 0, semanaVal = 0, nFatiga = 0;
         var gemelo = D.gemelos[j.id] ? D.jugadores.find(function(x) { return x.id === D.gemelos[j.id]; }) : null;
         var ref = refPropia[j.id] || 0;
         var refEs = ref > 0 ? 'propia' : (refEquipo > 0 ? 'equipo' : '');
@@ -524,10 +591,12 @@ function pdzCgRender() {
                 if (f === diaPost) { var gp = grupoPost(j.id, f); pct = '<div style="font-size:8px;color:' + (gp === 'C' ? '#fbbf24' : (gp === 'R' ? '#38bdf8' : '#64748b')) + '">' + (gp === 'C' ? 'COMP.' : (gp === 'R' ? 'RECUP.' : 'sin min.')) + '</div>' + pct; }
                 if (diaSemana(f) && !r.est) { semanaPct += pctV; semanaDias++; semanaVal += v; }
             }
+            var ie = (D.fechasPartido[f] || r.est) ? null : estadoIE(j.id, f);
+            if (ie && ie.tipo === 'fatiga') nFatiga++;
             var titulo = r.est ? 'Estimado por gemelo (' + (gemelo ? gemelo.nombre : '') + ')' : (!esExterna && r.rpe !== null ? 'RPE ' + r.rpe : '');
             var estiloEst = r.est ? 'opacity:0.65;font-style:italic;outline:1px dashed #7c3aed;outline-offset:-2px;' : '';
             var borde = sem === 'rojo' ? 'box-shadow:inset 0 0 0 2px ' + SEM_COLOR.rojo + ';' : (sem === 'ambar' ? 'box-shadow:inset 0 0 0 1px ' + SEM_COLOR.ambar + ';' : '');
-            html += '<td style="padding:5px 4px;text-align:center;' + estiloEst + borde + 'color:' + (v > 0 ? '#e2e8f0' : '#334155') + ';background:' + (v > 0 ? pdzCgHex(conf.color, intensidad) : 'transparent') + '" title="' + titulo + '">' + (v > 0 ? (r.est ? '≈' : '') + pdzCgFmt(v, conf.dec) : '—') + pct + '</td>';
+            html += '<td style="position:relative;padding:5px 4px;text-align:center;' + estiloEst + borde + 'color:' + (v > 0 ? '#e2e8f0' : '#334155') + ';background:' + (v > 0 ? pdzCgHex(conf.color, intensidad) : 'transparent') + '" title="' + titulo + '">' + iconoIE(ie) + (v > 0 ? (r.est ? '≈' : '') + pdzCgFmt(v, conf.dec) : '—') + pct + '</td>';
         });
         var semanaHtml = '';
         if (conSemana && semanaDias > 0) {
@@ -538,7 +607,7 @@ function pdzCgRender() {
             semanaHtml = '<div style="font-size:9px;color:' + (semSemana ? SEM_COLOR[semSemana] : '#94a3b8') + ';font-weight:' + (semSemana === 'rojo' ? '700' : '400') + '" title="Suma de los dias de entrenamiento antes del partido (' + semanaDias + '). Objetivo semanal: ' + pdzCgFmt(objS[0], conf.dec) + ' - ' + pdzCgFmt(objS[1], conf.dec) + ' (' + bandas.SEMANA[m][0] + '-' + bandas.SEMANA[m][1] + '%)">' + Math.round(semanaPct) + '%' + (semSemana ? ' ●' : '') + '</div>'
                 + '<div style="font-size:9px;color:' + (dS === 0 ? '#22c55e' : (dS < 0 ? '#f87171' : '#fbbf24')) + '">' + (dS === 0 ? 'ok' : fmtDelta(dS)) + '</div>';
         }
-        html += '<td style="padding:5px 8px;text-align:center;color:#e2e8f0;font-weight:700;' + (algunEst ? 'font-style:italic;opacity:0.75' : '') + '">' + (total > 0 ? (algunEst ? '≈' : '') + pdzCgFmt(total, conf.dec) : '—') + (diasConDato > 0 ? '<div style="font-size:9px;color:#64748b;font-weight:400">' + diasConDato + ' d</div>' : '') + semanaHtml + '</td>';
+        html += '<td style="padding:5px 8px;text-align:center;color:#e2e8f0;font-weight:700;' + (algunEst ? 'font-style:italic;opacity:0.75' : '') + '">' + (total > 0 ? (algunEst ? '≈' : '') + pdzCgFmt(total, conf.dec) : '—') + (diasConDato > 0 ? '<div style="font-size:9px;color:#64748b;font-weight:400">' + diasConDato + ' d</div>' : '') + (nFatiga > 0 ? '<div style="font-size:9px;color:' + (nFatiga >= 2 ? '#f87171' : '#fbbf24') + ';font-weight:700" title="Dias del micro con coste percibido por encima de su media">⚠ ' + nFatiga + ' fatiga</div>' : '') + semanaHtml + '</td>';
         html += '</tr>';
     });
 
@@ -589,6 +658,7 @@ function pdzCgRender() {
         leyenda += 'sRPE = RPE del jugador x minutos (sesion: duracion real; partido: minutos jugados). Pasa el raton por una celda para ver el RPE. El % es respecto al partido del propio jugador (>= ' + MIN_PARTIDO_COMPLETO + ' min); si no lo tiene, respecto a la media del equipo (<span style="color:#a78bfa">≈morado</span>).'
             + (refEquipo > 0 ? ' Referencia del equipo en partido: <strong style="color:#cbd5e1">' + pdzCgFmt(refEquipo, conf.dec) + '</strong>.' : ' Sin partido completo en este periodo: no hay referencia para el %.');
     }
+    if (hayIE) leyenda += '<br>Esquina de la celda (carga interna/externa): <span style="color:#f87171">⚠</span> posible fatiga &middot; <span style="color:#60a5fa">⚡</span> va sobrado &middot; <span style="color:#4ade80">✓</span> concuerdan &middot; <span style="color:#475569">·</span> sin linea base. Compara el UA/km (sRPE por km) del dia con la media del propio jugador en sus entrenos con GPS y RPE de los 28 dias previos (minimo 3). Pasa el raton por el icono para ver el calculo.';
     html += '<div style="font-size:10px;color:#64748b;margin-top:6px;line-height:1.5">' + leyenda + '</div>';
 
     cont.innerHTML = html;
