@@ -86,6 +86,9 @@ registrarSubTab('planificador', 'calendario', cargarCalendarioUnificado);
         }
         var jugadoresPlantilla = [];
         var jugadoresSeleccionados = [];
+        document.addEventListener('change', function(e) {
+            if (e.target && e.target.id === 'sesion-fecha' && jugadoresPlantilla.length) { try { renderizarJugadoresSesion(); } catch (er) { console.error(er); } }
+        });
         var gpsAsignaciones = {};
         var gpsColapsado = false;
 
@@ -105,7 +108,7 @@ registrarSubTab('planificador', 'calendario', cargarCalendarioUnificado);
             try {
                let qJug = supabaseClient
                     .from('season_players')
-                    .select('id, player_id, shirt_number, players(id, name, photo_url, position)')
+                    .select('id, player_id, shirt_number, players(id, name, photo_url, position, status, fecha_baja)')
                     .eq('season_id', seasonId);
                 // Modo Club: filtrar por el equipo seleccionado en el header
                 if (typeof cmState !== 'undefined' && cmState.activo && cmState.equipoSeleccionado) {
@@ -194,6 +197,16 @@ registrarSubTab('planificador', 'calendario', cargarCalendarioUnificado);
             return grupos;
         }
 
+        // Plantilla sin los jugadores en baja cuya fecha de baja sea igual o anterior a la fecha de la sesion
+        function planPlantillaActiva() {
+            var f = (document.getElementById('sesion-fecha') || {}).value || new Date().toISOString().slice(0, 10);
+            return jugadoresPlantilla.filter(function(sp) {
+                var p = sp.players || {};
+                if (p.status !== 'baja') return true;
+                return !(p.fecha_baja && f >= p.fecha_baja);
+            });
+        }
+
       function renderizarJugadoresSesion() {
             const grid = document.getElementById('jugadores-sesion-grid');
             grid.style.maxHeight = 'none';
@@ -203,7 +216,9 @@ registrarSubTab('planificador', 'calendario', cargarCalendarioUnificado);
             grid.style.gap = '6px';
             grid.style.alignItems = 'stretch';
             
-            const grupos = planAgruparPorPosicion(jugadoresPlantilla);
+            const activos = planPlantillaActiva();
+            jugadoresSeleccionados = jugadoresSeleccionados.filter(id => activos.some(sp => String(sp.id) === String(id)));
+            const grupos = planAgruparPorPosicion(activos);
             
             grid.innerHTML = grupos.map(grupo => {
                 const cabecera = `<div style="grid-column:1/-1;font-size:11px;font-weight:800;color:#7c3aed;letter-spacing:0.06em;border-bottom:2px solid #e9d5ff;padding:8px 2px 3px;">${grupo.nombre} (${grupo.jugadores.length})</div>`;
@@ -251,10 +266,10 @@ registrarSubTab('planificador', 'calendario', cargarCalendarioUnificado);
         }
         
         function toggleTodosJugadores() {
-            if (jugadoresSeleccionados.length === jugadoresPlantilla.length) {
+             if (jugadoresSeleccionados.length === planPlantillaActiva().length) {
                 jugadoresSeleccionados = [];
             } else {
-                jugadoresSeleccionados = jugadoresPlantilla.map(sp => sp.id);
+                jugadoresSeleccionados = planPlantillaActiva().map(sp => sp.id);
             }
             renderizarJugadoresSesion();
         }
@@ -266,7 +281,7 @@ registrarSubTab('planificador', 'calendario', cargarCalendarioUnificado);
         }
         
         function obtenerJugadoresParaGuardar() {
-            return jugadoresPlantilla
+            return planPlantillaActiva()
                 .filter(sp => jugadoresSeleccionados.includes(sp.id))
                 .map(sp => ({
                     id: sp.id,
@@ -293,7 +308,7 @@ registrarSubTab('planificador', 'calendario', cargarCalendarioUnificado);
         }
 
         function gpsSeleccionados() {
-            return jugadoresPlantilla.filter(function(sp) {
+            return planPlantillaActiva().filter(function(sp) {
                 return jugadoresSeleccionados.some(function(id) { return String(id) === String(sp.id); });
             }).sort(function(a, b) {
                 return (parseInt(a.shirt_number) || 999) - (parseInt(b.shirt_number) || 999);
