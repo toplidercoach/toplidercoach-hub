@@ -45,11 +45,11 @@ const RPE_DESCRIPCIONES = {
 };
 
 // Ventana de envío del RPE (debe coincidir con fn_token_guardar_rpe en Supabase)
-const RPE_ABRE_MIN = 90;    // minutos tras el inicio de la sesión
-const RPE_CIERRA_MIN = 180; // minutos tras el inicio de la sesión
+const RPE_ABRE_MIN = 15;    // minutos tras el inicio de la sesión
+// Cierre: siempre a las 23:59 del día de la sesión (hora local del jugador)
 // Partido (debe coincidir con fn_token_guardar_rpe_partido): referencia inicio + 1h45, abierto 2h
 const RPE_PARTIDO_ABRE_MIN = 105;
-const RPE_PARTIDO_CIERRA_MIN = 225;
+// Cierre partido: también a las 23:59 del día
 
 // Zona horaria del dispositivo del jugador (ej. 'America/Bogota').
 // Se envia al servidor para que la ventana de envio se calcule en SU hora local.
@@ -81,7 +81,8 @@ function ventanaRpe(sesion) {
     inicio.setHours(parseInt(partes[0]), parseInt(partes[1]), 0, 0);
     const esPartido = sesion.tipo === 'partido';
     const abre = new Date(inicio.getTime() + (esPartido ? RPE_PARTIDO_ABRE_MIN : RPE_ABRE_MIN) * 60000);
-    const cierra = new Date(inicio.getTime() + (esPartido ? RPE_PARTIDO_CIERRA_MIN : RPE_CIERRA_MIN) * 60000);
+    const cierra = new Date(inicio.getTime());
+    cierra.setHours(23, 59, 59, 999);
     const ahora = new Date();
     let estado = 'abierto';
     if (ahora < abre) estado = 'antes';
