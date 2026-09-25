@@ -259,11 +259,12 @@ async function cargarAsistenciaRango() {
         
         const { data: spData } = await supabaseClient
             .from('season_players')
-            .select('player_id, shirt_number, players(id, name, photo_url, position, status)')
+            .select('player_id, shirt_number, players(id, name, photo_url, position, status, fecha_baja)')
             .eq('season_id', currentSeasonId)
             .order('shirt_number');
         
-        const jugadores = (spData || []).map(sp => ({
+        const fechaIniRango = getFechaInicio();
+        const jugadores = (spData || []).filter(sp => sp.players && !(sp.players.status === 'baja' && sp.players.fecha_baja && sp.players.fecha_baja <= fechaIniRango)).map(sp => ({
             id: sp.players.id,
             name: sp.players.name,
             photo_url: sp.players.photo_url,
@@ -360,7 +361,17 @@ async function abrirModalAsistenciaSesion(sesionId, esPartido) {
         document.getElementById('asistencia-sesion-nombre').textContent = sesion.name;
         document.getElementById('asistencia-sesion-fecha').textContent = new Date(sesion.session_date + 'T12:00:00').toLocaleDateString('es-ES');
         
-        const jugadoresSesion = sesion.players || [];
+        let jugadoresSesion = sesion.players || [];
+        // Excluir jugadores en baja si la sesion es igual o posterior a su fecha de baja
+        try {
+            const idsSes = jugadoresSesion.map(j => j.player_id).filter(Boolean);
+            if (idsSes.length) {
+                const { data: bajas } = await supabaseClient.from('players').select('id, fecha_baja').in('id', idsSes).eq('status', 'baja');
+                const bajaMap = {};
+                (bajas || []).forEach(b => { bajaMap[b.id] = b.fecha_baja || '0000-00-00'; });
+                jugadoresSesion = jugadoresSesion.filter(j => !(bajaMap[j.player_id] && sesion.session_date >= bajaMap[j.player_id]));
+            }
+        } catch (eB) { console.warn('Filtro bajas:', eB); }
         if (jugadoresSesion.length === 0) {
             document.getElementById('modal-asistencia-jugadores').innerHTML = '<p style="text-align:center;color:#9ca3af;">No hay jugadores en esta sesión</p>';
             return;
@@ -1093,11 +1104,12 @@ async function generarPDFPlantillaGeneral() {
         
         const { data: spData } = await supabaseClient
             .from('season_players')
-            .select('player_id, shirt_number, players(id, name, photo_url, position)')
+            .select('player_id, shirt_number, players(id, name, photo_url, position, status, fecha_baja)')
             .eq('season_id', currentSeasonId)
             .order('shirt_number');
         
-        const jugadores = (spData || []).map(sp => ({
+        const fechaIniPdf = getFechaInicio();
+        const jugadores = (spData || []).filter(sp => sp.players && !(sp.players.status === 'baja' && sp.players.fecha_baja && sp.players.fecha_baja <= fechaIniPdf)).map(sp => ({
             id: sp.players.id, name: sp.players.name, photo_url: sp.players.photo_url,
             position: sp.players.position, shirt_number: sp.shirt_number
         }));
