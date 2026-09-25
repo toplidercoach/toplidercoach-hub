@@ -238,7 +238,7 @@ registrarSubTab('config', 'datos', cargarDatosClub);
             try {
                 let qPlantilla = supabaseClient
                     .from('season_players')
-                    .select('id, player_id, shirt_number, players(id, name, status, position, position_detail, position_secondary, is_sub23, acquisition, photo_url, birth_date, height_cm, weight_kg, dominant_foot)')
+                    .select('id, player_id, shirt_number, players(id, name, status, fecha_baja, position, position_detail, position_secondary, is_sub23, acquisition, photo_url, birth_date, height_cm, weight_kg, dominant_foot)')
                     .eq('season_id', tempId);
                 // Modo Club: solo el equipo seleccionado (o jugadores sin equipo, datos historicos)
                 if (typeof cmState !== 'undefined' && cmState.activo && cmState.equipoSeleccionado) {
@@ -269,7 +269,13 @@ registrarSubTab('config', 'datos', cargarDatosClub);
                     });
                 }
                 
-                const count = (data || []).length;
+                // Bajas al final (no cuentan para el limite de plantilla)
+                (data || []).sort(function(a, b) {
+                    var ba = ((a.players || {}).status === 'baja') ? 1 : 0, bb = ((b.players || {}).status === 'baja') ? 1 : 0;
+                    return ba - bb || ((a.shirt_number || 999) - (b.shirt_number || 999));
+                });
+                const nBajas = (data || []).filter(function(sp) { return (sp.players || {}).status === 'baja'; }).length;
+                const count = (data || []).length - nBajas;
                 
                 const maxJug = (clubData && clubData.max_players) ? clubData.max_players : 40;
                 const contador = document.getElementById('plantilla-contador');
@@ -321,8 +327,9 @@ registrarSubTab('config', 'datos', cargarDatosClub);
                     const j = sp.players || {};
                     const st = statsMap[sp.player_id] || { pj:0, min:0, g:0, a:0, ta:0, tr:0 };
                     const statusClass = j.status || 'available';
-                    const statusIcon = { available: '●', injured: '🏥', suspended: '⛔' }[statusClass] || '●';
-                    const statusText = { available: 'OK', injured: 'Lesión', suspended: 'Sanc.' }[statusClass] || 'OK';
+                    const esBaja = statusClass === 'baja';
+                    const statusIcon = { available: '●', injured: '🏥', suspended: '⛔', baja: '🚪' }[statusClass] || '●';
+                    const statusText = { available: 'OK', injured: 'Lesión', suspended: 'Sanc.', baja: 'Baja' }[statusClass] || 'OK';
                     const inicial = j.name ? j.name.charAt(0).toUpperCase() : '?';
                     const col = posColor(j.position);
                     const posAb = posAbrev(j.position);
@@ -333,7 +340,7 @@ registrarSubTab('config', 'datos', cargarDatosClub);
                     const nombre = j.name ? j.name.split(' ').slice(0, -1).join(' ') : '';
 
 return `
-    <div class="pcard" onclick="abrirFichaJugador('${j.id}')" style="--pos-color:${col};position:relative;overflow:hidden" data-pos="${j.position_detail||''}" data-sub23="${j.is_sub23?'1':'0'}" data-origen="${j.acquisition||''}">
+    <div class="pcard${esBaja ? ' pcard-baja' : ''}" onclick="abrirFichaJugador('${j.id}')" style="--pos-color:${col};position:relative;overflow:hidden${esBaja ? ';opacity:.45;filter:grayscale(.8)' : ''}" title="${esBaja ? 'Baja' + (j.fecha_baja ? ' desde ' + j.fecha_baja.split('-').reverse().join('/') : '') : ''}" data-pos="${j.position_detail||''}" data-sub23="${j.is_sub23?'1':'0'}" data-origen="${j.acquisition||''}">
         ${j.is_sub23 ? '<div style="position:absolute;top:0;right:0;width:74px;height:74px;overflow:hidden;pointer-events:none;z-index:5"><div style="position:absolute;transform:rotate(45deg);background:#7c3aed;color:#fff;font-size:10px;font-weight:800;letter-spacing:.5px;text-align:center;width:100px;top:16px;right:-26px;padding:3px 0;box-shadow:0 1px 4px rgba(0,0,0,.35)">U23</div></div>' : ''}
         ${j.acquisition === 'prueba' ? '<div style="position:absolute;top:0;left:0;width:74px;height:74px;overflow:hidden;pointer-events:none;z-index:5"><div style="position:absolute;transform:rotate(-45deg);background:#f97316;color:#fff;font-size:9px;font-weight:800;text-align:center;width:100px;top:16px;left:-26px;padding:3px 0;box-shadow:0 1px 4px rgba(0,0,0,.35)">A PRUEBA</div></div>' : ''}
         ${j.acquisition === 'prueba' ? '<div style="position:absolute;top:0;left:0;width:74px;height:74px;overflow:hidden;pointer-events:none;z-index:5"><div style="position:absolute;transform:rotate(-45deg);background:#f97316;color:#fff;font-size:9px;font-weight:800;letter-spacing:.3px;text-align:center;width:100px;top:16px;left:-26px;padding:3px 0;box-shadow:0 1px 4px rgba(0,0,0,.35)">A PRUEBA</div></div>' : ''}
@@ -377,6 +384,16 @@ return `
                 }
                 
                 lista.innerHTML = html;
+                // Bloque "Bajas": cabecera antes de la primera baja y la tarjeta "Añadir" delante de ella
+                var primeraBaja = lista.querySelector('.pcard-baja');
+                if (primeraBaja) {
+                    var addCard = lista.querySelector('.add-jugador-card');
+                    if (addCard) lista.insertBefore(addCard, primeraBaja);
+                    var cab = document.createElement('div');
+                    cab.style.cssText = 'grid-column:1/-1;margin-top:18px;padding:6px 0;border-top:1px dashed #475569;color:#94a3b8;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px';
+                    cab.textContent = 'Bajas (' + nBajas + ') · conservan su historial';
+                    lista.insertBefore(cab, primeraBaja);
+                }
                 cmMiClubInyectarFiltros();
                 cmMiClubFiltrar();
                 
@@ -441,6 +458,19 @@ return `
             var sel = document.getElementById('jugador-posicion');
             if (!sel || sel.dataset.mejorada === '1') return;
             sel.dataset.mejorada = '1';
+            // Estado "Baja" + fecha de baja (el jugador deja la plantilla pero conserva su historial)
+            var selEst = document.getElementById('jugador-estado');
+            if (selEst && !selEst.querySelector('option[value="baja"]')) {
+                var opB = document.createElement('option'); opB.value = 'baja'; opB.textContent = 'Baja (deja la plantilla)';
+                selEst.appendChild(opB);
+                var grpEst = selEst.closest('.form-group') || selEst.parentElement;
+                var grpBaja = document.createElement('div');
+                grpBaja.className = 'form-group'; grpBaja.id = 'jugador-fecha-baja-grp'; grpBaja.style.display = 'none';
+                grpBaja.innerHTML = '<label>Fecha de baja</label><input type="date" id="jugador-fecha-baja">' +
+                    '<div style="font-size:11px;color:#6b7280;margin-top:4px">Sus partidos, sesiones y datos anteriores se conservan. A partir de esta fecha deja de aparecer en asistencias, convocatorias y paneles.</div>';
+                grpEst.parentNode.insertBefore(grpBaja, grpEst.nextSibling);
+                selEst.addEventListener('change', function() { cmMiClubToggleBaja(selEst.value); });
+            }
             var grupos = [
                 ['Portería', [['POR','Portero']]],
                 ['Defensa', [['LD','Lateral Derecho'],['LI','Lateral Izquierdo'],['CAD','Carrilero Derecho'],['CAI','Carrilero Izquierdo'],['DCD','Central Derecho'],['DCC','Central'],['DCI','Central Izquierdo']]],
@@ -480,6 +510,20 @@ return `
             }
         }
 
+        function cmMiClubToggleBaja(estado, fecha) {
+            var grp = document.getElementById('jugador-fecha-baja-grp');
+            var inp = document.getElementById('jugador-fecha-baja');
+            if (!grp || !inp) return;
+            if (estado === 'baja') {
+                grp.style.display = '';
+                if (fecha !== undefined) inp.value = fecha || '';
+                if (!inp.value) inp.value = new Date().toISOString().slice(0, 10);
+            } else {
+                grp.style.display = 'none';
+                if (fecha !== undefined) inp.value = fecha || '';
+            }
+        }
+
         function abrirModalJugador() {
             cmMiClubMejorarFicha();
             jugadorEditando = null;
@@ -500,6 +544,7 @@ return `
             document.getElementById('jugador-telefono').value = '';
             document.getElementById('jugador-email').value = '';
             document.getElementById('jugador-estado').value = 'available';
+            cmMiClubToggleBaja('available', '');
             document.getElementById('jugador-documento').value = '';
             document.getElementById('jugador-licencia').value = '';
             document.getElementById('jugador-foto-preview').style.display = 'none';
@@ -531,6 +576,7 @@ return `
             document.getElementById('jugador-telefono').value = player.phone || '';
             document.getElementById('jugador-email').value = player.email || '';
             document.getElementById('jugador-estado').value = player.status || 'available';
+            cmMiClubToggleBaja(player.status || 'available', player.fecha_baja || '');
             document.getElementById('jugador-documento').value = player.document_number || '';
             document.getElementById('jugador-licencia').value = player.federation_license || '';
             
@@ -619,7 +665,10 @@ return `
                 weight_kg: document.getElementById('jugador-peso').value || null,
                 phone: document.getElementById('jugador-telefono').value,
                 email: document.getElementById('jugador-email').value,
-         status: document.getElementById('jugador-estado').value,
+                status: document.getElementById('jugador-estado').value,
+                fecha_baja: document.getElementById('jugador-estado').value === 'baja'
+                    ? ((document.getElementById('jugador-fecha-baja') || {}).value || new Date().toISOString().slice(0, 10))
+                    : null,
                 document_number: document.getElementById('jugador-documento').value || null,
                 federation_license: document.getElementById('jugador-licencia').value || null
             };
@@ -752,7 +801,7 @@ async function generarPDFPlantilla() {
         licencia:    { header: 'Nº Licencia', getValue: (sp) => sp.players?.federation_license || '-' },
         estado:      { header: 'Estado', getValue: (sp) => {
             const st = sp.players?.status;
-            return st === 'available' ? 'Disponible' : st === 'injured' ? 'Lesionado' : st === 'suspended' ? 'Sancionado' : '-';
+            return st === 'available' ? 'Disponible' : st === 'injured' ? 'Lesionado' : st === 'suspended' ? 'Sancionado' : st === 'baja' ? 'Baja' : '-';
         }}
     };
     
