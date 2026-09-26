@@ -124,9 +124,9 @@ async function cargarPanelCargas(contenedorId) {
         if (jugIds.length > 0) {
             const { data: jugs } = await supabaseClient
                 .from('players')
-                .select('id, name, photo_url')
+                .select('id, name, photo_url, status')
                 .in('id', jugIds);
-            (jugs || []).forEach(j => { cgJugadores[j.id] = j; });
+            (jugs || []).forEach(j => { if (j.status !== 'baja') cgJugadores[j.id] = j; });
         }
 
         cgCargas = {};
