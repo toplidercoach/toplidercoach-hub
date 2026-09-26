@@ -55,10 +55,15 @@ async function pdzCargaMicro(periodo) {
         }
         var { data: plantilla, error: errPl } = await supabaseClient
             .from('season_players')
-            .select('player_id, players(id, name)')
+            .select('player_id, players(id, name, status, fecha_baja)')
             .eq('season_id', idTemporada);
         if (errPl) console.error('Plantilla carga micro:', errPl);
-        var jugadores = (plantilla || []).filter(function(sp) { return sp.players; }).map(function(sp) {
+        var jugadores = (plantilla || []).filter(function(sp) {
+            if (!sp.players) return false;
+            // Fuera los jugadores en baja anterior al inicio del micro
+            if (sp.players.status === 'baja' && sp.players.fecha_baja && sp.players.fecha_baja <= periodo.date_start) return false;
+            return true;
+        }).map(function(sp) {
             return { id: sp.player_id, nombre: sp.players.name, dorsal: '', pos: '' };
         }).sort(function(a, b) { return (a.nombre || '').localeCompare(b.nombre || '', 'es'); });
 
