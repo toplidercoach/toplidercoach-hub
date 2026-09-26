@@ -678,6 +678,14 @@ return `
             if (jugadorEditando) {
                 await supabaseClient.from('players').update(playerData).eq('id', jugadorEditando.playerId);
                 await supabaseClient.from('season_players').update({ shirt_number: parseInt(dorsal) }).eq('id', jugadorEditando.spId);
+                // Puente Club Mode: baja -> club_players.active=false; cualquier otro estado -> active=true
+                try {
+                    var esBajaCP = playerData.status === 'baja';
+                    var upCP = await supabaseClient.from('club_players').update({ active: !esBajaCP }).eq('club_id', clubId).eq('legacy_player_id', jugadorEditando.playerId).select('id');
+                    if (!upCP.data || !upCP.data.length) {
+                        await supabaseClient.from('club_players').update({ active: !esBajaCP }).eq('club_id', clubId).ilike('name', playerData.name);
+                    }
+                } catch (eCP) { console.warn('club_players active:', eCP); }
            } else {
                 // Evitar duplicados: si ya existe un jugador con ese nombre en el club, reutilizar su ficha (conserva historial)
                 const normNombre = function(s) { return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim(); };
