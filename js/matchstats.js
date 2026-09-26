@@ -512,7 +512,7 @@ async function generarPDFConvocatoriaDesdeVer(partidoId) {
     document.getElementById('partido-notas-convocatoria').value = p.notas_convocatoria || '';
     
     // Cargar convocados y titulares
-    plantillaPartido = await cargarPlantillaParaPDF();
+    plantillaPartido = msPlantillaActiva(await cargarPlantillaParaPDF());
     convocadosPartido = (p.convocados || []).map(c => String(c.id));
     titularesPartido = (p.titulares || []).map(t => String(t.id));
     
@@ -522,7 +522,7 @@ async function generarPDFConvocatoriaDesdeVer(partidoId) {
 async function cargarPlantillaParaPDF() {
     const { data } = await supabaseClient
         .from('season_players')
-        .select('id, player_id, shirt_number, players(id, name, position, photo_url)')
+        .select('id, player_id, shirt_number, players(id, name, position, photo_url, status, fecha_baja)')
         .eq('season_id', seasonId)
         .order('shirt_number');
     return data || [];
@@ -544,7 +544,7 @@ async function cargarPlantillaParaPDF() {
     try {
         const { data, error } = await supabaseClient
             .from('season_players')
-            .select('id, player_id, shirt_number, players(id, name, position, photo_url)')
+            .select('id, player_id, shirt_number, players(id, name, position, photo_url, status, fecha_baja)')
             .eq('season_id', seasonId)
             .order('shirt_number');
         
@@ -569,10 +569,28 @@ async function cargarPlantillaParaPDF() {
     }
 }
 
+// Plantilla sin los jugadores en baja cuya fecha de baja sea igual o anterior a la fecha del partido del formulario
+function msPlantillaActiva(lista) {
+    var f = (document.getElementById('partido-fecha') || {}).value || new Date().toISOString().slice(0, 10);
+    return (lista || plantillaPartido || []).filter(function(sp) {
+        var p = sp.players || {};
+        if (p.status !== 'baja') return true;
+        return !(p.fecha_baja && f >= p.fecha_baja);
+    });
+}
+document.addEventListener('change', function(e) {
+    if (e.target && e.target.id === 'partido-fecha' && plantillaPartido && plantillaPartido.length) {
+        try { renderizarConvocatoria(); if (typeof renderizarAlineacion === 'function') renderizarAlineacion(); } catch (er) { console.error(er); }
+    }
+});
+
 function renderizarConvocatoria() {
             const grid = document.getElementById('convocatoria-grid');
             
-            grid.innerHTML = plantillaPartido.map(sp => {
+            const activosConv = msPlantillaActiva();
+            convocadosPartido = convocadosPartido.filter(id => activosConv.some(sp => String(sp.id) === String(id)));
+            titularesPartido = titularesPartido.filter(id => activosConv.some(sp => String(sp.id) === String(id)));
+            grid.innerHTML = activosConv.map(sp => {
                 const j = sp.players;
                 if (!j) return '';
                 const seleccionado = convocadosPartido.includes(String(sp.id));
@@ -866,7 +884,7 @@ function renderizarConvocatoria() {
     
     // No convocados
     if (noConvGrid && noConvSection) {
-        const noConvocados = plantillaPartido.filter(sp => !convocadosPartido.includes(String(sp.id)));
+        const noConvocados = msPlantillaActiva().filter(sp => !convocadosPartido.includes(String(sp.id)));
         if (noConvocados.length > 0) {
             noConvSection.style.display = 'block';
             noConvGrid.innerHTML = noConvocados.slice(0, 8).map(sp => {
@@ -1914,8 +1932,8 @@ async function abrirComparativaJugadores() {
     // Cargar plantilla
     var jugadores = [];
     try {
-        var { data } = await supabaseClient.from('season_players').select('id,shirt_number,players(id,name,position,ratings,photo_url)').eq('season_id', seasonId).order('shirt_number', { ascending: true });
-        jugadores = (data || []).filter(function(sp) { return sp.players && sp.players.id !== _radarPlayerId; });
+        var { data } = await supabaseClient.from('season_players').select('id,shirt_number,players(id,name,position,ratings,photo_url,status)').eq('season_id', seasonId).order('shirt_number', { ascending: true });
+        jugadores = (data || []).filter(function(sp) { return sp.players && sp.players.id !== _radarPlayerId && sp.players.status !== 'baja'; });
     } catch (e) { showToast('Error cargando jugadores'); return; }
 
     var prev = document.getElementById('modal-comparar');
