@@ -40,7 +40,7 @@
   .hero .circle{position:absolute;right:-8%;top:-40%;width:min(70vw,760px);aspect-ratio:1;border:3px solid rgba(247,244,234,.10);border-radius:50%;pointer-events:none}
   .hero .circle::after{content:"";position:absolute;left:50%;top:50%;width:16px;height:16px;margin:-8px;border-radius:50%;background:rgba(247,244,234,.14)}
   .hero .line{position:absolute;left:0;right:0;top:calc(-40% + min(35vw,380px) - 2px);height:3px;background:rgba(247,244,234,.08);pointer-events:none}
-  .hero h1{font-size:clamp(44px,7.2vw,96px);letter-spacing:-.01em;max-width:14ch}
+  .hero h1{font-size:clamp(38px,7.2vw,96px);letter-spacing:-.01em;max-width:14ch}
   .hero h1 small{display:block;font-size:.42em;font-weight:600;color:var(--amber);letter-spacing:.01em;margin-bottom:14px}
   .hero p{max-width:60ch;color:var(--ink-2);font-size:19px;margin:24px 0 0}
   .hero p strong{color:var(--ink);font-weight:600}
@@ -56,7 +56,7 @@
   .door{position:relative;background:linear-gradient(180deg,var(--slate-2),var(--slate));border:1px solid var(--line);border-top-width:6px;border-top-color:#3b4a63;border-radius:6px 6px 4px 4px;min-height:290px;padding:22px 18px 18px;display:flex;flex-direction:column;text-align:left;color:inherit;cursor:pointer;font:inherit;transition:transform .18s ease,border-color .18s ease}
   .door:hover{transform:translateY(-3px);border-top-color:var(--amber)}
   .door[aria-expanded="true"]{border-top-color:var(--amber);background:linear-gradient(180deg,#2b3a52,var(--slate))}
-  .door .plate{align-self:flex-start;background:linear-gradient(180deg,#e2c46a,var(--brass) 55%,#a8843a);color:#2b2205;font-family:"Barlow Condensed";font-weight:700;font-size:17px;letter-spacing:.06em;padding:5px 12px;border-radius:2px;box-shadow:inset 0 1px 0 rgba(255,255,255,.55),0 1px 0 var(--brass-2)}
+  .door .plate{align-self:flex-start;max-width:100%;background:linear-gradient(180deg,#e2c46a,var(--brass) 55%,#a8843a);color:#2b2205;font-family:"Barlow Condensed";font-weight:700;font-size:17px;line-height:1.15;letter-spacing:.06em;padding:5px 12px;border-radius:2px;box-shadow:inset 0 1px 0 rgba(255,255,255,.55),0 1px 0 var(--brass-2)}
   .door .plate::before,.door .plate::after{content:"";position:absolute;width:5px;height:5px;border-radius:50%;background:#6b5522;top:9px}
   .door .plate{position:relative}
   .door .plate::before{left:4px}.door .plate::after{right:4px}
@@ -121,8 +121,13 @@
     .facts{gap:8px 18px}
     .doors{grid-template-columns:repeat(2,1fr);gap:10px}
     .door{min-height:220px;padding:16px 14px 14px}
-    .door .who b{font-size:22px}
+    .door .who b{font-size:21px}
+    .door .plate{font-size:14px;padding:4px 9px}
+    .door .ver{font-size:13px}
+    .open{padding:20px 16px 18px}
+    .open h3{font-size:26px}
     .top a.cliente{display:none}
+    .cta .row a.btn{width:100%;text-align:center}
   }
 </style>
 </head>
@@ -131,7 +136,7 @@
 <header>
   <div class="wrap top">
     <a class="mark" href="https://toplidercoach.com/"><i aria-hidden="true"></i>TopLiderCoach</a>
-    <a class="cliente" href="https://toplidercoach.github.io/toplidercoach-hub/">Ya soy cliente</a>
+    <a class="cliente" href="https://toplidercoach.com/planificadorpro/">Ya soy cliente</a>
   </div>
 </header>
 
@@ -205,7 +210,7 @@
 
 <script>
 /* ===== Configuración ===== */
-var HUB_URL = 'https://toplidercoach.github.io/toplidercoach-hub/';
+var HUB_URL = 'https://toplidercoach.com/planificadorpro/';
 var SUPABASE_URL = 'https://cqteodxyvavyroxeshoz.supabase.co';
 var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNxdGVvZHh5dmF2eXJveGVzaG96Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUyNzc2OTksImV4cCI6MjA4MDg1MzY5OX0.8sJC6twae2pnrf8NDVlOV2KnSOhBC1RrqWC0IiuE614';
 
