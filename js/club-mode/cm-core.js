@@ -392,10 +392,18 @@ function cmAplicarPermisos() {
     var plan = cmGestionarSubtabs('.planificador-subtabs .sub-tab', 'planificador', CM_PLAN_SUBTABS);
     var gc   = cmGestionarSubtabs('#modulo-matchstats .sub-tab', 'matchstats', CM_GC_SUBTABS);
 
+    // Mi Club: solo la plantilla es de campo; Datos y Temporadas son configuracion del club
+    var CM_CONFIG_SUBTABS = {
+        'datos':      ['configuracion_club'],
+        'temporadas': ['configuracion_club'],
+        'plantilla':  ['plantilla', 'plantilla_maestra']
+    };
+    var cfg  = cmGestionarSubtabs('.config-subtabs .sub-tab', 'config', CM_CONFIG_SUBTABS);
+
     // ===== Pestanas principales: candado en vez de ocultar =====
     var MAPEO_HUB_PERMISOS = {
         'pizarra':    ['pizarra'],
-        'config':     ['configuracion_club'],
+
         'staff':      ['cuerpo_tecnico_ia'],
         'medico':     ['modulo_medico'],
         'pagos':      ['pagos_cuotas'],
@@ -417,6 +425,10 @@ function cmAplicarPermisos() {
         }
         if (mod === 'matchstats') {
             if (!gc.alguna) cmBloquear(tab);
+            return;
+        }
+        if (mod === 'config') {
+            if (!cfg.alguna) cmBloquear(tab);
             return;
         }
         var claves = MAPEO_HUB_PERMISOS[mod];
@@ -443,6 +455,7 @@ function cmAplicarPermisos() {
     // Si la subpestana por defecto esta bloqueada, activar la primera permitida
     if (plan.alguna && !plan.defaultOk && plan.primera) { try { plan.primera.click(); } catch (e) {} }
     if (gc.alguna && !gc.defaultOk && gc.primera)       { try { gc.primera.click(); } catch (e) {} }
+    if (cfg.alguna && !cfg.defaultOk && cfg.primera)    { try { cfg.primera.click(); } catch (e) {} }
 }
 
 // ========== PANTALLA "EN DESARROLLO" ==========
