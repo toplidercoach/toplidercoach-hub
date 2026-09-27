@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Demo TopLiderCoach — entra en un club real con tu cargo</title>
+<meta name="description" content="Prueba TopLiderCoach sin registro: entra en Rapid Alianza, un club de Primera Federación con 7 equipos y 142 jugadores, con el despacho que tú tengas en tu club.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#0f172a; --slate:#1e293b; --slate-2:#273449; --line:#334155;
+    --ink:#e8edf5; --ink-2:#aab6c8; --ink-3:#7d8aa0;
+    --amber:#f59e0b; --amber-2:#d97706; --chalk:#f7f4ea; --pitch:#1f7a4d;
+    --brass:#c9a24a; --brass-2:#8a6d2b;
+    --w:1180px;
+    box-sizing:border-box;
+  }
+  *,*::before,*::after{box-sizing:inherit}
+  html{scroll-behavior:smooth}
+  @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto} *{transition:none!important;animation:none!important}}
+  body{margin:0;background:var(--navy);color:var(--ink);font-family:"Barlow",system-ui,sans-serif;font-size:17px;line-height:1.55;-webkit-font-smoothing:antialiased}
+  a{color:inherit}
+  h1,h2,h3{font-family:"Barlow Condensed","Barlow",sans-serif;font-weight:700;line-height:1;margin:0}
+  .wrap{width:min(var(--w),calc(100% - 40px));margin:0 auto}
+  :focus-visible{outline:3px solid var(--amber);outline-offset:3px;border-radius:4px}
+
+  /* ---------- Cabecera ---------- */
+  header{position:sticky;top:0;z-index:20;background:rgba(15,23,42,.85);backdrop-filter:blur(10px);border-bottom:1px solid rgba(255,255,255,.06)}
+  .top{display:flex;align-items:center;justify-content:space-between;height:64px}
+  .mark{display:flex;align-items:center;gap:10px;text-decoration:none;font-family:"Barlow Condensed";font-weight:700;font-size:22px;letter-spacing:.02em}
+  .mark i{width:30px;height:30px;border-radius:50%;background:conic-gradient(var(--amber) 0 75%,var(--chalk) 75% 100%);display:inline-block;position:relative}
+  .mark i::after{content:"";position:absolute;inset:9px;border-radius:50%;background:var(--navy)}
+  .top a.cliente{font-size:15px;color:var(--ink-2);text-decoration:none;border:1px solid var(--line);padding:8px 14px;border-radius:999px}
+  .top a.cliente:hover{color:var(--ink);border-color:var(--ink-3)}
+
+  /* ---------- Hero ---------- */
+  .hero{position:relative;padding:72px 0 40px;overflow:hidden}
+  .hero .circle{position:absolute;right:-8%;top:-40%;width:min(70vw,760px);aspect-ratio:1;border:3px solid rgba(247,244,234,.10);border-radius:50%;pointer-events:none}
+  .hero .circle::after{content:"";position:absolute;left:50%;top:50%;width:16px;height:16px;margin:-8px;border-radius:50%;background:rgba(247,244,234,.14)}
+  .hero .line{position:absolute;left:0;right:0;top:calc(-40% + min(35vw,380px) - 2px);height:3px;background:rgba(247,244,234,.08);pointer-events:none}
+  .hero h1{font-size:clamp(44px,7.2vw,96px);letter-spacing:-.01em;max-width:14ch}
+  .hero h1 small{display:block;font-size:.42em;font-weight:600;color:var(--amber);letter-spacing:.01em;margin-bottom:14px}
+  .hero p{max-width:60ch;color:var(--ink-2);font-size:19px;margin:24px 0 0}
+  .hero p strong{color:var(--ink);font-weight:600}
+  .facts{display:flex;flex-wrap:wrap;gap:10px 28px;margin-top:28px;color:var(--ink-3);font-size:15px}
+  .facts span b{color:var(--ink);font-weight:600}
+
+  /* ---------- Pasillo de despachos ---------- */
+  .pasillo{padding:36px 0 80px;background:
+     linear-gradient(180deg,rgba(255,255,255,0) 0,rgba(255,255,255,.025) 100%)}
+  .pasillo h2{font-size:clamp(28px,3.6vw,40px);font-weight:600;color:var(--ink);margin-bottom:6px}
+  .pasillo .sub{color:var(--ink-3);margin:0 0 28px}
+  .doors{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px;align-items:start}
+  .door{position:relative;background:linear-gradient(180deg,var(--slate-2),var(--slate));border:1px solid var(--line);border-top-width:6px;border-top-color:#3b4a63;border-radius:6px 6px 4px 4px;min-height:290px;padding:22px 18px 18px;display:flex;flex-direction:column;text-align:left;color:inherit;cursor:pointer;font:inherit;transition:transform .18s ease,border-color .18s ease}
+  .door:hover{transform:translateY(-3px);border-top-color:var(--amber)}
+  .door[aria-expanded="true"]{border-top-color:var(--amber);background:linear-gradient(180deg,#2b3a52,var(--slate))}
+  .door .plate{align-self:flex-start;background:linear-gradient(180deg,#e2c46a,var(--brass) 55%,#a8843a);color:#2b2205;font-family:"Barlow Condensed";font-weight:700;font-size:17px;letter-spacing:.06em;padding:5px 12px;border-radius:2px;box-shadow:inset 0 1px 0 rgba(255,255,255,.55),0 1px 0 var(--brass-2)}
+  .door .plate::before,.door .plate::after{content:"";position:absolute;width:5px;height:5px;border-radius:50%;background:#6b5522;top:9px}
+  .door .plate{position:relative}
+  .door .plate::before{left:4px}.door .plate::after{right:4px}
+  .door .who{margin-top:auto;padding-top:22px}
+  .door .who b{display:block;font-family:"Barlow Condensed";font-weight:600;font-size:26px;line-height:1.05;letter-spacing:.005em}
+  .door .who span{display:block;color:var(--ink-3);font-size:14px;margin-top:6px;line-height:1.4}
+  .door .knob{position:absolute;right:16px;top:50%;width:10px;height:10px;border-radius:50%;background:var(--brass);box-shadow:0 0 0 3px rgba(201,162,74,.18)}
+  .door .ver{margin-top:14px;font-size:14px;color:var(--amber);font-weight:600}
+
+  /* Panel abierto (qué verás + entrar) */
+  .open{grid-column:1/-1;background:var(--slate);border:1px solid var(--line);border-left:4px solid var(--amber);border-radius:6px;padding:26px 26px 22px;display:grid;grid-template-columns:1.2fr .8fr;gap:28px}
+  .open h3{font-size:30px;font-weight:600;margin-bottom:6px}
+  .open .role{color:var(--amber);font-family:"Barlow Condensed";font-weight:700;font-size:17px;letter-spacing:.06em;margin-bottom:12px}
+  .open ul{margin:14px 0 0;padding:0;list-style:none;display:grid;gap:9px}
+  .open li{position:relative;padding-left:20px;color:var(--ink-2)}
+  .open li::before{content:"";position:absolute;left:0;top:.62em;width:9px;height:9px;border-radius:2px;background:var(--pitch)}
+  .open li b{color:var(--ink);font-weight:600}
+  .enter{background:#101a2e;border:1px solid var(--line);border-radius:6px;padding:20px;display:flex;flex-direction:column;gap:12px}
+  .enter label{font-size:14px;color:var(--ink-2)}
+  .enter input{width:100%;font:inherit;font-size:16px;color:var(--ink);background:var(--navy);border:1px solid var(--line);border-radius:6px;padding:12px 14px}
+  .enter input::placeholder{color:var(--ink-3)}
+  .btn{font-family:"Barlow Condensed";font-weight:700;font-size:20px;letter-spacing:.04em;border:0;border-radius:6px;padding:14px 18px;cursor:pointer;color:#1a1200;background:var(--amber);transition:background .15s}
+  .btn:hover{background:#fbbf24}
+  .btn.ghost{background:transparent;color:var(--ink-2);border:1px solid var(--line);font-size:17px;padding:11px 16px}
+  .btn.ghost:hover{color:var(--ink);border-color:var(--ink-3)}
+  .enter .fine{font-size:13px;color:var(--ink-3);margin:0}
+  .close{position:absolute;right:14px;top:12px;background:none;border:0;color:var(--ink-3);font-size:22px;cursor:pointer;line-height:1}
+  .open{position:relative}
+
+  /* ---------- Por qué es distinto ---------- */
+  .why{padding:60px 0 80px;border-top:1px solid rgba(255,255,255,.06)}
+  .why .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:40px}
+  .why h2{font-size:clamp(28px,3.6vw,40px);font-weight:600;margin-bottom:34px;max-width:22ch}
+  .why h3{font-size:24px;font-weight:600;margin-bottom:10px}
+  .why p{color:var(--ink-2);margin:0;font-size:16px}
+  .why .grid>div{border-left:3px solid var(--amber);padding-left:18px}
+
+  /* ---------- Cierre ---------- */
+  .cta{padding:60px 0 90px;background:var(--chalk);color:#1a2333}
+  .cta h2{font-size:clamp(32px,4.2vw,52px);max-width:18ch;color:#0f172a}
+  .cta p{max-width:58ch;color:#3b465a;font-size:18px;margin:16px 0 26px}
+  .cta .row{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+  .cta a.btn{text-decoration:none;display:inline-block}
+  .cta a.btn.ghost{color:#0f172a;border-color:#8a93a5}
+  footer{padding:26px 0;color:var(--ink-3);font-size:14px;display:flex;flex-wrap:wrap;gap:10px 24px;justify-content:space-between}
+
+  /* Pantalla de paso al HUB */
+  .pass{position:fixed;inset:0;background:var(--navy);display:none;align-items:center;justify-content:center;z-index:50;text-align:center;padding:24px}
+  .pass.on{display:flex}
+  .pass h2{font-size:clamp(30px,5vw,56px);font-weight:600}
+  .pass p{color:var(--ink-2);margin:12px 0 0}
+  .pass .bar{width:min(320px,80vw);height:4px;background:var(--line);margin:28px auto 0;border-radius:2px;overflow:hidden}
+  .pass .bar i{display:block;height:100%;width:0;background:var(--amber);animation:fill .9s ease forwards}
+  @keyframes fill{to{width:100%}}
+
+  @media (max-width:900px){
+    .open{grid-template-columns:1fr}
+    .why .grid{grid-template-columns:1fr;gap:26px}
+  }
+  @media (max-width:560px){
+    .hero{padding-top:44px}
+    .facts{gap:8px 18px}
+    .doors{grid-template-columns:repeat(2,1fr);gap:10px}
+    .door{min-height:220px;padding:16px 14px 14px}
+    .door .who b{font-size:22px}
+    .top a.cliente{display:none}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap top">
+    <a class="mark" href="https://toplidercoach.com/"><i aria-hidden="true"></i>TopLiderCoach</a>
+    <a class="cliente" href="https://toplidercoach.com/planificadorpro/">Ya soy cliente</a>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="circle" aria-hidden="true"></div>
+  <div class="line" aria-hidden="true"></div>
+  <div class="wrap">
+    <h1><small>Demo sin registro</small>Entra en un club real con el cargo que tienes en el tuyo</h1>
+    <p><strong>Rapid Alianza</strong> es un club de Primera Federación con siete equipos, 142 jugadores y 19 personas de cuerpo técnico. Todo lo que verás dentro son datos de esta temporada: la Liga acaba de empezar, hay dos lesionados en tratamiento y un certificado médico a punto de caducar. Elige tu despacho y entra. Si tu cargo no está, entra como Dirección y lo verás todo.</p>
+    <div class="facts">
+      <span><b>7</b> equipos</span>
+      <span><b>142</b> jugadores</span>
+      <span><b>19</b> miembros de staff</span>
+      <span><b>11</b> despachos</span>
+      <span>Sin tarjeta, sin registro</span>
+    </div>
+  </div>
+</section>
+
+<section class="pasillo" id="despachos">
+  <div class="wrap">
+    <h2>Elige tu despacho</h2>
+    <p class="sub">Cada persona del club ve solo lo que le corresponde. Prueba a entrar con dos cargos distintos y compara.</p>
+    <div class="doors" id="doors" role="list"></div>
+  </div>
+</section>
+
+<section class="why">
+  <div class="wrap">
+    <h2>Lo que vas a notar en los dos primeros minutos</h2>
+    <div class="grid">
+      <div>
+        <h3>Cada despacho ve solo lo suyo</h3>
+        <p>Entra como fisioterapeuta y no verás las cuotas. Entra como tesorero y no verás las lesiones. Los datos de salud de un menor no pasan por manos que no deben tocarlos. Eso no es una opción de configuración: es cómo está construido.</p>
+      </div>
+      <div>
+        <h3>El campo y la oficina en la misma casa</h3>
+        <p>La lesión que registra el médico cambia el semáforo del entrenador, avisa al fisio y aparece en la carga del preparador físico. La cuota cobrada entra en la contabilidad y en el control económico de la RFEF. Nadie copia nada dos veces.</p>
+      </div>
+      <div>
+        <h3>Un club vivo, no una captura</h3>
+        <p>El próximo partido es esta semana, la agenda del fisio tiene citas mañana y la Dirección tiene entregas de la RFEF que vencen el día 30. Rapid Alianza está siempre en la misma semana de temporada que tú.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="cta">
+  <div class="wrap">
+    <h2>¿Quieres esto para tu club?</h2>
+    <p>Te preparamos un club como Rapid Alianza con tus equipos, tu staff y tus jugadores, y lo recorremos juntos en una llamada de 30 minutos. Sin compromiso.</p>
+    <div class="row">
+      <a class="btn" href="mailto:info@toplidercoach.com?subject=Quiero%20TopLiderCoach%20para%20mi%20club">Pedir una llamada</a>
+      <a class="btn ghost" href="#despachos">Volver a los despachos</a>
+    </div>
+  </div>
+</section>
+
+<footer class="wrap">
+  <span>TopLiderCoach · Rapid Alianza es un club de demostración: nombres, jugadores y datos son ficticios.</span>
+  <a href="https://toplidercoach.com/" style="color:var(--ink-2);text-decoration:none">toplidercoach.com</a>
+</footer>
+
+<div class="pass" id="pass" aria-live="polite">
+  <div>
+    <h2 id="pass-title">Abriendo tu despacho</h2>
+    <p id="pass-sub"></p>
+    <div class="bar"><i></i></div>
+  </div>
+</div>
+
+<script>
+/* ===== Configuración ===== */
+var HUB_URL = 'https://toplidercoach.com/planificadorpro/';
+var SUPABASE_URL = 'https://cqteodxyvavyroxeshoz.supabase.co';
+var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNxdGVvZHh5dmF2eXJveGVzaG96Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUyNzc2OTksImV4cCI6MjA4MDg1MzY5OX0.8sJC6twae2pnrf8NDVlOV2KnSOhBC1RrqWC0IiuE614';
+
+/* ===== Despachos (miembros reales de Rapid Alianza) ===== */
+var ROLES = [
+  { slug:'direccion', rol:'Dirección', nombre:'Dirección Rapid Alianza', tag:'Ve todo el club', wp:100000014, username:'demo.direccion',
+    intro:'Es el cargo con visión completa: los siete equipos y todos los despachos, del campo a la oficina.',
+    ves:['<b>Semáforo de disponibilidad</b> de toda la plantilla en una pantalla','<b>Cuotas, contabilidad y Control RFEF</b> con el ratio de coste de plantilla','<b>Miembros y permisos</b>: quién ve qué, por cargo','El próximo partido, la agenda del fisio y las circulares a familias'] },
+  { slug:'entrenador', rol:'Entrenador', nombre:'Roberto Cifuentes', tag:'Primer equipo', wp:100000017, username:'demo.entrenador',
+    intro:'Entrena al primer equipo. Liga recién empezada, partido el martes y dos bajas que le cambian la convocatoria.',
+    ves:['<b>Plantilla y semáforo</b>: quién está apto, limitado o de baja, sin ver el diagnóstico','<b>Sesiones de entrenamiento</b> planificadas hasta el próximo partido de Copa','<b>RPE y carga</b> de cada jugador tras cada sesión','<b>Dossier del rival</b> preparado por el analista para el martes'] },
+  { slug:'director-deportivo', rol:'Director Deportivo', nombre:'Jorge Villanueva', tag:'Todos los equipos', wp:100000015, username:'demo.dd',
+    intro:'Planifica la plantilla de la próxima temporada y aprueba los gastos del cuerpo técnico.',
+    ves:['<b>Plan de temporada</b> y objetivos de fichaje por posición','<b>Agentes</b> con los que se negocia','<b>Hojas de gastos</b> de scouting pendientes de su aprobación','<b>Plantilla maestra</b> de los siete equipos'] },
+  { slug:'medico', rol:'Médico', nombre:'Dra. Irene Salgado', tag:'Despacho privado', wp:100000025, username:'demo.medico',
+    intro:'La única persona del club que ve el diagnóstico. Lo que decide aquí cambia el semáforo del entrenador.',
+    ves:['<b>Seis lesiones</b> con código OSIICS, mapa corporal y protocolo de vuelta al juego','<b>Fichas médicas</b> de 25 jugadores, con una alerta de certificado caducado','<b>Consentimientos RGPD</b> firmados por las familias','Historial y evaluaciones OSTRC por jugador'] },
+  { slug:'fisio', rol:'Fisioterapeuta', nombre:'Claudia Reguera', tag:'Primer equipo y filial', wp:100000026, username:'demo.fisio',
+    intro:'Trata a los lesionados que le deriva el médico y le cuenta al entrenador, cada tarde, quién está y quién no.',
+    ves:['<b>Cuatro tratamientos activos</b>, uno en fase aguda (rotura fibrilar)','<b>Agenda de la semana</b> con siete citas programadas','<b>Sesiones SOAP</b> con dolor, técnicas y recomendación al entrenador','<b>Informe diario</b> que le llega al entrenador como notificación'] },
+  { slug:'preparador-fisico', rol:'Preparador Físico', nombre:'Víctor Landa', tag:'Primer equipo', wp:100000028, username:'demo.pf',
+    intro:'Controla la carga del primer equipo y decide cuándo un jugador puede volver a sprintar.',
+    ves:['<b>GPS</b> de las últimas diez sesiones, jugador por jugador','<b>Tests físicos</b>: dos baterías con evolución (CMJ, sprint, Yo-Yo…)','<b>Antropometría</b> con pliegues y porcentaje graso','<b>ACWR y monotonía</b> calculados solos desde el RPE'] },
+  { slug:'analista', rol:'Analista', nombre:'Hugo Cerezo', tag:'Primer equipo y filial', wp:100000029, username:'demo.analista',
+    intro:'Ve los partidos de los rivales, prepara el dossier del martes y pasa sus gastos de desplazamiento.',
+    ves:['<b>Dossieres de rival</b>: sistema, puntos fuertes, jugadores clave, balón parado','<b>Partidos observados</b> con notas y vídeo','<b>Sus hojas de gastos</b>: una pagada, una aprobada y una en borrador','Informes de jugadores en seguimiento'] },
+  { slug:'economico', rol:'Gestor Económico', nombre:'Montserrat Vidal', tag:'Oficina', wp:100000031, username:'demo.economico',
+    intro:'Lleva las cuotas de 96 familias, la contabilidad del club y las entregas al control económico de la RFEF.',
+    ves:['<b>Cuotas</b>: cobros del mes, morosos y recibos','<b>Contabilidad</b> por partida doble con libro diario','<b>Control RFEF</b>: semáforo de entregas y ratio de coste de plantilla al 64,6%','<b>Patrocinadores</b> con contratos y calendario de cobros'] },
+  { slug:'cantera', rol:'Coordinador de Cantera', nombre:'Sergio Lastra', tag:'5 equipos de cantera', wp:100000016, username:'demo.cantera',
+    intro:'Coordina desde el Benjamín hasta el Juvenil y es la voz del club hacia las familias.',
+    ves:['<b>Cinco plantillas</b> de cantera con sus entrenadores','<b>Directorio de familias</b> y circulares con confirmación de lectura','<b>Asistencia y RPE</b> de los equipos de formación','Semáforo de disponibilidad de la cantera'] },
+  { slug:'utillero', rol:'Utillero', nombre:'Emilio Roales', tag:'Todo el club', wp:100000030, username:'demo.utillero',
+    intro:'Gestiona el almacén, sabe la talla de los 142 jugadores y recibe las peticiones del resto del staff.',
+    ves:['<b>Almacén</b> con alertas de stock bajo mínimo','<b>Tallas</b> de camiseta, pantalón, medias y botas de cada jugador','<b>Peticiones</b> del cuerpo técnico, con una urgente de la fisio','Entregas y devoluciones de material'] }
+];
+
+var doorsEl = document.getElementById('doors');
+var abierto = null;
+
+function render(){
+  doorsEl.innerHTML = '';
+  ROLES.forEach(function(r, i){
+    var b = document.createElement('button');
+    b.className = 'door'; b.type = 'button'; b.setAttribute('role','listitem');
+    b.setAttribute('aria-expanded', abierto === i ? 'true' : 'false');
+    b.setAttribute('aria-controls', 'open-panel');
+    b.innerHTML = '<span class="plate">' + r.rol + '</span><span class="knob" aria-hidden="true"></span>' +
+      '<span class="who"><b>' + r.nombre + '</b><span>' + r.tag + '</span></span>' +
+      '<span class="ver">' + (abierto === i ? 'Cerrar' : 'Abrir la puerta') + '</span>';
+    b.addEventListener('click', function(){ abierto = (abierto === i) ? null : i; render(); if (abierto !== null) scrollToPanel(); });
+    doorsEl.appendChild(b);
+    if (abierto === i) doorsEl.appendChild(panel(r));
+  });
+}
+
+function panel(r){
+  var d = document.createElement('div');
+  d.className = 'open'; d.id = 'open-panel';
+  d.innerHTML =
+    '<button class="close" type="button" aria-label="Cerrar">×</button>' +
+    '<div><div class="role">' + r.rol + '</div><h3>' + r.nombre + '</h3><p style="margin:0;color:var(--ink-2)">' + r.intro + '</p>' +
+    '<ul>' + r.ves.map(function(v){ return '<li>' + v + '</li>'; }).join('') + '</ul></div>' +
+    '<form class="enter" novalidate>' +
+      '<label for="email-' + r.slug + '">¿Te enviamos el acceso por correo para volver más tarde? (opcional)</label>' +
+      '<input id="email-' + r.slug + '" type="email" name="email" placeholder="tu@club.com" autocomplete="email">' +
+      '<button class="btn" type="submit">Entrar como ' + r.rol.toLowerCase() + '</button>' +
+      '<button class="btn ghost" type="button" data-skip>Entrar sin dejar correo</button>' +
+      '<p class="fine">No creamos ninguna cuenta. Entras directamente en el club.</p>' +
+    '</form>';
+  d.querySelector('.close').addEventListener('click', function(){ abierto = null; render(); });
+  var form = d.querySelector('form');
+  form.addEventListener('submit', function(e){ e.preventDefault(); entrar(r, form.email.value.trim()); });
+  d.querySelector('[data-skip]').addEventListener('click', function(){ entrar(r, ''); });
+  return d;
+}
+
+function scrollToPanel(){
+  var p = document.getElementById('open-panel');
+  if (p) setTimeout(function(){ p.scrollIntoView({ behavior:'smooth', block:'nearest' }); }, 30);
+}
+
+function guardarLead(email, r){
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return Promise.resolve();
+  return fetch(SUPABASE_URL + '/rest/v1/demo_leads', {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json', 'apikey':SUPABASE_KEY, 'Authorization':'Bearer ' + SUPABASE_KEY, 'Prefer':'return=minimal' },
+    body: JSON.stringify({ email:email, role_slug:r.slug, source:'demo-page', user_agent:navigator.userAgent.slice(0,200) })
+  }).catch(function(){});
+}
+
+function entrar(r, email){
+  var pass = document.getElementById('pass');
+  document.getElementById('pass-title').textContent = 'Abriendo el despacho de ' + r.nombre;
+  document.getElementById('pass-sub').textContent = r.rol + ' · Rapid Alianza';
+  pass.classList.add('on');
+
+  // Pase del visitante: el HUB lo reconoce como miembro de Rapid Alianza
+  try {
+    localStorage.removeItem('cm_auth');
+    localStorage.removeItem('hub_supabase_jwt');
+    // Sesion propia de Supabase Auth (si el navegador la tenia de un login anterior): fuera
+    Object.keys(localStorage).forEach(function(k){ if (k.indexOf('sb-') === 0) localStorage.removeItem(k); });
+    localStorage.setItem('hub_user', JSON.stringify({
+      id: r.wp, name: r.nombre, display_name: r.nombre, username: r.username, email: r.username + '@toplidercoach.com', demo: true
+    }));
+    localStorage.setItem('hub_token', 'demo');
+    localStorage.setItem('tlc_demo_role', r.slug);
+  } catch(e) {}
+
+  guardarLead(email, r).then(function(){
+    setTimeout(function(){ window.location.href = HUB_URL; }, 900);
+  });
+}
+
+// Entrada directa por URL: /demo/?rol=fisio
+(function(){
+  var q = new URLSearchParams(location.search).get('rol');
+  if (q) { var i = ROLES.findIndex(function(r){ return r.slug === q; }); if (i >= 0) abierto = i; }
+  render();
+  if (abierto !== null) scrollToPanel();
+})();
+</script>
+</body>
+</html>
