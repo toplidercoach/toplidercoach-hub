@@ -110,10 +110,14 @@
     function hablar(t) {
         if (mudo || !t || !('speechSynthesis' in window)) return;
         speechSynthesis.cancel();
-        var u = new SpeechSynthesisUtterance(t.replace(/<[^>]+>/g, '')); u.lang = 'es-ES'; if (vozES) u.voice = vozES;
-        speechSynthesis.speak(u);
+        var texto = t.replace(/<[^>]+>/g, '');
+        clearTimeout(hablar._t);
+        hablar._t = setTimeout(function () {
+            var u = new SpeechSynthesisUtterance(texto); u.lang = 'es-ES'; if (vozES) u.voice = vozES;
+            speechSynthesis.speak(u);
+        }, 260);
     }
-    function callar() { if ('speechSynthesis' in window) speechSynthesis.cancel(); }
+    function callar() { clearTimeout(hablar._t); if ('speechSynthesis' in window) speechSynthesis.cancel(); }
 
     /* ---------- Cambio de despacho en el sitio ---------- */
     function cambiarA(r) {

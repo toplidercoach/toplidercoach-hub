@@ -466,11 +466,14 @@ if ('speechSynthesis' in window) { elegirVoz(); speechSynthesis.onvoiceschanged 
 function hablar(txt) {
   if (mudo || !txt || !('speechSynthesis' in window)) return;
   speechSynthesis.cancel();
-  var u = new SpeechSynthesisUtterance(txt);
-  u.lang = 'es-ES'; u.rate = 1; u.pitch = 1; if (vozES) u.voice = vozES;
-  speechSynthesis.speak(u);
+  clearTimeout(hablar._t);
+  hablar._t = setTimeout(function () {
+    var u = new SpeechSynthesisUtterance(txt);
+    u.lang = 'es-ES'; u.rate = 1; u.pitch = 1; if (vozES) u.voice = vozES;
+    speechSynthesis.speak(u);
+  }, 260);
 }
-function pararVoz() { if ('speechSynthesis' in window) speechSynthesis.cancel(); }
+function pararVoz() { clearTimeout(hablar._t); if ('speechSynthesis' in window) speechSynthesis.cancel(); }
 
 /* Entrada directa: /demo/?rol=fisio */
 (function () {
