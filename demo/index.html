@@ -47,10 +47,21 @@
   .top a.cliente:hover{color:var(--ink);border-color:var(--ink-3)}
 
   /* ---------- Hero ---------- */
-  .hero{position:relative;padding:64px 0 28px;text-align:center;overflow:hidden}
-  .hero video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;opacity:.35}
-  .hero .veil{position:absolute;inset:0;z-index:1;background:linear-gradient(180deg,rgba(15,23,42,.35) 0,rgba(15,23,42,.9) 80%,var(--navy) 100%)}
+  .hero{position:relative;padding:56px 0 20px;text-align:center;overflow:hidden}
   .hero .wrap{position:relative;z-index:2}
+  /* Reproductor protagonista */
+  .player{position:relative;margin:34px auto 0;max-width:980px;aspect-ratio:16/9;border-radius:22px;overflow:hidden;background:#000;box-shadow:0 0 0 1px rgba(255,255,255,.08),0 30px 80px rgba(0,0,0,.55),0 0 120px rgba(245,158,11,.18)}
+  .player::before{content:"";position:absolute;inset:-2px;border-radius:24px;padding:2px;background:linear-gradient(135deg,rgba(245,158,11,.6),rgba(255,255,255,.08) 40%,rgba(245,158,11,.25));-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none;z-index:3}
+  .player video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000}
+  .player .cover{position:absolute;inset:0;z-index:2;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;cursor:pointer;background:linear-gradient(180deg,rgba(15,23,42,.15) 0,rgba(15,23,42,.55) 100%)}
+  .player .cover img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-1}
+  .player .play{width:92px;height:92px;border-radius:50%;background:var(--amber);color:#1a1200;display:grid;place-items:center;box-shadow:0 12px 40px rgba(245,158,11,.45);transition:transform .18s}
+  .player .cover:hover .play{transform:scale(1.06)}
+  .player .play svg{width:38px;height:38px;margin-left:5px}
+  .player .cover b{font-family:"Barlow Condensed";font-weight:700;font-size:22px;letter-spacing:.03em;text-shadow:0 2px 12px rgba(0,0,0,.6)}
+  .player .cover small{color:var(--ink-2);font-size:14px;text-shadow:0 1px 8px rgba(0,0,0,.6)}
+  .player.playing .cover{display:none}
+  .hero .under{margin-top:18px;display:flex;flex-wrap:wrap;justify-content:center;gap:10px}
   .badge{display:inline-flex;align-items:center;gap:8px;background:rgba(245,158,11,.14);color:#fcd34d;border:1px solid rgba(245,158,11,.4);border-radius:999px;padding:6px 14px;font-size:13px;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
   .badge i{width:8px;height:8px;border-radius:50%;background:var(--amber);animation:blink 1.6s infinite}
   @keyframes blink{50%{opacity:.35}}
@@ -156,6 +167,9 @@
   @media (max-width:560px){
     .hero{padding-top:40px}
     .hero h1{font-size:38px}
+    .player{border-radius:12px;margin-top:22px}
+    .player .play{width:64px;height:64px}
+    .player .play svg{width:26px;height:26px}
     .grid{grid-template-columns:1fr 1fr;gap:10px}
     .card{padding:16px 14px 14px;border-radius:12px}
     .card .ico{width:44px;height:44px;border-radius:10px;margin-bottom:10px}
@@ -175,21 +189,33 @@
     <a class="mark" href="https://toplidercoach.com/"><img src="https://toplidercoach.com/wp-content/uploads/2025/11/diseno-sin-titulo-11.png" alt="">TopLiderCoach</a>
     <div class="acts">
       <a class="btn" href="#oferta" style="font-size:16px;padding:9px 14px">Club Prioritario</a>
-      <a class="cliente" href="    var esProduccion = (host === 'toplidercoach.com' || host === 'www.toplidercoach.com' || host === 'toplidercoach.github.io' || host === 'club.toplidercoach.com');">Ya soy cliente</a>
+      <a class="cliente" href="https://toplidercoach.github.io/toplidercoach-hub/">Ya soy cliente</a>
     </div>
   </div>
 </header>
 
 <section class="hero">
-  <!-- Opcional: demo/media/hero.mp4 como fondo. Si no existe, no pasa nada. -->
-  <video autoplay muted loop playsinline aria-hidden="true"><source src="media/hero.mp4" type="video/mp4" onerror="this.parentNode.style.display='none'"></video>
-  <div class="veil" aria-hidden="true"></div>
   <div class="wrap">
     <span class="badge"><i></i>Modo demostración</span>
     <img class="logo" src="https://toplidercoach.com/wp-content/uploads/2025/11/diseno-sin-titulo-11.png" alt="TopLiderCoach">
     <h1>Elige tu despacho</h1>
-    <p>Comprueba lo que el <strong>Modo Club del Planificador TopLiderCoach</strong> puede hacer en tu equipo y en tu club. Un software profesional para clubs de cualquier nivel que quieren tenerlo todo controlado y registrado: canteras, clubs profesionales, academias. Entra con el cargo que tienes en tu club y verás tu despacho, con lo que ves tú y solo tú.</p>
-    <div class="tut"><button class="btn ghost" type="button" id="btn-tutorial">▶&nbsp; Ver tutorial (con voz)</button></div>
+    <p>Comprueba lo que el <strong>Modo Club del Planificador TopLiderCoach</strong> puede hacer en tu equipo y en tu club. Un software profesional para clubs de cualquier nivel que quieren tenerlo todo controlado y registrado: canteras, clubs profesionales, academias.</p>
+
+    <!-- Reproductor protagonista: pon las URLs del video y de la portada en VIDEO_URL / POSTER_URL (abajo, en el script) -->
+    <div class="player" id="player">
+      <video id="hero-video" playsinline preload="metadata" controls controlslist="nodownload"></video>
+      <div class="cover" id="hero-cover">
+        <img id="hero-poster" alt="">
+        <span class="play" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></span>
+        <b>Ver cómo funciona</b>
+        <small>1 minuto y 10 segundos · con sonido</small>
+      </div>
+    </div>
+
+    <div class="under">
+      <a class="btn" href="#despachos">Elegir mi despacho</a>
+      <button class="btn ghost" type="button" id="btn-tutorial">Guía de los despachos (con voz)</button>
+    </div>
     <div class="who"><span>Canteras</span><span>Clubs profesionales</span><span>Academias</span><span>Escuelas de fútbol</span><span>Sin tarjeta · Sin registro</span></div>
   </div>
 </section>
@@ -282,7 +308,10 @@
 
 <script>
 /* ===== Configuracion ===== */
-var HUB_URL = 'https://club.toplidercoach.com/';
+var HUB_URL = 'https://toplidercoach.github.io/toplidercoach-hub/';
+/* Video del hero: pega aqui las URLs (WordPress > Medios). Si VIDEO_URL esta vacio, el reproductor se oculta. */
+var VIDEO_URL  = 'https://toplidercoach.com/wp-content/uploads/2026/09/mi-pelicula-3-1.mp4';
+var POSTER_URL = 'https://toplidercoach.com/wp-content/uploads/2026/09/captura-de-pantalla-2026-09-28-214313.png';
 var SUPABASE_URL = 'https://cqteodxyvavyroxeshoz.supabase.co';
 var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNxdGVvZHh5dmF2eXJveGVzaG96Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUyNzc2OTksImV4cCI6MjA4MDg1MzY5OX0.8sJC6twae2pnrf8NDVlOV2KnSOhBC1RrqWC0IiuE614';
 
@@ -474,6 +503,21 @@ function hablar(txt) {
   }, 260);
 }
 function pararVoz() { clearTimeout(hablar._t); if ('speechSynthesis' in window) speechSynthesis.cancel(); }
+
+/* ===== Reproductor del hero ===== */
+(function () {
+  var pl = document.getElementById('player'), v = document.getElementById('hero-video'), cover = document.getElementById('hero-cover'), poster = document.getElementById('hero-poster');
+  if (!VIDEO_URL) { pl.style.display = 'none'; return; }
+  v.src = VIDEO_URL;
+  if (POSTER_URL) { poster.src = POSTER_URL; v.poster = POSTER_URL; } else { poster.style.display = 'none'; }
+  cover.addEventListener('click', function () {
+    pararVoz(); cerrarTour();
+    pl.classList.add('playing');
+    v.muted = false; v.currentTime = 0;
+    var p = v.play(); if (p && p.catch) p.catch(function () {});
+  });
+  v.addEventListener('ended', function () { pl.classList.remove('playing'); });
+})();
 
 /* Entrada directa: /demo/?rol=fisio */
 (function () {
