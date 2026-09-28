@@ -147,7 +147,7 @@
         if (s.go) { try { s.go(); } catch (e) {} }
         target = null; render(); place();
         if (!s.sel) return;
-        waitFor(function () { var el = $(s.sel); return visible(el) ? el : null; }, 4000, function (el) {
+        waitFor(function () { var el = $(s.sel); return visible(el) ? el : null; }, 8000, function (el) {
             if (i !== n) return;
             target = el;
             if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -223,7 +223,8 @@ window.DEMO_TOURS = {
     ],
     'medico': [
         { title: 'Hola, doctora Salgado',
-          text: 'Eres la medico de Rapid Alianza y la unica persona del club que ve un diagnostico. Ahora mismo tienes dos lesionados activos, uno en vuelta al juego y un certificado medico caducado. Te enseño tu despacho en 8 pasos.' },
+          text: 'Eres la medico de Rapid Alianza y la unica persona del club que ve un diagnostico. Ahora mismo tienes dos lesionados activos, uno en vuelta al juego y un certificado medico caducado. Te enseño tu despacho en 8 pasos.',
+          go: function () { var t = document.querySelector('.main-tab[onclick*="cambiarModulo(\'medico\'"]'); if (t) t.click(); } },
         { sel: '#cmmed-stats-bar', title: 'El semaforo del club',
           text: 'Cuantos jugadores estan disponibles, en precaucion o lesionados. Lo que marques aqui es lo que vera el entrenador en su plantilla: el color, nunca el motivo.' },
         { sel: '#cmmed-cert-alerts', title: 'Certificados medicos',
@@ -247,7 +248,8 @@ window.DEMO_TOURS = {
     ],
     'fisio': [
         { title: 'Hola, Claudia',
-          text: 'Eres la fisioterapeuta del primer equipo y el filial. Tienes cuatro tratamientos activos, siete citas esta semana y cada tarde le cuentas al entrenador quien esta y quien no. Te lo enseño en 8 pasos.' },
+          text: 'Eres la fisioterapeuta del primer equipo y el filial. Tienes cuatro tratamientos activos, siete citas esta semana y cada tarde le cuentas al entrenador quien esta y quien no. Te lo enseño en 8 pasos.',
+          go: function () { var t = document.querySelector('.main-tab[onclick*="cambiarModulo(\'fisio\'"]'); if (t) t.click(); } },
         { sel: '#cmfisio-stats-bar', title: 'Tu resumen de plantilla',
           text: 'Disponibles, en precaucion y lesionados. Pulsa un color y filtras la lista. Tu y la doctora compartis este semaforo: quien cambia el color, cambia lo que ve el entrenador.' },
         { sel: '#cmfisio-player-grid', title: 'Tus jugadores',
