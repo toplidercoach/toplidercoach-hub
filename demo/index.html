@@ -313,7 +313,7 @@ function entrar(r, email){
     localStorage.removeItem('cm_auth');
     localStorage.removeItem('hub_supabase_jwt');
     // Sesion propia de Supabase Auth (si el navegador la tenia de un login anterior): fuera
-    Object.keys(localStorage).forEach(function(k){ if (k.indexOf('sb-') === 0) localStorage.removeItem(k); });
+    Object.keys(localStorage).forEach(function(k){ if (k.indexOf('sb-') === 0 || k.indexOf('tlc_tour_done_') === 0) localStorage.removeItem(k); });
     localStorage.setItem('hub_user', JSON.stringify({
       id: r.wp, name: r.nombre, display_name: r.nombre, username: r.username, email: r.username + '@toplidercoach.com', demo: true
     }));
