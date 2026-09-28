@@ -274,6 +274,10 @@
     function fichaMed(pid, nombre, tabKey, tabTxt) { return function () { if (typeof cmMedAbrirFicha === 'function') cmMedAbrirFicha(pid, nombre, ''); if (tabKey) setTimeout(function () { var b = Array.prototype.filter.call(document.querySelectorAll('.cmmed-tab'), function (x) { return new RegExp(tabTxt).test(x.textContent); })[0]; if (b && typeof cmMedCambiarTab === 'function') cmMedCambiarTab(tabKey, b); }, 500); }; }
     function fichaFis(pid, nombre, tabKey, tabTxt) { return function () { if (typeof cmFisioAbrirFicha === 'function') cmFisioAbrirFicha(pid, nombre, ''); if (tabKey) setTimeout(function () { var b = Array.prototype.filter.call(document.querySelectorAll('.cmfisio-tab'), function (x) { return new RegExp(tabTxt).test(x.textContent); })[0]; if (b && typeof cmFisioCambiarTab === 'function') cmFisioCambiarTab(tabKey, b); }, 500); }; }
     var HERRERA = '00000000-0000-4000-8000-de310000000d', HERRERA_N = 'Nicolas Herrera Vazquez';
+    var FERNANDEZ = '00000000-0000-4000-8000-de3100000005';
+    // Pulsa el boton cuyo onclick contiene fn('key' (sirve para cmXxxCambiarTab, cmXxxCambiarVista...)
+    function btn(fn, key) { return function () { var b = document.querySelector('[onclick*="' + fn + '(\'' + key + '\'"]'); if (b) b.click(); }; }
+    function seq() { var fs = Array.prototype.slice.call(arguments); return function () { fs.forEach(function (f, i) { setTimeout(f, i * 350); }); }; }
 
     window.DEMO_RECORRIDOS = {
         'entrenador': [
@@ -332,6 +336,130 @@
             ] },
             { id: 'otra', ico: '🔁', title: 'Compruébalo desde el banquillo', sub: 'Entra como entrenador: no verá nada de esto', steps: [
                 { title: 'Ahora, como entrenador', text: 'Tres personas, tres despachos, un solo dato. Arriba, en "Ver como", pulsa Entrenador y comprueba que él solo ve el color del semáforo.', go: function () { var o = document.getElementById('cmfisio-report-overlay'); if (o) o.remove(); } }
+            ] }
+        ],
+        'direccion': [
+            { id: 'club', ico: '🏟️', title: 'El club entero', sub: 'Siete equipos en un solo cuadro de mando', steps: [
+                { sel: '#dash-hero-stats', title: 'Todos los equipos', text: 'Arriba a la derecha eliges equipo o ves el club completo. Del Benjamín al primer equipo: partidos, racha, cargas y disponibilidad.', go: tab('dashboard') },
+                { sel: '#dash-squad-status', title: 'Disponibilidad global', text: 'Quién está de baja en cada equipo, sin ver diagnósticos. Dirección ve el semáforo; el motivo se queda en el despacho médico.' }
+            ] },
+            { id: 'miembros', ico: '🗝️', title: 'Quién ve qué', sub: '19 personas de staff, 11 cargos, permisos por despacho', steps: [
+                { sel: '#cm-l-miembros', title: 'Miembros y permisos', text: 'Cada persona del club con su cargo. Los permisos van por cargo: el fisio ve fisio, el tesorero ve cuotas. Invitas a alguien y entra en su despacho sin ver nada más.', go: tab('club') }
+            ] },
+            { id: 'salud', ico: '🚦', title: 'El semáforo médico', sub: 'Dos lesionados, un certificado caducado', steps: [
+                { sel: '#cmmed-stats-bar', title: 'Despacho médico', text: 'Como Dirección puedes entrar en todos los despachos. Aquí, el semáforo del club y las alertas de certificados que caducan.', go: tab('medico') }
+            ] },
+            { id: 'dinero', ico: '💶', title: 'Cuotas y contabilidad', sub: '96 familias, libro diario, resultados', steps: [
+                { sel: '#cmpay-cobros-kpis', title: 'Cuotas', text: 'Cobros del mes, impagos y recibos de 96 familias. Cada cobro entra solo en la contabilidad.', go: seq(tab('pagos'), btn('cmPayCambiarTab', 'cobros')) },
+                { sel: '#cmeco-tab-content', title: 'Contabilidad', text: 'Partida doble con libro diario, mayor y balance. Ingresos, gastos y presupuesto de la temporada en el mismo sitio.', go: seq(tab('economico'), btn('cmEcoCambiarTab', 'resumen')) }
+            ] },
+            { id: 'rfef', ico: '🏛️', title: 'Control económico RFEF', sub: 'Entregas, certificados y ratio de coste de plantilla', steps: [
+                { sel: '#cmrf-cont', title: 'Cumplimiento RFEF', text: 'Semáforo de las 11 obligaciones del control económico: dos vencen el día 30 y los certificados de Hacienda y Seguridad Social caducan pronto. El ratio de coste de plantilla está en el 64,6 %, por debajo del límite del 70 %.', go: seq(tab('cumplimiento_rfef'), btn('cmRfefCambiarTab', 'panel')) }
+            ] }
+        ],
+        'preparador-fisico': [
+            { id: 'gps', ico: '📡', title: 'GPS sesión a sesión', sub: 'Diez sesiones, jugador por jugador', steps: [
+                { sel: '#cmpf-vista-sesiones', title: 'Sesiones con GPS', text: 'Distancia total, alta intensidad, sprints y velocidad máxima de cada jugador en cada sesión. Las recuperaciones rondan los 4.000 metros; los días de carga, 7.500.', go: seq(tab('prepfisica'), btn('cmPfCambiarVista', 'sesiones')) }
+            ] },
+            { id: 'cargas', ico: '📈', title: 'Control de cargas', sub: 'ACWR, monotonía y strain automáticos', steps: [
+                { sel: '#cmpf-vista-cargas', title: 'Cargas', text: 'Carga aguda y crónica, ratio ACWR, monotonía y strain calculados solos desde el RPE de los jugadores. Cinco en zona de atención antes del partido del martes.', go: btn('cmPfCambiarVista', 'cargas') }
+            ] },
+            { id: 'tests', ico: '⏱️', title: 'Tests físicos', sub: 'Dos baterías con evolución', steps: [
+                { sel: '#cmpf-tab-pruebas', title: 'Tests de Fernández Guerrero', text: 'Sprint 10 y 30 metros, CMJ, Yo-Yo, Nordic y Sit and Reach. Dos baterías: inicio de pretemporada y control. El CMJ medio del equipo ha subido de 40,2 a 41,8 centímetros.', go: seq(btn('cmPfCambiarVista', 'jugadores'), function () { if (typeof cmPfAbrirFicha === 'function') cmPfAbrirFicha(FERNANDEZ); }, btn('cmPfCambiarTab', 'pruebas')) }
+            ] },
+            { id: 'antro', ico: '📏', title: 'Antropometría', sub: 'Pliegues, perímetros y porcentaje graso', steps: [
+                { sel: '#cmpf-tab-antropometria', title: 'Antropometría', text: 'Seis pliegues, perímetros y los derivados calculados: suma de pliegues, porcentaje graso e IMC. Dos mediciones para ver la evolución.', go: btn('cmPfCambiarTab', 'antropometria') }
+            ] },
+            { id: 'informe', ico: '📄', title: 'El informe del jugador', sub: 'Todo lo suyo en una página, listo para el entrenador', steps: [
+                { sel: '#cmpf-tab-informe', title: 'Informe individual', text: 'GPS, tests, antropometría y cargas del jugador en una sola ficha, exportable. Lo que le pasas al entrenador cuando pregunta cómo va alguien.', go: btn('cmPfCambiarTab', 'informe') }
+            ] }
+        ],
+        'analista': [
+            { id: 'dossier', ico: '📋', title: 'El dossier del rival', sub: 'Casarejo, listo para el martes', steps: [
+                { sel: '#matchstats-analisisrival', title: 'Dossier de Sporting Casarejo', text: 'Sistema, estilo, puntos fuertes y débiles, jugadores clave, fases de juego y balón parado. Tres dossieres preparados: Casarejo, Lantigua y Vega Real.', go: sub('matchstats', 'analisisrival') }
+            ] },
+            { id: 'partidos', ico: '🎥', title: 'Partidos observados', sub: 'Cuatro partidos con notas y vídeo', steps: [
+                { sel: '#cmsc-tab-content', title: 'Partidos observados', text: 'Cada partido al que has ido, con fecha, notas y enlace al vídeo. De aquí salen los gastos de desplazamiento.', go: seq(tab('scouting'), btn('cmScCambiarTab', 'partidos')) }
+            ] },
+            { id: 'jugadores', ico: '🔎', title: 'Jugadores en seguimiento', sub: 'Informes y shortlist', steps: [
+                { sel: '#cmsc-tab-content', title: 'Informes de jugadores', text: 'Cinco informes de jugadores observados, con perfil por posición y estado en el pipeline: seguimiento, interesa, descartado.', go: btn('cmScCambiarTab', 'jugadores') }
+            ] },
+            { id: 'gastos', ico: '🧾', title: 'Tus gastos', sub: 'Una hoja pagada, una aprobada, una en borrador', steps: [
+                { sel: '#modulo-misgastos', title: 'Mis gastos', text: 'Kilometraje, peajes, comidas y entradas por partido observado. Envías la hoja, el director deportivo la aprueba y tesorería la paga. Sin tickets en el salpicadero.', go: tab('misgastos') }
+            ] },
+            { id: 'otra', ico: '🔁', title: 'Mira cómo le llega al entrenador', sub: 'Entra como entrenador y abre el dossier', steps: [
+                { title: 'Ahora, como entrenador', text: 'Arriba, en "Ver como", pulsa Entrenador y abre Gestión de Competición → Análisis de rivales: el dossier que acabas de ver, tal cual lo abre él en el vestuario.' }
+            ] }
+        ],
+        'economico': [
+            { id: 'cuotas', ico: '💶', title: 'Cuotas', sub: '96 familias, cobros del mes e impagos', steps: [
+                { sel: '#cmpay-cobros-kpis', title: 'Cobros', text: 'Lo cobrado, lo pendiente y los impagos del mes de un vistazo. Cada recibo con su familia, su concepto y su periodo.', go: seq(tab('pagos'), btn('cmPayCambiarTab', 'cobros')) },
+                { sel: '#cmpay-cobros-tabla', title: 'Recibo a recibo', text: 'Filtra por equipo, estado o mes. La cuota de septiembre está casi cobrada; los pendientes reciben aviso.' }
+            ] },
+            { id: 'conta', ico: '📒', title: 'Contabilidad', sub: 'Partida doble: diario, mayor y balance', steps: [
+                { sel: '#cmeco-tab-content', title: 'Resumen económico', text: 'Ingresos, gastos y resultado de la temporada. Las cuotas cobradas entran solas como ingreso.', go: seq(tab('economico'), btn('cmEcoCambiarTab', 'resumen')) },
+                { sel: '#cmeco-tab-content', title: 'Libro diario', text: 'Asiento de apertura del 1 de julio y todos los movimientos desde entonces: remesas de cuotas, patrocinios, gastos de material.', go: seq(btn('cmEcoCambiarTab', 'contabilidad'), btn('cmEcoContaSubTab', 'diario')) }
+            ] },
+            { id: 'rfef', ico: '🏛️', title: 'Control económico RFEF', sub: '11 entregas, ratio de coste de plantilla', steps: [
+                { sel: '#cmrf-cont', title: 'Cumplimiento', text: 'Las 11 obligaciones del control económico con su estado: seis presentadas, cuatro pendientes, una no aplica. Dos vencen el día 30.', go: seq(tab('cumplimiento_rfef'), btn('cmRfefCambiarTab', 'panel')) },
+                { sel: '#cmrf-cont', title: 'Indicadores', text: 'Coste de plantilla 420.000 sobre 650.000 de ingresos previstos: ratio 64,6 %, por debajo del 70 %. Patrimonio neto calculado desde la contabilidad.', go: btn('cmRfefCambiarTab', 'indicadores') }
+            ] },
+            { id: 'spon', ico: '🤝', title: 'Patrocinadores', sub: 'Contratos y calendario de cobros', steps: [
+                { sel: '#cmspon-tab-content', title: 'Patrocinadores', text: 'Cada patrocinador con su contrato, importe, plazos y contraprestaciones. Los cobros previstos aparecen en el calendario y, al cobrarlos, en la contabilidad.', go: seq(tab('patrocinadores'), btn('cmSponCambiarTab', 'panel')) }
+            ] },
+            { id: 'reemb', ico: '🧾', title: 'Reembolsos al staff', sub: 'Las hojas de gastos del cuerpo técnico', steps: [
+                { sel: '#cmeco-tab-content', title: 'Reembolsos', text: 'Las hojas de gastos que el staff envía y el director deportivo aprueba llegan aquí para pagarlas. Una pagada, una pendiente de pago.', go: seq(tab('economico'), btn('cmEcoCambiarTab', 'reembolsos')) }
+            ] }
+        ],
+        'director-deportivo': [
+            { id: 'dash', ico: '📊', title: 'Tu cuadro de mando', sub: 'Plantilla, objetivos y cobertura', steps: [
+                { sel: '#cmdd-tab-content', title: 'Dirección Deportiva', text: 'Estado de la plantilla, objetivos de fichaje y contratos que vencen. Lo que miras el lunes por la mañana.', go: seq(tab('dd'), btn('cmDdCambiarTab', 'dashboard')) }
+            ] },
+            { id: 'plan', ico: '🗓️', title: 'Plan de temporada', sub: 'Objetivos de fichaje por posición', steps: [
+                { sel: '#cmdd-tab-content', title: 'Planificación', text: 'La plantilla de la próxima temporada, posición por posición: quién sigue, quién sale y qué perfil buscas para cada hueco.', go: btn('cmDdCambiarTab', 'planificacion') }
+            ] },
+            { id: 'ideal', ico: '⚽', title: 'El once ideal y la cobertura', sub: 'Dónde estás corto', steps: [
+                { sel: '#cmdd-tab-content', title: 'Cobertura por posición', text: 'Cuántos jugadores tienes por posición y cuántos necesitas. Las posiciones en rojo son las que hay que reforzar.', go: btn('cmDdCambiarTab', 'cobertura') }
+            ] },
+            { id: 'agentes', ico: '📞', title: 'Agentes', sub: 'Con quién negocias y qué se habló', steps: [
+                { sel: '#cmdd-tab-content', title: 'Agentes', text: 'Los representantes con los que trabajas, sus jugadores y el historial de conversaciones. Nada se queda en un WhatsApp perdido.', go: btn('cmDdCambiarTab', 'agentes') }
+            ] },
+            { id: 'gastos', ico: '🧾', title: 'Gastos del staff', sub: 'Hojas pendientes de tu aprobación', steps: [
+                { sel: '#cmdd-tab-content', title: 'Aprobar gastos', text: 'Las hojas de gastos que envía el analista y el resto del staff pasan por ti. Una aprobada y pagada, una aprobada pendiente de pago, una en borrador.', go: btn('cmDdCambiarTab', 'gastos') }
+            ] }
+        ],
+        'cantera': [
+            { id: 'equipos', ico: '👥', title: 'Cinco equipos de cantera', sub: 'Del Benjamín al Juvenil', steps: [
+                { sel: '#dash-hero-stats', title: 'Tus equipos', text: 'Arriba a la derecha cambias de equipo: Benjamín, Alevín, Infantil, Cadete y Juvenil. Cada uno con su entrenador, sus sesiones y sus partidos.', go: tab('dashboard') }
+            ] },
+            { id: 'plantilla', ico: '📋', title: 'Las plantillas', sub: 'Jugadores, dorsales y fichas', steps: [
+                { sel: '#lista-jugadores', title: 'Plantilla', text: 'La plantilla del equipo seleccionado. Cada ficha con dorsal, posición, asistencia y datos de contacto de la familia.', go: sub('config', 'plantilla') }
+            ] },
+            { id: 'familias', ico: '🏠', title: 'Directorio de familias', sub: '96 familias con sus tutores', steps: [
+                { sel: '#cmfam-tab-content', title: 'Familias', text: 'Tutores, teléfonos y correos de cada jugador de cantera, agrupados por equipo. El directorio que siempre falta en el momento clave.', go: seq(tab('familias'), btn('cmFamCambiarTab', 'directorio')) }
+            ] },
+            { id: 'circulares', ico: '📨', title: 'Circulares', sub: 'Con confirmación de lectura', steps: [
+                { sel: '#cmfam-tab-content', title: 'Circulares', text: 'Cuatro circulares esta temporada: inicio de temporada, el Torneo del Pilar, la cuota de octubre y las fotos oficiales. Sabes quién ha leído y quién ha confirmado.', go: btn('cmFamCambiarTab', 'circulares') }
+            ] },
+            { id: 'asistencia', ico: '✅', title: 'Asistencia y RPE', sub: 'Quién viene a entrenar y cómo lo lleva', steps: [
+                { sel: '#planificador-asistencia', title: 'Asistencia', text: 'Asistencia a cada sesión y el RPE que registra cada chaval. Los que faltan mucho o los que van cargados se ven a la primera.', go: sub('planificador', 'asistencia') }
+            ] }
+        ],
+        'utillero': [
+            { id: 'almacen', ico: '📦', title: 'El almacén', sub: 'Stock, mínimos y alertas', steps: [
+                { sel: '#cmutil-vista-inventario', title: 'Inventario', text: 'Balones, petos, conos, equipaciones y botiquín, con stock actual y mínimo. Lo que baja del mínimo se marca en rojo.', go: seq(tab('utillero'), btn('cmUtilCambiarVista', 'inventario')) }
+            ] },
+            { id: 'peticiones', ico: '📝', title: 'Peticiones del staff', sub: 'Una urgente de la fisio', steps: [
+                { sel: '#cmutil-vista-peticiones', title: 'Peticiones', text: 'El cuerpo técnico te pide material desde su despacho y te llega aquí con prioridad y fecha. La fisio tiene una urgente.', go: btn('cmUtilCambiarVista', 'peticiones') }
+            ] },
+            { id: 'tallas', ico: '👕', title: 'Tallas de 142 jugadores', sub: 'Camiseta, pantalón, medias y botas', steps: [
+                { sel: '#lista-jugadores', title: 'Tallas', text: 'Cada jugador del club con su talla de camiseta, pantalón, medias, chándal y botas. El pedido de equipaciones sale de aquí, no de tu cabeza.', go: sub('config', 'plantilla') }
+            ] },
+            { id: 'entregas', ico: '🔁', title: 'Entregas y devoluciones', sub: 'Quién tiene qué', steps: [
+                { sel: '#cmutil-vista-inventario', title: 'Movimientos', text: 'Cada entrega y cada devolución queda registrada con fecha y persona. Si falta un juego de petos, sabes quién lo tiene.', go: seq(tab('utillero'), btn('cmUtilCambiarVista', 'inventario')) }
+            ] },
+            { id: 'otra', ico: '🔁', title: 'Cambia de sillón', sub: 'Mira el club desde Dirección', steps: [
+                { title: 'Ver como Dirección', text: 'Arriba, en "Ver como", pulsa Dirección: verás el club entero, y comprobarás que tu almacén es una pieza más de la misma casa.' }
             ] }
         ],
         'generico': [
