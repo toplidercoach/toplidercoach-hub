@@ -854,9 +854,9 @@
             } else {
                 // ----- CREACION: Edge Function (crea cuenta Supabase + ficha club_members) -----
                 const { data: sess } = await supabaseClient.auth.getSession();
-                const accessToken = sess && sess.session ? sess.session.access_token : null;
+                const accessToken = (sess && sess.session ? sess.session.access_token : null) || localStorage.getItem('hub_supabase_jwt');
                 if (!accessToken) {
-                    showToast('Para crear miembros debes haber entrado como administrador de club (cuenta Supabase).');
+                    showToast('Para crear miembros debes haber iniciado sesión como administrador del club');
                     return;
                 }
 
@@ -942,9 +942,9 @@
         }
 
         const { data: sess } = await supabaseClient.auth.getSession();
-        const accessToken = sess && sess.session ? sess.session.access_token : null;
+        const accessToken = (sess && sess.session ? sess.session.access_token : null) || localStorage.getItem('hub_supabase_jwt');
         if (!accessToken) {
-            showToast('Para resetear contraseñas debes haber entrado como administrador de club (cuenta Supabase).');
+            showToast('Para resetear contraseñas debes haber iniciado sesión como administrador del club');
             return;
         }
 
