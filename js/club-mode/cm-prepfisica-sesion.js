@@ -234,7 +234,7 @@ var CMPFSES2_HISTKEYS = ['td', 'mmin', 'hsr', 'hsrmin', 'spr', 'nspr', 'vmax', '
     var intentos = 0;
     var t = setInterval(function () {
         intentos++;
-        if (typeof cmPfRenderSesionCompleta === 'function' || intentos > 40) {
+        if (typeof cmPfRenderSesionCompleta === 'function' || intentos > 600) {
             clearInterval(t);
             if (typeof cmPfRenderSesionCompleta === 'function') {
                 cmPfRenderSesionCompleta = function (ses, allData, playerMap, segmentos) {

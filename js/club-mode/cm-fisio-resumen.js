@@ -76,7 +76,7 @@ function cmFisioResLunesDe(d) {
         intentos++;
         var ok1 = envolver();
         var ok2 = envolverCalendario();
-        if ((ok1 && ok2) || intentos > 40) {
+        if ((ok1 && ok2) || intentos > 600) {
             clearInterval(t);
             inyectarBoton(); // por si el panel ya estaba renderizado
         }

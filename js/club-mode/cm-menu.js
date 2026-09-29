@@ -145,7 +145,7 @@
     var n = 0;
     var iv = setInterval(function() {
         n++;
-        if (n > 40) { clearInterval(iv); return; }
+        if (n > 600) { clearInterval(iv); return; }
         if (typeof cmState === 'undefined' || !cmState.activo) return;
         pasada();
     }, 500);

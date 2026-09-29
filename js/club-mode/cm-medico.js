@@ -2092,7 +2092,7 @@ async function cmMedNotificar(type, title, message, playerName, relatedType, rel
     var intentos = 0;
     var intervalo = setInterval(function() {
         intentos++;
-        if (intentos > 40) { clearInterval(intervalo); return; }
+        if (intentos > 600) { clearInterval(intervalo); return; }
         // Esperar a que el club este activo
         if (typeof cmState === 'undefined' || !cmState.activo) return;
         // Esperar a tener permiso. NO matamos el intervalo: los permisos pueden tardar un tick.

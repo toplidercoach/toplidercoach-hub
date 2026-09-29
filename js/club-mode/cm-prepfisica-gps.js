@@ -43,7 +43,7 @@ var cmPfDev = {
     var intentos = 0;
     var t = setInterval(function () {
         intentos++;
-        if (envolver() || intentos > 40) {
+        if (envolver() || intentos > 600) {
             clearInterval(t);
             inyectarBoton();
         }

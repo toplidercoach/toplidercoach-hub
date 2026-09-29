@@ -828,7 +828,7 @@ function cmFamCerrarDetalleCircular() {
     var intentos = 0;
     var intervalo = setInterval(function() {
         intentos++;
-        if (intentos > 40) { clearInterval(intervalo); return; }
+        if (intentos > 600) { clearInterval(intervalo); return; }
         if (typeof cmState === 'undefined' || !cmState.activo) return;
         if (typeof cmPuedeVer !== 'function' || !cmPuedeVer('comunicacion_familias')) return;
         if (document.getElementById('cm-tab-familias')) { clearInterval(intervalo); return; }

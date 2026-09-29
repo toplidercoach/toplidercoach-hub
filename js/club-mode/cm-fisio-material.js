@@ -16,7 +16,7 @@ var cmFisioMaterialCatalogReady = false;
 // ========== INYECTAR BOTON MATERIAL EN CABECERA FISIO ==========
 (function() {
     var n = 0, iv = setInterval(function() {
-        n++; if (n > 40) { clearInterval(iv); return; }
+        n++; if (n > 600) { clearInterval(iv); return; }
         var header = document.querySelector('.cmfisio-header');
         if (!header || document.getElementById('cmfisio-btn-material')) return;
         var btnDiv = header.querySelector('div');
@@ -196,7 +196,7 @@ async function cmFisioMaterialEnviar() {
 (function cmFisioCrossVisibilityInit() {
     // Esperar a que cm-medico.js este cargado
     var n = 0, iv = setInterval(function() {
-        n++; if (n > 30) { clearInterval(iv); return; }
+        n++; if (n > 600) { clearInterval(iv); return; }
         if (typeof cmMedAbrirFicha !== 'function') return;
         if (cmMedAbrirFicha._crossPatched) { clearInterval(iv); return; }
         clearInterval(iv);

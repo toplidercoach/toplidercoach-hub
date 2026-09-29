@@ -23,7 +23,7 @@ var cmPfAct = {
     var intentos = 0;
     var t = setInterval(function () {
         intentos++;
-        if (typeof cmPfSes2Render === 'function' || intentos > 40) {
+        if (typeof cmPfSes2Render === 'function' || intentos > 600) {
             clearInterval(t);
             if (typeof cmPfSes2Render !== 'function') return;
             var orig = cmPfSes2Render;

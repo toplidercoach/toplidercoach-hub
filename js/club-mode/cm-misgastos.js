@@ -355,7 +355,7 @@ async function cmMGGuardar() {
     var intentos = 0;
     var intervalo = setInterval(function() {
         intentos++;
-        if (intentos > 40) { clearInterval(intervalo); return; }
+        if (intentos > 600) { clearInterval(intervalo); return; }
         if (typeof cmState === 'undefined' || !cmState.activo) return;
         if (document.getElementById('cm-tab-misgastos')) { clearInterval(intervalo); return; }
         var mainTabs = document.querySelector('.main-tabs');

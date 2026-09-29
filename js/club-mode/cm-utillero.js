@@ -483,7 +483,7 @@ function cmUtilFecha(d) {
     var intentos = 0;
     var intervalo = setInterval(function() {
         intentos++;
-        if (intentos > 20) { clearInterval(intervalo); return; }
+        if (intentos > 600) { clearInterval(intervalo); return; }
         if (typeof cmState === 'undefined' || !cmState.activo) return;
         if (!cmPuedeVer('modulo_utillero')) { clearInterval(intervalo); return; }
         clearInterval(intervalo);

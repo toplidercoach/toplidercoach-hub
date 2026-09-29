@@ -2858,7 +2858,7 @@ async function cmScApiImportar(fixtureId) {
     var intentos = 0;
     var intervalo = setInterval(function() {
         intentos++;
-        if (intentos > 40) { clearInterval(intervalo); return; }
+        if (intentos > 600) { clearInterval(intervalo); return; }
         if (typeof cmState === 'undefined' || !cmState.activo) return;
         if (typeof cmPuedeVer !== 'function' || !cmPuedeVer('scouting')) return;
         if (document.getElementById('cm-tab-scouting')) { clearInterval(intervalo); return; }

@@ -15,7 +15,7 @@ var cmNotifCount = 0;
     var intentos = 0;
     var intervalo = setInterval(function() {
         intentos++;
-        if (intentos > 30) { clearInterval(intervalo); return; }
+        if (intentos > 600) { clearInterval(intervalo); return; }
         if (typeof cmState === 'undefined' || !cmState.activo) return;
         clearInterval(intervalo);
 
