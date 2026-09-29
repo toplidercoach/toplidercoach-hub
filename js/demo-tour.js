@@ -10,6 +10,18 @@
     try { ROLE = localStorage.getItem('tlc_demo_role'); } catch (e) {}
     if (!ROLE) return;
 
+    // Solo es demo si el usuario guardado es un pase de visitante (demo:true). Si un cliente real
+    // entra con su cuenta en este navegador, se borra el recuerdo de la demo y no pasa nada mas.
+    function limpiarDemo() {
+        try {
+            localStorage.removeItem('tlc_demo_role');
+            Object.keys(localStorage).forEach(function (k) { if (k.indexOf('tlc_prog_') === 0) localStorage.removeItem(k); });
+        } catch (e) {}
+    }
+    var esVisitante = false;
+    try { var hu = JSON.parse(localStorage.getItem('hub_user') || 'null'); esVisitante = !!(hu && hu.demo === true && localStorage.getItem('hub_token') === 'demo'); } catch (e) {}
+    if (!esVisitante) { limpiarDemo(); return; }
+
     var DEMO_URL = 'demo/';
     var OFERTA_URL = 'demo/#oferta';
     var WA_URL = 'https://wa.me/34611126983?text=Hola%2C%20quiero%20reservar%20mi%20plaza%20de%20Club%20Prioritario%20en%20TopLiderCoach';
