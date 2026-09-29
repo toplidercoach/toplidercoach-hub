@@ -49,6 +49,9 @@
   #tlc-sidebar .it.locked { opacity: .38; cursor: not-allowed; }
   #tlc-sidebar .it.locked::after { content: "🔒"; margin-left: auto; font-size: 11px; }
   #tlc-sidebar .it .lb { overflow: hidden; text-overflow: ellipsis; }
+  #tlc-sidebar a.it { text-decoration: none; color: #94a3b8; }
+  #tlc-sidebar a.it:hover { color: #fff; }
+  #tlc-sidebar a.it .lb::after { content: " ↗"; font-size: 11px; opacity: .6; }
   body.tlc-sb-min #tlc-sidebar .it { justify-content: center; padding: 11px 0; }
   body.tlc-sb-min #tlc-sidebar .it .lb, body.tlc-sb-min #tlc-sidebar .it.locked::after { display: none; }
   body.tlc-sb-min #tlc-sidebar .it.on::before { left: -10px; }

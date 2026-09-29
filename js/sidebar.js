@@ -39,6 +39,13 @@
         _: '<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 12h8M12 8v8"/>'
     };
     var GRUPOS = { campo: 'Club Campo', oficina: 'Club Oficina' };
+    var WEB = [
+        { label: 'Ejercicios',   url: 'https://toplidercoach.com/temas-entrenamiento/',       ico: '<polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>' },
+        { label: 'Entrenadores', url: 'https://toplidercoach.com/entrenadores-referencia-3/', ico: '<circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/>' },
+        { label: 'Tienda',       url: 'https://toplidercoach.com/tienda-toplidercoach/',      ico: '<path d="M6 6h15l-1.5 9h-12zM6 6L5 3H2M9 20a1 1 0 1 0 0 .1M18 20a1 1 0 1 0 0 .1"/>' },
+        { label: 'Tu cuenta',    url: 'https://toplidercoach.com/registrarse/tu-membresia/',  ico: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.5a6 6 0 0 1 11 0"/>' },
+        { label: 'Web',          url: 'https://toplidercoach.com/',                          ico: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>' }
+    ];
 
     function $(s, r) { return (r || document).querySelector(s); }
     function $$(s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); }
@@ -99,7 +106,13 @@
             var h = document.createElement('div'); h.className = 'grp'; h.innerHTML = '<span>' + GRUPOS[gk] + '</span>'; frag.appendChild(h);
             tabs.forEach(function (t) { frag.appendChild(item(t)); });
         });
-        // Grupos que cm-menu pueda tener sin panel (pocos módulos): las pestañas siguen en .main-tabs y ya están arriba
+        // Enlaces a la web de TopLiderCoach (se abren en pestaña nueva)
+        var hw = document.createElement('div'); hw.className = 'grp'; hw.innerHTML = '<span>TopLiderCoach</span>'; frag.appendChild(hw);
+        WEB.forEach(function (w) {
+            var a = document.createElement('a'); a.className = 'it ext'; a.href = w.url; a.target = '_blank'; a.rel = 'noopener';
+            a.innerHTML = '<svg viewBox="0 0 24 24">' + w.ico + '</svg><span class="lb">' + w.label + '</span><span class="tip">' + w.label + '</span>';
+            frag.appendChild(a);
+        });
         nav.innerHTML = ''; nav.appendChild(frag);
         // Observar paneles nuevos
         $$('.cmmenu-panel').forEach(function (p) { if (!p.__tlcObs) { p.__tlcObs = true; new MutationObserver(function () { clearTimeout(timer); timer = setTimeout(render, 120); }).observe(p, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'style', 'data-cm-locked'] }); } });
