@@ -94,6 +94,7 @@
     + '#tlc-inicio .offer .btn.a{white-space:nowrap}'
     + '#tlc-inicio .mob{display:none}'
     + '@media (max-width:900px){#tlc-inicio .lay{grid-template-columns:1fr}#tlc-inicio aside{display:none}#tlc-inicio main{padding:22px 14px 40px}#tlc-inicio .tiles{grid-template-columns:1fr 1fr;gap:10px}#tlc-inicio .tile{aspect-ratio:4/3;border-radius:12px}#tlc-inicio .tile .tx{left:10px;right:10px;bottom:10px}#tlc-inicio .tile .tx b{font-size:15px}#tlc-inicio .tile .tx span{display:none}#tlc-inicio .tile .bg.ico{font-size:40px}}'
+    + 'body.tlc-inicio-on #tlc-panel, body.tlc-inicio-on #tlc-tour-fab{display:none!important}'
     + '@media (prefers-reduced-motion:reduce){#tlc-inicio .tile{transition:none}}';
     var st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
 
@@ -164,9 +165,9 @@
             b.onclick = function () { if (b.classList.contains('locked')) return; var all = ms.principal.concat(ms.campo, ms.oficina); var m = all.filter(function (x) { return x.k === b.dataset.k; })[0]; if (m) ir(m.tab); };
         });
         $('#tlc-ini-rec', root).onclick = function () { cerrar(); var p = $('#tlc-panel'); if (p) { p.classList.remove('min'); var n = $('#tlc-next'); if (n) n.click(); } };
-        root.classList.add('on'); document.body.style.overflow = 'hidden';
+        root.classList.add('on'); document.body.style.overflow = 'hidden'; document.body.classList.add('tlc-inicio-on');
     }
-    function cerrar() { if (root) root.classList.remove('on'); document.body.style.overflow = ''; }
+    function cerrar() { if (root) root.classList.remove('on'); document.body.style.overflow = ''; document.body.classList.remove('tlc-inicio-on'); }
     function abrir() { render(); }
 
     /* Boton "Inicio" en la barra de demo */
