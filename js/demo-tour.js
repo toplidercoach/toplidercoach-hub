@@ -271,7 +271,8 @@
         barra(); suavizarErrores(); panel();
         waitFor(function () { var h = $('#dash-hero-stats'); return (h && h.textContent.trim().length > 0) ? true : null; }, 6000, function () {
             var next = siguienteIdx();
-            if (next === 0 && window.innerWidth > 640) setTimeout(function () { lanzar(0); }, 800);
+            // Si existe la pantalla de inicio (demo-inicio.js), el recorrido arranca desde su boton, no solo
+            if (next === 0 && window.innerWidth > 640 && typeof window.tlcAbrirInicio !== 'function') setTimeout(function () { lanzar(0); }, 800);
         });
     });
 })();
