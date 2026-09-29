@@ -1,0 +1,67 @@
+/* ============================================================
+   TopLiderCoach HUB — Menú lateral (escritorio y tablet grande)
+   Se activa cuando body lleva la clase .tlc-sb (la pone js/sidebar.js).
+   En pantallas de hasta 900 px no actúa: ahí manda el menú móvil.
+   ============================================================ */
+:root { --tlc-sb-w: 244px; --tlc-sb-min: 68px; }
+
+@media (min-width: 901px) {
+  body.tlc-sb .main-tabs { display: none !important; }
+  body.tlc-sb #app-container { margin-left: var(--tlc-sb-w); transition: margin-left .2s ease; min-width: 0; }
+  body.tlc-sb.tlc-sb-min #app-container { margin-left: var(--tlc-sb-min); }
+  body.tlc-sb .app-header { padding-left: 22px !important; }
+  body.tlc-sb .app-header .header-brand h1 { display: none; }
+  body.tlc-sb .app-header .header-logo { display: none; }
+  /* Las barras del modo demo también se desplazan */
+  body.tlc-sb #tlc-bar { margin-left: 0; }
+
+  #tlc-sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; width: var(--tlc-sb-w); z-index: 950;
+    background: linear-gradient(180deg, #0f172a 0%, #111c33 100%); color: #e2e8f0;
+    display: flex; flex-direction: column; border-right: 1px solid rgba(255,255,255,.06);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif; transition: width .2s ease;
+    box-shadow: 8px 0 30px rgba(0,0,0,.25);
+  }
+  body.tlc-sb-min #tlc-sidebar { width: var(--tlc-sb-min); }
+
+  #tlc-sidebar .brand { display: flex; align-items: center; gap: 10px; padding: 16px 16px 14px; border-bottom: 1px solid rgba(255,255,255,.06); min-height: 64px; }
+  #tlc-sidebar .brand img { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+  #tlc-sidebar .brand b { font-size: 15px; font-weight: 800; color: #f59e0b; white-space: nowrap; letter-spacing: -.01em; }
+  #tlc-sidebar .brand small { display: block; font-size: 11px; color: #94a3b8; font-weight: 500; margin-top: 1px; white-space: nowrap; }
+  body.tlc-sb-min #tlc-sidebar .brand { justify-content: center; padding: 16px 0 14px; }
+  body.tlc-sb-min #tlc-sidebar .brand div { display: none; }
+
+  #tlc-sidebar nav { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 10px 10px 12px; scrollbar-width: thin; scrollbar-color: #334155 transparent; }
+  #tlc-sidebar .grp { font-size: 10.5px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: #64748b; padding: 14px 10px 6px; white-space: nowrap; }
+  body.tlc-sb-min #tlc-sidebar .grp { text-align: center; padding: 12px 0 4px; }
+  body.tlc-sb-min #tlc-sidebar .grp span { display: none; }
+  body.tlc-sb-min #tlc-sidebar .grp::before { content: ""; display: block; height: 1px; background: rgba(255,255,255,.08); margin: 0 14px; }
+
+  #tlc-sidebar .it {
+    position: relative; display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+    padding: 10px 12px; margin: 2px 0; border: 0; border-radius: 10px; background: none; color: #cbd5e1;
+    font: 500 14px/1.2 system-ui, sans-serif; cursor: pointer; white-space: nowrap; transition: background .12s, color .12s;
+  }
+  #tlc-sidebar .it svg { width: 20px; height: 20px; flex-shrink: 0; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; opacity: .9; }
+  #tlc-sidebar .it:hover { background: rgba(255,255,255,.06); color: #fff; }
+  #tlc-sidebar .it.on { background: rgba(245,158,11,.14); color: #fbbf24; font-weight: 700; }
+  #tlc-sidebar .it.on::before { content: ""; position: absolute; left: -10px; top: 8px; bottom: 8px; width: 3px; border-radius: 0 3px 3px 0; background: #f59e0b; }
+  #tlc-sidebar .it.locked { opacity: .38; cursor: not-allowed; }
+  #tlc-sidebar .it.locked::after { content: "🔒"; margin-left: auto; font-size: 11px; }
+  #tlc-sidebar .it .lb { overflow: hidden; text-overflow: ellipsis; }
+  body.tlc-sb-min #tlc-sidebar .it { justify-content: center; padding: 11px 0; }
+  body.tlc-sb-min #tlc-sidebar .it .lb, body.tlc-sb-min #tlc-sidebar .it.locked::after { display: none; }
+  body.tlc-sb-min #tlc-sidebar .it.on::before { left: -10px; }
+  /* Etiqueta flotante cuando está plegado */
+  body.tlc-sb-min #tlc-sidebar .it:hover .tip { display: block; }
+  #tlc-sidebar .tip { display: none; position: absolute; left: calc(100% + 12px); top: 50%; transform: translateY(-50%); background: #0f172a; color: #fff; border: 1px solid #334155; padding: 6px 10px; border-radius: 8px; font-size: 13px; font-weight: 600; white-space: nowrap; box-shadow: 0 8px 24px rgba(0,0,0,.4); z-index: 5; }
+
+  #tlc-sidebar .ft { border-top: 1px solid rgba(255,255,255,.06); padding: 10px; }
+  #tlc-sidebar .fold { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 9px; border: 1px solid rgba(255,255,255,.1); border-radius: 10px; background: rgba(255,255,255,.04); color: #94a3b8; font: 600 12.5px system-ui, sans-serif; cursor: pointer; }
+  #tlc-sidebar .fold:hover { color: #fff; background: rgba(255,255,255,.08); }
+  #tlc-sidebar .fold svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; transition: transform .2s; }
+  body.tlc-sb-min #tlc-sidebar .fold span { display: none; }
+  body.tlc-sb-min #tlc-sidebar .fold svg { transform: rotate(180deg); }
+}
+@media (max-width: 900px) { #tlc-sidebar { display: none !important; } }
+body:not(.tlc-sb) #tlc-sidebar { display: none !important; }
