@@ -1,0 +1,162 @@
+/* ============================================================
+   TopLiderCoach HUB — Capa responsive (movil y tablet)
+   Se carga la ULTIMA en index.html para ganar a todo lo anterior.
+   Parte 1: cascaron (cabecera, menu, pestañas, contenedor)
+   Parte 2: patrones comunes de los despachos del Modo Club
+   ============================================================ */
+
+/* ---------- Ajustes globales ---------- */
+html { -webkit-text-size-adjust: 100%; }
+img, video, canvas, svg { max-width: 100%; }
+input, select, textarea, button { font-size: max(16px, 1em); } /* evita el zoom de iOS al enfocar */
+
+/* Boton hamburguesa y cajon lateral: ocultos en escritorio */
+#tlc-nav-btn, #tlc-drawer, #tlc-drawer-veil, #tlc-current { display: none; }
+
+/* ============================================================
+   TABLET Y MOVIL (hasta 900 px)
+   ============================================================ */
+@media (max-width: 900px) {
+
+  /* ---------- Cabecera compacta ---------- */
+  .app-header { padding: 8px 12px !important; gap: 8px; align-items: center; }
+  .header-brand h1 { display: none !important; }
+  .header-logo { height: 30px !important; width: 30px !important; }
+  .header-right { gap: 8px !important; flex-wrap: nowrap !important; min-width: 0; }
+  .club-badge { display: flex !important; padding: 4px 8px !important; max-width: 40vw; }
+  .club-badge #club-nombre-header { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+  .club-initial { width: 24px !important; height: 24px !important; font-size: 12px !important; }
+  .user-info { gap: 6px !important; }
+  .user-name { display: none !important; }
+  .btn-logout { padding: 6px 10px !important; font-size: 13px !important; }
+  #cm-team-selector-wrap, .cm-team-selector { max-width: 38vw; }
+  #cm-team-selector-wrap select { font-size: 13px; padding: 4px 6px; }
+
+  /* ---------- Pestañas principales -> hamburguesa + barra "estas en" ---------- */
+  .main-tabs { display: none !important; }
+  #tlc-current {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px; background: #0f172a; color: #e2e8f0; border-bottom: 1px solid #1e293b;
+    font: 600 15px/1 system-ui, sans-serif; position: sticky; top: 0; z-index: 900;
+  }
+  #tlc-nav-btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    height: 38px; padding: 0 12px; border-radius: 10px; border: 1px solid #334155;
+    background: #1e293b; color: #fff; font: 600 14px system-ui, sans-serif; cursor: pointer; flex-shrink: 0;
+  }
+  #tlc-nav-btn i { display: block; width: 18px; height: 2px; background: #fff; box-shadow: 0 -6px 0 #fff, 0 6px 0 #fff; }
+  #tlc-current .lbl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #tlc-current .lbl small { display: block; font-weight: 400; color: #94a3b8; font-size: 11px; margin-top: 3px; }
+
+  #tlc-drawer-veil { display: block; position: fixed; inset: 0; background: rgba(2,6,23,.6); z-index: 9700; opacity: 0; pointer-events: none; transition: opacity .2s; }
+  #tlc-drawer {
+    display: block; position: fixed; top: 0; bottom: 0; left: 0; width: min(320px, 86vw); z-index: 9701;
+    background: #0f172a; color: #e2e8f0; transform: translateX(-100%); transition: transform .22s ease;
+    overflow-y: auto; padding: 14px 12px 24px; box-shadow: 8px 0 30px rgba(0,0,0,.4);
+    padding-top: calc(14px + env(safe-area-inset-top, 0px));
+  }
+  body.tlc-drawer-open #tlc-drawer { transform: none; }
+  body.tlc-drawer-open #tlc-drawer-veil { opacity: 1; pointer-events: auto; }
+  body.tlc-drawer-open { overflow: hidden; }
+  #tlc-drawer .hd { display: flex; align-items: center; justify-content: space-between; padding: 0 4px 12px; border-bottom: 1px solid #1e293b; margin-bottom: 8px; }
+  #tlc-drawer .hd b { font: 700 16px system-ui, sans-serif; color: #f59e0b; }
+  #tlc-drawer .hd button { background: none; border: 0; color: #94a3b8; font-size: 24px; line-height: 1; cursor: pointer; padding: 4px 8px; }
+  #tlc-drawer .grp { margin-top: 12px; padding: 0 4px; font: 700 11px system-ui, sans-serif; letter-spacing: .1em; text-transform: uppercase; color: #64748b; }
+  #tlc-drawer .it {
+    display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+    padding: 12px 10px; margin-top: 2px; border-radius: 10px; border: 0; background: none; color: #e2e8f0;
+    font: 500 15px system-ui, sans-serif; cursor: pointer;
+  }
+  #tlc-drawer .it:active { background: #1e293b; }
+  #tlc-drawer .it.on { background: #1e293b; color: #f59e0b; font-weight: 700; }
+  #tlc-drawer .it.locked { opacity: .45; }
+  #tlc-drawer .it.locked::after { content: "🔒"; margin-left: auto; font-size: 12px; }
+
+  /* ---------- Subpestañas: chips con scroll ---------- */
+  .sub-tabs {
+    display: flex !important; overflow-x: auto !important; gap: 8px !important; padding: 10px 12px !important;
+    scrollbar-width: none; -webkit-overflow-scrolling: touch; scroll-snap-type: x proximity;
+    -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent);
+  }
+  .sub-tabs::-webkit-scrollbar { display: none; }
+  .sub-tab { white-space: nowrap !important; flex-shrink: 0; padding: 8px 14px !important; font-size: 14px !important; scroll-snap-align: start; }
+
+  /* ---------- Contenedor de modulos ---------- */
+  .vista-modulo { padding: 12px !important; }
+  .panel { padding: 14px !important; border-radius: 10px !important; }
+  .form-row, .form-grid, .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr !important; }
+
+  /* ---------- Barra de demo ---------- */
+  #tlc-bar { padding: 6px 10px; gap: 6px; }
+  #tlc-bar .vc { display: none; }
+  #tlc-bar .chip { padding: 4px 9px; font-size: 12px; }
+  #tlc-bar .act { padding: 5px 10px; font-size: 12px; }
+
+  /* ============================================================
+     PARTE 2 — Patrones comunes de los despachos del Modo Club
+     (Medico, Fisio, Prep. Fisica, Pagos, Economico, RFEF, Familias,
+      Utillero, Scouting, Dir. Deportiva, Patrocinadores, Miembros)
+     ============================================================ */
+
+  /* Barras de estadisticas: 2 columnas */
+  [class$="-stats-bar"], [id$="-stats-bar"], [class*="-kpis"], [id*="-kpis"], [class*="-kpi-grid"] {
+    display: grid !important; grid-template-columns: repeat(2, 1fr) !important; gap: 8px !important;
+  }
+  [class$="-stats-bar"] > *, [id$="-stats-bar"] > * { min-width: 0 !important; padding: 10px 8px !important; }
+
+  /* Rejillas de jugadores y tarjetas: 2 columnas */
+  [id$="-player-grid"], [class$="-player-grid"], [class$="-cards"], [class*="-card-grid"] {
+    display: grid !important; grid-template-columns: repeat(2, 1fr) !important; gap: 10px !important;
+  }
+  [class$="-player-card"] { padding: 10px !important; }
+
+  /* Cabeceras de modulo y toolbars: que se apilen */
+  [class$="-header"], [class$="-toolbar"], [class*="-toolbar "] { flex-wrap: wrap !important; gap: 8px !important; }
+  [class$="-header"] h2, [class$="-header"] h3 { font-size: 20px !important; }
+
+  /* Pestañas internas de los despachos: scroll horizontal */
+  [class$="-tabs"] { display: flex !important; overflow-x: auto !important; flex-wrap: nowrap !important; gap: 6px !important; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  [class$="-tabs"]::-webkit-scrollbar { display: none; }
+  [class$="-tabs"] > * { white-space: nowrap !important; flex-shrink: 0 !important; }
+
+  /* Fichas y modales: hoja a pantalla completa */
+  [id$="-ficha-overlay"], [class$="-overlay"], [class$="-modal-overlay"], [id$="-modal-overlay"] {
+    padding: 0 !important; align-items: flex-end !important;
+  }
+  [id$="-ficha-overlay"] > *, [class$="-overlay"] > [class*="modal"], [class$="-overlay"] > [class*="ficha"],
+  [class$="-modal"], [id$="-modal"], [class$="-ficha"] {
+    width: 100% !important; max-width: 100% !important; height: 100dvh !important; max-height: 100dvh !important;
+    border-radius: 16px 16px 0 0 !important; margin: 0 !important; overflow-y: auto !important;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  /* Tablas: scroll horizontal dentro de su contenedor */
+  .vista-modulo table { min-width: 560px; }
+  .vista-modulo table { display: table; }
+  [class$="-table-wrap"], [class*="-tabla-wrap"], .table-wrap, .tabla-wrap { overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
+  .vista-modulo > div table, .vista-modulo [class$="-tab-content"] table { max-width: 100%; }
+
+  /* Calendarios de 7 columnas: dejar respirar */
+  [class*="-cal-grid"], [class*="calendar-grid"] { gap: 2px !important; font-size: 11px !important; }
+  [class*="-cal-grid"] > *, [class*="calendar-grid"] > * { min-height: 44px !important; padding: 2px !important; }
+
+  /* Formularios de los despachos: una columna */
+  [class$="-form-grid"], [class$="-form-row"], [class*="-form-2col"], [class*="-two-cols"] { grid-template-columns: 1fr !important; }
+  [class$="-form-group"] { min-width: 0 !important; }
+
+  /* Botones de accion: que no se salgan */
+  [class$="-actions"], [class$="-btns"], [class$="-buttons"] { flex-wrap: wrap !important; gap: 8px !important; }
+}
+
+/* ============================================================
+   MOVIL PEQUEÑO (hasta 560 px)
+   ============================================================ */
+@media (max-width: 560px) {
+  .club-badge { max-width: 34vw; }
+  #tlc-current { font-size: 14px; }
+  .vista-modulo { padding: 10px !important; }
+  [class$="-stats-bar"] > *, [id$="-stats-bar"] > * { padding: 8px 6px !important; }
+  [class$="-stats-bar"] [class*="valor"], [class$="-stats-bar"] [class*="value"], [class$="-stats-bar"] b { font-size: 20px !important; }
+  [id$="-player-grid"], [class$="-player-grid"] { grid-template-columns: repeat(2, 1fr) !important; }
+  .dashboard-hero-stats, #dash-hero-stats { grid-template-columns: repeat(4, 1fr) !important; gap: 6px !important; }
+}
