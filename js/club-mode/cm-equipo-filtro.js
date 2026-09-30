@@ -50,8 +50,17 @@
         };
     }
 
-    // El cliente puede recrearse tras el login: vigilar y envolver el que este vigente
-    setInterval(function () { try { if (typeof supabaseClient !== 'undefined' && supabaseClient) envolver(supabaseClient); } catch (e) {} }, 300);
+    // Envolver el cliente en cuanto exista y cada vez que el HUB lo recree (login WordPress / Supabase)
+    function envolverActual() { try { if (typeof supabaseClient !== 'undefined' && supabaseClient) envolver(supabaseClient); } catch (e) {} }
+    envolverActual();
+    try {
+        if (typeof crearClienteSupabase === 'function' && !crearClienteSupabase.__tlcEquipo) {
+            var crearOriginal = crearClienteSupabase;
+            crearClienteSupabase = function () { var c = crearOriginal.apply(this, arguments); envolver(c); return c; };
+            crearClienteSupabase.__tlcEquipo = true;
+        }
+    } catch (e) {}
+    setInterval(envolverActual, 100);
 
     // ---------- Selectores de equipo en los formularios de partido y sesion ----------
     function rellenarSelectores() {
