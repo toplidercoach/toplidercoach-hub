@@ -17,7 +17,8 @@
     var SE_REFRESCAN = { config: true, planificador: true, fisio: true, medico: true, prepfisica: true };
 
     var UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    function listo() { return window.cmState && cmState.activo; }
+    // "Listo" solo cuando el Modo Club esta activo Y ya tiene cargados sus equipos
+    function listo() { return window.cmState && cmState.activo && (cmState.equipos || []).length > 0; }
     function activo() { return listo() && (cmState.equipos || []).length > 1; }
     // Recuerdo entre cargas: el club tiene varios equipos y cual estaba seleccionado.
     // Permite filtrar desde la primera consulta, antes de que el Modo Club termine de inicializarse.
@@ -111,6 +112,7 @@
     }
     document.addEventListener('cmTeamChanged', function () {
         if (!activo()) return;
+        recordar();
         var mod = moduloActivo();
         if (mod && SE_REFRESCAN[mod]) return;
         try { if (mod) localStorage.setItem('hub_modulo_reabrir', mod); } catch (e) {}
