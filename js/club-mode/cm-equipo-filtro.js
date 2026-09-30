@@ -16,14 +16,40 @@
     // Modulos que ya escuchan cmTeamChanged y se repintan solos
     var SE_REFRESCAN = { config: true, planificador: true, fisio: true, medico: true, prepfisica: true };
 
-    function activo() { return window.cmState && cmState.activo && (cmState.equipos || []).length > 1; }
-    function equipoActual() { return activo() && cmState.equipoSeleccionado ? cmState.equipoSeleccionado.id : null; }
+    var UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    function listo() { return window.cmState && cmState.activo; }
+    function activo() { return listo() && (cmState.equipos || []).length > 1; }
+    // Recuerdo entre cargas: el club tiene varios equipos y cual estaba seleccionado.
+    // Permite filtrar desde la primera consulta, antes de que el Modo Club termine de inicializarse.
+    function recordar() {
+        try {
+            if (!listo()) return;
+            localStorage.setItem('cm_multi_equipo', activo() ? '1' : '0');
+            if (activo()) localStorage.setItem('cm_equipo_ids_acceso', (cmState.esAdmin || cmState.teamScope === 'all') ? '*' : (cmState.equiposAcceso || []).map(function (e) { return e.id; }).join(','));
+        } catch (e) {}
+    }
+    setInterval(recordar, 500);
+    function equipoActual() {
+        if (listo()) return activo() && cmState.equipoSeleccionado ? cmState.equipoSeleccionado.id : null;
+        try { var t = localStorage.getItem('cm_team_selected'); return (localStorage.getItem('cm_multi_equipo') === '1' && t && UUID.test(t)) ? t : null; } catch (e) { return null; }
+    }
     function filtro() {
-        if (!activo()) return null;
-        if (cmState.equipoSeleccionado) return 'team_id.eq.' + cmState.equipoSeleccionado.id + ',team_id.is.null';
-        if (cmState.esAdmin || cmState.teamScope === 'all') return null;
-        var ids = (cmState.equiposAcceso || []).map(function (e) { return e.id; });
-        return ids.length ? 'team_id.in.(' + ids.join(',') + '),team_id.is.null' : 'team_id.is.null';
+        if (listo()) {
+            if (!activo()) return null;
+            if (cmState.equipoSeleccionado) return 'team_id.eq.' + cmState.equipoSeleccionado.id + ',team_id.is.null';
+            if (cmState.esAdmin || cmState.teamScope === 'all') return null;
+            var ids = (cmState.equiposAcceso || []).map(function (e) { return e.id; });
+            return ids.length ? 'team_id.in.(' + ids.join(',') + '),team_id.is.null' : 'team_id.is.null';
+        }
+        // Aun sin inicializar: usar lo recordado de la ultima sesion en este navegador
+        try {
+            if (localStorage.getItem('cm_multi_equipo') !== '1') return null;
+            var t = localStorage.getItem('cm_team_selected');
+            if (t && UUID.test(t)) return 'team_id.eq.' + t + ',team_id.is.null';
+            var acc = localStorage.getItem('cm_equipo_ids_acceso');
+            if (!acc || acc === '*') return null;
+            return 'team_id.in.(' + acc + '),team_id.is.null';
+        } catch (e) { return null; }
     }
     window.cmFiltroEquipoTabla = filtro;
 
