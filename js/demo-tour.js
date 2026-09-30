@@ -131,6 +131,21 @@
     }
     function callar() { clearTimeout(hablar._t); if ('speechSynthesis' in window) speechSynthesis.cancel(); }
 
+    /* ---------- Salir de la demo (borra todo rastro del visitante) ---------- */
+    function salirDemo() {
+        callar();
+        try { Object.keys(localStorage).forEach(function (k) { if (k.indexOf('tlc_') === 0) localStorage.removeItem(k); }); } catch (e) {}
+        try { sessionStorage.clear(); } catch (e) {}
+        if (typeof window.logout === 'function') window.logout();
+        else { try { localStorage.removeItem('hub_user'); localStorage.removeItem('hub_token'); } catch (e) {} location.reload(); }
+    }
+    // El boton "Salir" del HUB, en modo demo, tambien limpia el rastro del visitante
+    if (typeof window.logout === 'function' && !window.logout.__tlc) {
+        var _logout = window.logout;
+        var f = function () { try { Object.keys(localStorage).forEach(function (k) { if (k.indexOf('tlc_') === 0) localStorage.removeItem(k); }); sessionStorage.clear(); } catch (e) {} return _logout.apply(this, arguments); };
+        f.__tlc = true; window.logout = f;
+    }
+
     /* ---------- Cambio de despacho en el sitio ---------- */
     function cambiarA(r) {
         callar();
@@ -150,11 +165,12 @@
         var b = document.createElement('div'); b.id = 'tlc-bar';
         var chips = ROLES.map(function (r) { return '<button type="button" class="chip' + (r.slug === ROLE ? ' on' : '') + '" data-slug="' + r.slug + '">' + r.rol + '</button>'; }).join('');
         b.innerHTML = '<span class="lbl">👁 <b>Modo demo</b> — datos ficticios</span><span class="vc">Ver como</span>' + chips
-            + '<span class="sp"></span><button type="button" class="act" id="tlc-bar-rec">Recorrido</button><a class="act sub" href="' + OFERTA_URL + '">🚀 Suscríbete</a>';
+            + '<span class="sp"></span><button type="button" class="act" id="tlc-bar-rec">Recorrido</button><a class="act sub" href="' + OFERTA_URL + '">🚀 Suscríbete</a><button type="button" class="act" id="tlc-bar-salir" title="Cerrar la demo y volver al login">✕ Salir de la demo</button>';
         var app = $('#app-container') || document.body;
         app.insertBefore(b, app.firstChild);
         b.querySelectorAll('.chip').forEach(function (c) { c.onclick = function () { var r = ROLES.filter(function (x) { return x.slug === c.dataset.slug; })[0]; if (r && r.slug !== ROLE) cambiarA(r); }; });
         $('#tlc-bar-rec').onclick = function () { var p = $('#tlc-panel'); if (p) { p.classList.remove('min'); p.scrollIntoView(); } };
+        $('#tlc-bar-salir').onclick = salirDemo;
     }
 
     /* ---------- Mensajes amables del guardian ---------- */
