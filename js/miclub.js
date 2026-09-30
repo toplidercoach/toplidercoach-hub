@@ -243,6 +243,10 @@ registrarSubTab('config', 'datos', cargarDatosClub);
                 // Modo Club: solo el equipo seleccionado (o jugadores sin equipo, datos historicos)
                 if (typeof cmState !== 'undefined' && cmState.activo && cmState.equipoSeleccionado) {
                     qPlantilla = qPlantilla.or('team_id.eq.' + cmState.equipoSeleccionado.id + ',team_id.is.null');
+                } else if (typeof cmState !== 'undefined' && cmState.activo && !cmState.esAdmin && cmState.teamScope !== 'all') {
+                    qPlantilla = qPlantilla.or('team_id.in.(' + cmState.equiposAcceso.map(function(e){ return e.id; }).join(',') + '),team_id.is.null');
+                } else if (typeof cmState !== 'undefined' && cmState.activo && !cmState.esAdmin && cmState.teamScope !== 'all') {
+                    qPlantilla = qPlantilla.or('team_id.in.(' + cmState.equiposAcceso.map(function(e){ return e.id; }).join(',') + '),team_id.is.null');
                 }
                 const { data, error } = await qPlantilla.order('shirt_number');
                 
@@ -776,6 +780,8 @@ async function generarPDFPlantilla() {
         .eq('season_id', tempId);
     if (typeof cmState !== 'undefined' && cmState.activo && cmState.equipoSeleccionado) {
         qPdf = qPdf.or('team_id.eq.' + cmState.equipoSeleccionado.id + ',team_id.is.null');
+    } else if (typeof cmState !== 'undefined' && cmState.activo && !cmState.esAdmin && cmState.teamScope !== 'all') {
+        qPdf = qPdf.or('team_id.in.(' + cmState.equiposAcceso.map(function(e){ return e.id; }).join(',') + '),team_id.is.null');
     }
     const { data, error } = await qPdf.order('shirt_number');
     

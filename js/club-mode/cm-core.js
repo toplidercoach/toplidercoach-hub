@@ -164,7 +164,8 @@ async function cmInit() {
             if (ultimo) {
                 encontrado = cmState.equiposAcceso.find(function(e) { return e.id === ultimo; });
             }
-            cmState.equipoSeleccionado = encontrado || null;
+            // Por defecto, su equipo (o el primero). "Todos" solo si lo elige y tiene mas de uno.
+            cmState.equipoSeleccionado = encontrado || (cmState.equiposAcceso.length === 1 || !ultimo ? cmState.equiposAcceso[0] : null);
         }
 
         // 6. Montar el selector de equipo en el header
@@ -209,7 +210,7 @@ function cmMontarSelector() {
     }
 
     var sinSel = cmState.equipoSeleccionado ? '' : ' selected';
-    var opciones = '<option value="__all__"' + sinSel + '>Todos mis equipos (' + cmState.equiposAcceso.length + ')</option>';
+    var opciones = cmState.equiposAcceso.length > 1 ? '<option value="__all__"' + sinSel + '>Todos mis equipos (' + cmState.equiposAcceso.length + ')</option>' : '';
     opciones += cmState.equiposAcceso.map(function(e) {
         var selected = cmState.equipoSeleccionado && cmState.equipoSeleccionado.id === e.id ? ' selected' : '';
         var cat = e.category ? ' (' + e.category + ')' : '';
