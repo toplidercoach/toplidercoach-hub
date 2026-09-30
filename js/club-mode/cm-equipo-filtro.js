@@ -1,10 +1,11 @@
 // ============================================================
-// CLUB MODE - FILTRO CENTRAL POR EQUIPO (cm-equipo-filtro.js)  v4
+// CLUB MODE - FILTRO CENTRAL POR EQUIPO (cm-equipo-filtro.js)  v5
 // En un club con varios equipos, cada dato es de un equipo:
 //   - partidos y sesiones          -> matches.team_id / training_sessions.team_id
 //   - todo lo que cuelga de ellos  -> estadisticas por jugador, asistencia,
 //     analisis, planes de partido, conceptos y montajes de sesion. La base de
 //     datos copia sola el equipo del partido/sesion (trigger tlc_heredar_equipo).
+//   - ciclos de periodizacion y competiciones -> training_periods.team_id / competitions.team_id
 // Este modulo envuelve el cliente de datos del HUB para que, sin tocar los modulos:
 //   - toda lectura de esas tablas se limite al equipo seleccionado (o a los
 //     equipos del miembro si esta en "Todos"), mas los registros antiguos sin equipo;
@@ -17,7 +18,8 @@
     var TABLAS = {
         matches: true, training_sessions: true,
         match_player_stats: true, match_analysis: true, match_plans: true, asistencia_partidos: true,
-        asistencia_sesiones: true, sesion_conceptos: true, sesion_montajes: true
+        asistencia_sesiones: true, sesion_conceptos: true, sesion_montajes: true,
+        training_periods: true, competitions: true
     };
     // Modulos que ya escuchan cmTeamChanged y se repintan solos
     var SE_REFRESCAN = { config: true, fisio: true, medico: true, prepfisica: true };

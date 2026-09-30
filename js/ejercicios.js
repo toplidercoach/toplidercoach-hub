@@ -4525,11 +4525,13 @@ async function ejCargarPlantilla() {
         }
 
         // Cargar jugadores de la temporada
-        const { data, error } = await supabaseClient
+        let qPlantilla = supabaseClient
             .from('season_players')
             .select('shirt_number, player_id, players(name, position, photo_url)')
             .eq('season_id', seasonIdActual)
             .order('shirt_number', { ascending: true });
+        if (typeof cmAplicarFiltroEquipo === 'function') qPlantilla = cmAplicarFiltroEquipo(qPlantilla); // mi equipo + cedidos
+        const { data, error } = await qPlantilla;
 
         if (error) throw error;
         ejP._plantilla = (data || []).map(sp => ({
