@@ -111,7 +111,9 @@ registrarSubTab('planificador', 'calendario', cargarCalendarioUnificado);
                     .select('id, player_id, shirt_number, players(id, name, photo_url, position, status, fecha_baja)')
                     .eq('season_id', seasonId);
                 // Modo Club: filtrar por el equipo seleccionado en el header
-                if (typeof cmState !== 'undefined' && cmState.activo && cmState.equipoSeleccionado) {
+                if (typeof cmAplicarFiltroEquipo === 'function') {
+                    qJug = cmAplicarFiltroEquipo(qJug); // mi equipo + cedidos (cm-cesiones.js)
+                } else if (typeof cmState !== 'undefined' && cmState.activo && cmState.equipoSeleccionado) {
                     // Del equipo seleccionado O sin equipo asignado (datos historicos de clubes de un solo equipo)
                     qJug = qJug.or('team_id.eq.' + cmState.equipoSeleccionado.id + ',team_id.is.null');
                 }
@@ -903,29 +905,12 @@ if (!sesionEditandoId) {
 if (typeof scGuardarConceptos === 'function') { await scGuardarConceptos(sesionId, !!sesionEditandoId); }
                 showToast(sesionEditandoId ? 'Sesión actualizada correctamente' : 'Sesión guardada correctamente');
                 sesionEditandoId = sesionId; // Permanecer en la sesión tras guardar (Nueva Sesion = empezar de cero)
-                return true;
                 
             } catch (error) {
                 showToast('Error al guardar: ' + error.message);
             }
         }
         
-        // ========== ACCESOS RAPIDOS DESDE EL EDITOR ==========
-        // Guarda la sesion y abre la vista pedida sin pasar por Mis Sesiones
-        async function accionRapidaSesion(accion) {
-            if (accion === 'porteros' && (!sesion.porteros || sesion.porteros.length === 0)) {
-                showToast('Esta sesion no tiene trabajo de porteros');
-                return;
-            }
-            const guardada = await guardarSesion();
-            if (!guardada || !sesionEditandoId) return;
-            const id = sesionEditandoId;
-            if (accion === 'vestuario') abrirModoVestuario(id);
-            else if (accion === 'asistencia') abrirModalAsistenciaSesion(id);
-            else if (accion === 'pdf') abrirModalPDFSesion(id);
-            else if (accion === 'porteros') exportarSesionPDF(id, true, false, true);
-        }
-
         // ========== PLANIFICADOR: MIS SESIONES ==========
         async function cargarMisSesiones() {
             const lista = document.getElementById('lista-mis-sesiones');
@@ -2751,7 +2736,7 @@ async function enviarMaterialUtillero() {
 (function _mostrarBotonUtillero() {
     let n = 0;
     const iv = setInterval(function() {
-        n++; if (n > 600) { clearInterval(iv); return; }
+        n++; if (n > 20) { clearInterval(iv); return; }
         if (typeof cmState === 'undefined' || !cmState.activo) return;
         clearInterval(iv);
         const b = document.getElementById('btn-enviar-utillero');

@@ -520,11 +520,12 @@ async function generarPDFConvocatoriaDesdeVer(partidoId) {
 }
 
 async function cargarPlantillaParaPDF() {
-    const { data } = await supabaseClient
+    let qPdfConv = supabaseClient
         .from('season_players')
         .select('id, player_id, shirt_number, players(id, name, position, photo_url, status, fecha_baja)')
-        .eq('season_id', seasonId)
-        .order('shirt_number');
+        .eq('season_id', seasonId);
+    if (typeof cmAplicarFiltroEquipo === 'function') qPdfConv = cmAplicarFiltroEquipo(qPdfConv); // mi equipo + cedidos
+    const { data } = await qPdfConv.order('shirt_number');
     return data || [];
 }
         function editarPartido(id) {
@@ -542,11 +543,12 @@ async function cargarPlantillaParaPDF() {
     }
     
     try {
-        const { data, error } = await supabaseClient
+        let qConv = supabaseClient
             .from('season_players')
             .select('id, player_id, shirt_number, players(id, name, position, photo_url, status, fecha_baja)')
-            .eq('season_id', seasonId)
-            .order('shirt_number');
+            .eq('season_id', seasonId);
+        if (typeof cmAplicarFiltroEquipo === 'function') qConv = cmAplicarFiltroEquipo(qConv); // mi equipo + cedidos
+        const { data, error } = await qConv.order('shirt_number');
         
         if (error) {
             console.error('Error cargando convocatoria:', error);

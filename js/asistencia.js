@@ -257,11 +257,12 @@ async function cargarAsistenciaRango() {
             return;
         }
         
-        const { data: spData } = await supabaseClient
+        let qAsis = supabaseClient
             .from('season_players')
             .select('player_id, shirt_number, players(id, name, photo_url, position, status, fecha_baja)')
-            .eq('season_id', currentSeasonId)
-            .order('shirt_number');
+            .eq('season_id', currentSeasonId);
+        if (typeof cmAplicarFiltroEquipo === 'function') qAsis = cmAplicarFiltroEquipo(qAsis); // mi equipo + cedidos
+        const { data: spData } = await qAsis.order('shirt_number');
         
         const fechaIniRango = getFechaInicio();
         const jugadores = (spData || []).filter(sp => sp.players && !(sp.players.status === 'baja' && sp.players.fecha_baja && sp.players.fecha_baja <= fechaIniRango)).map(sp => ({
@@ -1102,11 +1103,12 @@ async function generarPDFPlantillaGeneral() {
         }
         if (!currentSeasonId) { showToast('No hay temporada activa'); return; }
         
-        const { data: spData } = await supabaseClient
+        let qAsis = supabaseClient
             .from('season_players')
             .select('player_id, shirt_number, players(id, name, photo_url, position, status, fecha_baja)')
-            .eq('season_id', currentSeasonId)
-            .order('shirt_number');
+            .eq('season_id', currentSeasonId);
+        if (typeof cmAplicarFiltroEquipo === 'function') qAsis = cmAplicarFiltroEquipo(qAsis); // mi equipo + cedidos
+        const { data: spData } = await qAsis.order('shirt_number');
         
         const fechaIniPdf = getFechaInicio();
         const jugadores = (spData || []).filter(sp => sp.players && !(sp.players.status === 'baja' && sp.players.fecha_baja && sp.players.fecha_baja <= fechaIniPdf)).map(sp => ({
@@ -1283,4 +1285,4 @@ function wActualizarRpe(input) {
     const card = input.closest('.wreg-card');
     const span = card.querySelector('.wreg-val[data-for="rpe"]');
     if (span) span.textContent = input.value;
-}
+}

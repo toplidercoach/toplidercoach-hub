@@ -241,12 +241,10 @@ registrarSubTab('config', 'datos', cargarDatosClub);
                     .select('id, player_id, shirt_number, players(id, name, status, fecha_baja, position, position_detail, position_secondary, is_sub23, acquisition, photo_url, birth_date, height_cm, weight_kg, dominant_foot)')
                     .eq('season_id', tempId);
                 // Modo Club: solo el equipo seleccionado (o jugadores sin equipo, datos historicos)
-                if (typeof cmState !== 'undefined' && cmState.activo && cmState.equipoSeleccionado) {
+                if (typeof cmAplicarFiltroEquipo === 'function') {
+                    qPlantilla = cmAplicarFiltroEquipo(qPlantilla); // mi equipo + cedidos (cm-cesiones.js)
+                } else if (typeof cmState !== 'undefined' && cmState.activo && cmState.equipoSeleccionado) {
                     qPlantilla = qPlantilla.or('team_id.eq.' + cmState.equipoSeleccionado.id + ',team_id.is.null');
-                } else if (typeof cmState !== 'undefined' && cmState.activo && !cmState.esAdmin && cmState.teamScope !== 'all') {
-                    qPlantilla = qPlantilla.or('team_id.in.(' + cmState.equiposAcceso.map(function(e){ return e.id; }).join(',') + '),team_id.is.null');
-                } else if (typeof cmState !== 'undefined' && cmState.activo && !cmState.esAdmin && cmState.teamScope !== 'all') {
-                    qPlantilla = qPlantilla.or('team_id.in.(' + cmState.equiposAcceso.map(function(e){ return e.id; }).join(',') + '),team_id.is.null');
                 }
                 const { data, error } = await qPlantilla.order('shirt_number');
                 
@@ -348,6 +346,7 @@ return `
         ${j.is_sub23 ? '<div style="position:absolute;top:0;right:0;width:74px;height:74px;overflow:hidden;pointer-events:none;z-index:5"><div style="position:absolute;transform:rotate(45deg);background:#7c3aed;color:#fff;font-size:10px;font-weight:800;letter-spacing:.5px;text-align:center;width:100px;top:16px;right:-26px;padding:3px 0;box-shadow:0 1px 4px rgba(0,0,0,.35)">U23</div></div>' : ''}
         ${j.acquisition === 'prueba' ? '<div style="position:absolute;top:0;left:0;width:74px;height:74px;overflow:hidden;pointer-events:none;z-index:5"><div style="position:absolute;transform:rotate(-45deg);background:#f97316;color:#fff;font-size:9px;font-weight:800;text-align:center;width:100px;top:16px;left:-26px;padding:3px 0;box-shadow:0 1px 4px rgba(0,0,0,.35)">A PRUEBA</div></div>' : ''}
         ${j.acquisition === 'prueba' ? '<div style="position:absolute;top:0;left:0;width:74px;height:74px;overflow:hidden;pointer-events:none;z-index:5"><div style="position:absolute;transform:rotate(-45deg);background:#f97316;color:#fff;font-size:9px;font-weight:800;letter-spacing:.3px;text-align:center;width:100px;top:16px;left:-26px;padding:3px 0;box-shadow:0 1px 4px rgba(0,0,0,.35)">A PRUEBA</div></div>' : ''}
+        ${(typeof cmEsCedido === 'function' && cmEsCedido(j.id)) ? '<div class="pcard-cedido">Cedido · ' + cmEsCedido(j.id) + '</div>' : ''}
         <div class="pcard-top">
             <div class="pcard-dorsal">${sp.shirt_number || '-'}</div>
             <div class="pcard-pos-badge">${posAb}</div>
@@ -385,6 +384,9 @@ return `
                 
                 if (count < maxJug) {
                     html += `<div class="add-jugador-card" onclick="abrirModalJugador()"><div class="icon">+</div><span>Añadir Jugador</span></div>`;
+                }
+                if (typeof cmState !== 'undefined' && cmState.activo && cmState.equipoSeleccionado && typeof cmCesionesAbrirModal === 'function') {
+                    html += `<div class="add-cesion-card" onclick="cmCesionesAbrirModal()"><div class="icon">🔁</div><span>Convocar de otro equipo</span><small style="font-weight:500;color:#a78bfa;opacity:.8">Temporal, sin cambiarlo de equipo</small></div>`;
                 }
                 
                 lista.innerHTML = html;
@@ -778,10 +780,10 @@ async function generarPDFPlantilla() {
         .from('season_players')
         .select('shirt_number, players(name, position, birth_date, dominant_foot, height_cm, weight_kg, phone, email, status, document_number, federation_license)')
         .eq('season_id', tempId);
-    if (typeof cmState !== 'undefined' && cmState.activo && cmState.equipoSeleccionado) {
+    if (typeof cmAplicarFiltroEquipo === 'function') {
+        qPdf = cmAplicarFiltroEquipo(qPdf);
+    } else if (typeof cmState !== 'undefined' && cmState.activo && cmState.equipoSeleccionado) {
         qPdf = qPdf.or('team_id.eq.' + cmState.equipoSeleccionado.id + ',team_id.is.null');
-    } else if (typeof cmState !== 'undefined' && cmState.activo && !cmState.esAdmin && cmState.teamScope !== 'all') {
-        qPdf = qPdf.or('team_id.in.(' + cmState.equiposAcceso.map(function(e){ return e.id; }).join(',') + '),team_id.is.null');
     }
     const { data, error } = await qPdf.order('shirt_number');
     
@@ -934,4 +936,4 @@ async function generarPDFPlantilla() {
     
     doc.save('plantilla_' + clubNombre.replace(/\s+/g, '_') + '.pdf');
     cerrarModalDescargarPlantilla();
-}
+}
