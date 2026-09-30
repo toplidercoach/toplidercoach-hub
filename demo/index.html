@@ -22,8 +22,13 @@
   *,*::before,*::after{box-sizing:inherit}
   html{scroll-behavior:smooth}
   @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto} *{transition:none!important;animation:none!important}}
-  body{margin:0;background:var(--navy);color:var(--ink);font-family:"Barlow",system-ui,sans-serif;font-size:17px;line-height:1.55;-webkit-font-smoothing:antialiased;
-    background-image:radial-gradient(rgba(247,244,234,.06) 1px,transparent 1px);background-size:26px 26px}
+  body{margin:0;background:var(--navy);color:var(--ink);font-family:"Barlow",system-ui,sans-serif;font-size:17px;line-height:1.55;-webkit-font-smoothing:antialiased}
+  /* Pizarra tactica viva de fondo */
+  #pizarra-bg{position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;display:block}
+  #pizarra-veil{position:fixed;inset:0;z-index:0;pointer-events:none;background:linear-gradient(180deg,rgba(15,23,42,.35) 0,rgba(15,23,42,.72) 55%,rgba(15,23,42,.9) 100%)}
+  header,section,footer{position:relative;z-index:1}
+  .roles,.why,.offer{background:transparent}
+  .why{background:linear-gradient(180deg,rgba(15,23,42,.0),rgba(15,23,42,.55))}
   a{color:inherit}
   h1,h2,h3{font-family:"Barlow Condensed","Barlow",sans-serif;font-weight:700;line-height:1;margin:0}
   .wrap{width:min(var(--w),calc(100% - 40px));margin:0 auto}
@@ -183,6 +188,8 @@
 </style>
 </head>
 <body>
+<canvas id="pizarra-bg" aria-hidden="true"></canvas>
+<div id="pizarra-veil" aria-hidden="true"></div>
 
 <header>
   <div class="wrap top">
@@ -517,6 +524,105 @@ function pararVoz() { clearTimeout(hablar._t); if ('speechSynthesis' in window) 
     var p = v.play(); if (p && p.catch) p.catch(function () {});
   });
   v.addEventListener('ended', function () { pl.classList.remove('playing'); });
+})();
+
+
+/* ===== Pizarra tactica viva (fondo) ===== */
+(function () {
+  var cv = document.getElementById('pizarra-bg'); if (!cv) return;
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var ctx = cv.getContext('2d'), W = 0, H = 0, dpr = Math.min(window.devicePixelRatio || 1, 2);
+  var CHALK = 'rgba(247,244,234,', AMBER = 'rgba(245,158,11,';
+  var players = [], passes = [], ball = null, t0 = performance.now(), last = t0, visible = true;
+
+  function resize() {
+    W = window.innerWidth; H = window.innerHeight;
+    cv.width = W * dpr; cv.height = H * dpr; cv.style.width = W + 'px'; cv.style.height = H + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    setup();
+  }
+  // Campo en perspectiva suave: coordenadas normalizadas (u,v) en [0,1] -> pantalla
+  function P(u, v) {
+    var top = H * 0.12, bottom = H * 1.02, y = top + (bottom - top) * v;
+    var k = 0.62 + 0.38 * v; // ancho crece hacia abajo
+    var x = W * 0.5 + (u - 0.5) * W * 1.15 * k;
+    return [x, y];
+  }
+  function setup() {
+    players = [];
+    var base = [[.5,.92],[.22,.72],[.4,.78],[.6,.78],[.78,.72],[.3,.55],[.5,.58],[.7,.55],[.28,.35],[.5,.3],[.72,.35]];
+    base.forEach(function (b, i) { players.push({ u: b[0], v: b[1], u0: b[0], v0: b[1], ph: Math.random() * 6.28, sp: 0.15 + Math.random() * 0.2, r: 0.025 + Math.random() * 0.02 }); });
+    passes = []; ball = { from: 0, to: 9, t: 0, dur: 1600 };
+  }
+  function line(a, b, alpha, w, dash) {
+    ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]);
+    ctx.strokeStyle = CHALK + alpha + ')'; ctx.lineWidth = w; ctx.setLineDash(dash || []); ctx.stroke(); ctx.setLineDash([]);
+  }
+  function campo() {
+    var a = 0.16;
+    // Bordes
+    line(P(0,0), P(1,0), a, 1.5); line(P(0,1), P(1,1), a, 1.5); line(P(0,0), P(0,1), a, 1.5); line(P(1,0), P(1,1), a, 1.5);
+    // Medio campo
+    line(P(0,.5), P(1,.5), a, 1.5);
+    // Circulo central (elipse por la perspectiva)
+    var c = P(.5,.5); var rx = (P(.5 + .11, .5)[0] - c[0]), ry = (P(.5,.5 + .085)[1] - c[1]);
+    ctx.beginPath(); ctx.ellipse(c[0], c[1], rx, ry, 0, 0, 6.283); ctx.strokeStyle = CHALK + a + ')'; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.beginPath(); ctx.arc(c[0], c[1], 3, 0, 6.283); ctx.fillStyle = CHALK + a + ')'; ctx.fill();
+    // Areas
+    [[0, 1], [1, -1]].forEach(function (s) {
+      var v0 = s[0], d = s[1];
+      line(P(.2, v0), P(.2, v0 + d * .16), a, 1.5); line(P(.8, v0), P(.8, v0 + d * .16), a, 1.5); line(P(.2, v0 + d * .16), P(.8, v0 + d * .16), a, 1.5);
+      line(P(.36, v0), P(.36, v0 + d * .06), a, 1.5); line(P(.64, v0), P(.64, v0 + d * .06), a, 1.5); line(P(.36, v0 + d * .06), P(.64, v0 + d * .06), a, 1.5);
+      var pen = P(.5, v0 + d * .11); ctx.beginPath(); ctx.arc(pen[0], pen[1], 2.5, 0, 6.283); ctx.fillStyle = CHALK + a + ')'; ctx.fill();
+    });
+  }
+  function nuevoPase() {
+    var from = ball.to, to; do { to = Math.floor(Math.random() * players.length); } while (to === from);
+    ball = { from: from, to: to, t: 0, dur: 1300 + Math.random() * 900 };
+    passes.push({ from: from, to: to, life: 0, max: 2600 });
+    if (Math.random() < 0.35) { var p = players[to]; passes.push({ arrow: true, from: to, dx: (Math.random() - .5) * .18, dy: -0.08 - Math.random() * .08, life: 0, max: 2200 }); }
+  }
+  function frame(now) {
+    if (!visible) { last = now; requestAnimationFrame(frame); return; }
+    var dt = Math.min(50, now - last); last = now; var T = (now - t0) / 1000;
+    ctx.clearRect(0, 0, W, H);
+    campo();
+    // Jugadores: deriva lenta alrededor de su posicion
+    players.forEach(function (p, i) {
+      if (!reduce) { p.u = p.u0 + Math.sin(T * p.sp + p.ph) * p.r; p.v = p.v0 + Math.cos(T * p.sp * 0.8 + p.ph) * p.r * 0.6; }
+      var s = P(p.u, p.v), rr = 5 + 3 * p.v;
+      ctx.beginPath(); ctx.arc(s[0], s[1], rr + 6, 0, 6.283); ctx.fillStyle = AMBER + '0.06)'; ctx.fill();
+      ctx.beginPath(); ctx.arc(s[0], s[1], rr, 0, 6.283); ctx.fillStyle = AMBER + (0.35 + 0.25 * p.v) + ')'; ctx.fill();
+    });
+    // Pases y flechas
+    for (var i = passes.length - 1; i >= 0; i--) {
+      var q = passes[i]; q.life += dt; var k = q.life / q.max; if (k >= 1) { passes.splice(i, 1); continue; }
+      var alpha = k < .15 ? k / .15 : (k > .7 ? (1 - k) / .3 : 1);
+      var a = P(players[q.from].u, players[q.from].v);
+      if (q.arrow) {
+        var b = P(players[q.from].u + q.dx, players[q.from].v + q.dy);
+        var prog = Math.min(1, k * 2.2); var bx = a[0] + (b[0] - a[0]) * prog, by = a[1] + (b[1] - a[1]) * prog;
+        line(a, [bx, by], 0.35 * alpha, 2);
+        if (prog > .95) { var ang = Math.atan2(b[1] - a[1], b[0] - a[0]); ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(bx - 10 * Math.cos(ang - .5), by - 10 * Math.sin(ang - .5)); ctx.lineTo(bx - 10 * Math.cos(ang + .5), by - 10 * Math.sin(ang + .5)); ctx.closePath(); ctx.fillStyle = CHALK + (0.35 * alpha) + ')'; ctx.fill(); }
+      } else {
+        var b2 = P(players[q.to].u, players[q.to].v);
+        ctx.lineDashOffset = -T * 40; line(a, b2, 0.3 * alpha, 1.5, [6, 8]); ctx.lineDashOffset = 0;
+      }
+    }
+    // Balon
+    if (!reduce) {
+      ball.t += dt; var kk = Math.max(0, Math.min(1, ball.t / ball.dur)); var e = kk < .5 ? 2 * kk * kk : -1 + (4 - 2 * kk) * kk;
+      var pa = P(players[ball.from].u, players[ball.from].v), pb = P(players[ball.to].u, players[ball.to].v);
+      var bx2 = pa[0] + (pb[0] - pa[0]) * e, by2 = pa[1] + (pb[1] - pa[1]) * e - Math.sin(kk * 3.1416) * 26;
+      ctx.beginPath(); ctx.arc(bx2, by2, 5, 0, 6.283); ctx.fillStyle = CHALK + '0.85)'; ctx.fill();
+      ctx.beginPath(); ctx.arc(bx2, by2, 5, 0, 6.283); ctx.strokeStyle = 'rgba(15,23,42,.6)'; ctx.lineWidth = 1; ctx.stroke();
+      if (kk >= 1 && !ball.done) { ball.done = true; setTimeout(nuevoPase, 700); }
+    } else if (passes.length === 0) { passes.push({ from: 0, to: 9, life: 0, max: 1e9 }); }
+    requestAnimationFrame(frame);
+  }
+  document.addEventListener('visibilitychange', function () { visible = !document.hidden; });
+  window.addEventListener('resize', resize);
+  resize(); nuevoPase(); requestAnimationFrame(frame);
 })();
 
 /* Entrada directa: /demo/?rol=fisio */
