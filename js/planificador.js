@@ -838,9 +838,11 @@ sesion = { nombre: '', fecha: fechaHoy, previo: [], calentamiento: [], principal
             }
             
             try {
+                const selEquipoSesion = document.getElementById('sesion-equipo');
                 const datosGuardar = {
                     club_id: clubId,
                     season_id: seasonId,
+                    team_id: (selEquipoSesion && selEquipoSesion.value) ? selEquipoSesion.value : ((typeof cmState !== 'undefined' && cmState.activo && cmState.equipoSeleccionado) ? cmState.equipoSeleccionado.id : null),
                     name: nombre,
                     session_date: fecha,
                     session_time: hora || null,
@@ -1106,6 +1108,7 @@ if (typeof scGuardarConceptos === 'function') { await scGuardarConceptos(sesionI
                 document.getElementById('sesion-equipo').value = data.team_category || '';
                 document.getElementById('sesion-objetivo').value = data.objective || '';
                 document.getElementById('sesion-material').value = data.materials || '';
+                if (document.getElementById('sesion-equipo')) document.getElementById('sesion-equipo').value = data.team_id || ((typeof cmState !== 'undefined' && cmState.activo && cmState.equipoSeleccionado) ? cmState.equipoSeleccionado.id : '');
               document.getElementById('sesion-notas').value = data.notes || '';
                 document.getElementById('sesion-rpe').value = data.rpe || '';
                 

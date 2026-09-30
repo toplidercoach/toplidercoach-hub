@@ -294,6 +294,10 @@
                                 <input type="text" id="sesion-nombre" placeholder="Ej: Posesion y finalizacion">
                             </div>
                             
+                            <div class="campo-grupo" style="display:none">
+                                <label>Equipo</label>
+                                <select id="sesion-equipo"></select>
+                            </div>
                             <div class="campo-grupo">
                                 <label>Fecha</label>
                                 <input type="date" id="sesion-fecha" onchange="if(typeof pdzAutoRellenar==='function')pdzAutoRellenar()">
@@ -1219,6 +1223,10 @@
                                 <input type="text" id="partido-rival" placeholder="Nombre del equipo rival" style="flex: 1;">
                             </div>
                         </div>
+                        <div class="form-group" style="display:none">
+                            <label>Equipo</label>
+                            <select id="partido-equipo"></select>
+                        </div>
                         <div class="form-group">
                             <label>Competicion</label>
                             <select id="partido-competicion">
@@ -1989,6 +1997,7 @@ document.getElementById('modal-tacticlip').addEventListener('click', function(e)
      <script src="https://unpkg.com/body-muscles/dist/umd/body-muscles.umd.min.js"></script>
     <script src="js/club-mode/cm-core.js"></script>
     <script src="js/club-mode/cm-cesiones.js"></script>
+    <script src="js/club-mode/cm-equipo-filtro.js"></script>
     <script src="js/demo-tour.js"></script>
     <script src="js/demo-inicio.js"></script>
     <script src="js/responsive-nav.js"></script>

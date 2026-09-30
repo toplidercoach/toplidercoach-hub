@@ -279,6 +279,7 @@ if (hasta) {
             document.getElementById('partido-id').value = '';
             document.getElementById('partido-rival').value = '';
             document.getElementById('partido-competicion').value = '';
+            if (document.getElementById('partido-equipo')) document.getElementById('partido-equipo').value = (typeof cmState !== 'undefined' && cmState.activo && cmState.equipoSeleccionado) ? cmState.equipoSeleccionado.id : '';
             const hoyFecha = new Date();
 document.getElementById('partido-fecha').value = hoyFecha.getFullYear() + '-' + String(hoyFecha.getMonth() + 1).padStart(2, '0') + '-' + String(hoyFecha.getDate()).padStart(2, '0');
             document.getElementById('partido-hora').value = '';
@@ -308,6 +309,7 @@ document.getElementById('video-preview-container').style.display = 'none';
                     document.getElementById('partido-id').value = p.id;
                     document.getElementById('partido-rival').value = p.opponent || '';
                     document.getElementById('partido-competicion').value = p.competition || '';
+                    if (document.getElementById('partido-equipo')) document.getElementById('partido-equipo').value = p.team_id || '';
                     document.getElementById('partido-fecha').value = p.match_date || '';
                     document.getElementById('partido-hora').value = p.kick_off_time || '';
                     document.getElementById('partido-localidad').value = p.home_away || 'home';
@@ -1040,9 +1042,11 @@ function renderizarConvocatoria() {
                 if (uploadedUrl) opponentLogoUrl = uploadedUrl;
             }
 
+            const selEquipoPartido = document.getElementById('partido-equipo');
             const partidoData = {
                 club_id: clubId,
                 season_id: seasonId,
+                team_id: (selEquipoPartido && selEquipoPartido.value) ? selEquipoPartido.value : ((typeof cmState !== 'undefined' && cmState.activo && cmState.equipoSeleccionado) ? cmState.equipoSeleccionado.id : null),
                 opponent: rival,
                 match_date: fecha,
                 kick_off_time: document.getElementById('partido-hora').value || null,
