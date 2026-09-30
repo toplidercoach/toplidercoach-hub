@@ -3384,26 +3384,27 @@ function msUrlADataUrl(url) {
 }
 
 // ============================================================
-// PDF RESUMIDO DE SESIÓN — ficha de un folio, 4 tareas por página
-// Formato: cabecera con datos, fila de tipos de tarea y cuadrícula 2x2
-// (dibujo + objetivo + franja de datos por tarea). Para vestuario o WhatsApp.
+// PDF RESUMIDO DE SESIÓN — ficha apaisada de un folio
+// Cabecera con datos, fila de tipos de tarea y cuadrícula de tarjetas
+// (dibujo arriba a todo el ancho, objetivo debajo, franja de datos).
+// 4 tareas -> 2x2 · 5-6 tareas -> 3x2 · más de 6 -> hojas de 6.
 // ============================================================
 async function exportarSesionPDFResumida(id) {
     const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+    const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'landscape' });
     const { data: s } = await supabaseClient.from('training_sessions').select('*').eq('id', id).single();
     const { data: club } = await supabaseClient.from('clubs').select('name, logo_url').eq('id', clubId).single();
     if (!s) { showToast('No se encontró la sesión'); return; }
 
     const NAVY = [15, 23, 42], AMBER = [245, 158, 11], GREY = [100, 116, 139], LINE = [203, 213, 225], SOFT = [241, 245, 249];
-    const W = 210, M = 10, CW = W - 2 * M;
+    const W = 297, H = 210, M = 8, CW = W - 2 * M;
     const limpiar = t => (t || '').replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/[^\x00-\x7F\xA0-\xFF\u0100-\u017F]/g, '').replace(/\s+/g, ' ').trim();
+    const recortar = (txt, maxW) => { let t = txt || ''; if (doc.getTextWidth(t) <= maxW) return t; while (t.length > 1 && doc.getTextWidth(t + '…') > maxW) t = t.slice(0, -1); return t + '…'; };
     const fecha = new Date(s.session_date + 'T12:00:00').toLocaleDateString('es-ES');
     const equipo = (typeof cmState !== 'undefined' && cmState.activo && cmState.equipoSeleccionado) ? cmState.equipoSeleccionado.name : '';
     const temporada = (function () { try { const sel = document.getElementById('plantilla-temporada') || document.querySelector('#temporada-select, #dash-temporada'); return sel && sel.selectedOptions[0] ? sel.selectedOptions[0].textContent.replace('(activa)', '').trim() : ''; } catch (e) { return ''; } })();
     const entrenador = (typeof usuario !== 'undefined' && usuario) ? (usuario.display_name || usuario.name || '') : '';
 
-    // Tareas en orden: calentamiento, principal, vuelta a la calma
     const tareas = [];
     [['warm_up', 'Calentamiento'], ['main_part', 'Parte principal'], ['cool_down', 'Vuelta a la calma']].forEach(([k, sec]) => {
         (s[k] || []).forEach(e => tareas.push(Object.assign({ seccion: sec }, e)));
@@ -3411,106 +3412,99 @@ async function exportarSesionPDFResumida(id) {
     if (!tareas.length) { showToast('La sesión no tiene ejercicios'); return; }
     const duracionTotal = tareas.reduce((a, e) => a + (e.duracion || 0), 0);
 
-    // Cargar imágenes como dataURL (evita problemas de CORS en jsPDF)
     async function cargarImagen(url) {
         if (!url) return null;
         return new Promise(res => {
             const img = new Image(); img.crossOrigin = 'anonymous';
-            img.onload = () => { try { const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight; c.getContext('2d').drawImage(img, 0, 0); res({ data: c.toDataURL('image/jpeg', 0.85), w: c.width, h: c.height }); } catch (e) { res(null); } };
+            img.onload = () => { try { const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight; const cx = c.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, c.width, c.height); cx.drawImage(img, 0, 0); res({ data: c.toDataURL('image/jpeg', 0.88), w: c.width, h: c.height }); } catch (e) { res(null); } };
             img.onerror = () => res(null);
             img.src = url;
         });
     }
     const imgs = await Promise.all(tareas.map(t => cargarImagen(t.imagen)));
-    let escudo = club && club.logo_url ? await cargarImagen(club.logo_url) : null;
+    const escudo = club && club.logo_url ? await cargarImagen(club.logo_url) : null;
 
     function celda(x, y, w, h, etiqueta, valor, fill) {
         if (fill) { doc.setFillColor(...fill); doc.rect(x, y, w, h, 'F'); }
         doc.setDrawColor(...LINE); doc.rect(x, y, w, h);
-        doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); doc.setTextColor(...GREY); doc.text(etiqueta.toUpperCase(), x + w / 2, y + 3.2, { align: 'center' });
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(6); doc.setTextColor(...GREY); doc.text(recortar(etiqueta.toUpperCase(), w - 2), x + w / 2, y + 3, { align: 'center' });
         doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(...NAVY);
-        doc.text(doc.splitTextToSize(String(valor || '—'), w - 3)[0] || '—', x + w / 2, y + h - 2.2, { align: 'center' });
+        doc.text(recortar(String(valor || '—'), w - 2), x + w / 2, y + h - 2, { align: 'center' });
     }
 
     function cabecera(pagina, total) {
-        // Banda superior
-        doc.setFillColor(...NAVY); doc.rect(0, 0, W, 22, 'F');
+        doc.setFillColor(...NAVY); doc.rect(0, 0, W, 18, 'F');
         let tx = M;
-        if (escudo) { try { doc.addImage(escudo.data, 'JPEG', M, 3, 16, 16); tx = M + 20; } catch (e) {} }
-        doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(15);
-        doc.text(limpiar(s.name).toUpperCase().slice(0, 48), tx, 10);
-        doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
-        doc.text((club && club.name ? limpiar(club.name) + '  ·  ' : '') + 'Sesión resumida' + (total > 1 ? '  ·  Hoja ' + pagina + ' de ' + total : ''), tx, 16);
+        if (escudo) { try { doc.addImage(escudo.data, 'JPEG', M, 2.5, 13, 13); tx = M + 16; } catch (e) {} }
+        doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(14);
+        doc.text(limpiar(s.name).toUpperCase().slice(0, 60), tx, 8.5);
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
+        doc.text((club && club.name ? limpiar(club.name) + '  ·  ' : '') + 'Sesión resumida' + (total > 1 ? '  ·  Hoja ' + pagina + ' de ' + total : ''), tx, 14);
         doc.setTextColor(...AMBER); doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
-        doc.text(duracionTotal + ' min  ·  ' + tareas.length + ' tareas', W - M, 10, { align: 'right' });
+        doc.text(duracionTotal + ' min  ·  ' + tareas.length + ' tareas', W - M, 8.5, { align: 'right' });
         doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
-        doc.text(fecha + (s.session_time ? '  ·  ' + s.session_time.substring(0, 5) : ''), W - M, 16, { align: 'right' });
-        // Fila de datos
-        const y = 25, h = 9; const cols = [['Microciclo', s.microciclo || '—'], ['Sesión', limpiar(s.name)], ['Fecha', fecha], ['Categoría', equipo || '—'], ['Temporada', temporada || '—'], ['Entrenador', entrenador || '—']];
-        const cw = CW / cols.length; cols.forEach((c, i) => celda(M + i * cw, y, cw, h, c[0], c[1], SOFT));
-        // Objetivo de la sesión (una línea)
-        let y2 = y + h + 2;
-        if (s.objective) {
-            doc.setFillColor(...SOFT); doc.setDrawColor(...LINE); doc.rect(M, y2, CW, 7, 'FD');
-            doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(...GREY); doc.text('OBJETIVO', M + 2, y2 + 4.6);
-            doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(...NAVY);
-            doc.text(doc.splitTextToSize(limpiar(s.objective), CW - 24)[0] || '', M + 22, y2 + 4.6);
-            y2 += 9;
-        }
-        return y2 + 1;
+        doc.text(fecha + (s.session_time ? '  ·  ' + s.session_time.substring(0, 5) : ''), W - M, 14, { align: 'right' });
+        const y = 20.5, h = 8;
+        const cols = [['Microciclo', s.microciclo || '—'], ['Sesión', limpiar(s.name)], ['Fecha', fecha], ['Categoría', equipo || '—'], ['Temporada', temporada || '—'], ['Entrenador', entrenador || '—']];
+        if (s.objective) cols.push(['Objetivo de la sesión', limpiar(s.objective)]);
+        const ws = cols.map(c => c[0].startsWith('Objetivo') ? 3 : 1), tot = ws.reduce((a, b) => a + b, 0);
+        let x = M; cols.forEach((c, i) => { const cw = CW * ws[i] / tot; celda(x, y, cw, h, c[0], c[1], SOFT); x += cw; });
+        return y + h + 2;
     }
 
-    function tarea(t, img, idx, x, y, w, h) {
-        // Marco y barra de título
+    function tarea(t, img, idx, x, y, w, h, cols) {
         doc.setDrawColor(...LINE); doc.setFillColor(255, 255, 255); doc.rect(x, y, w, h, 'FD');
-        doc.setFillColor(...NAVY); doc.rect(x, y, w, 7, 'F');
-        doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(255, 255, 255);
-        doc.text('TAREA ' + (idx + 1) + '  ·  ' + limpiar(t.titulo).slice(0, 44), x + 2, y + 4.9);
-        doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(...AMBER);
-        doc.text(t.seccion.toUpperCase(), x + w - 2, y + 4.9, { align: 'right' });
-        // Dibujo (izquierda) y textos (derecha)
-        const iy = y + 9, ih = h - 9 - 9, iw = w * 0.58, pad = 2;
+        // Barra de título
+        doc.setFillColor(...NAVY); doc.rect(x, y, w, 6.5, 'F');
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); doc.setTextColor(...AMBER);
+        const secTxt = t.seccion.toUpperCase(); const secW = doc.getTextWidth(secTxt);
+        doc.text(secTxt, x + w - 2, y + 4.5, { align: 'right' });
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(cols === 3 ? 8 : 9); doc.setTextColor(255, 255, 255);
+        doc.text(recortar('TAREA ' + (idx + 1) + '  ·  ' + limpiar(t.titulo), w - secW - 6), x + 2, y + 4.6);
+        // Zonas: dibujo arriba, texto abajo, franja al pie
+        const strip = 8.5, textH = cols === 3 ? 16 : 18;
+        const iy = y + 7.5, ih = h - 7.5 - textH - strip - 1, pad = 1.5;
         if (img) {
-            const r = Math.min((iw - 2 * pad) / img.w, (ih - 2 * pad) / img.h); const dw = img.w * r, dh = img.h * r;
-            try { doc.addImage(img.data, 'JPEG', x + pad + (iw - 2 * pad - dw) / 2, iy + pad + (ih - 2 * pad - dh) / 2, dw, dh); } catch (e) {}
+            const r = Math.min((w - 2 * pad) / img.w, (ih - 2 * pad) / img.h); const dw = img.w * r, dh = img.h * r;
+            try { doc.addImage(img.data, 'JPEG', x + (w - dw) / 2, iy + pad + (ih - 2 * pad - dh) / 2, dw, dh); } catch (e) {}
         } else {
-            doc.setFillColor(...SOFT); doc.rect(x + pad, iy + pad, iw - 2 * pad, ih - 2 * pad, 'F');
-            doc.setFontSize(7); doc.setTextColor(...GREY); doc.text('Sin dibujo', x + iw / 2, iy + ih / 2, { align: 'center' });
+            doc.setFillColor(...SOFT); doc.rect(x + pad, iy + pad, w - 2 * pad, ih - 2 * pad, 'F');
+            doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(...GREY); doc.text('Sin dibujo', x + w / 2, iy + ih / 2, { align: 'center' });
         }
-        const tx = x + iw + 1, tw = w - iw - 3;
-        doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); doc.setTextColor(...GREY); doc.text('OBJETIVO / DESCRIPCIÓN', tx, iy + 3.5);
-        doc.setFont('helvetica', 'normal'); doc.setFontSize(7.2); doc.setTextColor(...NAVY);
-        const lineas = doc.splitTextToSize(limpiar(t.objetivo) || '—', tw); const maxL = Math.floor((ih - 6) / 3.1);
-        doc.text(lineas.slice(0, maxL), tx, iy + 7.2, { lineHeightFactor: 1.15 });
-        if (t.entrenador) { doc.setFont('helvetica', 'italic'); doc.setFontSize(6.5); doc.setTextColor(...GREY); doc.text(limpiar(t.entrenador + (t.equipo ? ' · ' + t.equipo : '')).slice(0, 40), tx, iy + ih - 1); }
-        // Franja de datos
-        const fy = y + h - 9; const datos = [['Tiempo de trabajo', (t.duracion || 0) + "'"], ['Jugadores', t.jugadores || '—'], ['Espacio de juego', t.espacio || '—'], ['Tema', t.tema || '—']];
-        const cw = w / datos.length; datos.forEach((d, i) => celda(x + i * cw, fy, cw, 9, d[0], d[1], SOFT));
+        const ty = iy + ih + 1, tx = x + 2, tw = w - 4;
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(6); doc.setTextColor(...GREY); doc.text('OBJETIVO / DESCRIPCIÓN', tx, ty + 2.6);
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(cols === 3 ? 6.8 : 7.4); doc.setTextColor(...NAVY);
+        const lineas = doc.splitTextToSize(limpiar(t.objetivo) || '—', tw); const lh = cols === 3 ? 2.9 : 3.1; const maxL = Math.max(1, Math.floor((textH - 4) / lh));
+        const mostrar = lineas.slice(0, maxL); if (lineas.length > maxL) mostrar[maxL - 1] = recortar(mostrar[maxL - 1] + '…', tw);
+        doc.text(mostrar, tx, ty + 6, { lineHeightFactor: 1.12 });
+        const fy = y + h - strip;
+        const datos = [['Tiempo', (t.duracion || 0) + "'"], ['Jugadores', t.jugadores || '—'], ['Espacio', t.espacio || '—'], ['Tema', t.tema || '—']];
+        const cw = w / datos.length; datos.forEach((d, i) => celda(x + i * cw, fy, cw, strip, d[0], d[1], SOFT));
     }
 
-    const porPagina = 4, total = Math.ceil(tareas.length / porPagina);
+    const porPagina = tareas.length <= 4 ? 4 : 6, total = Math.ceil(tareas.length / porPagina);
     for (let p = 0; p < total; p++) {
         if (p > 0) doc.addPage();
         let y = cabecera(p + 1, total);
-        // Fila "tipos de tareas"
         const lote = tareas.slice(p * porPagina, (p + 1) * porPagina);
-        doc.setFillColor(...NAVY); doc.rect(M, y, CW, 6, 'F');
-        doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(255, 255, 255); doc.text('TAREAS', M + 2, y + 4.2);
-        const tw = (CW - 22) / lote.length;
-        lote.forEach((t, i) => { doc.text('TAREA ' + (p * porPagina + i + 1), M + 22 + i * tw + tw / 2, y + 4.2, { align: 'center' }); });
-        y += 6;
-        doc.setFillColor(...SOFT); doc.setDrawColor(...LINE); doc.rect(M, y, CW, 6, 'FD');
-        doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); doc.setTextColor(...GREY); doc.text('TIPOS DE TAREAS', M + 2, y + 4.2);
+        const cols = lote.length <= 4 ? 2 : 3, rows = Math.ceil(lote.length / cols);
+        // Fila tareas / tipos
+        const lw = 26, tw = (CW - lw) / lote.length;
+        doc.setFillColor(...NAVY); doc.rect(M, y, CW, 5.5, 'F');
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(255, 255, 255); doc.text('TAREAS', M + 2, y + 3.9);
+        lote.forEach((t, i) => doc.text('TAREA ' + (p * porPagina + i + 1), M + lw + i * tw + tw / 2, y + 3.9, { align: 'center' }));
+        y += 5.5;
+        doc.setFillColor(...SOFT); doc.setDrawColor(...LINE); doc.rect(M, y, CW, 5.5, 'FD');
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(6); doc.setTextColor(...GREY); doc.text('TIPOS DE TAREAS', M + 2, y + 3.8);
         doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(...NAVY);
-        lote.forEach((t, i) => { doc.text(doc.splitTextToSize(limpiar(t.tema || t.titulo), tw - 2)[0] || '', M + 22 + i * tw + tw / 2, y + 4.2, { align: 'center' }); });
-        y += 8;
-        // Cuadrícula 2x2
-        const gap = 3, cw = (CW - gap) / 2, disponible = 297 - 8 - y, ch = Math.min(112, (disponible - gap) / 2);
-        lote.forEach((t, i) => { const col = i % 2, row = Math.floor(i / 2); tarea(t, imgs[p * porPagina + i], p * porPagina + i, M + col * (cw + gap), y + row * (ch + gap), cw, ch); });
-        // Pie
+        lote.forEach((t, i) => doc.text(recortar(limpiar(t.tema || t.titulo), tw - 3), M + lw + i * tw + tw / 2, y + 3.8, { align: 'center' }));
+        y += 7.5;
+        // Cuadrícula
+        const gap = 3, cw = (CW - gap * (cols - 1)) / cols, ch = (H - 6 - y - gap * (rows - 1)) / rows;
+        lote.forEach((t, i) => { const c = i % cols, r = Math.floor(i / cols); tarea(t, imgs[p * porPagina + i], p * porPagina + i, M + c * (cw + gap), y + r * (ch + gap), cw, ch, cols); });
         doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); doc.setTextColor(...GREY);
-        doc.text('Generado con TopLiderCoach · toplidercoach.com', M, 293);
-        if (s.notes && p === total - 1) { doc.text('Notas: ' + limpiar(s.notes).slice(0, 110), W - M, 293, { align: 'right' }); }
+        doc.text('Generado con TopLiderCoach · toplidercoach.com', M, H - 2.5);
+        if (s.notes && p === total - 1) doc.text(recortar('Notas: ' + limpiar(s.notes), 180), W - M, H - 2.5, { align: 'right' });
     }
     doc.save('sesion_resumida_' + (s.name || 'sesion').replace(/\s+/g, '_') + '.pdf');
 }
