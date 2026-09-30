@@ -223,7 +223,7 @@ registrarSubTab('planificador', 'calendario', cargarCalendarioUnificado);
             const grupos = planAgruparPorPosicion(activos);
             
             grid.innerHTML = grupos.map(grupo => {
-                const cabecera = `<div style="grid-column:1/-1;font-size:11px;font-weight:800;color:#7c3aed;letter-spacing:0.06em;border-bottom:2px solid #e9d5ff;padding:8px 2px 3px;">${grupo.nombre} (${grupo.jugadores.length})</div>`;
+                const cabecera = `<div style="grid-column:1/-1;font-size:11px;font-weight:800;color:#7c3aed;letter-spacing:0.06em;border-bottom:2px solid #e9d5ff;padding:8px 2px 3px;">${grupo.nombre} <span style="font-weight:600;color:#6b7280">${grupo.jugadores.filter(sp => jugadoresSeleccionados.some(id => String(id) === String(sp.id))).length} de ${grupo.jugadores.length}</span></div>`;
                 const fichas = grupo.jugadores.map(sp => {
                 const jugador = sp.players;
                 const seleccionado = jugadoresSeleccionados.some(id => String(id) === String(sp.id));
@@ -1283,14 +1283,18 @@ if (s.players && s.players.length > 0) {
             jugs.forEach(j => { usadosPDF[j.id] = true; });
             if (jugs.length > 0) {
                 const texto = jugs.map(j => `${j.shirt_number || '?'}.${j.name}`).join('  |  ');
-                filasPDF.push({ titulo: g.nombre, lineas: doc.splitTextToSize(texto, 126) });
+                filasPDF.push({ titulo: g.nombre + ' (' + jugs.length + ')', lineas: doc.splitTextToSize(texto, 126) });
             }
         });
         const sinPosPDF = s.players.filter(j => !usadosPDF[j.id]);
         if (sinPosPDF.length > 0) {
             const texto = sinPosPDF.map(j => `${j.shirt_number || '?'}.${j.name}`).join('  |  ');
-            filasPDF.push({ titulo: 'SIN POSICION', lineas: doc.splitTextToSize(texto, 126) });
+            filasPDF.push({ titulo: 'SIN POSICION (' + sinPosPDF.length + ')', lineas: doc.splitTextToSize(texto, 126) });
         }
+        // Linea de total: "2 porteros + 19 de campo = 21"
+        const nPorteros = s.players.filter(j => j._posCode === 'POR').length;
+        const nCampo = s.players.length - nPorteros;
+        filasPDF.push({ titulo: 'TOTAL', lineas: [nPorteros + (nPorteros === 1 ? ' portero' : ' porteros') + ' + ' + nCampo + ' de campo = ' + s.players.length + ' jugadores'] });
 
         const totalLineas = filasPDF.reduce((sum, f) => sum + f.lineas.length, 0);
         const alturaBloque = 8 + (totalLineas * 4);
