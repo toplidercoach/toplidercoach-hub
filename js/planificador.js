@@ -2734,7 +2734,7 @@ async function enviarMaterialUtillero() {
 (function _mostrarBotonUtillero() {
     let n = 0;
     const iv = setInterval(function() {
-        n++; if (n > 20) { clearInterval(iv); return; }
+        n++; if (n > 600) { clearInterval(iv); return; }
         if (typeof cmState === 'undefined' || !cmState.activo) return;
         clearInterval(iv);
         const b = document.getElementById('btn-enviar-utillero');
