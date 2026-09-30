@@ -1,3 +1,13 @@
+// Jugadores del equipo seleccionado (Modo Club multi-equipo): ids de players o null si no hay que filtrar
+async function dashIdsJugadoresEquipo() {
+    try {
+        if (typeof cmFiltroEquipoOr !== 'function' || !cmFiltroEquipoOr()) return null;
+        var sid = (document.getElementById('dashboard-temporada') && document.getElementById('dashboard-temporada').value) || seasonId;
+        if (!sid) return null;
+        var r = await cmAplicarFiltroEquipo(supabaseClient.from('season_players').select('player_id').eq('season_id', sid));
+        return (r.data || []).map(function (x) { return x.player_id; }).filter(Boolean);
+    } catch (e) { return null; }
+}
 // ========== DASHBOARD.JS - TopLiderCoach HUB ==========
 registrarModulo('dashboard', function() { cargarSelectorTemporadasDashboard(); cargarDashboard(); });
 registrarInit(function() { cargarSelectorTemporadasDashboard(); cargarDashboard(); });
@@ -74,7 +84,10 @@ async function cargarTopPerformers() {
     const grid = document.getElementById('dash-perf-grid');
     const container = document.getElementById('dash-performers');
     if (!grid || !tempId) { if(container) container.style.display='none'; return; }
-    const { data: stats } = await supabaseClient.from('match_player_stats').select('player_id, minutes_played, goals, assists, yellow_cards, red_cards, matches!inner(season_id)').eq('matches.season_id', tempId);
+    let qStats = supabaseClient.from('match_player_stats').select('player_id, minutes_played, goals, assists, yellow_cards, red_cards, matches!inner(season_id, team_id)').eq('matches.season_id', tempId);
+    const fEq = (typeof cmFiltroEquipoTabla === 'function') ? cmFiltroEquipoTabla() : null;
+    if (fEq) qStats = qStats.or(fEq, { foreignTable: 'matches' });
+    const { data: stats } = await qStats;
     if (!stats || stats.length === 0) { container.style.display='none'; return; }
     const agg = {};
     stats.forEach(s => { const pid = s.player_id; if (!agg[pid]) agg[pid]={pj:0,min:0,g:0,a:0}; if(s.minutes_played>0) agg[pid].pj++; agg[pid].min+=s.minutes_played||0; agg[pid].g+=s.goals||0; agg[pid].a+=s.assists||0; });
@@ -355,7 +368,10 @@ async function cargarInsightsDashboard() {
 
     // Cumpleanos en los proximos 30 dias
     try {
-        const { data: jugs } = await supabaseClient.from('players').select('name, birth_date').eq('club_id', clubId).not('birth_date', 'is', null);
+        let qCumple = supabaseClient.from('players').select('name, birth_date').eq('club_id', clubId).not('birth_date', 'is', null);
+        const idsEq = await dashIdsJugadoresEquipo();
+        if (idsEq) qCumple = qCumple.in('id', idsEq.length ? idsEq : ['00000000-0000-0000-0000-000000000000']);
+        const { data: jugs } = await qCumple;
         const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
         const lista = [];
         (jugs || []).forEach(j => {
@@ -392,12 +408,15 @@ cargarDashboard = async function() {
 // --- PDF de cumpleaños (solo nueva incorporación y en propiedad) ---
 async function dashCumplesPDF() {
     try {
-        const { data: jugs } = await supabaseClient
+        let qPdfC = supabaseClient
             .from('players')
             .select('id, name, shirt_number, birth_date, acquisition')
             .eq('club_id', clubId)
             .in('acquisition', ['nueva_incorporacion', 'propiedad'])
             .not('birth_date', 'is', null);
+        const idsEqPdf = await dashIdsJugadoresEquipo();
+        if (idsEqPdf) qPdfC = qPdfC.in('id', idsEqPdf.length ? idsEqPdf : ['00000000-0000-0000-0000-000000000000']);
+        const { data: jugs } = await qPdfC;
 
         let lista = jugs || [];
         if (typeof seasonId !== 'undefined' && seasonId) {
