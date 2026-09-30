@@ -903,12 +903,29 @@ if (!sesionEditandoId) {
 if (typeof scGuardarConceptos === 'function') { await scGuardarConceptos(sesionId, !!sesionEditandoId); }
                 showToast(sesionEditandoId ? 'Sesión actualizada correctamente' : 'Sesión guardada correctamente');
                 sesionEditandoId = sesionId; // Permanecer en la sesión tras guardar (Nueva Sesion = empezar de cero)
+                return true;
                 
             } catch (error) {
                 showToast('Error al guardar: ' + error.message);
             }
         }
         
+        // ========== ACCESOS RAPIDOS DESDE EL EDITOR ==========
+        // Guarda la sesion y abre la vista pedida sin pasar por Mis Sesiones
+        async function accionRapidaSesion(accion) {
+            if (accion === 'porteros' && (!sesion.porteros || sesion.porteros.length === 0)) {
+                showToast('Esta sesion no tiene trabajo de porteros');
+                return;
+            }
+            const guardada = await guardarSesion();
+            if (!guardada || !sesionEditandoId) return;
+            const id = sesionEditandoId;
+            if (accion === 'vestuario') abrirModoVestuario(id);
+            else if (accion === 'asistencia') abrirModalAsistenciaSesion(id);
+            else if (accion === 'pdf') abrirModalPDFSesion(id);
+            else if (accion === 'porteros') exportarSesionPDF(id, true, false, true);
+        }
+
         // ========== PLANIFICADOR: MIS SESIONES ==========
         async function cargarMisSesiones() {
             const lista = document.getElementById('lista-mis-sesiones');
