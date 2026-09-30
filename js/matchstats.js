@@ -1314,20 +1314,45 @@ function renderizarConvocatoria() {
                 jugadorStats[pid].tr += s.red_cards || 0;
             });
             
+            // Titular / suplente / convocado sin jugar, a partir de convocados y titulares de cada partido
+            statsCalcularParticipacion(jugadorStats, (partidosTodos || []).filter(p => !compSel || p.competition === compSel), statsFiltrados);
+
             window.statsJugCache = Object.values(jugadorStats);
             if (!window.statsOrden) window.statsOrden = { col: 'goles', dir: 'desc' };
             statsActivarOrdenCabeceras(tablaBody);
             const ordenados = statsOrdenar(window.statsJugCache);
             
             if (ordenados.length === 0) {
-                tablaBody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#9ca3af;">No hay estadisticas</td></tr>';
+                tablaBody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#9ca3af;">No hay estadisticas</td></tr>';
             } else {
                tablaBody.innerHTML = ordenados.map(statsFilaHtml).join('');
             }
         }
 
         // ---- Orden de la tabla de jugadores ----
-        const STATS_COLS = ['nombre', 'pj', 'min', 'goles', 'asist', 'ta', 'tr'];
+        const STATS_COLS = ['nombre', 'pj', 'tit', 'sup', 'conv', 'min', 'goles', 'asist', 'ta', 'tr'];
+
+        // Reparte, por jugador, los partidos en titular / suplente (jugo desde el banquillo) / convocado sin jugar.
+        // Usa matches.titulares y matches.convocados (guardan player_id) y los minutos de match_player_stats.
+        function statsCalcularParticipacion(jugadorStats, partidos, stats) {
+            const jugoEn = {};
+            (stats || []).forEach(s => { if (s.minutes_played > 0) jugoEn[s.match_id + '|' + s.player_id] = true; });
+            Object.values(jugadorStats).forEach(j => { j.tit = 0; j.sup = 0; j.conv = 0; });
+            (partidos || []).forEach(p => {
+                const tit = new Set((p.titulares || []).map(t => t.player_id).filter(Boolean));
+                const conv = (p.convocados || []).map(c => c.player_id).filter(Boolean);
+                const todos = new Set([...conv, ...tit]);
+                todos.forEach(pid => {
+                    if (!jugadorStats[pid]) {
+                        const info = (p.convocados || []).find(c => c.player_id === pid) || (p.titulares || []).find(t => t.player_id === pid) || {};
+                        jugadorStats[pid] = { player: { id: pid, name: info.name || 'Jugador', position: info.position || '' }, pj: 0, min: 0, goles: 0, asist: 0, ta: 0, tr: 0, tit: 0, sup: 0, conv: 0 };
+                    }
+                    if (tit.has(pid)) jugadorStats[pid].tit++;
+                    else if (jugoEn[p.id + '|' + pid]) jugadorStats[pid].sup++;
+                    else jugadorStats[pid].conv++;
+                });
+            });
+        }
 
         function statsFilaHtml(j) {
             const inicial = j.player?.name?.charAt(0) || '?';
@@ -1346,6 +1371,9 @@ function renderizarConvocatoria() {
                 </div>
             </td>
             <td>${j.pj}</td>
+            <td>${j.tit || 0}</td>
+            <td>${j.sup || 0}</td>
+            <td style="color:#9ca3af">${j.conv || 0}</td>
             <td>${j.min}</td>
             <td><strong>${j.goles}</strong></td>
             <td>${j.asist}</td>

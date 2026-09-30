@@ -773,12 +773,27 @@ async function dibujarJugadorCardCompacta(doc, jugador, x, y, ancho, alto, color
             doc.text(`Partidos: ${partidos?.length || 0}  |  V: ${victorias}  |  E: ${empates}  |  D: ${derrotas}  |  GF: ${gF}  |  GC: ${gC}`, 20, y);
             
             y += 20;
+            // Titular / suplente / convocado sin jugar
+            const jugoEn = {};
+            (stats || []).forEach(s => { if (s.minutes_played > 0) jugoEn[s.match_id + '|' + s.player_id] = true; });
+            Object.values(jugadorStats).forEach(j => { j.tit = 0; j.sup = 0; j.conv = 0; });
+            (partidos || []).forEach(p => {
+                const tit = new Set((p.titulares || []).map(t => t.player_id).filter(Boolean));
+                const conv = (p.convocados || []).map(c => c.player_id).filter(Boolean);
+                new Set([...conv, ...tit]).forEach(pid => {
+                    if (!jugadorStats[pid]) {
+                        const info = (p.convocados || []).find(c => c.player_id === pid) || (p.titulares || []).find(t => t.player_id === pid) || {};
+                        jugadorStats[pid] = { name: info.name || 'Jugador', pos: info.position || '', pj: 0, min: 0, goles: 0, asist: 0, ta: 0, tr: 0, tit: 0, sup: 0, conv: 0 };
+                    }
+                    if (tit.has(pid)) jugadorStats[pid].tit++; else if (jugoEn[p.id + '|' + pid]) jugadorStats[pid].sup++; else jugadorStats[pid].conv++;
+                });
+            });
             const ordenados = Object.values(jugadorStats).sort((a, b) => b.goles - a.goles);
-            const tableData = ordenados.map(j => [j.name, j.pos, j.pj, j.min, j.goles, j.asist, j.ta, j.tr]);
+            const tableData = ordenados.map(j => [j.name, j.pos, j.pj, j.tit || 0, j.sup || 0, j.conv || 0, j.min, j.goles, j.asist, j.ta, j.tr]);
             
             doc.autoTable({
                 startY: y,
-                head: [['Jugador', 'Pos', 'PJ', 'Min', 'Goles', 'Asist', 'TA', 'TR']],
+                head: [['Jugador', 'Pos', 'PJ', 'Tit', 'Sup', 'Conv', 'Min', 'Goles', 'Asist', 'TA', 'TR']],
                 body: tableData,
                 theme: 'striped',
                 headStyles: { fillColor: [5, 150, 105] },
