@@ -117,7 +117,9 @@ async function cargarTopPerformers() {
 // ========== ESTADO PLANTILLA ==========
 async function cargarEstadoPlantilla() {
     const c = document.getElementById('dash-squad-status'); if(!c) return;
-    const { data: sp } = await supabaseClient.from('season_players').select('shirt_number, players(id, name, photo_url, position, status)').eq('season_id', seasonId).order('shirt_number');
+    let qSp = supabaseClient.from('season_players').select('shirt_number, players(id, name, photo_url, position, status)').eq('season_id', seasonId).order('shirt_number');
+    if (typeof cmAplicarFiltroEquipo === 'function') qSp = cmAplicarFiltroEquipo(qSp); // mi equipo + cedidos
+    const { data: sp } = await qSp;
     if (!sp || sp.length===0) { c.innerHTML='<div class="sin-datos"><div class="icono">👥</div><p>Sin plantilla</p></div>'; return; }
     const inj = sp.filter(s=>s.players?.status==='injured'), sus = sp.filter(s=>s.players?.status==='suspended'), avail = sp.filter(s=>s.players?.status==='available'||!s.players?.status);
     if (inj.length===0 && sus.length===0) { c.innerHTML=`<div class="dash-squad-ok"><div class="dash-squad-ok-icon">✅</div><div class="dash-squad-ok-text">Plantilla completa</div><div class="dash-squad-ok-count">${avail.length} disponibles</div></div>`; return; }

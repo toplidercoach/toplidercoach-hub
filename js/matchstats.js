@@ -1966,7 +1966,9 @@ async function abrirComparativaJugadores() {
     // Cargar plantilla
     var jugadores = [];
     try {
-        var { data } = await supabaseClient.from('season_players').select('id,shirt_number,players(id,name,position,ratings,photo_url,status)').eq('season_id', seasonId).order('shirt_number', { ascending: true });
+        var qComp = supabaseClient.from('season_players').select('id,shirt_number,players(id,name,position,ratings,photo_url,status)').eq('season_id', seasonId).order('shirt_number', { ascending: true });
+        if (typeof cmAplicarFiltroEquipo === 'function') qComp = cmAplicarFiltroEquipo(qComp); // mi equipo + cedidos
+        var { data } = await qComp;
         jugadores = (data || []).filter(function(sp) { return sp.players && sp.players.id !== _radarPlayerId && sp.players.status !== 'baja'; });
     } catch (e) { showToast('Error cargando jugadores'); return; }
 

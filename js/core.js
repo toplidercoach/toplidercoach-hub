@@ -234,6 +234,14 @@ async function mostrarApp() {
     document.getElementById('user-name').textContent = usuario.name;
     
     await inicializarClub();
+
+    // Modo Club: saber quien es el miembro y que equipo tiene seleccionado ANTES de pintar
+    // ningun modulo. Asi la primera carga de datos ya sale filtrada por su equipo.
+    if (typeof cmInit === 'function') {
+        window.__cmInitLanzado = true;
+        // Como mucho 8 segundos: si la red falla, el HUB arranca igualmente
+        try { await Promise.race([cmInit(), new Promise(function (r) { setTimeout(r, 8000); })]); } catch (e) { console.error('[Club Mode] Error en cmInit:', e); }
+    }
     
     // Inicializar fecha de sesion
     const fechaInput = document.getElementById('sesion-fecha');
@@ -247,6 +255,10 @@ async function mostrarApp() {
             console.error('Error en init de módulo:', e);
         }
     }
+
+    // Aviso para el resto de archivos: el HUB ya esta listo (club, equipo y modulos)
+    window.__hubListo = true;
+    try { document.dispatchEvent(new CustomEvent('hubReady')); } catch (e) {}
 }
 
 // ========== CLUB & TEMPORADA ==========

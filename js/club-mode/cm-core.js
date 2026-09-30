@@ -526,7 +526,10 @@ function cmEsClubMode() {
 // ========== REGISTRO EN EL SISTEMA DEL HUB ==========
 // Se ejecuta al cargar el DOM, despues de que core.js haya inicializado
 // TODO: sustituir el setTimeout por un evento "hubReady" cuando exista
+// core.js llama a cmInit() antes de pintar los modulos (window.__cmInitLanzado).
+// Si por cache se cargara un core.js antiguo, se mantiene el arranque de siempre.
 registrarInit(function() {
+    if (window.__cmInitLanzado) return;
     setTimeout(function() {
         cmInit();
     }, 500);
