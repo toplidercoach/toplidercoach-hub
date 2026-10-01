@@ -810,7 +810,7 @@ sesion = { nombre: '', fecha: fechaHoy, previo: [], calentamiento: [], principal
             document.getElementById('sesion-microciclo').value = '';
             document.getElementById('sesion-md').value = '';
             document.getElementById('sesion-jugadores').value = '';
-            document.getElementById('sesion-equipo').value = '';
+            document.getElementById('sesion-categoria').value = '';
             document.getElementById('sesion-objetivo').value = '';
             document.getElementById('sesion-material').value = '';
             document.getElementById('sesion-notas').value = '';
@@ -827,7 +827,7 @@ sesion = { nombre: '', fecha: fechaHoy, previo: [], calentamiento: [], principal
             const microciclo = document.getElementById('sesion-microciclo').value.trim();
             const md = document.getElementById('sesion-md').value.trim();
             const jugadores = document.getElementById('sesion-jugadores').value;
-            const equipo = document.getElementById('sesion-equipo').value.trim();
+            const equipo = document.getElementById('sesion-categoria').value.trim();
             const objetivo = document.getElementById('sesion-objetivo').value.trim();
             const material = document.getElementById('sesion-material').value.trim();
             const notas = document.getElementById('sesion-notas').value.trim();
@@ -911,12 +911,29 @@ if (!sesionEditandoId) {
 if (typeof scGuardarConceptos === 'function') { await scGuardarConceptos(sesionId, !!sesionEditandoId); }
                 showToast(sesionEditandoId ? 'Sesión actualizada correctamente' : 'Sesión guardada correctamente');
                 sesionEditandoId = sesionId; // Permanecer en la sesión tras guardar (Nueva Sesion = empezar de cero)
+                return true;
                 
             } catch (error) {
                 showToast('Error al guardar: ' + error.message);
             }
         }
         
+        // ========== ACCESOS RAPIDOS DESDE EL EDITOR ==========
+        // Guarda la sesion y abre la vista pedida sin pasar por Mis Sesiones
+        async function accionRapidaSesion(accion) {
+            if (accion === 'porteros' && (!sesion.porteros || sesion.porteros.length === 0)) {
+                showToast('Esta sesion no tiene trabajo de porteros');
+                return;
+            }
+            const guardada = await guardarSesion();
+            if (!guardada || !sesionEditandoId) return;
+            const id = sesionEditandoId;
+            if (accion === 'vestuario') abrirModoVestuario(id);
+            else if (accion === 'asistencia') abrirModalAsistenciaSesion(id);
+            else if (accion === 'pdf') abrirModalPDFSesion(id);
+            else if (accion === 'porteros') exportarSesionPDF(id, true, false, true);
+        }
+
         // ========== PLANIFICADOR: MIS SESIONES ==========
         async function cargarMisSesiones() {
             const lista = document.getElementById('lista-mis-sesiones');
@@ -1105,7 +1122,7 @@ if (typeof scGuardarConceptos === 'function') { await scGuardarConceptos(sesionI
                 document.getElementById('sesion-microciclo').value = data.microciclo || '';
                 document.getElementById('sesion-md').value = data.match_day || '';
                 document.getElementById('sesion-jugadores').value = data.num_players || '';
-                document.getElementById('sesion-equipo').value = data.team_category || '';
+                document.getElementById('sesion-categoria').value = data.team_category || '';
                 document.getElementById('sesion-objetivo').value = data.objective || '';
                 document.getElementById('sesion-material').value = data.materials || '';
                 if (document.getElementById('sesion-equipo')) document.getElementById('sesion-equipo').value = data.team_id || ((typeof cmState !== 'undefined' && cmState.activo && cmState.equipoSeleccionado) ? cmState.equipoSeleccionado.id : '');
@@ -2759,7 +2776,7 @@ async function enviarMaterialUtillero() {
 (function _mostrarBotonUtillero() {
     let n = 0;
     const iv = setInterval(function() {
-        n++; if (n > 20) { clearInterval(iv); return; }
+        n++; if (n > 600) { clearInterval(iv); return; }
         if (typeof cmState === 'undefined' || !cmState.activo) return;
         clearInterval(iv);
         const b = document.getElementById('btn-enviar-utillero');
