@@ -450,7 +450,23 @@ function ppAbpQuitarImagen(){_ppAbpForm.imagen='';_ppAbpForm.pizarra_item_id=nul
 function ppThumbADataUrl(thumb){
     return new Promise(function(resolve){
         if(!thumb){resolve('');return}
-        var src=thumb.trim().indexOf('data:')===0?thumb.trim():URL.createObjectURL(new Blob([thumb],{type:'image/svg+xml'}));
+        var esData=thumb.trim().indexOf('data:')===0;
+        if(!esData){
+            // Dibujo vectorial sin medidas propias (width="100%"): darle 1200 px de ancho
+            // y el alto que le corresponda segun su viewBox, para que no salga borroso
+            try{
+                var raiz=(thumb.match(/<svg[^>]*>/)||[''])[0];
+                if(raiz){
+                    var vb=(raiz.match(/viewBox="([^"]+)"/)||[])[1];
+                    var p=vb?vb.trim().split(/[\s,]+/).map(Number):[];
+                    var prop=(p.length===4&&p[2]>0&&p[3]>0)?p[3]/p[2]:0.625;
+                    var W=1200,H=Math.round(W*prop);
+                    var raiz2=raiz.replace(/\sstyle="[^"]*"/,'').replace(/\swidth="[^"]*"/,'').replace(/\sheight="[^"]*"/,'').replace('<svg','<svg width="'+W+'" height="'+H+'"');
+                    thumb=thumb.replace(raiz,raiz2);
+                }
+            }catch(e){}
+        }
+        var src=esData?thumb.trim():URL.createObjectURL(new Blob([thumb],{type:'image/svg+xml'}));
         var img=new Image();
         img.onload=function(){try{var cv=document.createElement('canvas');var w=img.naturalWidth||1200,h=img.naturalHeight||750;var esc=Math.min(1,1400/w);cv.width=Math.round(w*esc);cv.height=Math.round(h*esc);var ctx=cv.getContext('2d');ctx.fillStyle='#0f4c2a';ctx.fillRect(0,0,cv.width,cv.height);ctx.drawImage(img,0,0,cv.width,cv.height);resolve(cv.toDataURL('image/jpeg',0.85))}catch(e){resolve(thumb.indexOf('data:')===0?thumb:'')}};
         img.onerror=function(){resolve('')};
@@ -495,7 +511,7 @@ async function ppAbpElegirPizarra(itemId,nombre){
         if(r.error)throw r.error;
         var img=await ppThumbADataUrl(r.data.thumbnail_svg);
         if(!img){showToast('Esa fase no tiene miniatura; guarda la fase en la pizarra primero');return}
-        _ppAbpForm.imagen=img;_ppAbpForm.pizarra_item_id=itemId;_ppAbpForm.pizarra_nombre=nombre;_ppAbpForm.pizarra_hash=r.data.thumbnail_svg.length;
+        _ppAbpForm.imagen=img;_ppAbpForm.pizarra_item_id=itemId;_ppAbpForm.pizarra_nombre=nombre;_ppAbpForm.pizarra_hash=r.data.thumbnail_svg.length;_ppAbpForm.pizarra_v=2;
         ppRenderAbpForm();
     }catch(e){showToast('Error: '+e.message)}
 }
@@ -512,9 +528,9 @@ async function ppAbpSincronizarPizarra(){
             var c=cards[i];if(!c.pizarra_item_id)continue;
             var it=r.data.find(function(x){return x.id===c.pizarra_item_id});
             if(!it||!it.thumbnail_svg)continue;
-            if(c.pizarra_hash===it.thumbnail_svg.length)continue;
+            if(c.pizarra_hash===it.thumbnail_svg.length&&c.pizarra_v===2)continue;
             var img=await ppThumbADataUrl(it.thumbnail_svg);
-            if(img){c.imagen=img;c.pizarra_hash=it.thumbnail_svg.length;cambios++}
+            if(img){c.imagen=img;c.pizarra_hash=it.thumbnail_svg.length;c.pizarra_v=2;cambios++}
         }
         if(cambios){await ppSaveAbpCards(cards);showToast(cambios+' ABP actualizada'+(cambios>1?'s':'')+' desde la pizarra');ppMostrarTab('abp')}
     }catch(e){console.warn('Sync ABP pizarra:',e)}
