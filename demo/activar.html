@@ -194,6 +194,12 @@
 <script>
 (function () {
   'use strict';
+  // Si esta persona estuvo antes en la demo, su navegador guarda el pase de visitante y el HUB
+  // entraria otra vez en el club de demostracion. Se borra aqui para que entre en SU club.
+  try {
+    if (localStorage.getItem('hub_token') === 'demo') { localStorage.removeItem('hub_user'); localStorage.removeItem('hub_token'); }
+    Object.keys(localStorage).forEach(function (k) { if (k.indexOf('tlc_') === 0) localStorage.removeItem(k); });
+  } catch (e) {}
   var URL_SB = 'https://cqteodxyvavyroxeshoz.supabase.co';
   var KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNxdGVvZHh5dmF2eXJveGVzaG96Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUyNzc2OTksImV4cCI6MjA4MDg1MzY5OX0.8sJC6twae2pnrf8NDVlOV2KnSOhBC1RrqWC0IiuE614';
   var API = URL_SB + '/functions/v1/prueba-club';
