@@ -708,9 +708,16 @@ return `
                         playerId = dup.id;
                     }
                 }
+                let fichaNueva = false;
                 if (!playerId) {
-                    const { data: newPlayer } = await supabaseClient.from('players').insert(playerData).select().single();
+                    const { data: newPlayer, error: errFicha } = await supabaseClient.from('players').insert(playerData).select().single();
+                    if (errFicha || !newPlayer) {
+                        guardarJugador._busy = false;
+                        showToast('No se pudo guardar el jugador: ' + ((errFicha && errFicha.message) || 'error desconocido'), 'error');
+                        return;
+                    }
                     playerId = newPlayer.id;
+                    fichaNueva = true;
                 }
                 const spNuevo = {
                     season_id: tempId,
@@ -721,7 +728,14 @@ return `
                 if (typeof cmState !== 'undefined' && cmState.activo && cmState.equipoSeleccionado) {
                     spNuevo.team_id = cmState.equipoSeleccionado.id;
                 }
-                await supabaseClient.from('season_players').insert(spNuevo);
+                const { error: errPlantilla } = await supabaseClient.from('season_players').insert(spNuevo);
+                if (errPlantilla) {
+                    // No dejar una ficha suelta que no aparece en ninguna plantilla
+                    if (fichaNueva) { try { await supabaseClient.from('players').delete().eq('id', playerId); } catch (eDel) {} }
+                    guardarJugador._busy = false;
+                    showToast('No se pudo a\u00f1adir el jugador a la plantilla: ' + errPlantilla.message, 'error');
+                    return;
+                }
             }
             
             cerrarModalJugador();
