@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Activa tu prueba · TopLiderCoach</title>
+<link rel="icon" href="https://toplidercoach.com/wp-content/uploads/2025/11/diseno-sin-titulo-11.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#0f172a; --navy-2:#111c33; --slate:#1e293b; --line:#334155;
+    --ink:#e8edf5; --ink-2:#aab6c8; --ink-3:#7d8aa0;
+    --amber:#f59e0b; --pitch:#1f7a4d; --ok:#22c55e; --mal:#fca5a5;
+    box-sizing:border-box;
+  }
+  *,*::before,*::after{box-sizing:inherit}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+  html,body{height:100%}
+  body{margin:0;background:var(--navy);color:var(--ink);font-family:"Barlow",system-ui,sans-serif;font-size:17px;line-height:1.55;-webkit-font-smoothing:antialiased;
+    padding:env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0)}
+  h1,h2{font-family:"Barlow Condensed","Barlow",sans-serif;font-weight:700;line-height:1;margin:0}
+  a{color:inherit}
+  :focus-visible{outline:3px solid var(--amber);outline-offset:3px;border-radius:6px}
+
+  header{border-bottom:1px solid rgba(255,255,255,.06)}
+  .top{width:min(760px,calc(100% - 40px));margin:0 auto;height:62px;display:flex;align-items:center;justify-content:space-between}
+  .mark{display:flex;align-items:center;gap:10px;text-decoration:none;font-family:"Barlow Condensed";font-weight:700;font-size:21px;letter-spacing:.02em}
+  .mark img{width:32px;height:32px;border-radius:50%;object-fit:cover}
+  .ayuda{font-size:14px;color:var(--ink-2);text-decoration:none;border:1px solid var(--line);padding:7px 13px;border-radius:999px}
+  .ayuda:hover{color:var(--ink);border-color:var(--ink-3)}
+  .ayuda{white-space:nowrap}
+  @media (max-width:420px){.ayuda{font-size:13px;padding:6px 10px}.mark{font-size:19px}}
+
+  main{width:min(760px,calc(100% - 40px));margin:0 auto;padding:44px 0 64px}
+  .vista{display:none}
+  .vista.activa{display:block}
+
+  /* Ficha del club: el nombre del club es lo unico grande de la pagina */
+  .ficha{border-radius:16px;overflow:hidden;background:var(--navy-2);border:1px solid rgba(255,255,255,.08)}
+  .ficha .cesped{background:
+      repeating-linear-gradient(90deg,rgba(255,255,255,.045) 0 56px,transparent 56px 112px),
+      var(--pitch);
+    padding:30px 28px 26px;position:relative}
+  .ficha .cesped::after{content:"";position:absolute;right:-70px;top:50%;width:180px;height:180px;border:2px solid rgba(255,255,255,.28);border-radius:50%;transform:translateY(-50%)}
+  .ficha .estado{display:inline-flex;align-items:center;gap:8px;font-size:14px;font-weight:600;background:rgba(15,23,42,.55);padding:5px 12px;border-radius:999px;position:relative;z-index:1}
+  .ficha .estado i{width:9px;height:9px;border-radius:50%;background:var(--ok);display:block}
+  .ficha h1{font-size:clamp(40px,9vw,68px);margin-top:16px;letter-spacing:.01em;text-wrap:balance;position:relative;z-index:1;overflow-wrap:anywhere}
+  .ficha .cuerpo{padding:26px 28px 30px}
+  .ficha .cuerpo > p{margin:0 0 18px;color:var(--ink-2)}
+  .ficha .cuerpo > p b{color:var(--ink);font-weight:600}
+
+  label{display:block;font-size:14px;font-weight:600;color:var(--ink-2);margin:14px 0 6px}
+  .campo{position:relative}
+  input[type=password],input[type=text]{width:100%;padding:13px 92px 13px 14px;border-radius:10px;border:1px solid var(--line);background:var(--navy);color:#fff;font:inherit}
+  input::placeholder{color:var(--ink-3)}
+  .ver{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:0;color:var(--ink-2);font:inherit;font-size:14px;padding:8px 10px;cursor:pointer;border-radius:8px}
+  .ver:hover{color:var(--ink)}
+  .usuario{font-weight:600;color:#fff;background:var(--navy);border:1px dashed var(--line);border-radius:10px;padding:12px 14px;overflow-wrap:anywhere}
+  .aviso{margin:14px 0 0;font-size:15px;color:var(--mal);min-height:1.4em}
+
+  .btn{font-family:"Barlow Condensed";font-weight:700;font-size:20px;letter-spacing:.04em;border:0;border-radius:10px;padding:14px 22px;cursor:pointer;color:#1a1200;background:var(--amber);text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:8px;transition:background .15s}
+  .btn:hover{background:#fbbf24}
+  .btn[disabled]{opacity:.6;cursor:progress}
+  .btn.ancho{width:100%;margin-top:18px}
+  .btn.ghost{background:transparent;color:var(--ink);border:1px solid rgba(255,255,255,.28)}
+  .btn.ghost:hover{background:rgba(255,255,255,.08)}
+
+  .pasos{margin:34px 0 0;padding:0;list-style:none;counter-reset:p}
+  .pasos li{counter-increment:p;display:grid;grid-template-columns:38px 1fr;gap:14px;padding:16px 0;border-top:1px solid rgba(255,255,255,.08)}
+  .pasos li::before{content:counter(p);font-family:"Barlow Condensed";font-weight:700;font-size:22px;width:38px;height:38px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;color:var(--amber)}
+  .pasos b{display:block;color:#fff;font-weight:600}
+  .pasos span{color:var(--ink-2);font-size:16px}
+  h2{font-size:28px;margin-top:40px}
+
+  /* Estados sin club (esperando, pendiente, error) */
+  .mensaje{border:1px solid rgba(255,255,255,.08);background:var(--navy-2);border-radius:16px;padding:34px 28px}
+  .mensaje h1{font-size:clamp(32px,7vw,46px);text-wrap:balance}
+  .mensaje p{color:var(--ink-2);margin:14px 0 0;max-width:60ch}
+  .mensaje .acciones{margin-top:24px;display:flex;gap:10px;flex-wrap:wrap}
+  .girando{width:34px;height:34px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--amber);animation:giro .9s linear infinite;margin-bottom:18px}
+  @keyframes giro{to{transform:rotate(360deg)}}
+
+  table.diag{width:100%;border-collapse:collapse;margin-top:18px;font-size:16px}
+  table.diag td{padding:10px 0;border-top:1px solid rgba(255,255,255,.08)}
+  table.diag td:last-child{text-align:right;font-weight:600}
+  .si{color:var(--ok)} .no{color:var(--mal)}
+
+  /* Formulario de la prueba */
+  .intro{margin:0 0 26px}
+  .intro .kicker{display:inline-flex;align-items:center;gap:8px;font-size:14px;font-weight:600;color:#fbbf24;border:1px solid rgba(245,158,11,.4);padding:5px 12px;border-radius:999px}
+  .intro h1{font-size:clamp(38px,8vw,60px);margin:16px 0 12px;text-wrap:balance}
+  .intro p{color:var(--ink-2);margin:0;max-width:58ch}
+  .caja{border:1px solid rgba(255,255,255,.08);background:var(--navy-2);border-radius:16px;padding:26px 28px 30px}
+  .dos{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
+  @media (max-width:560px){.dos{grid-template-columns:1fr}.caja{padding:22px 18px 24px}}
+  input[type=text],input[type=email],input[type=tel],input[type=number],select{width:100%;padding:13px 14px;border-radius:10px;border:1px solid var(--line);background:var(--navy);color:#fff;font:inherit}
+  select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--ink-2) 50%),linear-gradient(135deg,var(--ink-2) 50%,transparent 50%);background-position:calc(100% - 20px) 55%,calc(100% - 14px) 55%;background-size:6px 6px;background-repeat:no-repeat}
+  .ayuda-campo{font-size:13.5px;color:var(--ink-3);margin:6px 0 0}
+  .mal-campo{border-color:var(--mal)!important}
+  .trampa{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+  .acepto{display:grid;grid-template-columns:22px 1fr;gap:12px;align-items:start;margin:22px 0 0;font-size:15px;color:var(--ink-2);font-weight:400}
+  .acepto input{width:20px;height:20px;margin:2px 0 0;accent-color:var(--amber)}
+  .acepto a{color:var(--ink);text-underline-offset:3px}
+  .puntos{list-style:none;padding:0;margin:28px 0 0;display:grid;gap:10px;color:var(--ink-2);font-size:15.5px}
+  .puntos li{display:grid;grid-template-columns:20px 1fr;gap:10px}
+  .puntos li::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--ok);margin-top:9px}
+</style>
+</head>
+<body>
+<header>
+  <div class="top">
+    <a class="mark" href="https://toplidercoach.com/"><img src="https://toplidercoach.com/wp-content/uploads/2025/11/diseno-sin-titulo-11.png" alt="">TopLiderCoach</a>
+    <a class="ayuda" href="https://wa.me/34611126983" target="_blank" rel="noopener">Ayuda por WhatsApp</a>
+  </div>
+</header>
+
+<main>
+  <!-- 1. Confirmar (no se valida nada hasta que la persona pulsa el boton) -->
+  <section class="vista activa" id="v-inicio">
+    <div class="mensaje">
+      <h1>Activa tu prueba de 7 días</h1>
+      <p>Pulsa el botón para confirmar tu correo. A continuación eliges tu contraseña y tu club queda creado.</p>
+      <div class="acciones"><button type="button" class="btn" id="a-confirmar">Confirmar mi correo</button></div>
+      <p class="aviso" id="a-aviso" role="alert"></p>
+    </div>
+  </section>
+
+  <!-- 2. Elegir contrasena -->
+  <section class="vista" id="v-crear">
+    <div class="ficha">
+      <div class="cesped">
+        <span class="estado"><i></i>Prueba de 7 días</span>
+        <h1 data-club></h1>
+      </div>
+      <div class="cuerpo">
+        <p>Correo confirmado. Elige la contraseña con la que vas a entrar y activamos tu club.</p>
+        <label>Tu usuario</label>
+        <div class="usuario" data-email></div>
+        <label for="pw1">Contraseña (mínimo 8 caracteres)</label>
+        <div class="campo">
+          <input type="password" id="pw1" autocomplete="new-password" minlength="8" maxlength="72">
+          <button type="button" class="ver" data-ver="pw1">Mostrar</button>
+        </div>
+        <label for="pw2">Repite la contraseña</label>
+        <div class="campo">
+          <input type="password" id="pw2" autocomplete="new-password" minlength="8" maxlength="72">
+          <button type="button" class="ver" data-ver="pw2">Mostrar</button>
+        </div>
+        <p class="aviso" id="pw-aviso" role="alert"></p>
+        <button type="button" class="btn ancho" id="pw-guardar">Guardar y activar mi club</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. Listo -->
+  <section class="vista" id="v-listo">
+    <div class="ficha">
+      <div class="cesped">
+        <span class="estado"><i></i>Prueba activa</span>
+        <h1 data-club></h1>
+      </div>
+      <div class="cuerpo">
+        <p>Tu club está creado. Tienes acceso completo hasta el <b id="l-fecha"></b>.</p>
+        <label>Tu usuario</label>
+        <div class="usuario" data-email></div>
+        <a class="btn ancho" href="https://club.toplidercoach.com/">Entrar en mi club</a>
+      </div>
+    </div>
+    <h2>Por dónde empezar</h2>
+    <ol class="pasos">
+      <li><div><b>Pon el escudo y los datos del club</b><span>En Mi Club. Es lo que verá todo tu cuerpo técnico al entrar.</span></div></li>
+      <li><div><b>Crea tus equipos</b><span>Tienes uno de inicio, "Primer equipo". Añade el resto de categorías desde Mi Club.</span></div></li>
+      <li><div><b>Da de alta a tu gente</b><span>En Miembros eliges el cargo de cada persona y el equipo que lleva. Cada uno recibe su propio usuario, y así probáis el club entre todos.</span></div></li>
+    </ol>
+  </section>
+
+  <!-- Enlace no valido -->
+  <section class="vista" id="v-error">
+    <div class="mensaje">
+      <h1 id="err-titulo">Este enlace ya no sirve</h1>
+      <p id="err-texto"></p>
+      <div class="acciones">
+        <a class="btn" href="prueba.html">Pedir un enlace nuevo</a>
+        <a class="btn ghost" href="https://wa.me/34611126983" target="_blank" rel="noopener">Escribir por WhatsApp</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+(function () {
+  'use strict';
+  var URL_SB = 'https://cqteodxyvavyroxeshoz.supabase.co';
+  var KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNxdGVvZHh5dmF2eXJveGVzaG96Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUyNzc2OTksImV4cCI6MjA4MDg1MzY5OX0.8sJC6twae2pnrf8NDVlOV2KnSOhBC1RrqWC0IiuE614';
+  var API = URL_SB + '/functions/v1/prueba-club';
+  var params = new URLSearchParams(location.search);
+  var tokenHash = params.get('token_hash') || '', tipo = params.get('type') || 'invite';
+  // Sesion solo en memoria: no se mezcla con la del HUB en este navegador
+  var sb = window.supabase.createClient(URL_SB, KEY, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
+  var accessToken = null;
+
+  function ver(id) { document.querySelectorAll('.vista').forEach(function (v) { v.classList.toggle('activa', v.id === id); }); window.scrollTo(0, 0); }
+  function error(titulo, texto) { document.getElementById('err-titulo').textContent = titulo; document.getElementById('err-texto').textContent = texto; ver('v-error'); }
+  function poner(d) {
+    document.querySelectorAll('[data-club]').forEach(function (e) { e.textContent = d.club || 'Tu club'; });
+    document.querySelectorAll('[data-email]').forEach(function (e) { e.textContent = d.email || ''; });
+  }
+  function fecha(iso) { try { return new Date(iso).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' }); } catch (e) { return ''; } }
+  async function llamar(accion) {
+    var r = await fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + accessToken }, body: JSON.stringify({ action: accion }) });
+    return r.json();
+  }
+
+  if (!tokenHash) { error('Falta el enlace de activación', 'Abre esta página desde el botón del correo que te enviamos. Si no lo encuentras, pide un enlace nuevo.'); return; }
+
+  var bConf = document.getElementById('a-confirmar'), aAviso = document.getElementById('a-aviso');
+  bConf.addEventListener('click', async function () {
+    bConf.disabled = true; bConf.textContent = 'Confirmando…'; aAviso.textContent = '';
+    try {
+      var v = await sb.auth.verifyOtp({ token_hash: tokenHash, type: tipo });
+      if (v.error || !v.data || !v.data.session) {
+        error('Este enlace ya no sirve', 'Los enlaces de activación caducan y solo se pueden usar una vez. Pide uno nuevo con el mismo email y te llegará al momento.');
+        return;
+      }
+      accessToken = v.data.session.access_token;
+      var info = await llamar('info');
+      if (!info.ok) { error('No encontramos tu solicitud', (info.motivo || '') + ' Pide la prueba de nuevo o escríbenos por WhatsApp.'); return; }
+      poner(info);
+      ver('v-crear'); document.getElementById('pw1').focus();
+    } catch (e) {
+      bConf.disabled = false; bConf.textContent = 'Confirmar mi correo';
+      aAviso.textContent = 'No hay conexión. Vuelve a intentarlo.';
+    }
+  });
+
+  document.querySelectorAll('[data-ver]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var i = document.getElementById(b.dataset.ver), oculto = i.type === 'password';
+      i.type = oculto ? 'text' : 'password'; b.textContent = oculto ? 'Ocultar' : 'Mostrar';
+    });
+  });
+
+  var bPw = document.getElementById('pw-guardar'), pAviso = document.getElementById('pw-aviso');
+  async function guardar() {
+    var a = document.getElementById('pw1').value, b = document.getElementById('pw2').value;
+    pAviso.textContent = '';
+    if (a.length < 8) { pAviso.textContent = 'La contraseña debe tener al menos 8 caracteres.'; return; }
+    if (a !== b) { pAviso.textContent = 'Las dos contraseñas no coinciden.'; return; }
+    bPw.disabled = true; bPw.textContent = 'Creando tu club…';
+    try {
+      var u = await sb.auth.updateUser({ password: a });
+      if (u.error) { pAviso.textContent = 'No se pudo guardar la contraseña: ' + u.error.message; bPw.disabled = false; bPw.textContent = 'Guardar y activar mi club'; return; }
+      var s = await sb.auth.getSession(); if (s.data && s.data.session) accessToken = s.data.session.access_token;
+      var r = await llamar('activar');
+      if (!r.ok) { pAviso.textContent = r.motivo || 'No se pudo activar el club.'; bPw.disabled = false; bPw.textContent = 'Guardar y activar mi club'; return; }
+      poner(r);
+      document.getElementById('l-fecha').textContent = fecha(r.expires_at);
+      try { await sb.auth.signOut({ scope: 'local' }); } catch (e) {}
+      ver('v-listo');
+    } catch (e) {
+      pAviso.textContent = 'No hay conexión. Vuelve a intentarlo.'; bPw.disabled = false; bPw.textContent = 'Guardar y activar mi club';
+    }
+  }
+  bPw.addEventListener('click', guardar);
+  document.getElementById('pw2').addEventListener('keydown', function (e) { if (e.key === 'Enter') guardar(); });
+})();
+</script>
+</body>
+</html>

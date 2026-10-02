@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Prueba gratuita de 7 días · Modo Club · TopLiderCoach</title>
+<link rel="icon" href="https://toplidercoach.com/wp-content/uploads/2025/11/diseno-sin-titulo-11.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#0f172a; --navy-2:#111c33; --slate:#1e293b; --line:#334155;
+    --ink:#e8edf5; --ink-2:#aab6c8; --ink-3:#7d8aa0;
+    --amber:#f59e0b; --pitch:#1f7a4d; --ok:#22c55e; --mal:#fca5a5;
+    box-sizing:border-box;
+  }
+  *,*::before,*::after{box-sizing:inherit}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+  html,body{height:100%}
+  body{margin:0;background:var(--navy);color:var(--ink);font-family:"Barlow",system-ui,sans-serif;font-size:17px;line-height:1.55;-webkit-font-smoothing:antialiased;
+    padding:env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0)}
+  h1,h2{font-family:"Barlow Condensed","Barlow",sans-serif;font-weight:700;line-height:1;margin:0}
+  a{color:inherit}
+  :focus-visible{outline:3px solid var(--amber);outline-offset:3px;border-radius:6px}
+
+  header{border-bottom:1px solid rgba(255,255,255,.06)}
+  .top{width:min(760px,calc(100% - 40px));margin:0 auto;height:62px;display:flex;align-items:center;justify-content:space-between}
+  .mark{display:flex;align-items:center;gap:10px;text-decoration:none;font-family:"Barlow Condensed";font-weight:700;font-size:21px;letter-spacing:.02em}
+  .mark img{width:32px;height:32px;border-radius:50%;object-fit:cover}
+  .ayuda{font-size:14px;color:var(--ink-2);text-decoration:none;border:1px solid var(--line);padding:7px 13px;border-radius:999px}
+  .ayuda:hover{color:var(--ink);border-color:var(--ink-3)}
+  .ayuda{white-space:nowrap}
+  @media (max-width:420px){.ayuda{font-size:13px;padding:6px 10px}.mark{font-size:19px}}
+
+  main{width:min(760px,calc(100% - 40px));margin:0 auto;padding:44px 0 64px}
+  .vista{display:none}
+  .vista.activa{display:block}
+
+  /* Ficha del club: el nombre del club es lo unico grande de la pagina */
+  .ficha{border-radius:16px;overflow:hidden;background:var(--navy-2);border:1px solid rgba(255,255,255,.08)}
+  .ficha .cesped{background:
+      repeating-linear-gradient(90deg,rgba(255,255,255,.045) 0 56px,transparent 56px 112px),
+      var(--pitch);
+    padding:30px 28px 26px;position:relative}
+  .ficha .cesped::after{content:"";position:absolute;right:-70px;top:50%;width:180px;height:180px;border:2px solid rgba(255,255,255,.28);border-radius:50%;transform:translateY(-50%)}
+  .ficha .estado{display:inline-flex;align-items:center;gap:8px;font-size:14px;font-weight:600;background:rgba(15,23,42,.55);padding:5px 12px;border-radius:999px;position:relative;z-index:1}
+  .ficha .estado i{width:9px;height:9px;border-radius:50%;background:var(--ok);display:block}
+  .ficha h1{font-size:clamp(40px,9vw,68px);margin-top:16px;letter-spacing:.01em;text-wrap:balance;position:relative;z-index:1;overflow-wrap:anywhere}
+  .ficha .cuerpo{padding:26px 28px 30px}
+  .ficha .cuerpo > p{margin:0 0 18px;color:var(--ink-2)}
+  .ficha .cuerpo > p b{color:var(--ink);font-weight:600}
+
+  label{display:block;font-size:14px;font-weight:600;color:var(--ink-2);margin:14px 0 6px}
+  .campo{position:relative}
+  input[type=password],input[type=text]{width:100%;padding:13px 92px 13px 14px;border-radius:10px;border:1px solid var(--line);background:var(--navy);color:#fff;font:inherit}
+  input::placeholder{color:var(--ink-3)}
+  .ver{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:0;color:var(--ink-2);font:inherit;font-size:14px;padding:8px 10px;cursor:pointer;border-radius:8px}
+  .ver:hover{color:var(--ink)}
+  .usuario{font-weight:600;color:#fff;background:var(--navy);border:1px dashed var(--line);border-radius:10px;padding:12px 14px;overflow-wrap:anywhere}
+  .aviso{margin:14px 0 0;font-size:15px;color:var(--mal);min-height:1.4em}
+
+  .btn{font-family:"Barlow Condensed";font-weight:700;font-size:20px;letter-spacing:.04em;border:0;border-radius:10px;padding:14px 22px;cursor:pointer;color:#1a1200;background:var(--amber);text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:8px;transition:background .15s}
+  .btn:hover{background:#fbbf24}
+  .btn[disabled]{opacity:.6;cursor:progress}
+  .btn.ancho{width:100%;margin-top:18px}
+  .btn.ghost{background:transparent;color:var(--ink);border:1px solid rgba(255,255,255,.28)}
+  .btn.ghost:hover{background:rgba(255,255,255,.08)}
+
+  .pasos{margin:34px 0 0;padding:0;list-style:none;counter-reset:p}
+  .pasos li{counter-increment:p;display:grid;grid-template-columns:38px 1fr;gap:14px;padding:16px 0;border-top:1px solid rgba(255,255,255,.08)}
+  .pasos li::before{content:counter(p);font-family:"Barlow Condensed";font-weight:700;font-size:22px;width:38px;height:38px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;color:var(--amber)}
+  .pasos b{display:block;color:#fff;font-weight:600}
+  .pasos span{color:var(--ink-2);font-size:16px}
+  h2{font-size:28px;margin-top:40px}
+
+  /* Estados sin club (esperando, pendiente, error) */
+  .mensaje{border:1px solid rgba(255,255,255,.08);background:var(--navy-2);border-radius:16px;padding:34px 28px}
+  .mensaje h1{font-size:clamp(32px,7vw,46px);text-wrap:balance}
+  .mensaje p{color:var(--ink-2);margin:14px 0 0;max-width:60ch}
+  .mensaje .acciones{margin-top:24px;display:flex;gap:10px;flex-wrap:wrap}
+  .girando{width:34px;height:34px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--amber);animation:giro .9s linear infinite;margin-bottom:18px}
+  @keyframes giro{to{transform:rotate(360deg)}}
+
+  table.diag{width:100%;border-collapse:collapse;margin-top:18px;font-size:16px}
+  table.diag td{padding:10px 0;border-top:1px solid rgba(255,255,255,.08)}
+  table.diag td:last-child{text-align:right;font-weight:600}
+  .si{color:var(--ok)} .no{color:var(--mal)}
+
+  /* Formulario de la prueba */
+  .intro{margin:0 0 26px}
+  .intro .kicker{display:inline-flex;align-items:center;gap:8px;font-size:14px;font-weight:600;color:#fbbf24;border:1px solid rgba(245,158,11,.4);padding:5px 12px;border-radius:999px}
+  .intro h1{font-size:clamp(38px,8vw,60px);margin:16px 0 12px;text-wrap:balance}
+  .intro p{color:var(--ink-2);margin:0;max-width:58ch}
+  .caja{border:1px solid rgba(255,255,255,.08);background:var(--navy-2);border-radius:16px;padding:26px 28px 30px}
+  .dos{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
+  @media (max-width:560px){.dos{grid-template-columns:1fr}.caja{padding:22px 18px 24px}}
+  input[type=text],input[type=email],input[type=tel],input[type=number],select{width:100%;padding:13px 14px;border-radius:10px;border:1px solid var(--line);background:var(--navy);color:#fff;font:inherit}
+  select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--ink-2) 50%),linear-gradient(135deg,var(--ink-2) 50%,transparent 50%);background-position:calc(100% - 20px) 55%,calc(100% - 14px) 55%;background-size:6px 6px;background-repeat:no-repeat}
+  .ayuda-campo{font-size:13.5px;color:var(--ink-3);margin:6px 0 0}
+  .mal-campo{border-color:var(--mal)!important}
+  .trampa{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+  .acepto{display:grid;grid-template-columns:22px 1fr;gap:12px;align-items:start;margin:22px 0 0;font-size:15px;color:var(--ink-2);font-weight:400}
+  .acepto input{width:20px;height:20px;margin:2px 0 0;accent-color:var(--amber)}
+  .acepto a{color:var(--ink);text-underline-offset:3px}
+  .puntos{list-style:none;padding:0;margin:28px 0 0;display:grid;gap:10px;color:var(--ink-2);font-size:15.5px}
+  .puntos li{display:grid;grid-template-columns:20px 1fr;gap:10px}
+  .puntos li::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--ok);margin-top:9px}
+</style>
+</head>
+<body>
+<header>
+  <div class="top">
+    <a class="mark" href="https://toplidercoach.com/"><img src="https://toplidercoach.com/wp-content/uploads/2025/11/diseno-sin-titulo-11.png" alt="">TopLiderCoach</a>
+    <a class="ayuda" href="https://wa.me/34611126983" target="_blank" rel="noopener">Ayuda por WhatsApp</a>
+  </div>
+</header>
+
+<main>
+  <section class="vista activa" id="v-form">
+    <div class="intro">
+      <span class="kicker">7 días · sin tarjeta</span>
+      <h1>Prueba el Modo Club con tu propio club</h1>
+      <p>Todos los despachos, todos tus equipos y todo tu cuerpo técnico, sin límites, durante 7 días. Lo que cargues se queda si decides contratar.</p>
+    </div>
+    <div class="caja">
+      <label for="f-club">Nombre del club</label>
+      <input type="text" id="f-club" maxlength="120" autocomplete="organization" placeholder="Ej.: CD La Bañeza">
+      <div class="dos">
+        <div>
+          <label for="f-nombre">Tu nombre y apellidos</label>
+          <input type="text" id="f-nombre" maxlength="120" autocomplete="name">
+        </div>
+        <div>
+          <label for="f-cargo">Tu cargo en el club</label>
+          <select id="f-cargo">
+            <option value="">Elige una opción</option>
+            <option>Presidente o directivo</option>
+            <option>Director deportivo</option>
+            <option>Coordinador</option>
+            <option>Entrenador</option>
+            <option>Secretaría o administración</option>
+            <option>Otro</option>
+          </select>
+        </div>
+      </div>
+      <div class="dos">
+        <div>
+          <label for="f-email">Email</label>
+          <input type="email" id="f-email" maxlength="160" autocomplete="email" inputmode="email">
+          <p class="ayuda-campo">Te enviaremos aquí el enlace para activar la prueba.</p>
+        </div>
+        <div>
+          <label for="f-telefono">Teléfono móvil</label>
+          <input type="tel" id="f-telefono" maxlength="20" autocomplete="tel" inputmode="tel" placeholder="Ej.: 611 126 983">
+          <p class="ayuda-campo">Fuera de España, con prefijo (+351…).</p>
+        </div>
+      </div>
+      <label for="f-equipos">¿Cuántos equipos tiene tu club?</label>
+      <input type="number" id="f-equipos" min="1" max="200" inputmode="numeric" style="max-width:160px">
+      <div class="trampa" aria-hidden="true"><label for="f-web">No rellenes este campo</label><input type="text" id="f-web" tabindex="-1" autocomplete="off"></div>
+
+      <label class="acepto"><input type="checkbox" id="f-acepta"><span>Acepto las condiciones de la prueba y la <a href="https://toplidercoach.com/politica-de-privacidad/" target="_blank" rel="noopener">política de privacidad</a>. La prueba dura 7 días. Al terminar, guardamos los datos de tu club 30 días por si decides contratar; pasado ese plazo se borran de forma definitiva.</span></label>
+
+      <p class="aviso" id="f-aviso" role="alert"></p>
+      <button type="button" class="btn ancho" id="f-enviar">Enviarme el enlace de activación</button>
+    </div>
+    <ul class="puntos">
+      <li>Los 7 días empiezan cuando activas la prueba desde tu correo, no ahora.</li>
+      <li>No pedimos tarjeta. Al terminar no se cobra nada: el acceso se cierra solo.</li>
+      <li>Una prueba por club. Si necesitas más tiempo, escríbenos por WhatsApp.</li>
+    </ul>
+  </section>
+
+  <section class="vista" id="v-enviado">
+    <div class="mensaje">
+      <h1>Revisa tu correo</h1>
+      <p>Hemos enviado un enlace de activación a <b id="e-email" style="color:#fff"></b>. Ábrelo y pulsa <b style="color:#fff">Activar mi prueba</b>.</p>
+      <p>Suele llegar en menos de un minuto. Si no lo ves, mira en la carpeta de spam o correo no deseado. El remitente es administracion@toplidercoach.com.</p>
+      <div class="acciones">
+        <button type="button" class="btn ghost" id="e-volver">He escrito mal el email</button>
+        <a class="btn ghost" href="https://wa.me/34611126983" target="_blank" rel="noopener">No me llega: WhatsApp</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  var API = 'https://cqteodxyvavyroxeshoz.supabase.co/functions/v1/prueba-club';
+  var CAMPOS = { club: 'f-club', nombre: 'f-nombre', email: 'f-email', telefono: 'f-telefono', acepta: 'f-acepta' };
+  var btn = document.getElementById('f-enviar'), aviso = document.getElementById('f-aviso');
+  function val(id) { return document.getElementById(id).value.trim(); }
+  function ver(id) { document.querySelectorAll('.vista').forEach(function (v) { v.classList.toggle('activa', v.id === id); }); window.scrollTo(0, 0); }
+  function marcar(campo) {
+    document.querySelectorAll('.mal-campo').forEach(function (e) { e.classList.remove('mal-campo'); });
+    var id = CAMPOS[campo]; if (!id) return;
+    var el = document.getElementById(id); el.classList.add('mal-campo'); if (el.focus) el.focus();
+  }
+  function fallo(texto, campo) { aviso.textContent = texto; marcar(campo); }
+
+  async function enviar() {
+    aviso.textContent = ''; marcar(null);
+    var d = { action: 'solicitar', club: val('f-club'), nombre: val('f-nombre'), cargo: val('f-cargo'), email: val('f-email'),
+              telefono: val('f-telefono'), equipos: val('f-equipos'), acepta: document.getElementById('f-acepta').checked, web: val('f-web') };
+    if (d.club.length < 3) return fallo('Escribe el nombre de tu club.', 'club');
+    if (d.nombre.length < 5 || d.nombre.indexOf(' ') < 0) return fallo('Escribe tu nombre y apellidos.', 'nombre');
+    if (!/^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/.test(d.email)) return fallo('Ese email no parece correcto.', 'email');
+    if (d.telefono.replace(/\D/g, '').length < 9) return fallo('Escribe tu teléfono móvil.', 'telefono');
+    if (!d.acepta) return fallo('Tienes que aceptar las condiciones de la prueba.', 'acepta');
+    btn.disabled = true; btn.textContent = 'Enviando…';
+    try {
+      var r = await fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(d) });
+      var j = await r.json();
+      if (j.ok) { document.getElementById('e-email').textContent = d.email; ver('v-enviado'); }
+      else fallo(j.motivo || 'No hemos podido enviar la solicitud.', j.campo);
+    } catch (e) { fallo('No hay conexión. Vuelve a intentarlo.'); }
+    btn.disabled = false; btn.textContent = 'Enviarme el enlace de activación';
+  }
+  btn.addEventListener('click', enviar);
+  document.getElementById('e-volver').addEventListener('click', function () { ver('v-form'); document.getElementById('f-email').focus(); });
+})();
+</script>
+</body>
+</html>
