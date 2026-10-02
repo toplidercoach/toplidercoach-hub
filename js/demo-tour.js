@@ -24,7 +24,8 @@
 
     var DEMO_URL = 'demo/';
     var OFERTA_URL = 'demo/#oferta';
-    var WA_URL = 'https://wa.me/34611126983?text=Hola%2C%20quiero%20reservar%20mi%20plaza%20de%20Club%20Prioritario%20en%20TopLiderCoach';
+    // Al terminar el recorrido se lleva a la oferta (precio, condiciones y boton de contratar)
+    var WA_URL = 'https://club.toplidercoach.com/demo/#oferta';
 
     var ROLES = [
         { slug:'direccion',          rol:'Dirección',            nombre:'Dirección Rapid Alianza', wp:100000014, username:'demo.direccion' },
