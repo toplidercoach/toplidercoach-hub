@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tu prueba ha terminado · TopLiderCoach</title>
+<link rel="icon" href="https://toplidercoach.com/wp-content/uploads/2025/11/diseno-sin-titulo-11.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#0f172a; --navy-2:#111c33; --slate:#1e293b; --line:#334155;
+    --ink:#e8edf5; --ink-2:#aab6c8; --ink-3:#7d8aa0;
+    --amber:#f59e0b; --pitch:#1f7a4d; --ok:#22c55e; --mal:#fca5a5;
+    box-sizing:border-box;
+  }
+  *,*::before,*::after{box-sizing:inherit}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+  html,body{height:100%}
+  body{margin:0;background:var(--navy);color:var(--ink);font-family:"Barlow",system-ui,sans-serif;font-size:17px;line-height:1.55;-webkit-font-smoothing:antialiased;
+    padding:env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0)}
+  h1,h2{font-family:"Barlow Condensed","Barlow",sans-serif;font-weight:700;line-height:1;margin:0}
+  a{color:inherit}
+  :focus-visible{outline:3px solid var(--amber);outline-offset:3px;border-radius:6px}
+
+  header{border-bottom:1px solid rgba(255,255,255,.06)}
+  .top{width:min(760px,calc(100% - 40px));margin:0 auto;height:62px;display:flex;align-items:center;justify-content:space-between}
+  .mark{display:flex;align-items:center;gap:10px;text-decoration:none;font-family:"Barlow Condensed";font-weight:700;font-size:21px;letter-spacing:.02em}
+  .mark img{width:32px;height:32px;border-radius:50%;object-fit:cover}
+  .ayuda{font-size:14px;color:var(--ink-2);text-decoration:none;border:1px solid var(--line);padding:7px 13px;border-radius:999px}
+  .ayuda:hover{color:var(--ink);border-color:var(--ink-3)}
+  .ayuda{white-space:nowrap}
+  @media (max-width:420px){.ayuda{font-size:13px;padding:6px 10px}.mark{font-size:19px}}
+
+  main{width:min(760px,calc(100% - 40px));margin:0 auto;padding:44px 0 64px}
+  .vista{display:none}
+  .vista.activa{display:block}
+
+  /* Ficha del club: el nombre del club es lo unico grande de la pagina */
+  .ficha{border-radius:16px;overflow:hidden;background:var(--navy-2);border:1px solid rgba(255,255,255,.08)}
+  .ficha .cesped{background:
+      repeating-linear-gradient(90deg,rgba(255,255,255,.045) 0 56px,transparent 56px 112px),
+      var(--pitch);
+    padding:30px 28px 26px;position:relative}
+  .ficha .cesped::after{content:"";position:absolute;right:-70px;top:50%;width:180px;height:180px;border:2px solid rgba(255,255,255,.28);border-radius:50%;transform:translateY(-50%)}
+  .ficha .estado{display:inline-flex;align-items:center;gap:8px;font-size:14px;font-weight:600;background:rgba(15,23,42,.55);padding:5px 12px;border-radius:999px;position:relative;z-index:1}
+  .ficha .estado i{width:9px;height:9px;border-radius:50%;background:var(--ok);display:block}
+  .ficha h1{font-size:clamp(40px,9vw,68px);margin-top:16px;letter-spacing:.01em;text-wrap:balance;position:relative;z-index:1;overflow-wrap:anywhere}
+  .ficha .cuerpo{padding:26px 28px 30px}
+  .ficha .cuerpo > p{margin:0 0 18px;color:var(--ink-2)}
+  .ficha .cuerpo > p b{color:var(--ink);font-weight:600}
+
+  label{display:block;font-size:14px;font-weight:600;color:var(--ink-2);margin:14px 0 6px}
+  .campo{position:relative}
+  input[type=password],input[type=text]{width:100%;padding:13px 92px 13px 14px;border-radius:10px;border:1px solid var(--line);background:var(--navy);color:#fff;font:inherit}
+  input::placeholder{color:var(--ink-3)}
+  .ver{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:0;color:var(--ink-2);font:inherit;font-size:14px;padding:8px 10px;cursor:pointer;border-radius:8px}
+  .ver:hover{color:var(--ink)}
+  .usuario{font-weight:600;color:#fff;background:var(--navy);border:1px dashed var(--line);border-radius:10px;padding:12px 14px;overflow-wrap:anywhere}
+  .aviso{margin:14px 0 0;font-size:15px;color:var(--mal);min-height:1.4em}
+
+  .btn{font-family:"Barlow Condensed";font-weight:700;font-size:20px;letter-spacing:.04em;border:0;border-radius:10px;padding:14px 22px;cursor:pointer;color:#1a1200;background:var(--amber);text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:8px;transition:background .15s}
+  .btn:hover{background:#fbbf24}
+  .btn[disabled]{opacity:.6;cursor:progress}
+  .btn.ancho{width:100%;margin-top:18px}
+  .btn.ghost{background:transparent;color:var(--ink);border:1px solid rgba(255,255,255,.28)}
+  .btn.ghost:hover{background:rgba(255,255,255,.08)}
+
+  .pasos{margin:34px 0 0;padding:0;list-style:none;counter-reset:p}
+  .pasos li{counter-increment:p;display:grid;grid-template-columns:38px 1fr;gap:14px;padding:16px 0;border-top:1px solid rgba(255,255,255,.08)}
+  .pasos li::before{content:counter(p);font-family:"Barlow Condensed";font-weight:700;font-size:22px;width:38px;height:38px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;color:var(--amber)}
+  .pasos b{display:block;color:#fff;font-weight:600}
+  .pasos span{color:var(--ink-2);font-size:16px}
+  h2{font-size:28px;margin-top:40px}
+
+  /* Estados sin club (esperando, pendiente, error) */
+  .mensaje{border:1px solid rgba(255,255,255,.08);background:var(--navy-2);border-radius:16px;padding:34px 28px}
+  .mensaje h1{font-size:clamp(32px,7vw,46px);text-wrap:balance}
+  .mensaje p{color:var(--ink-2);margin:14px 0 0;max-width:60ch}
+  .mensaje .acciones{margin-top:24px;display:flex;gap:10px;flex-wrap:wrap}
+  .girando{width:34px;height:34px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--amber);animation:giro .9s linear infinite;margin-bottom:18px}
+  @keyframes giro{to{transform:rotate(360deg)}}
+
+  table.diag{width:100%;border-collapse:collapse;margin-top:18px;font-size:16px}
+  table.diag td{padding:10px 0;border-top:1px solid rgba(255,255,255,.08)}
+  table.diag td:last-child{text-align:right;font-weight:600}
+  .si{color:var(--ok)} .no{color:var(--mal)}
+
+  .ficha .cesped.fin{background:repeating-linear-gradient(90deg,rgba(255,255,255,.04) 0 56px,transparent 56px 112px),#334155}
+  .ficha .estado i.gris{background:#fbbf24}
+  .plazo{border:1px dashed var(--line);border-radius:12px;padding:14px 16px;margin:0 0 20px;color:var(--ink-2);font-size:16px}
+  .plazo b{color:#fff;font-weight:600}
+  .precio{display:flex;align-items:baseline;gap:10px;margin:0 0 4px}
+  .precio strong{font-family:"Barlow Condensed";font-size:44px;line-height:1;color:#fff}
+  .precio s{color:var(--ink-3)}
+  .nota-precio{color:var(--ink-3);font-size:14.5px;margin:0}
+  .otra{display:block;text-align:center;margin-top:14px;color:var(--ink-2);font-size:15px}
+</style>
+</head>
+<body>
+<header>
+  <div class="top">
+    <a class="mark" href="https://toplidercoach.com/"><img src="https://toplidercoach.com/wp-content/uploads/2025/11/diseno-sin-titulo-11.png" alt="">TopLiderCoach</a>
+    <a class="ayuda" href="https://wa.me/34611126983" target="_blank" rel="noopener">Ayuda por WhatsApp</a>
+  </div>
+</header>
+<main>
+  <section class="vista activa">
+    <div class="ficha">
+      <div class="cesped fin">
+        <span class="estado"><i class="gris"></i>Prueba terminada</span>
+        <h1 id="t-club">Tu club</h1>
+      </div>
+      <div class="cuerpo">
+        <p>Tus 7 días de prueba han terminado y el acceso está cerrado. <b>No se ha perdido nada</b>: todo lo que cargasteis sigue guardado.</p>
+        <div class="plazo" id="t-plazo">Guardamos los datos de tu club 30 días desde el final de la prueba. Pasado ese plazo se borran de forma definitiva.</div>
+        <div class="precio"><strong>360 €</strong><span>el primer año</span> <s>450 €</s></div>
+        <p class="nota-precio">Club Prioritario: 20 % de descuento el primer año, después 450 €/año. Equipos, jugadores y cuerpo técnico sin límite. Sin permanencia.</p>
+        <a class="btn ancho" id="t-contratar" href="https://buy.stripe.com/3cIaEYaZW10S78KfUzcAo0C?prefilled_promo_code=PRIORITARIO">Contratar y recuperar mi club</a>
+        <a class="otra" href="https://wa.me/34611126983?text=Hola%2C%20mi%20prueba%20del%20Modo%20Club%20ha%20terminado%20y%20tengo%20una%20duda" target="_blank" rel="noopener">Tengo una duda antes: escribir por WhatsApp</a>
+      </div>
+    </div>
+    <h2>Qué pasa al contratar</h2>
+    <ol class="pasos">
+      <li><div><b>Pagas con tarjeta o domiciliación</b><span>Pago seguro con Stripe. El descuento ya va aplicado.</span></div></li>
+      <li><div><b>Tu club se reabre al momento</b><span>El mismo club, con sus equipos, jugadores, sesiones y miembros tal como los dejasteis.</span></div></li>
+      <li><div><b>Entráis con los mismos usuarios</b><span>Nadie tiene que volver a darse de alta ni cambiar la contraseña.</span></div></li>
+    </ol>
+  </section>
+</main>
+<script>
+(function () {
+  'use strict';
+  var p = new URLSearchParams(location.search);
+  var club = p.get('c') || '', nombre = (p.get('n') || '').slice(0, 120), hasta = p.get('h') || '', email = p.get('e') || '';
+  if (nombre) { document.getElementById('t-club').textContent = nombre; document.title = nombre + ' · Prueba terminada'; }
+  // Fecha de borrado: 30 dias despues del final de la prueba
+  var fin = new Date(hasta);
+  if (hasta && !isNaN(fin.getTime())) {
+    var borrado = new Date(fin.getTime() + 30 * 86400000);
+    var quedan = Math.ceil((borrado.getTime() - Date.now()) / 86400000);
+    var txt = borrado.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    var caja = document.getElementById('t-plazo');
+    caja.textContent = '';
+    caja.appendChild(document.createTextNode('Guardamos los datos de tu club hasta el '));
+    var b = document.createElement('b'); b.textContent = txt; caja.appendChild(b);
+    caja.appendChild(document.createTextNode(quedan > 0 ? ' (quedan ' + quedan + (quedan === 1 ? ' día' : ' días') + '). Ese día se borran de forma definitiva.' : '. El plazo ha terminado: escríbenos cuanto antes si quieres recuperarlos.'));
+  }
+  // El pago lleva la referencia del club para que se reabra ESE club
+  var url = 'https://buy.stripe.com/3cIaEYaZW10S78KfUzcAo0C?prefilled_promo_code=PRIORITARIO';
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(club)) url += '&client_reference_id=' + encodeURIComponent(club);
+  if (/^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/.test(email)) url += '&prefilled_email=' + encodeURIComponent(email);
+  document.getElementById('t-contratar').href = url;
+})();
+</script>
+</body>
+</html>

@@ -197,6 +197,17 @@ async function cmResolverAcceso(authUser) {
             (!c.license_valid_until || new Date(c.license_valid_until) > new Date());
 
         if (!licenciaActiva) {
+            // Prueba gratuita terminada: pagina propia, con la fecha de borrado y el boton de contratar
+            if (c.license_plan === 'trial') {
+                try { await supabaseClient.auth.signOut(); } catch (e) {}
+                localStorage.removeItem('cm_auth');
+                localStorage.removeItem('hub_user');
+                location.href = 'demo/prueba-terminada.html?c=' + encodeURIComponent(c.id)
+                    + '&n=' + encodeURIComponent(c.name || '')
+                    + '&h=' + encodeURIComponent(c.license_valid_until || '')
+                    + '&e=' + encodeURIComponent(authUser.email || '');
+                return { ok: false, motivo: 'Tu prueba gratuita ha terminado.' };
+            }
             return { ok: false, motivo: 'Tu club no tiene una licencia activa. Contacta con el administrador del club.' };
         }
 
