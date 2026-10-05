@@ -232,7 +232,7 @@
       poner(d);
       if (d.puede_crear_password) { ver('v-crear'); document.getElementById('pw1').focus(); return; }
       document.getElementById('listo-texto').textContent = d.cuenta_existia
-        ? 'Tu club ya está creado. Como ya tenías una cuenta con este email, entra con tu contraseña de siempre.'
+        ? 'Tu club está activo, con todo lo que ya tenías. Entra con tu usuario y tu contraseña de siempre.'
         : 'Tu club ya está creado y tu contraseña guardada. Entra con tu usuario y esa contraseña.';
       ver('v-listo');
       return;
