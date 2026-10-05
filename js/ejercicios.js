@@ -3831,6 +3831,7 @@ function ejBancoRender(list) {
             + '<div style="display:flex;gap:4px">'
             + '<button onclick="ejVerFicha(\'' + e.id + '\')" style="flex:1;padding:5px;font-size:11px;background:#1e293b;border:1px solid #334155;color:#93c5fd;border-radius:6px;cursor:pointer">Ver ficha</button>'
             + '<button onclick="ejBancoCargar(\'' + e.id + '\')" style="flex:1;padding:5px;font-size:11px;background:#1e293b;border:1px solid #334155;color:#cbd5e1;border-radius:6px;cursor:pointer">Editar</button>'
+            + '<button data-ejgps="' + e.id + '" onclick="ejGpsFicha(\'' + e.id + '\')" style="display:none;padding:5px 8px;font-size:11px;background:#0f3d3e;border:1px solid #14b8a6;color:#5eead4;border-radius:6px;cursor:pointer" title="Datos GPS medidos en este ejercicio">GPS</button>'
             + '<button onclick="ejEliminarDesdeBanco(\'' + e.id + '\')" style="padding:5px 6px;font-size:11px;background:#1e293b;border:1px solid #7f1d1d;color:#fca5a5;border-radius:6px;cursor:pointer" title="Eliminar">🗑</button>'
             + '</div>'
             + '</div>';
