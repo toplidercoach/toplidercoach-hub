@@ -174,7 +174,11 @@ function cmPfActRenderEjercicios(soloLibre) {
     } else if (!soloLibre) {
         h += '<p style="color:#94a3b8;font-size:12px">No hay sesion planificada en el HUB para ese dia.</p>';
     }
-    h += '<div style="margin-top:10px;color:#94a3b8;font-size:11px">O escribe el nombre de la actividad a mano:</div>' +
+    cmPfAct.bancoSel = null;
+    h += '<div style="margin-top:12px;color:#94a3b8;font-size:11px">O busca el ejercicio en tu banco:</div>' +
+        '<input type="text" class="cmpfact-inp" id="cmpfact-bbusca" placeholder="Escribe parte del nombre..." style="width:100%;max-width:320px;margin-top:4px" oninput="cmPfActBuscarBanco(this.value)">' +
+        '<div id="cmpfact-bres"></div><div id="cmpfact-bsel"></div>' +
+        '<div style="margin-top:12px;color:#94a3b8;font-size:11px">O escribe el nombre a mano (no se vinculara al banco):</div>' +
         '<input type="text" class="cmpfact-inp" id="cmpfact-libre" placeholder="Ej: Rondo 6x2" style="width:100%;max-width:320px;margin-top:4px" oninput="cmPfActElegir(-1)">';
     cont.innerHTML = h;
     cmPfAct.elegido = null;
@@ -182,10 +186,71 @@ function cmPfActRenderEjercicios(soloLibre) {
 
 function cmPfActElegir(i) {
     cmPfAct.elegido = i;
+    if (i !== -2) {
+        cmPfAct.bancoSel = null;
+        var bs = document.getElementById('cmpfact-bsel');
+        if (bs) bs.innerHTML = '';
+    }
     cmPfAct.ejercicios.forEach(function (ej, j) {
         var el = document.getElementById('cmpfact-ej-' + j);
         if (el) el.className = 'cmpfact-ej' + (i === j ? ' sel' : '');
     });
+}
+
+// ---------- Buscador del banco de ejercicios (custom_exercises) ----------
+async function cmPfActCargarBanco() {
+    if (cmPfAct.banco) return cmPfAct.banco;
+    var filtros = ['club_id.eq.' + clubId];
+    if (typeof usuario !== 'undefined' && usuario && usuario.id) filtros.push('coach_id.eq.' + String(usuario.id));
+    var r = await supabaseClient.from('custom_exercises')
+        .select('id, name, category, duration_min')
+        .or(filtros.join(','))
+        .order('name');
+    if (r.error) throw r.error;
+    cmPfAct.banco = r.data || [];
+    return cmPfAct.banco;
+}
+
+function cmPfActEsc(s) {
+    return String(s === null || s === undefined ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+async function cmPfActBuscarBanco(q) {
+    var cont = document.getElementById('cmpfact-bres');
+    if (!cont) return;
+    var norm = function (s) { return (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim(); };
+    var nq = norm(q);
+    if (nq.length < 2) { cont.innerHTML = ''; return; }
+    try {
+        var banco = await cmPfActCargarBanco();
+        if (!banco.length) { cont.innerHTML = '<p style="color:#fca5a5;font-size:12px">No se ha encontrado ningun ejercicio en tu banco.</p>'; return; }
+        var res = banco.filter(function (e) { return norm(e.name).indexOf(nq) !== -1; }).slice(0, 8);
+        if (!res.length) { cont.innerHTML = '<p style="color:#94a3b8;font-size:12px">Ningun ejercicio del banco coincide.</p>'; return; }
+        var h = '';
+        res.forEach(function (e) {
+            h += '<div class="cmpfact-ej" onclick="cmPfActElegirBanco(\'' + e.id + '\')">' +
+                '<span class="sec">' + cmPfActEsc(e.category || 'Banco') + (e.duration_min ? ' &middot; ' + e.duration_min + ' min' : '') + '</span><br>' + cmPfActEsc(e.name) +
+            '</div>';
+        });
+        cont.innerHTML = h;
+    } catch (e) {
+        cont.innerHTML = '<p style="color:#fca5a5;font-size:12px">Error leyendo el banco: ' + (e.message || e) + '</p>';
+    }
+}
+
+function cmPfActElegirBanco(id) {
+    var e = (cmPfAct.banco || []).filter(function (x) { return x.id === id; })[0];
+    if (!e) return;
+    cmPfActElegir(-2);
+    cmPfAct.bancoSel = { id: e.id, name: e.name };
+    var libre = document.getElementById('cmpfact-libre');
+    if (libre) libre.value = '';
+    var busca = document.getElementById('cmpfact-bbusca');
+    if (busca) busca.value = '';
+    var res = document.getElementById('cmpfact-bres');
+    if (res) res.innerHTML = '';
+    var bs = document.getElementById('cmpfact-bsel');
+    if (bs) bs.innerHTML = '<span class="cmpfact-chip ok">Vinculado al banco: ' + cmPfActEsc(e.name) + '</span>';
 }
 
 // ---------- Lectura y clasificacion de los CSV ----------
@@ -372,6 +437,9 @@ async function cmPfActGuardar() {
         var ej = cmPfAct.ejercicios[cmPfAct.elegido];
         nombreAct = ej.titulo;
         ref = ej.ref;
+    } else if (cmPfAct.bancoSel) {
+        nombreAct = cmPfAct.bancoSel.name;
+        ref = cmPfAct.bancoSel.id;
     } else if (libre) {
         nombreAct = libre;
     }
@@ -379,6 +447,10 @@ async function cmPfActGuardar() {
 
     var dorsales = Object.keys(cmPfAct.jugadores).filter(function (d) { return cmPfAct.asignacion[d]; });
     if (!dorsales.length) { if (typeof showToast === 'function') showToast('No hay jugadores emparejados'); return; }
+
+    var hayStats = cmPfAct.archivos.some(function (a) { return a.tipo === 'stats'; });
+    if (!hayStats) { if (typeof showToast === 'function') showToast('Falta el archivo "Estadisticas de equipo" (trae el tiempo y la distancia). Subelo junto a los demas.', 'error'); return; }
+    if (!ref && !confirm('Esta actividad NO esta vinculada a ningun ejercicio del banco, asi que sus datos no iran a ninguna ficha. Guardar igualmente?')) return;
 
     var btn = document.getElementById('cmpfact-guardar');
     if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
@@ -422,6 +494,7 @@ async function cmPfActGuardar() {
                 z5_distance_m: z5,
                 extra_metrics: {
                     distance_per_min: mmin,
+                    duration_exact_min: j.minutos != null ? Math.round(j.minutos * 100) / 100 : null,
                     avg_speed_kmh: j.vavg != null ? j.vavg : null,
                     hid21_m: j.hid21 != null ? j.hid21 : null,
                     acc_25: j.acc25 != null ? Math.round(j.acc25) : null,
