@@ -345,6 +345,10 @@ async function pdzCargaMicro(periodo) {
         Object.keys(histIE).forEach(function(jid) { histIE[jid].sort(function(a, b) { return a.fecha < b.fecha ? -1 : 1; }); });
 
         pdzCg.datos = { histIE: histIE, dias: dias, jugadores: jugadores, datos: datos, fechasPartido: fechasPartido, hayGps: gpsRows.length > 0, minPartido: minPartido, gemelos: gemelos, perfil: perfil, perfilEquipo: perfilEquipo, bandas: bandas, tolerancia: tolerancia, minRec: minRec, mdLabel: mdLabel, fechaPrevia: fechaPrevia };
+        // ---- Entrega 6: carga PLANIFICADA por dia (ejercicios de la sesion x ritmo GPS del banco) ----
+        try {
+            pdzCg.datos.plan = await pdzCgCalcularPlan(sesiones);
+        } catch (ePlan) { console.warn('Carga planificada no disponible:', ePlan); pdzCg.datos.plan = null; }
         pdzCgRender();
     } catch (err) {
         console.error('Error carga micro:', err);
@@ -353,6 +357,50 @@ async function pdzCargaMicro(periodo) {
 }
 
 function pdzCgCambiarMetrica(m) { pdzCg.metrica = m; pdzCgRender(); }
+
+// ---------- Carga planificada ----------
+// Para cada dia suma, de los ejercicios de sus sesiones, ritmo GPS medio del ejercicio
+// (vista cm_pf_ej_gps_resumen) x minutos planificados. Devuelve
+// { 'YYYY-MM-DD': { td, hsr, sprint, accdec, nCon, nSin, minCon, minSin } } (media por jugador).
+async function pdzCgCalcularPlan(sesiones) {
+    var plan = {};
+    if (!sesiones || !sesiones.length) return plan;
+    var r = await supabaseClient.from('cm_pf_ej_gps_resumen')
+        .select('activity_ref, td_min, hsr19_min, hsr24_min, acc30_min, dec30_min')
+        .eq('club_id', clubId);
+    if (r.error) throw r.error;
+    var ritmo = {};
+    (r.data || []).forEach(function(x) { ritmo[x.activity_ref] = x; });
+    var num = function(v) { var n = parseFloat(v); return isNaN(n) ? 0 : n; };
+    var lista = function(v) {
+        if (!v) return [];
+        if (typeof v === 'string') { try { v = JSON.parse(v); } catch (e) { return []; } }
+        return Array.isArray(v) ? v : [];
+    };
+    sesiones.forEach(function(s) {
+        var f = s.session_date;
+        if (!f) return;
+        if (!plan[f]) plan[f] = { td: 0, hsr: 0, sprint: 0, accdec: 0, nCon: 0, nSin: 0, minCon: 0, minSin: 0 };
+        var p = plan[f];
+        ['pre_field_work', 'warm_up', 'main_part', 'cool_down', 'post_field_work'].forEach(function(sec) {
+            lista(s[sec]).forEach(function(ej) {
+                if (!ej) return;
+                var min = num(ej.duracion);
+                var x = (ej.id !== null && ej.id !== undefined) ? ritmo[String(ej.id)] : null;
+                if (x) {
+                    p.td += num(x.td_min) * min;
+                    p.hsr += num(x.hsr19_min) * min;
+                    p.sprint += num(x.hsr24_min) * min;
+                    p.accdec += (num(x.acc30_min) + num(x.dec30_min)) * min;
+                    p.nCon++; p.minCon += min;
+                } else {
+                    p.nSin++; p.minSin += min;
+                }
+            });
+        });
+    });
+    return plan;
+}
 
 // ---------- Render ----------
 function pdzCgRender() {
@@ -557,6 +605,49 @@ function pdzCgRender() {
         html += '</tr>';
     }
 
+    // Fila de carga planificada (ejercicios de la sesion x ritmo GPS medido de cada ejercicio)
+    if (esExterna && D.plan && m !== 'pl') {
+        var hayPlan = D.dias.some(function(f) { return D.plan[f] && (D.plan[f].nCon + D.plan[f].nSin) > 0; });
+        if (hayPlan) {
+            var planSemana = 0, planSemanaSin = 0;
+            html += '<tr style="background:#0f2a1f;border-top:1px solid #1e3a5f">';
+            html += '<td style="padding:5px 10px;color:#4ade80;font-size:10px;font-weight:600;position:sticky;left:0;background:#0f2a1f" title="Suma de los ejercicios planificados en la sesion de cada dia: ritmo GPS medido del ejercicio x sus minutos. Media por jugador. No incluye pausas ni ejercicios sin datos GPS.">Planificado</td>';
+            D.dias.forEach(function(f) {
+                var p = D.plan[f], cel = '';
+                if (p && (p.nCon + p.nSin) > 0 && !D.fechasPartido[f]) {
+                    var vP = p[m] || 0;
+                    planSemana += vP; planSemanaSin += p.nSin;
+                    var tip = p.nCon + ' ejercicio(s) con datos GPS (' + Math.round(p.minCon) + ' min)' + (p.nSin ? ' - ' + p.nSin + ' sin datos (' + Math.round(p.minSin) + ' min, no cuentan)' : '');
+                    if (!p.nCon) {
+                        cel = '<span style="color:#64748b" title="' + tip + '">sin datos</span>';
+                    } else {
+                        var objP = (f === diaPost) ? null : objetivo(bandaDe(f, null), refEquipo);
+                        var colP = '#e2e8f0', notaP = '';
+                        if (objP) {
+                            var dP = delta(vP, objP);
+                            if (dP === 0) { colP = '#4ade80'; notaP = 'ok'; }
+                            else if (dP < 0) { colP = '#fbbf24'; notaP = fmtDelta(dP); }
+                            else { colP = '#f87171'; notaP = fmtDelta(dP); }
+                        }
+                        cel = '<span style="color:' + colP + ';font-weight:700;font-size:11px" title="' + tip + '">' + pdzCgFmt(vP, conf.dec) + (p.nSin ? '<span style="color:#fbbf24">*</span>' : '') + '</span>'
+                            + (notaP ? '<br><span style="color:' + colP + '">' + notaP + '</span>' : '');
+                    }
+                }
+                html += '<td style="padding:4px 4px;text-align:center;font-size:9px;white-space:nowrap">' + cel + '</td>';
+            });
+            var objSemP = (bandas && bandas.SEMANA && bandas.SEMANA[m] && refEquipo > 0) ? objetivo(bandas.SEMANA[m], refEquipo) : null;
+            var colS = '#e2e8f0', notaS = '';
+            if (objSemP) {
+                var dS = delta(planSemana, objSemP);
+                if (dS === 0) { colS = '#4ade80'; notaS = 'ok'; }
+                else if (dS < 0) { colS = '#fbbf24'; notaS = fmtDelta(dS); }
+                else { colS = '#f87171'; notaS = fmtDelta(dS); }
+            }
+            html += '<td style="padding:4px 8px;text-align:center;font-size:9px;white-space:nowrap"><span style="color:' + colS + ';font-weight:700;font-size:11px">' + pdzCgFmt(planSemana, conf.dec) + (planSemanaSin ? '<span style="color:#fbbf24">*</span>' : '') + '</span>' + (notaS ? '<br><span style="color:' + colS + '">' + notaS + '</span>' : '') + '</td>';
+            html += '</tr>';
+        }
+    }
+
     var totalesDia = {}, cuentaDia = {}, semanaEquipoPct = [];
     D.jugadores.forEach(function(j) {
         var total = 0, diasConDato = 0, algunEst = false, semanaPct = 0, semanaDias = 0, semanaVal = 0, nFatiga = 0;
@@ -664,6 +755,7 @@ function pdzCgRender() {
             + (refEquipo > 0 ? ' Referencia del equipo en partido: <strong style="color:#cbd5e1">' + pdzCgFmt(refEquipo, conf.dec) + '</strong>.' : ' Sin partido completo en este periodo: no hay referencia para el %.');
     }
     if (hayIE) leyenda += '<br>Esquina de la celda (carga interna/externa): <span style="color:#f87171">⚠</span> posible fatiga &middot; <span style="color:#60a5fa">⚡</span> va sobrado &middot; <span style="color:#4ade80">✓</span> concuerdan &middot; <span style="color:#475569">·</span> sin linea base. Compara el UA/km (sRPE por km) del dia con la media del propio jugador en sus entrenos con GPS y RPE de los 28 dias previos (minimo 3). Pasa el raton por el icono para ver el calculo.';
+    if (esExterna && D.plan && m !== 'pl') leyenda += '<br><span style="color:#4ade80">Planificado</span>: suma de los ejercicios de la sesion de cada dia (ritmo GPS medido de cada ejercicio x sus minutos), media por jugador. <span style="color:#fbbf24">*</span> = hay ejercicios sin datos GPS que no cuentan (pasa el raton para ver cuantos). No incluye pausas ni desplazamientos entre tareas.';
     html += '<div style="font-size:10px;color:#64748b;margin-top:6px;line-height:1.5">' + leyenda + '</div>';
 
     cont.innerHTML = html;
