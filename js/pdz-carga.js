@@ -824,6 +824,7 @@ function pdzCgObjFilas() {
         var d = new Date(f + 'T12:00:00');
         var nombre = DS[d.getDay()] + ' ' + d.getDate() + '/' + (d.getMonth() + 1);
         var haySesion = !!(D.plan && D.plan[f]);
+        if (D.plan && !haySesion) return;   // solo dias con sesion creada
         var esPost = (lab === 'MD+1' || lab === 'MD+2');
         if (esPost) {
             filas.push({ key: f, nombre: nombre, lab: lab, tipo: 'Recuperacion', clubKey: 'MD+1', val: ov[f] || club['MD+1'] || {}, propio: !!ov[f], haySesion: haySesion });
