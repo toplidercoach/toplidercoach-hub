@@ -349,6 +349,14 @@ async function pdzCargaMicro(periodo) {
         try {
             pdzCg.datos.plan = await pdzCgCalcularPlan(sesiones);
         } catch (ePlan) { console.warn('Carga planificada no disponible:', ePlan); pdzCg.datos.plan = null; }
+        // ---- Entrega 7: objetivos propios de esta semana (training_periods.md_bands), si los hay ----
+        pdzCg.datos.bandasDia = null;
+        try {
+            if (periodo && periodo.id) {
+                var rOv = await supabaseClient.from('training_periods').select('md_bands').eq('id', periodo.id).maybeSingle();
+                if (rOv && !rOv.error && rOv.data && rOv.data.md_bands) pdzCg.datos.bandasDia = rOv.data.md_bands;
+            }
+        } catch (eOv) { console.warn('Objetivos de la semana no disponibles:', eOv); }
         pdzCgRender();
     } catch (err) {
         console.error('Error carga micro:', err);
@@ -458,20 +466,43 @@ function pdzCgRender() {
 
     // ---- Banda y semaforo ----
     // Devuelve la banda [min,max] para un dia y jugador (MD+1: recuperacion si jugo >= 60', compensatorio si no)
+    // Banda del dia post-partido para un grupo ('R' recuperacion / 'C' compensatorio): ajuste de la semana o valor del club
+    function bandaPost(f, grupo) {
+        var ovP = D.bandasDia || {};
+        var kOv = grupo === 'C' ? f + '#C' : f;
+        if (ovP[kOv] && ovP[kOv][m]) return ovP[kOv][m];
+        var kClub = grupo === 'C' ? 'MD+1C' : 'MD+1';
+        return (bandas && bandas[kClub]) ? (bandas[kClub][m] || null) : null;
+    }
     function bandaDe(f, jid) {
         if (!bandas || !esExterna) return null;
         var lab = D.mdLabel[f] || '';
-        if (!lab || lab === 'MD') return null;
+        if (lab === 'MD' || D.fechasPartido[f]) return null;
         if (f === diaPost) {
             if (!jid) return null;
             var gp = grupoPost(jid, f);
-            if (gp === 'R') return bandas['MD+1'] ? (bandas['MD+1'][m] || null) : null;
-            if (gp === 'C') return bandas['MD+1C'] ? (bandas['MD+1C'][m] || null) : null;
+            if (gp === 'R' || gp === 'C') return bandaPost(f, gp);
             return null;
         }
         if (lab === 'MD+1' || lab === 'MD+2') return null;
+        var ovD = D.bandasDia || {};
+        if (ovD[f] && ovD[f][m]) return ovD[f][m];     // objetivo propio de esta semana
+        if (!lab) return null;
         var b = bandas[lab];
         return b ? (b[m] || null) : null;
+    }
+    // Objetivo semanal = suma de las bandas de los dias con sesion (se adapta a semanas de 4, 5 o 6 entrenos)
+    function semanaBanda(jid) {
+        var lo = 0, hi = 0, n = 0;
+        D.dias.forEach(function(f) {
+            if (D.fechasPartido[f]) return;
+            var haySesion = !D.plan || !!D.plan[f] || D.jugadores.some(function(j) { var c = (D.datos[j.id] || {})[f]; return c && c[m] > 0; });
+            if (!haySesion) return;
+            var b = (f === diaPost && !jid) ? bandaPost(f, 'R') : bandaDe(f, jid);
+            if (!b) return;
+            lo += b[0]; hi += b[1]; n++;
+        });
+        return n ? [Math.round(lo), Math.round(hi)] : null;
     }
     // 'ok' | 'ambar' | 'rojo' | null
     function semaforo(pct, banda) {
@@ -556,6 +587,9 @@ function pdzCgRender() {
         var nGem = Object.keys(D.gemelos).length;
         html += '<button onclick="pdzCgAbrirGemelos()" style="margin-left:6px;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;border:1px solid #475569;background:#0f172a;color:#cbd5e1">👥 Gemelos' + (nGem ? ' (' + nGem + ')' : '') + '</button>';
     }
+    if (D.hayGps && D.bandas) {
+        html += '<button onclick="pdzCgAbrirObjetivos()" title="Objetivos de carga por dia: ajustalos para esta semana o cambia los valores del club" style="padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;border:1px solid ' + (D.bandasDia ? '#38bdf8' : '#475569') + ';background:#0f172a;color:' + (D.bandasDia ? '#38bdf8' : '#cbd5e1') + '">🎯 Objetivos' + (D.bandasDia ? ' (semana propia)' : '') + '</button>';
+    }
     html += '</div></div>';
 
     if (!D.hayGps) {
@@ -566,7 +600,14 @@ function pdzCgRender() {
     var maxVal = 0;
     D.jugadores.forEach(function(j) { D.dias.forEach(function(f) { var r = valor(j.id, f); if (r.v > maxVal) maxVal = r.v; }); });
     if (maxVal === 0) maxVal = 1;
-    var conSemana = esExterna && bandas && bandas.SEMANA && refEquipo > 0;
+    if (esExterna && bandas) {
+        var semEquipoB = semanaBanda(null);
+        bandas = Object.assign({}, bandas);
+        bandas.SEMANA = {};
+        if (semEquipoB) bandas.SEMANA[m] = semEquipoB;
+    }
+    pdzCg._diaPost = diaPost;
+    var conSemana = esExterna && bandas && bandas.SEMANA && bandas.SEMANA[m] && refEquipo > 0;
 
     html += '<div style="overflow-x:auto;border:1px solid #1e3a5f;border-radius:8px"><table style="border-collapse:collapse;width:100%;min-width:' + (220 + D.dias.length * 62) + 'px;font-size:12px">';
     html += '<thead><tr style="background:#1e293b">';
@@ -590,8 +631,8 @@ function pdzCgRender() {
         D.dias.forEach(function(f) {
             var cel = '';
             if (f === diaPost) {
-                var oR = bandas['MD+1'] && bandas['MD+1'][m] ? objetivo(bandas['MD+1'][m], refEquipo) : null;
-                var oC = bandas['MD+1C'] && bandas['MD+1C'][m] ? objetivo(bandas['MD+1C'][m], refEquipo) : null;
+                var oR = objetivo(bandaPost(f, 'R'), refEquipo);
+                var oC = objetivo(bandaPost(f, 'C'), refEquipo);
                 if (oR) cel += '<span title="Recuperacion (jugaron >= ' + (D.minRec || 45) + ' min)">R ' + pdzCgFmt(oR[0], conf.dec) + '-' + pdzCgFmt(oR[1], conf.dec) + '</span><br>';
                 if (oC) cel += '<span style="color:#fbbf24" title="Compensatorio (jugaron < ' + (D.minRec || 45) + ' min)">C ' + pdzCgFmt(oC[0], conf.dec) + '-' + pdzCgFmt(oC[1], conf.dec) + '</span>';
             } else {
@@ -700,11 +741,12 @@ function pdzCgRender() {
         });
         var semanaHtml = '';
         if (conSemana && semanaDias > 0) {
-            var semSemana = semaforo(semanaPct, bandas.SEMANA[m]);
+            var sbJ = semanaBanda(j.id) || bandas.SEMANA[m];
+            var semSemana = semaforo(semanaPct, sbJ);
             if (refEs === 'propia') semanaEquipoPct.push(semanaPct);
-            var objS = objetivo(bandas.SEMANA[m], ref);
+            var objS = objetivo(sbJ, ref);
             var dS = delta(semanaVal, objS);
-            semanaHtml = '<div style="font-size:9px;color:' + (semSemana ? SEM_COLOR[semSemana] : '#94a3b8') + ';font-weight:' + (semSemana === 'rojo' ? '700' : '400') + '" title="Suma de los dias de entrenamiento antes del partido (' + semanaDias + '). Objetivo semanal: ' + pdzCgFmt(objS[0], conf.dec) + ' - ' + pdzCgFmt(objS[1], conf.dec) + ' (' + bandas.SEMANA[m][0] + '-' + bandas.SEMANA[m][1] + '%)">' + Math.round(semanaPct) + '%' + (semSemana ? ' ●' : '') + '</div>'
+            semanaHtml = '<div style="font-size:9px;color:' + (semSemana ? SEM_COLOR[semSemana] : '#94a3b8') + ';font-weight:' + (semSemana === 'rojo' ? '700' : '400') + '" title="Suma de los dias de entrenamiento antes del partido (' + semanaDias + '). Objetivo semanal: ' + pdzCgFmt(objS[0], conf.dec) + ' - ' + pdzCgFmt(objS[1], conf.dec) + ' (' + sbJ[0] + '-' + sbJ[1] + '%)">' + Math.round(semanaPct) + '%' + (semSemana ? ' ●' : '') + '</div>'
                 + '<div style="font-size:9px;color:' + (dS === 0 ? '#22c55e' : (dS < 0 ? '#f87171' : '#fbbf24')) + '">' + (dS === 0 ? 'ok' : fmtDelta(dS)) + '</div>';
         }
         html += '<td style="padding:5px 8px;text-align:center;color:#e2e8f0;font-weight:700;' + (algunEst ? 'font-style:italic;opacity:0.75' : '') + '">' + (total > 0 ? (algunEst ? '≈' : '') + pdzCgFmt(total, conf.dec) : '—') + (diasConDato > 0 ? '<div style="font-size:9px;color:#64748b;font-weight:400">' + diasConDato + ' d</div>' : '') + (nFatiga > 0 ? '<div style="font-size:9px;color:' + (nFatiga >= 2 ? '#f87171' : '#fbbf24') + ';font-weight:700" title="Dias del micro con coste percibido por encima de su media">⚠ ' + nFatiga + ' fatiga</div>' : '') + semanaHtml + '</td>';
@@ -751,7 +793,7 @@ function pdzCgRender() {
         }
         if (bandas) {
             var bl = [];
-            ['MD-4','MD-3','MD-2','MD-1','MD+1','MD+1C','SEMANA'].forEach(function(k) { if (bandas[k] && bandas[k][m]) bl.push('<span style="color:#38bdf8">' + (k === 'MD+1C' ? 'MD+1 comp.' : k) + '</span> ' + bandas[k][m][0] + '-' + bandas[k][m][1] + '%'); });
+            ['MD-6','MD-5','MD-4','MD-3','MD-2','MD-1','MD+1','MD+1C','SEMANA'].forEach(function(k) { if (bandas[k] && bandas[k][m]) bl.push('<span style="color:#38bdf8">' + (k === 'MD+1C' ? 'MD+1 comp.' : k) + '</span> ' + bandas[k][m][0] + '-' + bandas[k][m][1] + '%'); });
             leyenda += '<br>Semaforo: <span style="color:' + SEM_COLOR.ok + '">●</span> dentro de la banda del dia &middot; <span style="color:' + SEM_COLOR.ambar + '">●</span> hasta ' + tol + ' puntos fuera &middot; <span style="color:' + SEM_COLOR.rojo + '">●</span> mas alla. Bandas (' + conf.label + '): ' + bl.join(' &middot; ') + '. Primera sesion tras el partido (MD+1 o MD+2): RECUP. si jugo >= ' + (D.minRec || 45) + '\' (banda recuperacion), COMP. si jugo menos (banda compensatoria), sin semaforo si no hay minutos registrados; ese dia la media del equipo no lleva semaforo porque mezcla los dos grupos. Debajo del %: <span style="color:#f87171">−</span> lo que falta / <span style="color:#fbbf24">+</span> lo que sobra respecto al objetivo del dia (pasa el raton para ver el objetivo). SEMANA = suma de todos los dias de entrenamiento antes del partido.';
         }
     } else {
@@ -759,10 +801,150 @@ function pdzCgRender() {
             + (refEquipo > 0 ? ' Referencia del equipo en partido: <strong style="color:#cbd5e1">' + pdzCgFmt(refEquipo, conf.dec) + '</strong>.' : ' Sin partido completo en este periodo: no hay referencia para el %.');
     }
     if (hayIE) leyenda += '<br>Esquina de la celda (carga interna/externa): <span style="color:#f87171">⚠</span> posible fatiga &middot; <span style="color:#60a5fa">⚡</span> va sobrado &middot; <span style="color:#4ade80">✓</span> concuerdan &middot; <span style="color:#475569">·</span> sin linea base. Compara el UA/km (sRPE por km) del dia con la media del propio jugador en sus entrenos con GPS y RPE de los 28 dias previos (minimo 3). Pasa el raton por el icono para ver el calculo.';
+    if (esExterna && bandas) leyenda += '<br>El objetivo de la SEMANA es la suma de los objetivos de los dias con sesion.' + (D.bandasDia ? ' <span style="color:#38bdf8">Esta semana tiene objetivos propios</span> (boton Objetivos).' : ' Con el boton Objetivos puedes ajustarlos para esta semana.');
     if (esExterna && D.plan && m !== 'pl') leyenda += '<br><span style="color:#4ade80">Planificado</span>: suma de los ejercicios de la sesion de cada dia (ritmo GPS medido de cada ejercicio x sus minutos), media por jugador. <span style="color:#fbbf24">*</span> = hay ejercicios sin datos GPS que no cuentan (pasa el raton para ver cuantos). No incluye pausas ni desplazamientos entre tareas. Pulsa la celda de un dia para ver sus ejercicios y anadir otros del banco.';
     html += '<div style="font-size:10px;color:#64748b;margin-top:6px;line-height:1.5">' + leyenda + '</div>';
 
     cont.innerHTML = html;
+}
+
+// ---------- Objetivos por dia (editor) ----------
+// Filas: dias de entrenamiento del micro (el dia post-partido lleva dos: recuperacion y compensatorio).
+// "Guardar para esta semana" -> training_periods.md_bands (por fecha). "Guardar como valores del club" -> cm_pf_gps_config.md_bands (por etiqueta MD).
+var PDZ_CG_OBJ_MET = [['td', 'Distancia'], ['hsr', 'HSR'], ['sprint', 'Sprint'], ['accdec', 'Acel+Desacel'], ['pl', 'Player Load']];
+
+function pdzCgObjFilas() {
+    var D = pdzCg.datos, filas = [];
+    var ov = D.bandasDia || {}, club = D.bandas || {};
+    var DS = ['DOM', 'LUN', 'MAR', 'MIE', 'JUE', 'VIE', 'SAB'];
+    D.dias.forEach(function(f) {
+        if (D.fechasPartido[f]) return;
+        var lab = D.mdLabel[f] || '';
+        if (lab === 'MD') return;
+        var d = new Date(f + 'T12:00:00');
+        var nombre = DS[d.getDay()] + ' ' + d.getDate() + '/' + (d.getMonth() + 1);
+        var haySesion = !!(D.plan && D.plan[f]);
+        var esPost = (lab === 'MD+1' || lab === 'MD+2');
+        if (esPost) {
+            filas.push({ key: f, nombre: nombre, lab: lab, tipo: 'Recuperacion', clubKey: 'MD+1', val: ov[f] || club['MD+1'] || {}, propio: !!ov[f], haySesion: haySesion });
+            filas.push({ key: f + '#C', nombre: nombre, lab: lab, tipo: 'Compensatorio', clubKey: 'MD+1C', val: ov[f + '#C'] || club['MD+1C'] || {}, propio: !!ov[f + '#C'], haySesion: haySesion });
+        } else {
+            filas.push({ key: f, nombre: nombre, lab: lab, tipo: '', clubKey: lab || null, val: ov[f] || (lab ? club[lab] : null) || {}, propio: !!ov[f], haySesion: haySesion });
+        }
+    });
+    return filas;
+}
+
+function pdzCgAbrirObjetivos() {
+    var D = pdzCg.datos;
+    if (!D) return;
+    var prev = document.getElementById('pdzob-overlay');
+    if (prev) prev.remove();
+    var filas = pdzCgObjFilas();
+    pdzCg._obFilas = filas;
+    var inp = 'width:42px;padding:3px 4px;background:#0f172a;border:1px solid #475569;color:#e2e8f0;border-radius:5px;font-size:11px;text-align:center';
+
+    var h = '<div style="background:#0f172a;border:1px solid #38bdf8;border-radius:14px;width:100%;max-width:940px;padding:20px;color:#e2e8f0">';
+    h += '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px"><div><div style="font-size:16px;font-weight:700">Objetivos de carga por dia</div>';
+    h += '<div style="font-size:11px;color:#94a3b8;margin-top:3px">En % del perfil de partido a 90 min (minimo - maximo). ' + (D.bandasDia ? '<span style="color:#38bdf8">Esta semana tiene objetivos propios.</span>' : 'Ahora se usan los valores generales del club.') + '</div></div>';
+    h += '<button onclick="document.getElementById(\'pdzob-overlay\').remove()" style="background:#334155;border:none;color:#94a3b8;width:30px;height:30px;border-radius:50%;cursor:pointer">x</button></div>';
+
+    h += '<div style="overflow-x:auto;margin-top:14px"><table style="border-collapse:collapse;width:100%;font-size:12px"><thead><tr>';
+    h += '<th style="text-align:left;padding:6px 8px;color:#94a3b8;font-size:10px;text-transform:uppercase;border-bottom:1px solid #334155">Dia</th>';
+    PDZ_CG_OBJ_MET.forEach(function(mm) {
+        var ref = D.perfilEquipo ? D.perfilEquipo[mm[0]] : 0;
+        h += '<th style="padding:6px 6px;color:#94a3b8;font-size:10px;text-transform:uppercase;border-bottom:1px solid #334155;text-align:center;white-space:nowrap">' + mm[1] + '<div style="font-weight:400;color:#64748b;text-transform:none">' + (ref > 0 ? '100% = ' + pdzCgFmt(ref, 0) : 'sin perfil') + '</div></th>';
+    });
+    h += '</tr></thead><tbody>';
+    filas.forEach(function(fl, i) {
+        h += '<tr style="border-bottom:1px solid #1e293b"><td style="padding:6px 8px;white-space:nowrap"><b>' + fl.nombre + '</b> <span style="color:#38bdf8;font-size:10px;font-weight:700">' + fl.lab + '</span>' +
+            (fl.tipo ? '<div style="font-size:10px;color:' + (fl.tipo === 'Compensatorio' ? '#fbbf24' : '#94a3b8') + '">' + fl.tipo + '</div>' : '') +
+            (fl.haySesion ? '' : '<div style="font-size:9px;color:#64748b">sin sesion</div>') + '</td>';
+        PDZ_CG_OBJ_MET.forEach(function(mm) {
+            var b = fl.val[mm[0]] || ['', ''];
+            h += '<td style="padding:5px 6px;text-align:center;white-space:nowrap"><input type="number" min="0" max="300" id="pdzob-' + i + '-' + mm[0] + '-0" value="' + b[0] + '" style="' + inp + '"> - <input type="number" min="0" max="300" id="pdzob-' + i + '-' + mm[0] + '-1" value="' + b[1] + '" style="' + inp + '"></td>';
+        });
+        h += '</tr>';
+    });
+    if (!filas.length) h += '<tr><td colspan="6" style="padding:14px;color:#64748b;text-align:center">Este periodo no tiene dias de entrenamiento.</td></tr>';
+    h += '</tbody></table></div>';
+
+    h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;align-items:center">';
+    h += '<button onclick="pdzCgGuardarObjetivos(\'semana\')" style="padding:8px 14px;border-radius:8px;border:none;background:#0ea5e9;color:#fff;font-weight:700;font-size:12px;cursor:pointer">Guardar para esta semana</button>';
+    if (D.bandasDia) h += '<button onclick="pdzCgGuardarObjetivos(\'reset\')" style="padding:8px 14px;border-radius:8px;border:1px solid #475569;background:transparent;color:#cbd5e1;font-size:12px;cursor:pointer">Volver a los valores del club</button>';
+    h += '<button onclick="pdzCgGuardarObjetivos(\'club\')" style="padding:8px 14px;border-radius:8px;border:1px solid #475569;background:transparent;color:#cbd5e1;font-size:12px;cursor:pointer;margin-left:auto">Guardar como valores del club</button>';
+    h += '</div>';
+    h += '<div style="font-size:10px;color:#64748b;margin-top:10px;line-height:1.5">"Para esta semana" solo cambia este microciclo. "Como valores del club" cambia el objetivo general de cada tipo de dia (MD-5, MD-4...) para todas las semanas que no tengan objetivos propios. Deja vacio un parametro para no fijarle objetivo ese dia.</div>';
+    h += '</div>';
+
+    var ov = document.createElement('div');
+    ov.id = 'pdzob-overlay';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:10040;display:flex;justify-content:center;align-items:flex-start;padding:22px;overflow-y:auto';
+    ov.onclick = function(e) { if (e.target === ov) ov.remove(); };
+    ov.innerHTML = h;
+    document.body.appendChild(ov);
+}
+
+// Lee la tabla del editor: { key: { td:[min,max], ... } }. Devuelve null si hay un minimo mayor que su maximo.
+function pdzCgLeerObjetivos() {
+    var filas = pdzCg._obFilas || [], out = {}, error = null;
+    filas.forEach(function(fl, i) {
+        var o = {};
+        PDZ_CG_OBJ_MET.forEach(function(mm) {
+            var a = document.getElementById('pdzob-' + i + '-' + mm[0] + '-0'), b = document.getElementById('pdzob-' + i + '-' + mm[0] + '-1');
+            var va = a ? parseFloat(a.value) : NaN, vb = b ? parseFloat(b.value) : NaN;
+            if (isNaN(va) || isNaN(vb)) return;
+            if (va > vb) { error = fl.nombre + ' (' + mm[1] + '): el minimo es mayor que el maximo'; return; }
+            o[mm[0]] = [va, vb];
+        });
+        if (Object.keys(o).length) out[fl.key] = o;
+    });
+    if (error) { if (typeof showToast === 'function') showToast(error, 'error'); else alert(error); return null; }
+    return out;
+}
+
+async function pdzCgGuardarObjetivos(modo) {
+    var D = pdzCg.datos;
+    if (!D) return;
+    var aviso = function(t, tipo) { if (typeof showToast === 'function') showToast(t, tipo || 'success'); };
+    try {
+        if (modo === 'reset') {
+            var r0 = await supabaseClient.from('training_periods').update({ md_bands: null }).eq('id', pdzCg.periodo.id);
+            if (r0.error) throw r0.error;
+            D.bandasDia = null;
+            aviso('Esta semana vuelve a usar los valores del club');
+        } else {
+            var leido = pdzCgLeerObjetivos();
+            if (!leido) return;
+            if (modo === 'semana') {
+                var r1 = await supabaseClient.from('training_periods').update({ md_bands: leido }).eq('id', pdzCg.periodo.id);
+                if (r1.error) throw r1.error;
+                D.bandasDia = leido;
+                aviso('Objetivos guardados para esta semana');
+            } else if (modo === 'club') {
+                var nuevo = Object.assign({}, D.bandas || {});
+                var cambiados = [];
+                (pdzCg._obFilas || []).forEach(function(fl) {
+                    if (!fl.clubKey || !leido[fl.key]) return;
+                    nuevo[fl.clubKey] = Object.assign({}, nuevo[fl.clubKey] || {}, leido[fl.key]);
+                    if (cambiados.indexOf(fl.clubKey) === -1) cambiados.push(fl.clubKey);
+                });
+                if (!cambiados.length) { aviso('No hay dias con etiqueta MD para guardar', 'error'); return; }
+                if (!confirm('Vas a cambiar los valores generales del club para: ' + cambiados.join(', ') + '. Afecta a todas las semanas sin objetivos propios. Continuar?')) return;
+                var r2 = await supabaseClient.from('cm_pf_gps_config').update({ md_bands: nuevo }).eq('club_id', clubId);
+                if (r2.error) throw r2.error;
+                D.bandas = nuevo;
+                aviso('Valores del club actualizados');
+            }
+        }
+        var ovEl = document.getElementById('pdzob-overlay');
+        if (ovEl) ovEl.remove();
+        pdzCgRender();
+    } catch (e) {
+        console.error('Guardar objetivos:', e);
+        var msg = 'No se pudo guardar: ' + (e.message || e);
+        if (typeof showToast === 'function') showToast(msg, 'error'); else alert(msg);
+    }
 }
 
 // ---------- Gemelos ----------

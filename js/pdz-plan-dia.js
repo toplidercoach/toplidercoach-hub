@@ -1,4 +1,4 @@
-// ========== PDZ-PLAN-DIA.JS (v1) - Planificar la carga de un dia desde Periodizacion ==========
+// ========== PDZ-PLAN-DIA.JS (v2) - Planificar la carga de un dia desde Periodizacion ==========
 // Se abre al pulsar una celda de la fila "Planificado" del panel de carga del microciclo
 // (pdz-carga.js). Muestra la sesion de ese dia con lo que aporta cada ejercicio (ritmo GPS
 // medido x minutos), el objetivo del dia por parametro (bandas MD x perfil de partido) y
@@ -43,12 +43,19 @@ function pdzPDAviso(msg, tipo) { if (typeof showToast === 'function') showToast(
 function pdzPDObjetivo(fecha, k) {
     var D = (typeof pdzCg !== 'undefined') ? pdzCg.datos : null;
     if (!D || !D.bandas || !D.perfilEquipo || !D.mdLabel) return null;
-    var lab = D.mdLabel[fecha] || '';
-    if (!lab || lab === 'MD' || lab.indexOf('MD+') === 0) return null;
-    var b = D.bandas[lab];
     var ref = pdzPDNum(D.perfilEquipo[k]);
-    if (!b || !b[k] || !(ref > 0)) return null;
-    return [b[k][0] / 100 * ref, b[k][1] / 100 * ref];
+    if (!(ref > 0)) return null;
+    var banda = null;
+    var ov = D.bandasDia || {};
+    if (ov[fecha] && ov[fecha][k]) banda = ov[fecha][k];          // objetivo propio de esta semana
+    else {
+        var lab = D.mdLabel[fecha] || '';
+        if (!lab || lab === 'MD' || lab.indexOf('MD+') === 0) return null;
+        var b = D.bandas[lab];
+        banda = (b && b[k]) ? b[k] : null;
+    }
+    if (!banda) return null;
+    return [banda[0] / 100 * ref, banda[1] / 100 * ref];
 }
 
 // ---------- Abrir / cerrar ----------
