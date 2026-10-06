@@ -607,14 +607,18 @@ function pdzCgRender() {
 
     // Fila de carga planificada (ejercicios de la sesion x ritmo GPS medido de cada ejercicio)
     if (esExterna && D.plan && m !== 'pl') {
-        var hayPlan = D.dias.some(function(f) { return D.plan[f] && (D.plan[f].nCon + D.plan[f].nSin) > 0; });
+        var hayPlan = D.dias.some(function(f) { return !!D.plan[f]; });
+        var puedePlanificar = typeof pdzPlanDiaAbrir === 'function';
         if (hayPlan) {
             var planSemana = 0, planSemanaSin = 0;
             html += '<tr style="background:#0f2a1f;border-top:1px solid #1e3a5f">';
             html += '<td style="padding:5px 10px;color:#4ade80;font-size:10px;font-weight:600;position:sticky;left:0;background:#0f2a1f" title="Suma de los ejercicios planificados en la sesion de cada dia: ritmo GPS medido del ejercicio x sus minutos. Media por jugador. No incluye pausas ni ejercicios sin datos GPS.">Planificado</td>';
             D.dias.forEach(function(f) {
                 var p = D.plan[f], cel = '';
-                if (p && (p.nCon + p.nSin) > 0 && !D.fechasPartido[f]) {
+                var clicable = p && !D.fechasPartido[f] && puedePlanificar;
+                if (p && (p.nCon + p.nSin) === 0 && !D.fechasPartido[f]) {
+                    cel = '<span style="color:#64748b">' + (puedePlanificar ? '+ planificar' : 'sesion vacia') + '</span>';
+                } else if (p && !D.fechasPartido[f]) {
                     var vP = p[m] || 0;
                     planSemana += vP; planSemanaSin += p.nSin;
                     var tip = p.nCon + ' ejercicio(s) con datos GPS (' + Math.round(p.minCon) + ' min)' + (p.nSin ? ' - ' + p.nSin + ' sin datos (' + Math.round(p.minSin) + ' min, no cuentan)' : '');
@@ -633,7 +637,7 @@ function pdzCgRender() {
                             + (notaP ? '<br><span style="color:' + colP + '">' + notaP + '</span>' : '');
                     }
                 }
-                html += '<td style="padding:4px 4px;text-align:center;font-size:9px;white-space:nowrap">' + cel + '</td>';
+                html += '<td' + (clicable ? ' onclick="pdzPlanDiaAbrir(\'' + f + '\')" title="Pulsa para planificar este dia"' : '') + ' style="padding:4px 4px;text-align:center;font-size:9px;white-space:nowrap' + (clicable ? ';cursor:pointer' : '') + '">' + cel + '</td>';
             });
             var objSemP = (bandas && bandas.SEMANA && bandas.SEMANA[m] && refEquipo > 0) ? objetivo(bandas.SEMANA[m], refEquipo) : null;
             var colS = '#e2e8f0', notaS = '';
@@ -755,7 +759,7 @@ function pdzCgRender() {
             + (refEquipo > 0 ? ' Referencia del equipo en partido: <strong style="color:#cbd5e1">' + pdzCgFmt(refEquipo, conf.dec) + '</strong>.' : ' Sin partido completo en este periodo: no hay referencia para el %.');
     }
     if (hayIE) leyenda += '<br>Esquina de la celda (carga interna/externa): <span style="color:#f87171">⚠</span> posible fatiga &middot; <span style="color:#60a5fa">⚡</span> va sobrado &middot; <span style="color:#4ade80">✓</span> concuerdan &middot; <span style="color:#475569">·</span> sin linea base. Compara el UA/km (sRPE por km) del dia con la media del propio jugador en sus entrenos con GPS y RPE de los 28 dias previos (minimo 3). Pasa el raton por el icono para ver el calculo.';
-    if (esExterna && D.plan && m !== 'pl') leyenda += '<br><span style="color:#4ade80">Planificado</span>: suma de los ejercicios de la sesion de cada dia (ritmo GPS medido de cada ejercicio x sus minutos), media por jugador. <span style="color:#fbbf24">*</span> = hay ejercicios sin datos GPS que no cuentan (pasa el raton para ver cuantos). No incluye pausas ni desplazamientos entre tareas.';
+    if (esExterna && D.plan && m !== 'pl') leyenda += '<br><span style="color:#4ade80">Planificado</span>: suma de los ejercicios de la sesion de cada dia (ritmo GPS medido de cada ejercicio x sus minutos), media por jugador. <span style="color:#fbbf24">*</span> = hay ejercicios sin datos GPS que no cuentan (pasa el raton para ver cuantos). No incluye pausas ni desplazamientos entre tareas. Pulsa la celda de un dia para ver sus ejercicios y anadir otros del banco.';
     html += '<div style="font-size:10px;color:#64748b;margin-top:6px;line-height:1.5">' + leyenda + '</div>';
 
     cont.innerHTML = html;
