@@ -170,8 +170,8 @@ function pdzPDRender() {
         var color = '#e2e8f0', nota = 'sin objetivo para este dia', pct = 0;
         if (obj) {
             pct = Math.min(100, v / obj[1] * 100);
-            if (v < obj[0]) { color = '#fbbf24'; nota = 'faltan ' + pdzPDFmt(obj[0] - v, m.dec) + (m.uni ? ' ' + m.uni : '') + ' para el minimo'; }
-            else if (v > obj[1]) { color = '#f87171'; nota = 'sobran ' + pdzPDFmt(v - obj[1], m.dec) + (m.uni ? ' ' + m.uni : ''); }
+            if (Math.round(v) < Math.round(obj[0])) { color = '#fbbf24'; nota = 'faltan ' + pdzPDFmt(obj[0] - v, m.dec) + (m.uni ? ' ' + m.uni : '') + ' para el minimo'; }
+            else if (Math.round(v) > Math.round(obj[1])) { color = '#f87171'; nota = 'sobran ' + pdzPDFmt(v - obj[1], m.dec) + (m.uni ? ' ' + m.uni : ''); }
             else { color = '#4ade80'; nota = 'dentro del objetivo'; }
         }
         kpis += '<div class="pdzpd-kpi"><div style="font-size:10px;color:#94a3b8;text-transform:uppercase">' + m.lbl + '</div>' +
