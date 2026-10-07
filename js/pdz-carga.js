@@ -587,6 +587,7 @@ function pdzCgRender() {
         var nGem = Object.keys(D.gemelos).length;
         html += '<button onclick="pdzCgAbrirGemelos()" style="margin-left:6px;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;border:1px solid #475569;background:#0f172a;color:#cbd5e1">👥 Gemelos' + (nGem ? ' (' + nGem + ')' : '') + '</button>';
     }
+    html += '<button onclick="ejUsosAbrir()" title="Ejercicios usados en las sesiones y en cuales" style="padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;border:1px solid #475569;background:#0f172a;color:#cbd5e1">📚 Historial</button>';
     if (D.hayGps && D.bandas) {
         html += '<button onclick="pdzCgAbrirObjetivos()" title="Objetivos de carga por dia: ajustalos para esta semana o cambia los valores del club" style="padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;border:1px solid ' + (D.bandasDia ? '#38bdf8' : '#475569') + ';background:#0f172a;color:' + (D.bandasDia ? '#38bdf8' : '#cbd5e1') + '">🎯 Objetivos' + (D.bandasDia ? ' (semana propia)' : '') + '</button>';
     }
