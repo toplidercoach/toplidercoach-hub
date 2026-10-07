@@ -1,4 +1,4 @@
-// ========== PDZ-PLAN-DIA.JS (v2) - Planificar la carga de un dia desde Periodizacion ==========
+// ========== PDZ-PLAN-DIA.JS (v3) - Planificar la carga de un dia desde Periodizacion ==========
 // Se abre al pulsar una celda de la fila "Planificado" del panel de carga del microciclo
 // (pdz-carga.js). Muestra la sesion de ese dia con lo que aporta cada ejercicio (ritmo GPS
 // medido x minutos), el objetivo del dia por parametro (bandas MD x perfil de partido) y
@@ -7,7 +7,7 @@
 // columna de la parte afectada), releyendo antes la sesion para no pisar cambios.
 // Cargar DESPUES de pdz-carga.js.
 
-var pdzPD = { fecha: null, sesiones: [], idx: 0, ritmo: {}, banco: [], filtro: '', sucio: false, ocupado: false };
+var pdzPD = { fecha: null, sesiones: [], idx: 0, ritmo: {}, banco: [], filtro: '', sucio: false, ocupado: false, quiero: null, evitar: null, verAltos: false };
 
 var PDZPD_SEC = [
     { col: 'pre_field_work',  lbl: 'Trabajo previo' },
@@ -60,7 +60,7 @@ function pdzPDObjetivo(fecha, k) {
 
 // ---------- Abrir / cerrar ----------
 async function pdzPlanDiaAbrir(fecha) {
-    pdzPD.fecha = fecha; pdzPD.idx = 0; pdzPD.filtro = ''; pdzPD.sucio = false; pdzPD.ocupado = false;
+    pdzPD.fecha = fecha; pdzPD.idx = 0; pdzPD.filtro = ''; pdzPD.quiero = null; pdzPD.evitar = null; pdzPD.verAltos = false; pdzPD.sucio = false; pdzPD.ocupado = false;
     pdzPDCerrar(true);
     var ov = document.createElement('div');
     ov.id = 'pdzpd-overlay';
@@ -211,37 +211,91 @@ function pdzPDRender() {
         PDZPD_MET.map(function (m) { return '<td style="font-weight:700;color:#4ade80;border-top:1px solid #334155">' + pdzPDFmt(c.tot[m.k], m.dec) + '</td>'; }).join('') + '<td style="border-top:1px solid #334155"></td></tr>';
     tabla += '</tbody></table>';
 
-    // Banco con datos GPS
+    // Banco con datos GPS: buscador por carga ("que aporte X sin aportar Y")
     var optsSec = PDZPD_SEC.map(function (s) { return '<option value="' + s.col + '"' + (s.col === 'main_part' ? ' selected' : '') + '>' + s.lbl + '</option>'; }).join('');
-    var norm = function (t) { return (t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); };
+    var norm = function (t) { return (t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); };
     var nf = norm(pdzPD.filtro);
-    var lista = pdzPD.banco.filter(function (e) { return !nf || norm(e.name).indexOf(nf) !== -1 || norm(e.category).indexOf(nf) !== -1; });
-    var banco = '<input type="text" class="pdzpd-inp" id="pdzpd-filtro" placeholder="Filtrar por nombre o categoria..." value="' + pdzPDEsc(pdzPD.filtro) + '" style="width:100%;max-width:300px;margin-bottom:8px" onchange="pdzPDFiltrar(this.value)">';
+    // Sugerencia: subir lo que mas lejos esta de su minimo y evitar lo que ya llega al maximo
+    var sugQ = null, sugE = null, peor = 1;
+    PDZPD_MET.forEach(function (m) {
+        var o = pdzPDObjetivo(f, m.k);
+        if (!o || !(o[0] > 0)) return;
+        var ratio = c.tot[m.k] / o[0];
+        if (ratio < peor) { peor = ratio; sugQ = m.k; }
+        if (!sugE && Math.round(c.tot[m.k]) >= Math.round(o[1] * 0.9)) sugE = m.k;
+    });
+    var quiero = pdzPD.quiero || sugQ || 'td';
+    var evitar = pdzPD.evitar === null ? (sugE && sugE !== quiero ? sugE : '') : pdzPD.evitar;
+    if (evitar === quiero) evitar = '';
+    var filasB = pdzPD.banco.map(function (e) {
+        var x = pdzPD.ritmo[e.id];
+        if (!x) return null;
+        var v = {};
+        PDZPD_MET.forEach(function (m) { v[m.k] = m.ritmo(x) * 10; });
+        return { e: e, x: x, v: v };
+    }).filter(function (r) { return r; });
+    // "Aporta demasiado" de lo que se quiere evitar: 10 min dan mas del 15% del maximo del dia (sin objetivo: 1,5 x la mediana)
+    var umbral = null;
+    if (evitar) {
+        var oEv = pdzPDObjetivo(f, evitar);
+        if (oEv && oEv[1] > 0) umbral = oEv[1] * 0.15;
+        else {
+            var vals = filasB.map(function (r) { return r.v[evitar]; }).sort(function (a, b) { return a - b; });
+            umbral = vals.length ? vals[Math.floor((vals.length - 1) / 2)] * 1.5 : 0;
+        }
+    }
+    filasB.forEach(function (r) { r.alto = !!(evitar && umbral !== null && r.v[evitar] > umbral); });
+    filasB.sort(function (a, b) { return b.v[quiero] - a.v[quiero]; });
+    var porNombre = filasB.filter(function (r) { return !nf || norm(r.e.name).indexOf(nf) !== -1 || norm(r.e.category).indexOf(nf) !== -1; });
+    var visibles = porNombre.filter(function (r) { return pdzPD.verAltos || !r.alto; });
+    var ocultos = porNombre.length - visibles.length;
+    var nomDe = function (k) { var m = PDZPD_MET.filter(function (z) { return z.k === k; })[0]; return m ? m.lbl : ''; };
+
+    var banco = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:12px;color:#cbd5e1;margin-bottom:8px">' +
+        '<span>Que aporte</span><select class="pdzpd-inp" onchange="pdzPDSetBusca(\'quiero\', this.value)">' +
+        PDZPD_MET.map(function (m) { return '<option value="' + m.k + '"' + (m.k === quiero ? ' selected' : '') + '>' + m.lbl + '</option>'; }).join('') + '</select>' +
+        '<span>sin aportar</span><select class="pdzpd-inp" onchange="pdzPDSetBusca(\'evitar\', this.value)"><option value="">(nada en concreto)</option>' +
+        PDZPD_MET.filter(function (m) { return m.k !== quiero; }).map(function (m) { return '<option value="' + m.k + '"' + (m.k === evitar ? ' selected' : '') + '>' + m.lbl + '</option>'; }).join('') + '</select>' +
+        '<input type="text" class="pdzpd-inp" id="pdzpd-filtro" placeholder="Filtrar por nombre..." value="' + pdzPDEsc(pdzPD.filtro) + '" style="width:190px;margin-left:auto" onchange="pdzPDFiltrar(this.value)"></div>';
     if (!pdzPD.banco.length) {
         banco += '<p style="color:#94a3b8;font-size:12px">Todavia no hay ejercicios del banco con datos GPS. Vincula actividades en las sesiones GPS de Preparacion Fisica para que aparezcan aqui.</p>';
     } else {
-        banco += '<table class="pdzpd-t"><thead><tr><th>Ejercicio con datos GPS</th><th>m/min</th><th>HSR/min</th><th>Ses.</th><th>Min</th><th>Parte</th><th></th></tr></thead><tbody>';
-        lista.forEach(function (e) {
-            var x = pdzPD.ritmo[e.id];
-            banco += '<tr><td><b>' + pdzPDEsc(e.name) + '</b>' + (e.category ? ' <span style="color:#64748b;font-size:10px">' + pdzPDEsc(e.category) + '</span>' : '') + '</td>' +
-                '<td>' + pdzPDFmt(pdzPDNum(x.td_min), 1) + '</td><td>' + pdzPDFmt(pdzPDNum(x.hsr19_min), 1) + '</td><td style="color:' + (x.n_sesiones >= 3 ? '#4ade80' : '#fbbf24') + '" title="Sesiones en las que se ha medido">' + x.n_sesiones + '</td>' +
+        banco += '<table class="pdzpd-t"><thead><tr><th>Ejercicio (aporte por cada 10 min)</th>' +
+            PDZPD_MET.map(function (m) { return '<th' + (m.k === quiero ? ' style="color:#4ade80"' : (m.k === evitar ? ' style="color:#fca5a5"' : '')) + '>' + (m.k === quiero ? '&#9650; ' : (m.k === evitar ? '&#10005; ' : '')) + m.lbl + '</th>'; }).join('') +
+            '<th>Ses.</th><th>Min</th><th>Parte</th><th></th></tr></thead><tbody>';
+        visibles.forEach(function (r) {
+            var e = r.e, x = r.x;
+            banco += '<tr><td><b>' + pdzPDEsc(e.name) + '</b>' + (e.category ? ' <span style="color:#64748b;font-size:10px">' + pdzPDEsc(e.category) + '</span>' : '') + '</td>';
+            PDZPD_MET.forEach(function (m) {
+                var st = '';
+                if (m.k === quiero) st = 'color:#4ade80;font-weight:700';
+                else if (m.k === evitar) st = 'font-weight:600;color:' + (r.alto ? '#f87171' : '#86efac');
+                banco += '<td style="' + st + '">' + pdzPDFmt(r.v[m.k], 0) + '</td>';
+            });
+            banco += '<td style="color:' + (x.n_sesiones >= 3 ? '#4ade80' : '#fbbf24') + '" title="Sesiones en las que se ha medido">' + x.n_sesiones + '</td>' +
                 '<td><input type="number" min="1" max="180" class="pdzpd-inp" style="width:58px;text-align:right" id="pdzpd-min-' + e.id + '" value="' + (Math.round(pdzPDNum(x.min_medios)) || e.duration_min || 10) + '"></td>' +
                 '<td><select class="pdzpd-inp" id="pdzpd-sec-' + e.id + '">' + optsSec + '</select></td>' +
                 '<td><button class="pdzpd-btn" onclick="pdzPDAnadir(\'' + e.id + '\')">+ Anadir</button></td></tr>';
         });
-        if (!lista.length) banco += '<tr><td colspan="7" style="color:#64748b;text-align:center;padding:12px">Ningun ejercicio coincide con el filtro.</td></tr>';
+        if (!visibles.length) banco += '<tr><td colspan="9" style="color:#64748b;text-align:center;padding:12px">Ningun ejercicio medido cumple esa combinacion.</td></tr>';
         banco += '</tbody></table>';
+        if (evitar && (ocultos > 0 || pdzPD.verAltos)) {
+            banco += '<div style="font-size:11px;color:#94a3b8;margin-top:6px">' + (pdzPD.verAltos ? 'Mostrando tambien los que aportan mucho ' + nomDe(evitar) + ' (en rojo). ' : ocultos + ' ocultos por aportar mucho ' + nomDe(evitar) + '. ') +
+                '<a href="#" onclick="pdzPDToggleAltos();return false" style="color:#38bdf8">' + (pdzPD.verAltos ? 'Ocultarlos' : 'Mostrarlos') + '</a></div>';
+        }
     }
 
     ov.innerHTML = css + '<div class="pdzpd-modal">' + cab + kpis + aviso +
         '<div class="pdzpd-h">Ejercicios de la sesion</div><div style="overflow-x:auto">' + tabla + '</div>' +
-        '<div class="pdzpd-h">Anadir del banco</div><div style="overflow-x:auto">' + banco + '</div>' +
+        '<div class="pdzpd-h">Buscar en el banco por carga</div><div style="overflow-x:auto">' + banco + '</div>' +
         '<div style="font-size:10px;color:#64748b;margin-top:12px;line-height:1.5">Media por jugador: ritmo GPS medido del ejercicio x minutos. Los cambios se guardan al momento en la sesion (la misma que ves en el Planificador). No tengas esa sesion abierta a la vez en el Planificador: si la guardas alli despues, pisaria lo anadido aqui.</div>' +
     '</div>';
 }
 
 function pdzPDCambiarSesion(i) { pdzPD.idx = parseInt(i, 10) || 0; pdzPDRender(); }
 function pdzPDFiltrar(v) { pdzPD.filtro = v || ''; pdzPDRender(); }
+function pdzPDSetBusca(campo, valor) { pdzPD[campo] = valor; if (campo === 'quiero' && pdzPD.evitar === valor) pdzPD.evitar = ''; pdzPDRender(); }
+function pdzPDToggleAltos() { pdzPD.verAltos = !pdzPD.verAltos; pdzPDRender(); }
 
 // ---------- Escritura en la sesion ----------
 // Relee la columna de la sesion, aplica el cambio y guarda solo esa columna.
@@ -337,4 +391,4 @@ async function pdzPDQuitar(col, i) {
     });
 }
 
-console.log('[PlanDia] pdz-plan-dia.js v1 cargado');
+console.log('[PlanDia] pdz-plan-dia.js v3 cargado');
