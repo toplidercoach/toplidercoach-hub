@@ -1,14 +1,16 @@
-// ========== PLAN-GPS-OBJETIVO.JS (v2) - Carga estimada de la sesion con datos GPS ==========
+// ========== PLAN-GPS-OBJETIVO.JS (v3) - Carga estimada de la sesion con datos GPS ==========
 // En el editor de sesion (Planificador > Mi Sesion) pinta un panel con la carga fisica
 // estimada: ritmo GPS de cada ejercicio del banco (vista cm_pf_ej_gps_resumen) x minutos.
 // v2: el objetivo del dia se carga SOLO desde Periodizacion (bandas MD del club o los
 //     objetivos propios de la semana x perfil de partido del equipo), segun la fecha de la
 //     sesion. Se puede seguir poniendo un objetivo manual, que manda sobre el automatico.
+// v3: buscador de ejercicios por carga ("que aporte X sin aportar Y") con boton para anadirlos a la sesion.
 // Tambien anade una etiqueta con el ritmo GPS en las tarjetas de "Mis ejercicios".
 // No modifica planificador.js. Cargar DESPUES de planificador.js.
 
 var planGps = { mapa: null, mapaClub: null, cargando: false, ultimaCarga: 0, obj: {}, abierto: true, detalle: false,
-                auto: null, autoClave: null, autoCargando: null };
+                auto: null, autoClave: null, autoCargando: null,
+                buscaAbierto: false, quiero: null, evitar: null, verAltos: false, banco: null, bancoCargando: false };
 
 // kObj = clave del parametro en las bandas de Periodizacion (null = sin objetivo automatico)
 var PLANGPS_MET = [
@@ -46,7 +48,7 @@ async function planGpsCargarMapa(forzar) {
     planGps.cargando = true;
     try {
         var r = await supabaseClient.from('cm_pf_ej_gps_resumen')
-            .select('activity_ref, n_sesiones, td_min, hsr19_min, hsr24_min, sprints_min, acc30_min, dec30_min')
+            .select('activity_ref, n_sesiones, min_medios, td_min, hsr19_min, hsr24_min, sprints_min, acc30_min, dec30_min')
             .eq('club_id', clubId);
         if (!r.error) {
             var m = {};
@@ -279,8 +281,154 @@ function planGpsHtml(ses, mapa, obj, abierto, detalle, auto) {
         });
         cuerpo += '</tbody></table>';
     }
+    cuerpo += planGpsHtmlBuscador(c, mapa, obj, auto);
     cuerpo += '<div style="font-size:10px;color:#64748b;margin-top:8px;line-height:1.4">Media por jugador: ritmo GPS del ejercicio &times; minutos en esta sesi&oacute;n. No incluye porteros.</div>';
     return cab + cuerpo + '</div>';
+}
+
+// ---------- Buscador de ejercicios por carga ----------
+var PLANGPS_BUSCA = [
+    { k: 'td',     kObj: 'td',     lbl: 'Distancia',      corto: 'Dist.' },
+    { k: 'hsr19',  kObj: 'hsr',    lbl: 'HSR >19',        corto: 'HSR19' },
+    { k: 'hsr24',  kObj: 'sprint', lbl: 'Sprint >24',     corto: 'Spr24' },
+    { k: 'accdec', kObj: 'accdec', lbl: 'Acel + Desacel', corto: 'Acc+Dec' }
+];
+function planGpsRitmoDe(r, k) {
+    var m = PLANGPS_MET.filter(function (x) { return x.k === k; })[0];
+    var v = m ? m.ritmo(r) : NaN;
+    return isNaN(v) ? 0 : v;
+}
+// Rango objetivo efectivo [min, max] de un parametro (manual o de Periodizacion), o null
+function planGpsRangoDe(k, obj, auto) {
+    var manual = parseFloat(obj[k]);
+    if (!isNaN(manual) && manual > 0) return [manual * 0.9, manual * 1.1];
+    var def = PLANGPS_BUSCA.filter(function (x) { return x.k === k; })[0];
+    if (auto && auto.rangos && def && auto.rangos[def.kObj]) return auto.rangos[def.kObj];
+    return null;
+}
+// Sugerencia automatica: subir lo que mas lejos esta del minimo, evitar lo que ya llega al maximo
+function planGpsSugerencia(c, obj, auto) {
+    var quiero = null, peor = 1, evitar = null;
+    PLANGPS_BUSCA.forEach(function (b) {
+        var r = planGpsRangoDe(b.k, obj, auto);
+        if (!r || !(r[0] > 0)) return;
+        var ratio = c.tot[b.k] / r[0];
+        if (ratio < peor) { peor = ratio; quiero = b.k; }
+        if (!evitar && Math.round(c.tot[b.k]) >= Math.round(r[1] * 0.9)) evitar = b.k;
+    });
+    return { quiero: quiero || 'td', evitar: evitar };
+}
+async function planGpsCargarBanco() {
+    if (planGps.banco || planGps.bancoCargando || !planGps.mapa) return;
+    var ids = Object.keys(planGps.mapa).filter(function (id) { return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id); });
+    if (!ids.length) { planGps.banco = []; return; }
+    planGps.bancoCargando = true;
+    try {
+        var r = await supabaseClient.from('custom_exercises')
+            .select('id, name, category, tema, duration_min, players_count, field_width, field_length, materials, objectives, description')
+            .in('id', ids).order('name');
+        planGps.banco = r.error ? [] : (r.data || []);
+    } catch (e) { planGps.banco = []; }
+    planGps.bancoCargando = false;
+    planGpsRender();
+}
+function planGpsHtmlBuscador(c, mapa, obj, auto) {
+    var h = '<div style="margin-top:10px;border-top:1px dashed #99f6e4;padding-top:8px">' +
+        '<a href="#" onclick="planGpsToggleBusca();return false" style="font-size:12px;color:#0f766e;font-weight:600">' + (planGps.buscaAbierto ? '&#9660;' : '&#9654;') + ' Buscar ejercicios por carga</a>';
+    if (!planGps.buscaAbierto) return h + '</div>';
+    if (!planGps.banco) return h + '<div style="font-size:11px;color:#64748b;margin-top:6px">Cargando ejercicios con datos GPS...</div></div>';
+    if (!planGps.banco.length) return h + '<div style="font-size:11px;color:#64748b;margin-top:6px">Todavia no hay ejercicios del banco con datos GPS.</div></div>';
+
+    var sug = planGpsSugerencia(c, obj, auto);
+    var quiero = planGps.quiero || sug.quiero;
+    var evitar = planGps.evitar === null ? (sug.evitar && sug.evitar !== quiero ? sug.evitar : '') : planGps.evitar;
+    if (evitar === quiero) evitar = '';
+    var sel = 'padding:3px 5px;border:1px solid #99f6e4;border-radius:5px;font-size:11px;background:#fff;color:#134e4a';
+    h += '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:11px;color:#134e4a;margin-top:7px">' +
+        '<span>Que aporte</span><select style="' + sel + '" onchange="planGpsSetBusca(\'quiero\', this.value)">' +
+        PLANGPS_BUSCA.map(function (b) { return '<option value="' + b.k + '"' + (b.k === quiero ? ' selected' : '') + '>' + b.lbl + '</option>'; }).join('') + '</select>' +
+        '<span>sin aportar</span><select style="' + sel + '" onchange="planGpsSetBusca(\'evitar\', this.value)"><option value="">(nada en concreto)</option>' +
+        PLANGPS_BUSCA.filter(function (b) { return b.k !== quiero; }).map(function (b) { return '<option value="' + b.k + '"' + (b.k === evitar ? ' selected' : '') + '>' + b.lbl + '</option>'; }).join('') + '</select></div>';
+
+    // Filas: ritmo por 10 minutos. "Alto" en el parametro a evitar: con objetivo del dia, si 10 min aportan mas del 15% del
+    // maximo de ese dia; sin objetivo, si aporta bastante mas que la mediana de los ejercicios medidos.
+    var filas = planGps.banco.map(function (e) {
+        var r = mapa[e.id];
+        if (!r) return null;
+        var v = {};
+        PLANGPS_BUSCA.forEach(function (b) { v[b.k] = planGpsRitmoDe(r, b.k) * 10; });
+        return { e: e, r: r, v: v };
+    }).filter(function (x) { return x; });
+    var umbral = null;
+    if (evitar) {
+        var rEv = planGpsRangoDe(evitar, obj, auto);
+        if (rEv && rEv[1] > 0) umbral = rEv[1] * 0.15;
+        else {
+            var vals = filas.map(function (f) { return f.v[evitar]; }).sort(function (a, b) { return a - b; });
+            umbral = vals.length ? vals[Math.floor((vals.length - 1) / 2)] * 1.5 : 0;
+        }
+    }
+    filas.forEach(function (f) { f.alto = !!(evitar && umbral !== null && f.v[evitar] > umbral); });
+    filas.sort(function (a, b) { return b.v[quiero] - a.v[quiero]; });
+    var visibles = filas.filter(function (f) { return planGps.verAltos || !f.alto; });
+    var ocultos = filas.length - visibles.length;
+
+    var th = 'style="text-align:right;padding:3px 3px;border-bottom:1px solid #99f6e4;font-size:10px;white-space:nowrap"';
+    h += '<table style="width:100%;border-collapse:collapse;font-size:11px;margin-top:7px;color:#134e4a"><thead><tr><th style="text-align:left;padding:3px 3px;border-bottom:1px solid #99f6e4;font-size:10px">Por cada 10 min</th>' +
+        PLANGPS_BUSCA.map(function (b) { return '<th ' + th + '>' + (b.k === quiero ? '&#9650; ' : (b.k === evitar ? '&#10005; ' : '')) + b.corto + '</th>'; }).join('') + '<th ' + th + '></th></tr></thead><tbody>';
+    var optSec = '<option value="calentamiento">Calent.</option><option value="principal" selected>Principal</option><option value="enfriamiento">V. calma</option><option value="previo">Previo</option><option value="postcampo">Post</option>';
+    visibles.forEach(function (f) {
+        var minDef = Math.round(parseFloat(f.r.min_medios)) || f.e.duration_min || 10;
+        h += '<tr><td style="padding:4px 3px;border-bottom:1px solid #ccfbf1"><b>' + planGpsEsc(f.e.name) + '</b>' +
+            '<div style="margin-top:3px;display:flex;gap:4px;align-items:center"><input type="number" min="1" max="180" id="plangps-min-' + f.e.id + '" value="' + minDef + '" title="Minutos" style="width:44px;padding:2px 4px;border:1px solid #99f6e4;border-radius:4px;font-size:11px;text-align:right">' +
+            '<span style="color:#64748b">min</span><select id="plangps-sec-' + f.e.id + '" style="padding:2px 3px;border:1px solid #99f6e4;border-radius:4px;font-size:11px;background:#fff">' + optSec + '</select>' +
+            '<button onclick="planGpsAnadir(\'' + f.e.id + '\')" style="padding:2px 8px;border-radius:4px;border:none;background:#0f766e;color:#fff;font-size:11px;font-weight:600;cursor:pointer">+ A&ntilde;adir</button></div></td>';
+        PLANGPS_BUSCA.forEach(function (b) {
+            var st = 'text-align:right;padding:4px 3px;border-bottom:1px solid #ccfbf1;vertical-align:top;';
+            if (b.k === quiero) st += 'font-weight:700;color:#0f766e;';
+            else if (b.k === evitar) st += 'color:' + (f.alto ? '#dc2626' : '#16a34a') + ';font-weight:600;';
+            h += '<td style="' + st + '">' + planGpsFmt(f.v[b.k], 0) + '</td>';
+        });
+        h += '<td style="border-bottom:1px solid #ccfbf1"></td></tr>';
+    });
+    if (!visibles.length) h += '<tr><td colspan="6" style="padding:8px;color:#64748b;text-align:center">Ningun ejercicio medido cumple esa combinacion.</td></tr>';
+    h += '</tbody></table>';
+    if (evitar && (ocultos > 0 || planGps.verAltos)) {
+        var nomEv = PLANGPS_BUSCA.filter(function (b) { return b.k === evitar; })[0].lbl;
+        h += '<div style="font-size:10px;color:#64748b;margin-top:5px">' + (planGps.verAltos ? 'Mostrando tambien los que aportan mucho ' + nomEv + ' (en rojo). ' : ocultos + ' ocultos por aportar mucho ' + nomEv + '. ') +
+            '<a href="#" onclick="planGpsToggleAltos();return false" style="color:#0f766e">' + (planGps.verAltos ? 'Ocultarlos' : 'Mostrarlos') + '</a></div>';
+    }
+    return h + '</div>';
+}
+function planGpsToggleBusca() { planGps.buscaAbierto = !planGps.buscaAbierto; if (planGps.buscaAbierto) planGpsCargarBanco(); planGpsRender(); }
+function planGpsSetBusca(campo, valor) { planGps[campo] = valor; if (campo === 'quiero' && planGps.evitar === valor) planGps.evitar = ''; planGpsRender(); }
+function planGpsToggleAltos() { planGps.verAltos = !planGps.verAltos; planGpsRender(); }
+
+// Anade el ejercicio a la sesion abierta en el editor, con el mismo formato que usa el Planificador
+async function planGpsAnadir(id) {
+    var e = (planGps.banco || []).filter(function (x) { return x.id === id; })[0];
+    if (!e || typeof sesion === 'undefined' || !sesion) return;
+    var inpMin = document.getElementById('plangps-min-' + id), selSec = document.getElementById('plangps-sec-' + id);
+    var min = parseInt(inpMin ? inpMin.value : '', 10);
+    var sec = selSec ? selSec.value : 'principal';
+    if (!(min > 0)) { if (typeof showToast === 'function') showToast('Pon los minutos del ejercicio', 'error'); return; }
+    if (!Array.isArray(sesion[sec])) sesion[sec] = [];
+    var imagen = '';
+    try {
+        var rt = await supabaseClient.from('custom_exercises').select('thumbnail_svg').eq('id', id).single();
+        if (rt.data && rt.data.thumbnail_svg && typeof ejSvgToPng === 'function') imagen = await ejSvgToPng(rt.data.thumbnail_svg);
+    } catch (eImg) { console.warn('[PlanGps] imagen:', eImg); }
+    sesion[sec].push({
+        id: e.id, titulo: e.name, duracion: min, imagen: imagen || '',
+        objetivo: (e.objectives ? e.objectives + '\n\n' : '') + (e.description || ''),
+        entrenador: '', equipo: '',
+        jugadores: e.players_count || '',
+        espacio: (e.field_width && e.field_length) ? e.field_width + 'x' + e.field_length + ' m' : '',
+        tema: e.tema || e.category || '',
+        material: e.materials || ''
+    });
+    renderizarSesion();
+    if (typeof showToast === 'function') showToast('Ejercicio anadido. Recuerda guardar la sesion.', 'success');
 }
 
 // ---------- Pintar en el editor ----------
@@ -352,4 +500,4 @@ function planGpsMarcarBiblioteca() {
 }
 setInterval(planGpsMarcarBiblioteca, 1500);
 
-console.log('[PlanGps] plan-gps-objetivo.js v2 cargado');
+console.log('[PlanGps] plan-gps-objetivo.js v3 cargado');
