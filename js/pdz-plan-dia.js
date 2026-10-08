@@ -1,4 +1,4 @@
-// ========== PDZ-PLAN-DIA.JS (v3) - Planificar la carga de un dia desde Periodizacion ==========
+// ========== PDZ-PLAN-DIA.JS (v4) - Planificar la carga de un dia desde Periodizacion ==========
 // Se abre al pulsar una celda de la fila "Planificado" del panel de carga del microciclo
 // (pdz-carga.js). Muestra la sesion de ese dia con lo que aporta cada ejercicio (ritmo GPS
 // medido x minutos), el objetivo del dia por parametro (bandas MD x perfil de partido) y
@@ -7,7 +7,7 @@
 // columna de la parte afectada), releyendo antes la sesion para no pisar cambios.
 // Cargar DESPUES de pdz-carga.js.
 
-var pdzPD = { fecha: null, sesiones: [], idx: 0, ritmo: {}, banco: [], filtro: '', sucio: false, ocupado: false, quiero: null, evitar: null, verAltos: false };
+var pdzPD = { fecha: null, sesiones: [], idx: 0, ritmo: {}, banco: [], filtro: '', sucio: false, ocupado: false, quiero: null, evitar: null, verAltos: false, sesFiltro: '', sesGps: [] };
 
 var PDZPD_SEC = [
     { col: 'pre_field_work',  lbl: 'Trabajo previo' },
@@ -60,7 +60,7 @@ function pdzPDObjetivo(fecha, k) {
 
 // ---------- Abrir / cerrar ----------
 async function pdzPlanDiaAbrir(fecha) {
-    pdzPD.fecha = fecha; pdzPD.idx = 0; pdzPD.filtro = ''; pdzPD.quiero = null; pdzPD.evitar = null; pdzPD.verAltos = false; pdzPD.sucio = false; pdzPD.ocupado = false;
+    pdzPD.fecha = fecha; pdzPD.idx = 0; pdzPD.filtro = ''; pdzPD.quiero = null; pdzPD.evitar = null; pdzPD.verAltos = false; pdzPD.sesFiltro = ''; pdzPD.sucio = false; pdzPD.ocupado = false;
     pdzPDCerrar(true);
     var ov = document.createElement('div');
     ov.id = 'pdzpd-overlay';
@@ -107,6 +107,40 @@ async function pdzPDCargar() {
             .in('id', ids).order('name');
         if (!rb.error) pdzPD.banco = rb.data || [];
     }
+
+    // Sesiones GPS con ejercicios medidos (para el filtro "Sesion" del buscador)
+    pdzPD.sesGps = [];
+    try {
+        var det = [], desde = 0, PAG = 1000;
+        while (true) {
+            var rd = await supabaseClient.from('cm_pf_ej_gps_detalle')
+                .select('activity_ref, session_id, session_date, minutos, td_m, hsr19_m, hsr24_m, acc30, dec30')
+                .eq('club_id', clubId).order('session_date', { ascending: false }).order('session_id').order('activity_ref').order('player_id')
+                .range(desde, desde + PAG - 1);
+            if (rd.error) throw rd.error;
+            det = det.concat(rd.data || []);
+            if (!rd.data || rd.data.length < PAG) break;
+            desde += PAG;
+        }
+        var porSes = {}, fechas = [];
+        det.forEach(function (d) {
+            var min = pdzPDNum(d.minutos);
+            if (!(min > 0)) return;
+            var sg = porSes[d.session_id];
+            if (!sg) { sg = porSes[d.session_id] = { id: String(d.session_id), fecha: d.session_date, nombres: [], ej: {} }; if (fechas.indexOf(d.session_date) === -1) fechas.push(d.session_date); }
+            var a = sg.ej[d.activity_ref];
+            if (!a) a = sg.ej[d.activity_ref] = { n: 0, min: 0, td: 0, hsr: 0, sprint: 0, accdec: 0 };
+            a.n++; a.min += min;
+            a.td += pdzPDNum(d.td_m); a.hsr += pdzPDNum(d.hsr19_m); a.sprint += pdzPDNum(d.hsr24_m); a.accdec += pdzPDNum(d.acc30) + pdzPDNum(d.dec30);
+        });
+        var nomFecha = {};
+        if (fechas.length) {
+            var rn = await supabaseClient.from('training_sessions').select('name, session_date').eq('club_id', clubId).in('session_date', fechas);
+            (rn.data || []).forEach(function (t) { if (!nomFecha[t.session_date]) nomFecha[t.session_date] = []; if (t.name) nomFecha[t.session_date].push(t.name); });
+        }
+        pdzPD.sesGps = Object.keys(porSes).map(function (k) { var sg = porSes[k]; sg.nombres = nomFecha[sg.fecha] || []; return sg; })
+            .sort(function (a, b) { return a.fecha < b.fecha ? 1 : (a.fecha > b.fecha ? -1 : 0); });
+    } catch (eDet) { console.warn('[PlanDia] sesiones GPS:', eDet); }
 }
 
 // ---------- Calculo de la sesion activa ----------
@@ -224,15 +258,25 @@ function pdzPDRender() {
         if (ratio < peor) { peor = ratio; sugQ = m.k; }
         if (!sugE && Math.round(c.tot[m.k]) >= Math.round(o[1] * 0.9)) sugE = m.k;
     });
-    var quiero = pdzPD.quiero || sugQ || 'td';
+    var quiero = pdzPD.quiero === null ? (sugQ || 'td') : pdzPD.quiero;   // '' = nada en concreto
     var evitar = pdzPD.evitar === null ? (sugE && sugE !== quiero ? sugE : '') : pdzPD.evitar;
     if (evitar === quiero) evitar = '';
+    // Filtro por sesion: solo los ejercicios medidos ese dia, con los datos de ESA sesion
+    var sesSel = null;
+    pdzPD.sesGps.forEach(function (sg) { if (sg.id === pdzPD.sesFiltro) sesSel = sg; });
     var filasB = pdzPD.banco.map(function (e) {
         var x = pdzPD.ritmo[e.id];
         if (!x) return null;
-        var v = {};
-        PDZPD_MET.forEach(function (m) { v[m.k] = m.ritmo(x) * 10; });
-        return { e: e, x: x, v: v };
+        var v = {}, minDef = null;
+        if (sesSel) {
+            var a = sesSel.ej[e.id];
+            if (!a || !(a.min > 0)) return null;
+            PDZPD_MET.forEach(function (m) { v[m.k] = a[m.k] / a.min * 10; });
+            minDef = Math.round(a.min / a.n);
+        } else {
+            PDZPD_MET.forEach(function (m) { v[m.k] = m.ritmo(x) * 10; });
+        }
+        return { e: e, x: x, v: v, minDef: minDef };
     }).filter(function (r) { return r; });
     // "Aporta demasiado" de lo que se quiere evitar: 10 min dan mas del 15% del maximo del dia (sin objetivo: 1,5 x la mediana)
     var umbral = null;
@@ -245,18 +289,26 @@ function pdzPDRender() {
         }
     }
     filasB.forEach(function (r) { r.alto = !!(evitar && umbral !== null && r.v[evitar] > umbral); });
-    filasB.sort(function (a, b) { return b.v[quiero] - a.v[quiero]; });
+    if (quiero) filasB.sort(function (a, b) { return b.v[quiero] - a.v[quiero]; });
+    else filasB.sort(function (a, b) { return norm(a.e.name).localeCompare(norm(b.e.name), 'es'); });
     var porNombre = filasB.filter(function (r) { return !nf || norm(r.e.name).indexOf(nf) !== -1 || norm(r.e.category).indexOf(nf) !== -1; });
     var visibles = porNombre.filter(function (r) { return pdzPD.verAltos || !r.alto; });
     var ocultos = porNombre.length - visibles.length;
     var nomDe = function (k) { var m = PDZPD_MET.filter(function (z) { return z.k === k; })[0]; return m ? m.lbl : ''; };
 
     var banco = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:12px;color:#cbd5e1;margin-bottom:8px">' +
-        '<span>Que aporte</span><select class="pdzpd-inp" onchange="pdzPDSetBusca(\'quiero\', this.value)">' +
+        '<span>Que aporte</span><select class="pdzpd-inp" onchange="pdzPDSetBusca(\'quiero\', this.value)"><option value=""' + (quiero ? '' : ' selected') + '>(nada en concreto)</option>' +
         PDZPD_MET.map(function (m) { return '<option value="' + m.k + '"' + (m.k === quiero ? ' selected' : '') + '>' + m.lbl + '</option>'; }).join('') + '</select>' +
         '<span>sin aportar</span><select class="pdzpd-inp" onchange="pdzPDSetBusca(\'evitar\', this.value)"><option value="">(nada en concreto)</option>' +
         PDZPD_MET.filter(function (m) { return m.k !== quiero; }).map(function (m) { return '<option value="' + m.k + '"' + (m.k === evitar ? ' selected' : '') + '>' + m.lbl + '</option>'; }).join('') + '</select>' +
-        '<input type="text" class="pdzpd-inp" id="pdzpd-filtro" placeholder="Filtrar por nombre..." value="' + pdzPDEsc(pdzPD.filtro) + '" style="width:190px;margin-left:auto" onchange="pdzPDFiltrar(this.value)"></div>';
+        '<input type="text" class="pdzpd-inp" id="pdzpd-filtro" placeholder="Filtrar por nombre..." value="' + pdzPDEsc(pdzPD.filtro) + '" style="width:170px;margin-left:auto" onchange="pdzPDFiltrar(this.value)">' +
+        '<select class="pdzpd-inp" style="max-width:230px" title="Ver solo los ejercicios medidos en una sesion, con los datos de esa sesion" onchange="pdzPDSetBusca(\'sesFiltro\', this.value)"><option value="">Sesion: todas</option>' +
+        pdzPD.sesGps.map(function (sg) {
+            var d = new Date(sg.fecha + 'T12:00:00');
+            var lab = ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2) + '/' + d.getFullYear() + (sg.nombres.length ? ' - ' + sg.nombres.join(' / ') : '');
+            return '<option value="' + pdzPDEsc(sg.id) + '"' + (sesSel && sesSel.id === sg.id ? ' selected' : '') + '>' + pdzPDEsc(lab) + '</option>';
+        }).join('') + '</select></div>';
+    if (sesSel) banco += '<div style="font-size:11px;color:#38bdf8;margin-bottom:6px">Ejercicios medidos en esa sesion, con lo que dieron ESE dia (media por jugador). Para ver la media de todas las veces, elige "Sesion: todas".</div>';
     if (!pdzPD.banco.length) {
         banco += '<p style="color:#94a3b8;font-size:12px">Todavia no hay ejercicios del banco con datos GPS. Vincula actividades en las sesiones GPS de Preparacion Fisica para que aparezcan aqui.</p>';
     } else {
@@ -273,11 +325,11 @@ function pdzPDRender() {
                 banco += '<td style="' + st + '">' + pdzPDFmt(r.v[m.k], 0) + '</td>';
             });
             banco += '<td style="color:' + (x.n_sesiones >= 3 ? '#4ade80' : '#fbbf24') + '" title="Sesiones en las que se ha medido">' + x.n_sesiones + '</td>' +
-                '<td><input type="number" min="1" max="180" class="pdzpd-inp" style="width:58px;text-align:right" id="pdzpd-min-' + e.id + '" value="' + (Math.round(pdzPDNum(x.min_medios)) || e.duration_min || 10) + '"></td>' +
+                '<td><input type="number" min="1" max="180" class="pdzpd-inp" style="width:58px;text-align:right" id="pdzpd-min-' + e.id + '" value="' + (r.minDef || Math.round(pdzPDNum(x.min_medios)) || e.duration_min || 10) + '"></td>' +
                 '<td><select class="pdzpd-inp" id="pdzpd-sec-' + e.id + '">' + optsSec + '</select></td>' +
                 '<td><button class="pdzpd-btn" onclick="pdzPDAnadir(\'' + e.id + '\')">+ Anadir</button></td></tr>';
         });
-        if (!visibles.length) banco += '<tr><td colspan="9" style="color:#64748b;text-align:center;padding:12px">Ningun ejercicio medido cumple esa combinacion.</td></tr>';
+        if (!visibles.length) banco += '<tr><td colspan="9" style="color:#64748b;text-align:center;padding:12px">Ningun ejercicio medido cumple esos filtros.</td></tr>';
         banco += '</tbody></table>';
         if (evitar && (ocultos > 0 || pdzPD.verAltos)) {
             banco += '<div style="font-size:11px;color:#94a3b8;margin-top:6px">' + (pdzPD.verAltos ? 'Mostrando tambien los que aportan mucho ' + nomDe(evitar) + ' (en rojo). ' : ocultos + ' ocultos por aportar mucho ' + nomDe(evitar) + '. ') +
@@ -391,4 +443,4 @@ async function pdzPDQuitar(col, i) {
     });
 }
 
-console.log('[PlanDia] pdz-plan-dia.js v3 cargado');
+console.log('[PlanDia] pdz-plan-dia.js v4 cargado');
