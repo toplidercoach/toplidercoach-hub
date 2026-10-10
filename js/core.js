@@ -110,6 +110,8 @@ async function login() {
 
         if (data.success) {
             usuario = data.user;
+            // Prueba gratuita de entrenador: fecha de fin que envia WordPress (o nada si es de pago)
+            if (data.prueba && usuario) { usuario.prueba = data.prueba; }
             token = data.token;
             window.cmAuthSource = 'wp';
             localStorage.setItem('hub_user', JSON.stringify(usuario));
