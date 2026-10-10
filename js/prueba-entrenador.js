@@ -38,7 +38,10 @@
     function cartel(hasta) {
         if (document.getElementById('pe-bar')) return;
         var app = document.getElementById('app-container'); if (!app) return;
-        var dias = Math.ceil((hasta - Date.now()) / 86400000);
+        // Dias de calendario que faltan hasta el ultimo dia (hoy = 0)
+        var h0 = new Date(hasta); h0.setHours(0, 0, 0, 0);
+        var n0 = new Date(); n0.setHours(0, 0, 0, 0);
+        var dias = Math.round((h0.getTime() - n0.getTime()) / 86400000);
         var fecha = new Date(hasta).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
         var st = document.createElement('style');
         st.textContent = '#pe-bar{position:sticky;top:0;z-index:940;display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:8px 16px;background:#78350f;color:#fff;font:500 14px/1.35 system-ui,-apple-system,"Segoe UI",sans-serif}'
@@ -46,8 +49,8 @@
             + '#pe-bar a{flex-shrink:0;font-weight:700;text-decoration:none;color:#1a1200;background:#f59e0b;border-radius:999px;padding:6px 16px}#pe-bar a:hover{background:#fbbf24}'
             + '@media (max-width:640px){#pe-bar{font-size:13px;padding:8px 12px;gap:8px}#pe-bar .sp{display:none}#pe-bar .nota{flex-basis:100%;order:3}}';
         document.head.appendChild(st);
-        var b = document.createElement('div'); b.id = 'pe-bar'; if (dias <= 2) b.className = 'urgente';
-        var t = document.createElement('b'); t.textContent = dias <= 1 ? 'Hoy es el último día de tu prueba gratuita' : 'Te quedan ' + dias + ' días de prueba gratuita';
+        var b = document.createElement('div'); b.id = 'pe-bar'; if (dias <= 1) b.className = 'urgente';
+        var t = document.createElement('b'); t.textContent = dias <= 0 ? 'Hoy es el último día de tu prueba gratuita' : (dias === 1 ? 'Te queda 1 día de prueba gratuita' : 'Te quedan ' + dias + ' días de prueba gratuita');
         var n = document.createElement('span'); n.className = 'nota'; n.textContent = 'Planificador completo hasta el ' + fecha + '. Lo que crees se conserva si te suscribes.';
         var sp = document.createElement('span'); sp.className = 'sp';
         var a = document.createElement('a'); a.href = ALTA; a.textContent = 'Suscribirme';
