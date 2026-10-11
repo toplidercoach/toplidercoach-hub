@@ -345,6 +345,11 @@ async function pdzCargaMicro(periodo) {
         Object.keys(histIE).forEach(function(jid) { histIE[jid].sort(function(a, b) { return a.fecha < b.fecha ? -1 : 1; }); });
 
         pdzCg.datos = { histIE: histIE, dias: dias, jugadores: jugadores, datos: datos, fechasPartido: fechasPartido, hayGps: gpsRows.length > 0, minPartido: minPartido, gemelos: gemelos, perfil: perfil, perfilEquipo: perfilEquipo, bandas: bandas, tolerancia: tolerancia, minRec: minRec, mdLabel: mdLabel, fechaPrevia: fechaPrevia };
+        // El club trabaja con GPS (tiene perfil de partido) aunque ESTA semana aun no tenga datos:
+        // asi se pueden ver objetivos y carga planificada de semanas futuras.
+        pdzCg.datos.gpsClub = pdzCg.datos.hayGps || !!(perfilEquipo && perfilEquipo.td > 0);
+        if (!pdzCg.datos.hayGps && pdzCg.datos.gpsClub && pdzCg.metrica === 'srpe') { pdzCg.metrica = 'td'; pdzCg._autoTd = true; }
+        else if (pdzCg.datos.hayGps && pdzCg._autoTd) { pdzCg.metrica = 'srpe'; pdzCg._autoTd = false; }
         // ---- Entrega 6: carga PLANIFICADA por dia (ejercicios de la sesion x ritmo GPS del banco) ----
         try {
             pdzCg.datos.plan = await pdzCgCalcularPlan(sesiones);
@@ -364,7 +369,7 @@ async function pdzCargaMicro(periodo) {
     }
 }
 
-function pdzCgCambiarMetrica(m) { pdzCg.metrica = m; pdzCgRender(); }
+function pdzCgCambiarMetrica(m) { pdzCg.metrica = m; pdzCg._autoTd = false; pdzCgRender(); }
 
 // ---------- Carga planificada ----------
 // Para cada dia suma, de los ejercicios de sus sesiones, ritmo GPS medio del ejercicio
@@ -416,7 +421,7 @@ function pdzCgRender() {
     var D = pdzCg.datos;
     if (!cont || !D) return;
 
-    if (!D.hayGps && PDZ_CG_METRICAS[pdzCg.metrica].tipo === 'externa') pdzCg.metrica = 'srpe';
+    if (!D.gpsClub && PDZ_CG_METRICAS[pdzCg.metrica].tipo === 'externa') pdzCg.metrica = 'srpe';
     var m = pdzCg.metrica;
     var conf = PDZ_CG_METRICAS[m];
     var esExterna = conf.tipo === 'externa';
@@ -579,7 +584,7 @@ function pdzCgRender() {
     html += '<div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center">';
     Object.keys(PDZ_CG_METRICAS).forEach(function(k) {
         var c = PDZ_CG_METRICAS[k];
-        if (c.tipo === 'externa' && !D.hayGps) return;
+        if (c.tipo === 'externa' && !D.gpsClub) return;
         var activo = (k === m);
         html += '<button onclick="pdzCgCambiarMetrica(\'' + k + '\')" style="padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;border:1px solid ' + (activo ? c.color : '#334155') + ';background:' + (activo ? c.color : '#1e293b') + ';color:' + (activo ? '#0f172a' : '#94a3b8') + ';font-weight:' + (activo ? '700' : '400') + '">' + c.label + '</button>';
     });
@@ -588,12 +593,14 @@ function pdzCgRender() {
         html += '<button onclick="pdzCgAbrirGemelos()" style="margin-left:6px;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;border:1px solid #475569;background:#0f172a;color:#cbd5e1">👥 Gemelos' + (nGem ? ' (' + nGem + ')' : '') + '</button>';
     }
     html += '<button onclick="ejUsosAbrir()" title="Ejercicios usados en las sesiones y en cuales" style="padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;border:1px solid #475569;background:#0f172a;color:#cbd5e1">📚 Historial</button>';
-    if (D.hayGps && D.bandas) {
+    if (D.gpsClub && D.bandas) {
         html += '<button onclick="pdzCgAbrirObjetivos()" title="Objetivos de carga por dia: ajustalos para esta semana o cambia los valores del club" style="padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;border:1px solid ' + (D.bandasDia ? '#38bdf8' : '#475569') + ';background:#0f172a;color:' + (D.bandasDia ? '#38bdf8' : '#cbd5e1') + '">🎯 Objetivos' + (D.bandasDia ? ' (semana propia)' : '') + '</button>';
     }
     html += '</div></div>';
 
-    if (!D.hayGps) {
+    if (!D.hayGps && D.gpsClub) {
+        html += '<div style="padding:8px 12px;background:#0f2a1f;border-radius:8px;margin-bottom:10px;font-size:11px;color:#a7f3d0;border-left:3px solid #22c55e">Esta semana todavia no tiene datos GPS: se muestran los <strong>objetivos</strong> de cada dia y la <strong>carga planificada</strong> de tus sesiones. Pulsa una celda de la fila <strong>Planificado</strong> para planificar ese dia.</div>';
+    } else if (!D.hayGps) {
         html += '<div style="padding:8px 12px;background:#1e293b;border-radius:8px;margin-bottom:10px;font-size:11px;color:#94a3b8;border-left:3px solid #475569">Sin datos GPS en este periodo: se muestra solo la carga interna (RPE x minutos). Los datos GPS se cargan en Preparacion Fisica.</div>';
     }
 
