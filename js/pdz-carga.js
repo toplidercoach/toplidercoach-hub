@@ -526,6 +526,14 @@ function pdzCgRender() {
         var hay = D.jugadores.some(function(j) { var c = (D.datos[j.id] || {})[f]; return c && c[m] > 0; });
         if (hay) diaPost = f;
     });
+    // Semana aun sin datos (futura): el dia post-partido es el primero con etiqueta MD+1/MD+2 que tenga sesion creada
+    if (!diaPost && D.plan) {
+        D.dias.forEach(function(f) {
+            if (diaPost || D.fechasPartido[f]) return;
+            var lab = D.mdLabel[f] || '';
+            if ((lab === 'MD+1' || lab === 'MD+2') && D.plan[f]) diaPost = f;
+        });
+    }
     function fechaPartidoPrevio(f) {
         var fp = D.fechaPrevia || null;
         D.dias.forEach(function(x) { if (D.fechasPartido[x] && x < f) fp = x; });
