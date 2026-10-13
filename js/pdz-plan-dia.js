@@ -7,7 +7,7 @@
 // columna de la parte afectada), releyendo antes la sesion para no pisar cambios.
 // Cargar DESPUES de pdz-carga.js.
 
-var pdzPD = { fecha: null, sesiones: [], idx: 0, ritmo: {}, banco: [], filtro: '', sucio: false, ocupado: false, quiero: null, evitar: null, verAltos: false, sesFiltro: '', sesGps: [] };
+var pdzPD = { fecha: null, sesiones: [], idx: 0, ritmo: {}, banco: [], filtro: '', sucio: false, ocupado: false, quiero: null, evitar: null, verAltos: false, sesFiltro: '', sesGps: [], orden: null };
 
 var PDZPD_SEC = [
     { col: 'pre_field_work',  lbl: 'Trabajo previo' },
@@ -60,7 +60,7 @@ function pdzPDObjetivo(fecha, k) {
 
 // ---------- Abrir / cerrar ----------
 async function pdzPlanDiaAbrir(fecha) {
-    pdzPD.fecha = fecha; pdzPD.idx = 0; pdzPD.filtro = ''; pdzPD.quiero = null; pdzPD.evitar = null; pdzPD.verAltos = false; pdzPD.sesFiltro = ''; pdzPD.sucio = false; pdzPD.ocupado = false;
+    pdzPD.fecha = fecha; pdzPD.idx = 0; pdzPD.filtro = ''; pdzPD.quiero = null; pdzPD.evitar = null; pdzPD.orden = null; pdzPD.verAltos = false; pdzPD.sesFiltro = ''; pdzPD.sucio = false; pdzPD.ocupado = false;
     pdzPDCerrar(true);
     var ov = document.createElement('div');
     ov.id = 'pdzpd-overlay';
@@ -289,8 +289,16 @@ function pdzPDRender() {
         }
     }
     filasB.forEach(function (r) { r.alto = !!(evitar && umbral !== null && r.v[evitar] > umbral); });
-    if (quiero) filasB.sort(function (a, b) { return b.v[quiero] - a.v[quiero]; });
-    else filasB.sort(function (a, b) { return norm(a.e.name).localeCompare(norm(b.e.name), 'es'); });
+    var porNom = function (a, b) { return norm(a.e.name).localeCompare(norm(b.e.name), 'es'); };
+    var ord = pdzPD.orden;   // orden elegido pulsando una cabecera: manda sobre el de "Que aporte"
+    if (ord) {
+        var sg = ord.dir === 'asc' ? 1 : -1;
+        if (ord.k === 'nombre') filasB.sort(function (a, b) { return sg * porNom(a, b); });
+        else if (ord.k === 'ses') filasB.sort(function (a, b) { return sg * (pdzPDNum(a.x.n_sesiones) - pdzPDNum(b.x.n_sesiones)) || porNom(a, b); });
+        else filasB.sort(function (a, b) { return sg * (a.v[ord.k] - b.v[ord.k]) || porNom(a, b); });
+    }
+    else if (quiero) filasB.sort(function (a, b) { return b.v[quiero] - a.v[quiero]; });
+    else filasB.sort(porNom);
     var porNombre = filasB.filter(function (r) { return !nf || norm(r.e.name).indexOf(nf) !== -1 || norm(r.e.category).indexOf(nf) !== -1; });
     var visibles = porNombre.filter(function (r) { return pdzPD.verAltos || !r.alto; });
     var ocultos = porNombre.length - visibles.length;
@@ -312,9 +320,14 @@ function pdzPDRender() {
     if (!pdzPD.banco.length) {
         banco += '<p style="color:#94a3b8;font-size:12px">Todavia no hay ejercicios del banco con datos GPS. Vincula actividades en las sesiones GPS de Preparacion Fisica para que aparezcan aqui.</p>';
     } else {
-        banco += '<table class="pdzpd-t"><thead><tr><th>Ejercicio (aporte por cada 10 min)</th>' +
-            PDZPD_MET.map(function (m) { return '<th' + (m.k === quiero ? ' style="color:#4ade80"' : (m.k === evitar ? ' style="color:#fca5a5"' : '')) + '>' + (m.k === quiero ? '&#9650; ' : (m.k === evitar ? '&#10005; ' : '')) + m.lbl + '</th>'; }).join('') +
-            '<th>Ses.</th><th>Min</th><th>Parte</th><th></th></tr></thead><tbody>';
+        // Cabeceras ordenables: una pulsacion ordena, otra invierte
+        var fl = function (k) { return (ord && ord.k === k) ? (ord.dir === 'asc' ? ' &#8593;' : ' &#8595;') : ''; };
+        var thO = function (k, txt, color, tit) {
+            return '<th onclick="pdzPDOrdenar(\'' + k + '\')" title="' + tit + '" style="cursor:pointer;user-select:none' + (color ? ';color:' + color : '') + (ord && ord.k === k ? ';text-decoration:underline' : '') + '">' + txt + fl(k) + '</th>';
+        };
+        banco += '<table class="pdzpd-t"><thead><tr>' + thO('nombre', 'Ejercicio (aporte por cada 10 min)', '', 'Ordenar por nombre') +
+            PDZPD_MET.map(function (m) { return thO(m.k, (m.k === quiero ? '&#9650; ' : (m.k === evitar ? '&#10005; ' : '')) + m.lbl, (m.k === quiero ? '#4ade80' : (m.k === evitar ? '#fca5a5' : '')), 'Ordenar de mayor a menor'); }).join('') +
+            thO('ses', 'Ses.', '', 'Ordenar por veces medido') + '<th>Min</th><th>Parte</th><th></th></tr></thead><tbody>';
         visibles.forEach(function (r) {
             var e = r.e, x = r.x;
             banco += '<tr><td><b>' + pdzPDEsc(e.name) + '</b>' + (e.category ? ' <span style="color:#64748b;font-size:10px">' + pdzPDEsc(e.category) + '</span>' : '') + '</td>';
@@ -346,7 +359,13 @@ function pdzPDRender() {
 
 function pdzPDCambiarSesion(i) { pdzPD.idx = parseInt(i, 10) || 0; pdzPDRender(); }
 function pdzPDFiltrar(v) { pdzPD.filtro = v || ''; pdzPDRender(); }
-function pdzPDSetBusca(campo, valor) { pdzPD[campo] = valor; if (campo === 'quiero' && pdzPD.evitar === valor) pdzPD.evitar = ''; pdzPDRender(); }
+function pdzPDSetBusca(campo, valor) { pdzPD[campo] = valor; pdzPD.orden = null; if (campo === 'quiero' && pdzPD.evitar === valor) pdzPD.evitar = ''; pdzPDRender(); }
+// Ordenar el banco pulsando una cabecera. Nombre: A-Z y luego Z-A. Numeros: mayor a menor y luego menor a mayor.
+function pdzPDOrdenar(k) {
+    var o = pdzPD.orden, primera = (k === 'nombre') ? 'asc' : 'desc';
+    pdzPD.orden = (o && o.k === k) ? { k: k, dir: (o.dir === 'asc' ? 'desc' : 'asc') } : { k: k, dir: primera };
+    pdzPDRender();
+}
 function pdzPDToggleAltos() { pdzPD.verAltos = !pdzPD.verAltos; pdzPDRender(); }
 
 // ---------- Escritura en la sesion ----------
