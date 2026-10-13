@@ -105,7 +105,13 @@
         // Render inicial de ambas pestanas
         cmMRenderListado();
         cmMRenderRolesList();
+
+        // Pestana Equipos (cm-equipos.js). Si ese archivo no estuviera, se abre Miembros como siempre.
+        if (typeof window.cmEquiposInit === 'function') window.cmEquiposInit('cm-pane-equipos');
+        else window.cmMCambiarTab('miembros');
     };
+    // cm-equipos.js avisa aqui cuando cambia la lista de equipos (para el alta de miembros)
+    window.cmMRecargarEquipos = function () { try { return cmMCargarEquipos(); } catch (e) {} };
 
     // ============================================================
     // 2) HTML DE LA SECCION (estilos + pestanas + paneles + modales)
@@ -147,12 +153,16 @@
 
             <div class="cm-miembros-wrap">
                 <div class="cm-tabs-nav">
-                    <button class="cm-tab-btn active" id="cm-tabb-miembros" onclick="cmMCambiarTab('miembros')">Miembros</button>
+                    <button class="cm-tab-btn active" id="cm-tabb-equipos" onclick="cmMCambiarTab('equipos')">Equipos</button>
+                    <button class="cm-tab-btn" id="cm-tabb-miembros" onclick="cmMCambiarTab('miembros')">Miembros</button>
                     <button class="cm-tab-btn" id="cm-tabb-roles" onclick="cmMCambiarTab('roles')">Roles y permisos</button>
                 </div>
 
+                <!-- ============ PANEL 0: EQUIPOS (lo pinta cm-equipos.js) ============ -->
+                <div class="cm-pane active" id="cm-pane-equipos"></div>
+
                 <!-- ============ PANEL 1: MIEMBROS ============ -->
-                <div class="cm-pane active" id="cm-pane-miembros">
+                <div class="cm-pane" id="cm-pane-miembros">
                     <div class="cm-card">
                         <div class="cm-card-head">
                             <h3>Miembros del staff</h3>
@@ -311,6 +321,9 @@
     // 3) PESTANAS
     // ============================================================
     window.cmMCambiarTab = function(tab) {
+        var pEq = document.getElementById('cm-pane-equipos'), bEq = document.getElementById('cm-tabb-equipos');
+        if (pEq) pEq.classList.toggle('active', tab === 'equipos');
+        if (bEq) bEq.classList.toggle('active', tab === 'equipos');
         document.getElementById('cm-pane-miembros').classList.toggle('active', tab === 'miembros');
         document.getElementById('cm-pane-roles').classList.toggle('active', tab === 'roles');
         document.getElementById('cm-tabb-miembros').classList.toggle('active', tab === 'miembros');
