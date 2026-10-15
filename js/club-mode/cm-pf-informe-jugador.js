@@ -29,7 +29,8 @@
         { k: 'musc',   lbl: 'Daño muscular (10 = lesión)', col: '#e11d48', invertida: true }
     ];
     var ST = { ok: '#22c55e', ambar: '#f59e0b', rojo: '#ef4444', gris: '#64748b' };
-    var S = { j: null, cont: null, cargado: null, rango: 28, tipo: 'all', md: '', metrica: 'td', charts: [] };
+    var S = { j: null, cont: null, cargado: null, rango: 28, tipo: 'all', md: '', metrica: 'td', charts: [], cmp: { p2: '', p3: '', met: 'td', tipo: 'all', md: '', vista: 'sesion', rango: 56 } };
+    var CMPCOL = ['#3b82f6', '#e11d48', '#0d9488'];
 
     function num(v) { var n = parseFloat(v); return isNaN(n) ? 0 : n; }
     function esc(t) { return String(t === null || t === undefined ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
@@ -66,6 +67,7 @@
         + '.ij .sub{color:#94a3b8;font-size:12.5px;margin-top:4px}'
         + '.ij .sub b{color:#cbd5e1;font-weight:600}'
         + '.ij .flt{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-left:auto}'
+        + '.ij .cl{display:flex;flex-direction:column;gap:2px;font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em}.ij .cl select{text-transform:none;letter-spacing:0}'
         + '.ij select,.ij button.b{background:#1e293b;border:1px solid #334155;color:#e2e8f0;padding:6px 10px;border-radius:7px;font:inherit;font-size:12px;cursor:pointer}'
         + '.ij button.b.p{background:#2563eb;border-color:#2563eb;color:#fff;font-weight:700}'
         + '.ij .sem{display:flex;gap:10px;align-items:center;padding:12px 14px;border-radius:12px;border:1px solid #334155;background:#111c33;margin-bottom:14px}'
@@ -261,7 +263,7 @@
     }
 
     /* ---------- Render ---------- */
-    function destruirCharts() { S.charts.forEach(function (c) { try { c.destroy(); } catch (e) {} }); S.charts = []; }
+    function destruirCharts() { S.charts.forEach(function (c) { try { c.destroy(); } catch (e) {} }); S.charts = []; if (S.chartCmp) { try { S.chartCmp.destroy(); } catch (e) {} S.chartCmp = null; } }
 
     function render() {
         var M = S.m; if (!M || !S.cont) return;
@@ -436,6 +438,9 @@
         }
         h += '</div></div></div>';
 
+        // ---- Comparar jugadores ----
+        h += '<h4>Comparar con otros jugadores <span>· elige con quién, qué métrica y en qué sesiones</span></h4><div class="card" id="ij-cmp"></div>';
+
         // ---- Wellness, RPE, peso ----
         var wF = M.well.filter(function (w) { return w.f >= desde; });
         h += '<h4>Wellness diario <span>· lo que responde el jugador antes de entrenar (1-10)</span></h4><div class="card">';
@@ -475,7 +480,81 @@
         h += '</div>';
         S.cont.innerHTML = h;
         pintarCharts(M, F, wF, pF, conZ, zn);
+        renderCmp();
     }
+
+    /* ---------- Comparar jugadores ---------- */
+    function sesionesDe(pid, M) {
+        // sesiones de un jugador sumadas por dia y tipo (igual que las del informe)
+        var pj = M.porJug[pid]; if (!pj) return [];
+        var porDia = {};
+        pj.training.concat(pj.match).forEach(function (s) {
+            var tipo = s.md === 'MD' ? 'match' : 'training', k = s.f + '|' + tipo;
+            if (!porDia[k]) { porDia[k] = Object.assign({ tipo: tipo }, s); return; }
+            var a = porDia[k]; a.min += s.min;
+            MET.forEach(function (m) { a[m.k] += s[m.k]; });
+            a.vmax = Math.max(a.vmax || 0, s.vmax || 0); a.nsprint = (a.nsprint || 0) + (s.nsprint || 0);
+            a.mmin = a.min > 0 ? a.td / a.min : null;
+        });
+        return Object.keys(porDia).map(function (k) { return porDia[k]; }).sort(function (a, b) { return a.f < b.f ? -1 : 1; });
+    }
+    function cmpMetricas() { return MET.concat(EXTRA.map(function (m) { return { k: m.k, lbl: m.lbl, dec: m.dec, uni: m.uni || '' }; })); }
+    function renderCmp() {
+        var c = document.getElementById('ij-cmp'); if (!c || !S.m) return;
+        var M = S.m, j = S.j, C = S.cmp, hoy = iso(new Date());
+        var ids = [j.id].concat([C.p2, C.p3].filter(function (x) { return x && x !== j.id; }));
+        ids = ids.filter(function (x, i) { return ids.indexOf(x) === i; });
+        var desde = C.rango ? addDias(hoy, -C.rango) : '0000-00-00';
+        var met = cmpMetricas().filter(function (m) { return m.k === C.met; })[0] || MET[0];
+        var filtrar = function (ss) { return ss.filter(function (s) { if (s.f < desde) return false; if (C.tipo === 'training' && s.tipo === 'match') return false; if (C.tipo === 'match' && s.tipo !== 'match') return false; if (C.md && s.md !== C.md) return false; return s[met.k] !== null && s[met.k] !== undefined; }); };
+        var series = ids.map(function (pid, i) { var pj = S.d.jug[pid] || { name: pid === j.id ? j.name : '?' }; return { pid: pid, nombre: pj.name, col: CMPCOL[i], ss: filtrar(sesionesDe(pid, M)) }; });
+        // selects
+        var jugadores = Object.keys(S.d.jug).filter(function (pid) { return pid !== j.id; }).map(function (pid) { return S.d.jug[pid]; }).sort(function (a, b) { var ga = grupoPos(a.position_detail || (a.positions_main && a.positions_main[0])), gb = grupoPos(b.position_detail || (b.positions_main && b.positions_main[0])); return ga === gb ? (a.name < b.name ? -1 : 1) : (ga < gb ? -1 : 1); });
+        var optJug = function (sel) { var h = '<option value="">— nadie —</option>', g = ''; jugadores.forEach(function (p) { var gp = grupoPos(p.position_detail || (p.positions_main && p.positions_main[0])); if (gp !== g) { if (g) h += '</optgroup>'; h += '<optgroup label="' + esc(gp) + '">'; g = gp; } var tiene = M.porJug[p.id] ? '' : ' (sin GPS)'; h += '<option value="' + p.id + '"' + (sel === p.id ? ' selected' : '') + '>' + esc(p.name) + tiene + '</option>'; }); if (g) h += '</optgroup>'; return h; };
+        var mds = {}; Object.keys(M.porJug).forEach(function (pid) { M.porJug[pid].training.forEach(function (s) { if (s.md) mds[s.md] = 1; }); });
+        var ordenMd = ['MD-6', 'MD-5', 'MD-4', 'MD-3', 'MD-2', 'MD-1', 'MD', 'MD+1', 'MD+2', 'MD+3'];
+        var h = '<div class="flt" style="margin-left:0;margin-bottom:10px">'
+            + '<label class="cl"><span>Jugador 2</span><select onchange="cmIjCmp(\'p2\',this.value)">' + optJug(C.p2) + '</select></label>'
+            + '<label class="cl"><span>Jugador 3</span><select onchange="cmIjCmp(\'p3\',this.value)">' + optJug(C.p3) + '</select></label>'
+            + '<label class="cl"><span>Métrica</span><select onchange="cmIjCmp(\'met\',this.value)">' + cmpMetricas().map(function (m) { return '<option value="' + m.k + '"' + (C.met === m.k ? ' selected' : '') + '>' + m.lbl + '</option>'; }).join('') + '</select></label>'
+            + '<label class="cl"><span>Sesiones</span><select onchange="cmIjCmp(\'tipo\',this.value)"><option value="all"' + (C.tipo === 'all' ? ' selected' : '') + '>Entrenos y partidos</option><option value="training"' + (C.tipo === 'training' ? ' selected' : '') + '>Solo entrenos</option><option value="match"' + (C.tipo === 'match' ? ' selected' : '') + '>Solo partidos</option></select></label>'
+            + '<label class="cl"><span>Día</span><select onchange="cmIjCmp(\'md\',this.value)"><option value="">Todos</option>' + ordenMd.filter(function (k) { return k === 'MD' || mds[k]; }).map(function (k) { return '<option value="' + k + '"' + (C.md === k ? ' selected' : '') + '>' + (k === 'MD' ? 'Partidos (MD)' : k) + '</option>'; }).join('') + '</select></label>'
+            + '<label class="cl"><span>Periodo</span><select onchange="cmIjCmp(\'rango\',this.value)">' + [[28, 'Últimas 4 semanas'], [56, 'Últimas 8 semanas'], [112, 'Últimas 16 semanas'], [0, 'Toda la temporada']].map(function (o) { return '<option value="' + o[0] + '"' + (C.rango === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></label>'
+            + '<label class="cl"><span>Vista</span><select onchange="cmIjCmp(\'vista\',this.value)"><option value="sesion"' + (C.vista === 'sesion' ? ' selected' : '') + '>Sesión a sesión</option><option value="media"' + (C.vista === 'media' ? ' selected' : '') + '>Medias</option></select></label>'
+            + '</div>';
+        if (ids.length < 2) h += '<div class="nota">Elige al menos un jugador más para comparar.</div>';
+        else {
+            var conDatos = series.filter(function (x) { return x.ss.length; });
+            if (!conDatos.length) h += '<div class="nota">Sin sesiones con esos filtros.</div>';
+            else {
+                h += '<div class="cv"><canvas id="ij-c-cmp"></canvas></div><div class="leg">' + series.map(function (x) { return '<span><i style="background:' + x.col + '"></i>' + esc(x.nombre) + ' (' + x.ss.length + ' ses.)</span>'; }).join('') + '</div>';
+                // tabla resumen
+                var mia = media(series[0].ss.map(function (s) { return s[met.k]; }));
+                h += '<div style="overflow-x:auto;margin-top:10px"><table class="t"><thead><tr><th style="text-align:left">Jugador</th><th>Sesiones</th><th>Media</th><th>Máximo</th><th>Mínimo</th><th>Total</th><th>vs ' + esc(j.name.split(' ')[0]) + '</th></tr></thead><tbody>';
+                series.forEach(function (x) {
+                    var v = x.ss.map(function (s) { return s[met.k]; }), mu = media(v);
+                    var dif = (mia && mu !== null && x.pid !== j.id) ? (mu - mia) / mia * 100 : null;
+                    h += '<tr><td style="text-align:left"><i style="display:inline-block;width:9px;height:9px;border-radius:2px;background:' + x.col + ';margin-right:6px;vertical-align:middle"></i>' + esc(x.nombre) + '</td><td>' + v.length + '</td><td style="color:#fff;font-weight:700">' + fmt(mu, met.dec) + '</td><td>' + (v.length ? fmt(Math.max.apply(null, v), met.dec) : '—') + '</td><td>' + (v.length ? fmt(Math.min.apply(null, v), met.dec) : '—') + '</td><td>' + (met.k === 'vmax' || met.k === 'mmin' ? '—' : fmt(v.reduce(function (a, b) { return a + b; }, 0), met.dec)) + '</td><td style="color:' + (dif === null ? '#64748b' : (dif > 0 ? ST.ok : ST.rojo)) + '">' + (dif === null ? '—' : (dif > 0 ? '+' : '') + fmt(dif, 0) + '%') + '</td></tr>';
+                });
+                h += '</tbody></table></div><div class="nota">' + met.lbl + (met.uni ? ' (' + met.uni + ')' : '') + ' por sesión (las sesiones del mismo día se suman). "vs" = diferencia de la media frente a ' + esc(j.name) + '. Pasa el ratón por la gráfica para ver cada sesión.</div>';
+            }
+        }
+        c.innerHTML = h;
+        // grafica
+        var ctx = document.getElementById('ij-c-cmp'); if (!ctx || typeof Chart === 'undefined') return;
+        if (S.chartCmp) { try { S.chartCmp.destroy(); } catch (e) {} S.chartCmp = null; }
+        if (C.vista === 'media') {
+            S.chartCmp = new Chart(ctx, { type: 'bar', data: { labels: series.map(function (x) { return x.nombre; }), datasets: [{ label: met.lbl, data: series.map(function (x) { return media(x.ss.map(function (s) { return s[met.k]; })); }), backgroundColor: series.map(function (x) { return x.col; }), borderRadius: 4, barPercentage: .45, categoryPercentage: .7 }] },
+                options: base({ indexAxis: 'y', plugins: { legend: { display: false }, tooltip: { callbacks: { label: function (it) { var x = series[it.dataIndex]; return 'Media: ' + fmt(it.raw, met.dec) + (met.uni ? ' ' + met.uni : '') + ' · ' + x.ss.length + ' sesiones'; } } } }, scales: { x: { grid: { color: 'rgba(148,163,184,.08)' }, ticks: { color: '#94a3b8', font: { size: 10 } }, beginAtZero: true }, y: { grid: { display: false }, ticks: { color: '#cbd5e1', font: { size: 12 } } } } }) });
+        } else {
+            var fechas = {}; series.forEach(function (x) { x.ss.forEach(function (s) { fechas[s.f + '|' + s.tipo] = s; }); });
+            var keys = Object.keys(fechas).sort();
+            var ds = series.map(function (x) { var map = {}; x.ss.forEach(function (s) { map[s.f + '|' + s.tipo] = s; }); return { label: x.nombre, data: keys.map(function (k) { return map[k] ? map[k][met.k] : null; }), borderColor: x.col, backgroundColor: x.col, borderWidth: 2, pointRadius: keys.map(function (k) { return fechas[k].tipo === 'match' ? 6 : 4; }), pointStyle: keys.map(function (k) { return fechas[k].tipo === 'match' ? 'rectRot' : 'circle'; }), tension: .2, spanGaps: false, _map: map }; });
+            S.chartCmp = new Chart(ctx, { type: 'line', data: { labels: keys.map(function (k) { return fecha(k.slice(0, 10)); }), datasets: ds },
+                options: base({ plugins: { legend: { display: false }, tooltip: { callbacks: { title: function (it) { var s = fechas[keys[it[0].dataIndex]]; return fecha(s.f, true) + ' · ' + (s.tipo === 'match' ? 'Partido' : s.md); }, label: function (it) { var s = it.dataset._map[keys[it.dataIndex]]; return it.dataset.label + ': ' + fmt(it.raw, met.dec) + (met.uni ? ' ' + met.uni : '') + (s && s.min ? ' · ' + fmt(s.min, 0) + ' min' : ''); } } } } }) });
+        }
+    }
+    window.cmIjCmp = function (k, v) { if (k === 'rango') v = parseInt(v, 10) || 0; S.cmp[k] = v; renderCmp(); };
 
     function calcAcwr(M) {
         var hoy = iso(new Date()), sem = (M.cfg && M.cfg.acwr_chronic_weeks) || 4;
