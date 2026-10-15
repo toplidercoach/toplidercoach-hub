@@ -209,6 +209,8 @@
         var h = '<div class="ch-minis">';
         ms.forEach(function (m, i) {
             if (m.type === 'image') h += '<div class="ch-mini" onclick="chVisor(\'' + id + '\',' + i + ')"><img src="' + esc(m.url) + '" alt=""><span class="lupa">🔍</span>' + (m.title ? '<span class="cap">' + esc(m.title) + '</span>' : '') + '</div>';
+            else if (m.type === 'local') { var nm = L.nombreDe(m), ok = L.tiene(nm); h += '<div class="ch-mini" onclick="chVisor(\'' + id + '\',' + i + ')" title="' + esc(nm) + '"' + (ok ? ' data-local="' + esc(nm) + '"' : '') + '><div class="vid" style="flex-direction:column;gap:4px;font-size:30px">🎞️<span style="font-size:11px;color:' + (ok ? '#86efac' : '#fbbf24') + '">' + (ok ? 'Vídeo listo' : 'Vídeo en tu carpeta') + '</span></div><span class="lupa">▶</span><span class="cap">' + esc(m.title || nm) + '</span></div>'; }
+            else if (esVideoDirecto(m.url)) h += '<div class="ch-mini" onclick="chVisor(\'' + id + '\',' + i + ')"><div class="vid">🎬</div><span class="cap">' + esc(m.title || 'Ver vídeo') + '</span></div>';
             else h += '<a class="ch-mini" href="' + esc(m.url) + '" target="_blank" rel="noopener" style="text-decoration:none"><div class="vid">🎬</div><span class="cap">' + esc(m.title || 'Ver vídeo') + '</span></a>';
         });
         return h + '</div>';
@@ -228,7 +230,7 @@
                 S.push({ c: c, html: '<div class="ch-centro"><div style="display:flex;align-items:center;gap:40px"><div style="text-align:center">' + logo(pL, true) + '<div style="margin-top:10px;font-size:20px;font-weight:800;color:#86efac;text-transform:uppercase">' + esc(pN) + '</div></div><div style="font-size:54px;font-weight:900;color:#f59e0b">VS</div><div style="text-align:center">' + logo(rL, true) + '<div style="margin-top:10px;font-size:20px;font-weight:800;color:#fca5a5;text-transform:uppercase">' + esc(rN) + '</div></div></div><div style="font-size:clamp(28px,4vw,52px);font-weight:900;color:#fff;letter-spacing:1px;text-transform:uppercase">Plan de partido</div><div style="font-size:20px;color:#94a3b8">' + (par.competition ? esc(par.competition) + ' · ' : '') + fe + (par.kick_off_time ? ' · ' + String(par.kick_off_time).slice(0, 5) + 'h' : '') + '</div></div>' });
             } else if (c.key === 'sistema') {
                 var sP = ppParseFormacion(plan.rival_formation);
-                S.push({ c: c, html: '<div class="ch-sec" style="color:#fca5a5">Rival</div><h1 class="ch-h1">' + esc(rN) + ' · ' + esc(plan.rival_formation) + '</h1><div style="display:flex;justify-content:center;align-items:center;height:calc(100% - 90px)">' + ppRenderCampo(sP, (plan.weekly_map && plan.weekly_map.rival_lineup) || {}, plan.rival_players || [], 'big') + '</div>' });
+                S.push({ c: c, html: '<div style="display:grid;grid-template-columns:1fr auto;gap:30px;height:100%;min-height:0"><div style="min-width:0"><div class="ch-sec" style="color:#fca5a5">Rival · Sistema</div><h1 class="ch-h1">' + esc(rN) + '</h1><div style="font-size:clamp(34px,5vw,64px);font-weight:900;color:#f59e0b;line-height:1">' + esc(plan.rival_formation) + '</div>' + (plan.rival_style ? '<div class="ch-txt" style="margin-top:18px;color:#cbd5e1">' + esc(plan.rival_style) + '</div>' : '') + '</div><div id="ch-campo" style="height:100%;min-height:0;display:flex;align-items:center"><div style="width:600px;max-width:40vw">' + ppRenderCampo(sP, (plan.weekly_map && plan.weekly_map.rival_lineup) || {}, plan.rival_players || [], 'big') + '</div></div></div>' });
             } else if (c.key === 'scouting') {
                 S.push({ c: c, html: '<div class="ch-sec" style="color:#fca5a5">Rival · Scouting</div><h1 class="ch-h1">' + esc(rN) + (plan.rival_style ? ' <span style="font-size:.5em;color:#94a3b8;font-weight:500">· ' + esc(plan.rival_style) + '</span>' : '') + '</h1><div class="ch-kv" style="height:calc(100% - 100px)"><div><h3 style="color:#22c55e">💪 Puntos fuertes</h3><div class="' + tamTexto(plan.rival_strengths) + '">' + esc(plan.rival_strengths || '—') + '</div></div><div><h3 style="color:#ef4444">🎯 Puntos débiles</h3><div class="' + tamTexto(plan.rival_weaknesses) + '">' + esc(plan.rival_weaknesses || '—') + '</div></div></div>' });
             } else if (c.key.indexOf('conf:') === 0) {
@@ -256,6 +258,7 @@
     /* ---------- Presentacion ---------- */
     function presentar(sel) {
         css();
+        L.init().then(function () { C.slides = construir(sel); pintarEstadoCarpeta(); pintar(); });
         C.slides = construir(sel); C.idx = 0;
         if (!C.slides.length) { showToast('Sin contenido para la charla'); return; }
         var prev = document.getElementById('ch-ov'); if (prev) prev.remove();
@@ -265,17 +268,22 @@
         var ov = document.createElement('div'); ov.id = 'ch-ov';
         ov.innerHTML = '<div class="ch-top">' + lg(clubLogo(), '⚽') + '<span class="eq" style="color:#86efac">' + esc(pN) + '</span><span class="vs">VS</span>' + lg(rivalLogo(), '🛡️') + '<span class="eq" style="color:#fca5a5">' + esc(rN) + '</span><div class="info">' + esc(par.competition || '') + '<br>' + fe + (par.kick_off_time ? ' · ' + String(par.kick_off_time).slice(0, 5) + 'h' : '') + '</div></div>'
             + '<div class="ch-prog"><i id="ch-prog"></i></div><div class="ch-body" id="ch-body"></div>'
-            + '<div class="ch-bot"><button onclick="chNav(-1)">← Anterior</button><div class="ch-dots" id="ch-dots"></div><span class="ch-cnt" id="ch-cnt"></span><button onclick="chGrid()" title="Ver todas (G)">▦ Índice</button><button onclick="chFull()" title="Pantalla completa (F)">⛶</button><button class="p" onclick="chNav(1)">Siguiente →</button><button class="x" onclick="chCerrar()">✕ Salir</button></div>';
+            + '<div class="ch-bot"><button onclick="chNav(-1)">← Anterior</button><div class="ch-dots" id="ch-dots"></div><span class="ch-cnt" id="ch-cnt"></span><button id="ch-carpeta" onclick="chCarpetaClick()">📁 Vídeos</button><button onclick="chGrid()" title="Ver todas (G)">▦ Índice</button><button onclick="chFull()" title="Pantalla completa (F)">⛶</button><button class="p" onclick="chNav(1)">Siguiente →</button><button class="x" onclick="chCerrar()">✕ Salir</button></div>';
         document.body.appendChild(ov);
         ov.addEventListener('touchstart', function (e) { C.touchX = e.touches[0].clientX; }, { passive: true });
         ov.addEventListener('touchend', function (e) { if (C.touchX === null || document.getElementById('ch-visor')) return; var dx = e.changedTouches[0].clientX - C.touchX; if (Math.abs(dx) > 70) chNav(dx < 0 ? 1 : -1); C.touchX = null; }, { passive: true });
         document.addEventListener('keydown', teclas);
-        pintar();
+        pintar(); pintarEstadoCarpeta();
         try { if (ov.requestFullscreen) { var fp = ov.requestFullscreen(); if (fp && fp.catch) fp.catch(function () {}); } } catch (e) {}
     }
     function pintar() {
         var s = C.slides[C.idx], b = document.getElementById('ch-body'); if (!b) return;
         b.innerHTML = '<div class="ch-slide" id="ch-slide">' + s.html + '</div>';
+        // miniaturas de video local: poner el primer fotograma como portada
+        Array.prototype.forEach.call(b.querySelectorAll('.ch-mini[data-local]'), function (el) {
+            L.url(el.getAttribute('data-local')).then(function (u) { if (!u || !el.isConnected) return; var vd = el.querySelector('.vid'); if (!vd) return; var v = document.createElement('video'); v.src = u + '#t=0.5'; v.muted = true; v.preload = 'metadata'; v.playsInline = true; v.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;background:#000'; v.onloadeddata = function () { vd.replaceWith(v); }; });
+        });
+        var cw = document.getElementById('ch-campo'); if (cw && cw.firstChild) { var hd = cw.clientHeight || 600; cw.firstChild.style.width = Math.min(600, Math.floor(hd * 68 / 105)) + 'px'; }
         var p = document.getElementById('ch-prog'); if (p) p.style.width = ((C.idx + 1) / C.slides.length * 100) + '%';
         var cnt = document.getElementById('ch-cnt'); if (cnt) cnt.textContent = (C.idx + 1) + ' / ' + C.slides.length;
         var d = document.getElementById('ch-dots'); if (d) d.innerHTML = C.slides.map(function (x, i) { var eq = x.c.equipo === 'rival' ? 'r' : (x.c.equipo === 'own' ? 'n' : ''); return '<button class="ch-dot ' + eq + (i === C.idx ? ' a' : '') + '" onclick="chIr(' + i + ')" title="' + esc(x.c.titulo) + '"></button>'; }).join('');
@@ -309,7 +317,7 @@
         C.visor = { d: d, i: i };
         var prev = document.getElementById('ch-visor'); if (prev) prev.remove();
         var v = document.createElement('div'); v.id = 'ch-visor';
-        v.onclick = function (e) { if (e.target === v || e.target.classList.contains('med')) v.remove(); };
+        v.onclick = function (e) { if (e.target === v || (e.target.classList && e.target.classList.contains('med'))) v.remove(); };
         // dentro de #ch-ov: en pantalla completa solo se ve lo que cuelga del elemento a pantalla completa
         (document.getElementById('ch-ov') || document.body).appendChild(v);
         pintarVisor();
@@ -318,21 +326,153 @@
         C.visorData = C.visorData || {}; C.visorData.__d = { items: [{ type: 'image', url: src, title: titulo }], lado: '', texto: '', titulo: titulo };
         chVisor('__d', 0);
     };
-    function pintarVisor() {
+    function visorVisible(m) { return m.type === 'image' || m.type === 'local' || esVideoDirecto(m.url); }
+    async function pintarVisor() {
         var v = document.getElementById('ch-visor'), x = C.visor; if (!v || !x) return;
-        var imgs = x.d.items.filter(function (m) { return m.type === 'image'; });
+        var imgs = x.d.items.filter(visorVisible);
         var m = x.d.items[x.i]; if (!m) return;
-        var n = imgs.length;
+        var n = imgs.length, med;
+        if (m.type === 'image') med = '<img src="' + esc(m.url) + '" alt="">';
+        else if (m.type === 'local') { var nm = L.nombreDe(m); await L.init(); var u = L.tiene(nm) ? await L.url(nm) : null; med = u ? '<video src="' + u + '" controls autoplay style="max-width:100%;max-height:100%;border-radius:10px;background:#000"></video>' : avisoSinVideo(nm); }
+        else med = '<video src="' + esc(m.url) + '" controls autoplay style="max-width:100%;max-height:100%;border-radius:10px;background:#000"></video>';
+        if (!document.getElementById('ch-visor')) return;
         v.innerHTML = '<div class="cab"><span class="t">' + esc(x.d.titulo) + '</span><span class="c">' + esc(m.title || '') + (n > 1 ? ' · ' + (imgs.indexOf(m) + 1) + ' / ' + n : '') + '</span><button onclick="document.getElementById(\'ch-visor\').remove()">✕ Cerrar (Esc)</button></div>'
-            + '<div class="med"><img src="' + esc(m.url) + '" alt="">' + (n > 1 ? '<button class="fl i" onclick="chVisorNav(-1)">‹</button><button class="fl d" onclick="chVisorNav(1)">›</button>' : '') + '</div>'
+            + '<div class="med">' + med + (n > 1 ? '<button class="fl i" onclick="chVisorNav(-1)">‹</button><button class="fl d" onclick="chVisorNav(1)">›</button>' : '') + '</div>'
             + (x.d.texto ? '<div class="txt ' + x.d.lado + '">' + esc(x.d.texto) + '</div>' : '');
     }
     window.chVisorNav = function (d) {
         var x = C.visor; if (!x) return;
-        var imgs = x.d.items.map(function (m, i) { return m.type === 'image' ? i : -1; }).filter(function (i) { return i >= 0; });
+        var imgs = x.d.items.map(function (m, i) { return visorVisible(m) ? i : -1; }).filter(function (i) { return i >= 0; });
         var k = imgs.indexOf(x.i); if (k < 0) return;
         x.i = imgs[(k + d + imgs.length) % imgs.length]; pintarVisor();
     };
+
+
+    /* ---------- Videos locales: carpeta del PC o USB ---------- */
+    // No se sube nada: en la fase solo se guarda el NOMBRE del archivo. El entrenador conecta una vez la
+    // carpeta (Chrome/Edge recuerdan el permiso) y los videos se reproducen desde su disco o USB.
+    var VID_EXT = /\.(mp4|m4v|webm|mov|mkv|avi|ogv)$/i;
+    var L = { handle: null, files: {}, nombre: '', estado: 'none', urls: {} };
+    function idb() {
+        return new Promise(function (res, rej) {
+            var r = indexedDB.open('tlc_charla', 1);
+            r.onupgradeneeded = function () { r.result.createObjectStore('kv'); };
+            r.onsuccess = function () { res(r.result); }; r.onerror = function () { rej(r.error); };
+        });
+    }
+    function idbSet(k, v) { return idb().then(function (db) { return new Promise(function (res, rej) { var t = db.transaction('kv', 'readwrite'); t.objectStore('kv').put(v, k); t.oncomplete = res; t.onerror = function () { rej(t.error); }; }); }); }
+    function idbGet(k) { return idb().then(function (db) { return new Promise(function (res, rej) { var t = db.transaction('kv', 'readonly'), q = t.objectStore('kv').get(k); q.onsuccess = function () { res(q.result); }; q.onerror = function () { rej(q.error); }; }); }); }
+    L.soporte = function () { return typeof window.showDirectoryPicker === 'function'; };
+    L.init = async function () {
+        if (L.inited) return; L.inited = true;
+        try {
+            if (!L.soporte() || !window.indexedDB) return;
+            var h = await idbGet('carpeta'); if (!h) return;
+            L.handle = h; L.nombre = h.name || 'carpeta';
+            var perm = await h.queryPermission({ mode: 'read' });
+            if (perm === 'granted') { await L.scan(); } else L.estado = 'prompt';
+        } catch (e) { console.warn('[charla] carpeta', e); }
+    };
+    L.scan = async function () {
+        L.files = {};
+        async function rec(dir, prefijo, nivel) {
+            for await (var ent of dir.values()) {
+                if (ent.kind === 'file') { if (VID_EXT.test(ent.name)) L.files[prefijo + ent.name] = ent; }
+                else if (ent.kind === 'directory' && nivel < 2) await rec(ent, prefijo + ent.name + '/', nivel + 1);
+            }
+        }
+        try { await rec(L.handle, '', 0); L.estado = 'ok'; } catch (e) { L.estado = 'prompt'; }
+    };
+    L.conectar = async function () {
+        try {
+            if (L.soporte()) {
+                var h = await window.showDirectoryPicker({ mode: 'read' });
+                L.handle = h; L.nombre = h.name; await L.scan();
+                try { await idbSet('carpeta', h); } catch (e) {}
+                showToast('Carpeta "' + h.name + '": ' + Object.keys(L.files).length + ' vídeos');
+                return true;
+            }
+            // Navegadores sin selector de carpeta: elegir los archivos (dura hasta cerrar la pestaña)
+            return await new Promise(function (res) {
+                var inp = document.createElement('input'); inp.type = 'file'; inp.multiple = true; inp.accept = 'video/*'; inp.setAttribute('webkitdirectory', '');
+                inp.onchange = function () { L.files = {}; Array.prototype.forEach.call(inp.files, function (f) { if (VID_EXT.test(f.name)) L.files[f.name] = f; }); L.nombre = 'archivos elegidos'; L.estado = Object.keys(L.files).length ? 'ok' : 'none'; showToast(Object.keys(L.files).length + ' vídeos'); res(true); };
+                inp.click();
+            });
+        } catch (e) { if (e && e.name !== 'AbortError') showToast('No se pudo abrir la carpeta: ' + e.message); return false; }
+    };
+    L.reconectar = async function () {
+        if (!L.handle) return L.conectar();
+        try { var p = await L.handle.requestPermission({ mode: 'read' }); if (p === 'granted') { await L.scan(); return true; } } catch (e) {}
+        return L.conectar();
+    };
+    L.tiene = function (name) { return !!L.files[name]; };
+    L.url = async function (name) {
+        if (L.urls[name]) return L.urls[name];
+        var f = L.files[name]; if (!f) return null;
+        var file = typeof f.getFile === 'function' ? await f.getFile() : f;
+        var u = URL.createObjectURL(file); L.urls[name] = u; return u;
+    };
+    L.nombreDe = function (m) { return m.file || String(m.url || '').replace(/^local:/, ''); };
+    function esVideoDirecto(u) { return /\.(mp4|webm|ogv|m4v|mov)(\?|$)/i.test(u || ''); }
+
+    // Dialogo para elegir un video de la carpeta
+    function pickerVideoLocal(cb) {
+        var prev = document.getElementById('ch-vl'); if (prev) prev.remove();
+        var ov = document.createElement('div'); ov.id = 'ch-vl';
+        ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+        ov.onclick = function (e) { if (e.target === ov) ov.remove(); };
+        document.body.appendChild(ov);
+        C.vlCb = cb; C.vlFiltro = '';
+        L.init().then(pintarVl);
+    }
+    function pintarVl() {
+        var ov = document.getElementById('ch-vl'); if (!ov) return;
+        var nombres = Object.keys(L.files).sort(), f = (C.vlFiltro || '').toLowerCase();
+        if (f) nombres = nombres.filter(function (n) { return n.toLowerCase().indexOf(f) >= 0; });
+        var est = L.estado === 'ok' ? '<span style="color:#86efac">📁 ' + esc(L.nombre) + ' · ' + Object.keys(L.files).length + ' vídeos</span> <button onclick="chVlConectar()" style="margin-left:8px;padding:3px 9px;background:#1e293b;border:1px solid #334155;color:#94a3b8;border-radius:6px;cursor:pointer;font-size:11px">Cambiar carpeta</button>'
+            : (L.estado === 'prompt' ? '<span style="color:#fbbf24">📁 ' + esc(L.nombre) + ' · hay que volver a dar permiso</span> <button onclick="chVlReconectar()" style="margin-left:8px;padding:5px 12px;background:#065f46;border:1px solid #10b981;color:#6ee7b7;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700">Permitir acceso</button>'
+            : '<span style="color:#94a3b8">Sin carpeta conectada.</span> <button onclick="chVlConectar()" style="margin-left:8px;padding:6px 14px;background:#065f46;border:1px solid #10b981;color:#6ee7b7;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700">📁 Conectar carpeta de vídeos</button>');
+        var lista = '';
+        if (L.estado === 'ok') {
+            if (!nombres.length) lista = '<div style="color:#64748b;padding:14px 0">' + (f ? 'Nada coincide con "' + esc(f) + '".' : 'La carpeta no tiene vídeos (mp4, webm, mov, mkv, avi).') + '</div>';
+            else lista = '<div style="display:grid;gap:4px;max-height:48vh;overflow-y:auto">' + nombres.map(function (n) { return '<button onclick="chVlElegir(' + JSON.stringify(n).replace(/"/g, '&quot;') + ')" style="text-align:left;padding:8px 12px;background:#111c33;border:1px solid #1e293b;color:#e2e8f0;border-radius:8px;cursor:pointer;font-size:13px;display:flex;gap:10px;align-items:center" onmouseenter="this.style.borderColor=\'#f97316\'" onmouseleave="this.style.borderColor=\'#1e293b\'"><span style="font-size:18px">🎞️</span><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(n) + '</span></button>'; }).join('') + '</div>';
+        }
+        ov.innerHTML = '<div style="background:#0f172a;border:1px solid #1e3a5f;border-radius:14px;max-width:640px;width:100%;max-height:85vh;display:flex;flex-direction:column;color:#e2e8f0;font-family:inherit"><div style="padding:14px 18px;border-bottom:1px solid #1e3a5f;display:flex;justify-content:space-between;align-items:center"><h3 style="margin:0;color:#fdba74;font-size:15px">🎞️ Vídeo de tu carpeta (PC o USB)</h3><button onclick="document.getElementById(\'ch-vl\').remove()" style="background:none;border:none;color:#9ca3af;font-size:20px;cursor:pointer">×</button></div>'
+            + '<div style="padding:14px 18px;font-size:12.5px;display:flex;flex-direction:column;gap:12px"><div>' + est + '</div>'
+            + (L.estado === 'ok' ? '<input placeholder="Buscar por nombre..." value="' + esc(C.vlFiltro || '') + '" oninput="chVlFiltrar(this.value)" style="padding:8px 10px;background:#0b1220;border:1px solid #334155;color:#e2e8f0;border-radius:8px;font-size:13px">' + lista : '')
+            + '<div style="font-size:11.5px;color:#64748b;line-height:1.5">El vídeo no se sube a ningún sitio: solo se guarda su nombre. Para la charla, lleva el PC o el USB con esa carpeta y conéctala si te lo pide. Funciona en Chrome y Edge.</div></div></div>';
+    }
+    window.chVlConectar = async function () { if (await L.conectar()) pintarVl(); };
+    window.chVlReconectar = async function () { if (await L.reconectar()) pintarVl(); };
+    window.chVlFiltrar = function (v) { C.vlFiltro = v; var ov = document.getElementById('ch-vl'); var inp = ov && ov.querySelector('input'); var pos = inp ? inp.selectionStart : null; pintarVl(); var i2 = document.getElementById('ch-vl').querySelector('input'); if (i2) { i2.focus(); if (pos !== null) i2.setSelectionRange(pos, pos); } };
+    window.chVlElegir = function (n) { var ov = document.getElementById('ch-vl'); if (ov) ov.remove(); if (C.vlCb) C.vlCb(n); };
+    // Reproducir un video local en un visor sencillo (fuera de la charla)
+    window.chVerLocal = async function (name, texto) {
+        await L.init();
+        var u = L.tiene(name) ? await L.url(name) : null;
+        var prev = document.getElementById('ch-visor'); if (prev) prev.remove();
+        var v = document.createElement('div'); v.id = 'ch-visor'; css();
+        v.onclick = function (e) { if (e.target === v) v.remove(); };
+        v.innerHTML = '<div class="cab"><span class="t">🎞️ ' + esc(name) + '</span><button onclick="document.getElementById(\'ch-visor\').remove()">✕ Cerrar</button></div><div class="med">' + (u ? '<video src="' + u + '" controls autoplay style="max-width:100%;max-height:100%;border-radius:10px;background:#000"></video>' : avisoSinVideo(name)) + '</div>' + (texto ? '<div class="txt">' + esc(texto) + '</div>' : '');
+        (document.getElementById('ch-ov') || document.body).appendChild(v);
+    };
+    function avisoSinVideo(name) {
+        var btn = L.estado === 'prompt' ? '<button onclick="chVisorCarpeta()" style="margin-top:14px;padding:10px 20px;background:#065f46;border:1px solid #10b981;color:#6ee7b7;border-radius:8px;cursor:pointer;font-size:15px;font-weight:700">Permitir acceso a "' + esc(L.nombre) + '"</button>'
+            : '<button onclick="chVisorCarpeta()" style="margin-top:14px;padding:10px 20px;background:#065f46;border:1px solid #10b981;color:#6ee7b7;border-radius:8px;cursor:pointer;font-size:15px;font-weight:700">📁 Conectar carpeta de vídeos</button>';
+        var msg = L.estado === 'ok' ? 'No está en la carpeta "' + esc(L.nombre) + '". Copia el archivo ahí o conecta la carpeta correcta.' : (L.estado === 'prompt' ? 'El navegador pide permiso para leer la carpeta de vídeos.' : 'Este vídeo está en tu PC o USB. Conecta la carpeta donde lo tienes.');
+        return '<div style="text-align:center;color:#cbd5e1;font-size:18px;max-width:560px"><div style="font-size:54px">🎞️</div><div style="font-weight:700;color:#fff;margin:8px 0">' + esc(name) + '</div><div>' + msg + '</div>' + btn + '</div>';
+    }
+    window.chVisorCarpeta = async function () {
+        var ok = await L.reconectar();
+        if (ok) { if (C.visor) pintarVisor(); else { var v = document.getElementById('ch-visor'); if (v) v.remove(); } pintarEstadoCarpeta(); }
+    };
+    function pintarEstadoCarpeta() {
+        var e = document.getElementById('ch-carpeta'); if (!e) return;
+        e.innerHTML = L.estado === 'ok' ? '📁 ' + esc(L.nombre) : (L.estado === 'prompt' ? '📁 Permitir vídeos' : '📁 Vídeos');
+        e.style.color = L.estado === 'ok' ? '#86efac' : (L.estado === 'prompt' ? '#fbbf24' : '#94a3b8');
+        e.title = L.estado === 'ok' ? 'Carpeta de vídeos conectada (' + Object.keys(L.files).length + ' vídeos)' : 'Conectar la carpeta del PC o USB con los vídeos';
+    }
+    window.chCarpetaClick = async function () { if (await L.reconectar()) { pintarEstadoCarpeta(); pintar(); } };
 
     /* ---------- Pestana Confrontacion: imagenes y pizarra en cada fase ---------- */
     function pickerPizarra(cb) {
@@ -395,6 +535,14 @@
     window.chImgOur = function (secId) { ppAbrirModalMedia('ch-media-ov', function (url, title, tipo) { addMediaOur(secId, url, title, tipo); }); };
     window.chPizRival = function (i) { pickerPizarra(function (img, nombre, id) { addMediaRival(i, img, nombre, 'image', id); }); };
     window.chPizOur = function (secId) { pickerPizarra(function (img, nombre, id) { addMediaOur(secId, img, nombre, 'image', id); }); };
+    function tituloVideo(n) { return n.split('/').pop().replace(VID_EXT, '').replace(/[_\-]+/g, ' '); }
+    window.chVidRival = function (i) { pickerVideoLocal(function (n) { addMediaLocal('rival', i, n); }); };
+    window.chVidOur = function (secId) { pickerVideoLocal(function (n) { addMediaLocal('our', secId, n); }); };
+    async function addMediaLocal(lado, ref, n) {
+        var m = { url: 'local:' + n, file: n, title: tituloVideo(n), type: 'local' };
+        if (lado === 'rival') { var f = ppGetFases(); if (!f[ref].media) f[ref].media = []; if (f[ref].media.length >= PP_MAX_MEDIA_POR_FASE) { showToast('Máximo ' + PP_MAX_MEDIA_POR_FASE + ' por fase'); return; } f[ref].media.push(m); if (await ppGuardarFasesArray(f)) { showToast('Vídeo añadido'); ppMostrarTab('confront'); } }
+        else { var ph = ppGetOurPhases(); if (!ph[ref]) ph[ref] = { notes: '', media: [] }; if (!ph[ref].media) ph[ref].media = []; if (ph[ref].media.length >= PP_MAX_MEDIA_POR_FASE) { showToast('Máximo ' + PP_MAX_MEDIA_POR_FASE + ' por apartado'); return; } ph[ref].media.push(m); await ppSaveOurPhases(ph); showToast('Vídeo añadido'); ppMostrarTab('confront'); }
+    }
     window.chQuitarRival = async function (i, mi) { if (!confirm('¿Quitar esta imagen de la fase?')) return; var f = ppGetFases(); f[i].media.splice(mi, 1); if (await ppGuardarFasesArray(f)) ppMostrarTab('confront'); };
     window.chQuitarOur = async function (secId, mi) { if (!confirm('¿Quitar esta imagen del apartado?')) return; var ph = ppGetOurPhases(); if (ph[secId] && ph[secId].media) { ph[secId].media.splice(mi, 1); await ppSaveOurPhases(ph); ppMostrarTab('confront'); } };
     window.chVerImg = function (src, texto) { if (typeof ppMostrarVisor === 'function') ppMostrarVisor(src, texto); };
@@ -404,14 +552,18 @@
         var h = '<div class="ch-mm">';
         ms.forEach(function (m, k) {
             if (!m || !m.url) return;
-            h += '<div class="m">' + (m.type === 'image' ? '<img src="' + esc(m.url) + '" title="' + esc(m.title || '') + '" onclick="chVerImg(this.src,' + JSON.stringify(texto || '').replace(/"/g, '&quot;') + ')">' : '<a href="' + esc(m.url) + '" target="_blank" title="' + esc(m.title || 'Vídeo') + '">🎬</a>') + '<b onclick="' + onQuitar(k) + '" title="Quitar">×</b></div>';
+            var inner;
+            if (m.type === 'image') inner = '<img src="' + esc(m.url) + '" title="' + esc(m.title || '') + '" onclick="chVerImg(this.src,' + JSON.stringify(texto || '').replace(/"/g, '&quot;') + ')">';
+            else if (m.type === 'local') inner = '<a href="#" onclick="chVerLocal(' + JSON.stringify(L.nombreDe(m)).replace(/"/g, '&quot;') + ',' + JSON.stringify(texto || '').replace(/"/g, '&quot;') + ');return false" title="' + esc(L.nombreDe(m)) + ' (vídeo de tu carpeta)" style="flex-direction:column;gap:2px;font-size:16px">🎞️<span style="font-size:9px;max-width:76px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(m.title || L.nombreDe(m)) + '</span></a>';
+            else inner = '<a href="' + esc(m.url) + '" target="_blank" title="' + esc(m.title || 'Vídeo') + '">🎬</a>';
+            h += '<div class="m">' + inner + '<b onclick="' + onQuitar(k) + '" title="Quitar">×</b></div>';
         });
         return h + '</div>';
     }
     // Envuelve ppRenderConfront: añade botones de imagen/pizarra y miniaturas con borrado a cada tarjeta
     var origConfront = window.ppRenderConfront;
     window.ppRenderConfront = function () {
-        css();
+        css(); L.init();
         var html = origConfront();
         try {
             var tmp = document.createElement('div'); tmp.innerHTML = html;
@@ -426,12 +578,12 @@
                 var i = k++; var f = fases[i]; if (!f) return;
                 // quitar las miniaturas que ya pinta el original (dentro de la tarjeta) y poner las editables
                 Array.prototype.forEach.call(izq.querySelectorAll('div[style*="flex-wrap"]'), function (d) { d.remove(); });
-                izq.insertAdjacentHTML('beforeend', miniEdit(f.media, f.notes, function (mi) { return 'chQuitarRival(' + i + ',' + mi + ')'; }) + '<div class="ch-acc"><button onclick="chImgRival(' + i + ')">📷 Imagen / vídeo</button><button onclick="chPizRival(' + i + ')">🎨 Dibujo de pizarra</button></div>');
+                izq.insertAdjacentHTML('beforeend', miniEdit(f.media, f.notes, function (mi) { return 'chQuitarRival(' + i + ',' + mi + ')'; }) + '<div class="ch-acc"><button onclick="chImgRival(' + i + ')">📷 Imagen / vídeo</button><button onclick="chPizRival(' + i + ')">🎨 Dibujo de pizarra</button><button onclick="chVidRival(' + i + ')">🎞️ Vídeo de mi carpeta</button></div>');
                 var pid = ppPairDe(f), sec = pid ? ppSeccionPropia(pid) : null;
                 if (sec && der.querySelector('textarea')) {
                     var od = our[sec.id] || {};
                     Array.prototype.forEach.call(der.querySelectorAll('div[style*="flex-wrap"]'), function (d) { if (!d.querySelector('select')) d.remove(); });
-                    der.insertAdjacentHTML('beforeend', miniEdit(od.media, od.notes, function (mi) { return 'chQuitarOur(\'' + sec.id + '\',' + mi + ')'; }) + '<div class="ch-acc"><button onclick="chImgOur(\'' + sec.id + '\')">📷 Imagen / vídeo</button><button onclick="chPizOur(\'' + sec.id + '\')">🎨 Dibujo de pizarra</button></div>');
+                    der.insertAdjacentHTML('beforeend', miniEdit(od.media, od.notes, function (mi) { return 'chQuitarOur(\'' + sec.id + '\',' + mi + ')'; }) + '<div class="ch-acc"><button onclick="chImgOur(\'' + sec.id + '\')">📷 Imagen / vídeo</button><button onclick="chPizOur(\'' + sec.id + '\')">🎨 Dibujo de pizarra</button><button onclick="chVidOur(\'' + sec.id + '\')">🎞️ Vídeo de mi carpeta</button></div>');
                 }
             });
             // aviso arriba
