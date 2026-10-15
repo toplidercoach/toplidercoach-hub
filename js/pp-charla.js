@@ -166,7 +166,7 @@
         var prev = document.getElementById('ch-prep'); if (prev) prev.remove();
         C.lista = ordenadas();
         var ov = document.createElement('div'); ov.id = 'ch-prep';
-        ov.onclick = function (e) { if (e.target === ov) ov.remove(); };
+        ov.onclick = function (e) { if (e.target === ov) chPrepCerrar(); };
         document.body.appendChild(ov);
         pintarPreparador();
     }
@@ -174,7 +174,7 @@
     function pintarPreparador() {
         var ov = document.getElementById('ch-prep'); if (!ov) return;
         var L = C.lista, n = L.filter(function (c) { return c.on; }).length;
-        var h = '<div class="box"><div class="cab"><div><h3>📺 Preparar la charla</h3><p>Marca qué entra en la presentación y ordénala con las flechas. Portada y cierre van siempre. Se guarda para este partido.</p></div><button onclick="document.getElementById(\'ch-prep\').remove()" style="margin-left:auto;background:none;border:none;color:#94a3b8;font-size:22px;cursor:pointer">×</button></div><div class="lst">';
+        var h = '<div class="box"><div class="cab"><div><h3>📺 Preparar la charla</h3><p>Marca qué entra en la presentación y ordénala con las flechas. Portada y cierre van siempre. Se guarda para este partido.</p></div><button onclick="chPrepCerrar()" style="margin-left:auto;background:none;border:none;color:#94a3b8;font-size:22px;cursor:pointer">×</button></div><div class="lst">';
         L.forEach(function (c, i) {
             var col = colorTipo(c.tipo);
             h += '<div class="it' + (c.on ? '' : ' off') + '"><input type="checkbox"' + (c.on ? ' checked' : '') + (c.fijo ? ' disabled' : '') + ' onchange="chPrepToggle(' + i + ',this.checked)">'
@@ -183,19 +183,25 @@
                + (c.fijo ? '' : '<div class="mv"><button onclick="chPrepMover(' + i + ',-1)" title="Subir">▲</button> <button onclick="chPrepMover(' + i + ',1)" title="Bajar">▼</button></div>')
                + '</div>';
         });
-        h += '</div><div class="pie"><button onclick="chPrepTodas(true)">Marcar todas</button><button onclick="chPrepTodas(false)">Solo portada y cierre</button><span class="n">' + n + ' diapositiva' + (n === 1 ? '' : 's') + '</span><button class="p" onclick="chPrepEmpezar()">▶ Empezar charla</button></div></div>';
+        h += '</div><div class="pie"><button onclick="chPrepTodas(true)">Marcar todas</button><button onclick="chPrepTodas(false)">Solo portada y cierre</button><span class="n">' + n + ' diapositiva' + (n === 1 ? '' : 's') + ' · <span id="ch-prep-estado" style="color:#86efac">✓ Se guarda sola</span></span><button onclick="chPrepCerrar()">💾 Guardar y cerrar</button><button class="p" onclick="chPrepEmpezar()">▶ Empezar charla</button></div></div>';
         ov.innerHTML = h;
     }
-    window.chPrepToggle = function (i, v) { C.lista[i].on = !!v; pintarPreparador(); };
+    // Cada cambio se guarda solo (con medio segundo de margen) en el plan del partido
+    function cfgDeLista() { var cfg = { off: {}, orden: [] }; C.lista.forEach(function (c) { if (!c.on) cfg.off[c.key] = true; if (!c.fijo) cfg.orden.push(c.key); }); return cfg; }
+    function guardarSel() {
+        var e = document.getElementById('ch-prep-estado'); if (e) { e.textContent = 'Guardando…'; e.style.color = '#fbbf24'; }
+        clearTimeout(C.tGuardar);
+        C.tGuardar = setTimeout(function () { cfgGuardar(cfgDeLista()).then(function () { var e2 = document.getElementById('ch-prep-estado'); if (e2) { e2.textContent = '✓ Selección guardada'; e2.style.color = '#86efac'; } }); }, 500);
+    }
+    window.chPrepToggle = function (i, v) { C.lista[i].on = !!v; pintarPreparador(); guardarSel(); };
     window.chPrepMover = function (i, d) {
         var L = C.lista, j = i + d; if (j < 1 || j > L.length - 2 || L[i].fijo || L[j].fijo) return;
-        var t = L[i]; L[i] = L[j]; L[j] = t; pintarPreparador();
+        var t = L[i]; L[i] = L[j]; L[j] = t; pintarPreparador(); guardarSel();
     };
-    window.chPrepTodas = function (v) { C.lista.forEach(function (c) { if (!c.fijo) c.on = v; }); pintarPreparador(); };
+    window.chPrepTodas = function (v) { C.lista.forEach(function (c) { if (!c.fijo) c.on = v; }); pintarPreparador(); guardarSel(); };
+    window.chPrepCerrar = function () { clearTimeout(C.tGuardar); cfgGuardar(cfgDeLista()).then(function () { showToast('Selección de la charla guardada'); }); var ov = document.getElementById('ch-prep'); if (ov) ov.remove(); };
     window.chPrepEmpezar = function () {
-        var cfg = { off: {}, orden: [] };
-        C.lista.forEach(function (c) { if (!c.on) cfg.off[c.key] = true; if (!c.fijo) cfg.orden.push(c.key); });
-        cfgGuardar(cfg);
+        clearTimeout(C.tGuardar); cfgGuardar(cfgDeLista());
         var ov = document.getElementById('ch-prep'); if (ov) ov.remove();
         presentar(C.lista.filter(function (c) { return c.on; }));
     };
