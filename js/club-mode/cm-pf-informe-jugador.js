@@ -350,7 +350,7 @@
         if (!M.ref.td) h += '<div class="nota">Sin perfil de partido ni referencia de equipo: no se pueden calcular objetivos. Importa partidos con GPS.</div>';
         else {
             var cumpl = { ok: 0, ambar: 0, mal: 0 };
-            h += '<div style="overflow-x:auto"><table class="t"><thead><tr><th>Día</th><th>MD</th><th>Min</th>' + MET.map(function (m) { return '<th style="color:' + m.col + '">' + m.lbl + '</th>'; }).join('') + '<th>Cumple</th></tr></thead><tbody>';
+            h += '<div style="overflow-x:auto"><table class="t obj"><thead><tr><th>Día</th><th>MD</th><th>Min</th>' + MET.map(function (m) { return '<th style="color:' + m.col + '">' + m.lbl + '</th>'; }).join('') + '<th>Cumple</th></tr></thead><tbody>';
             var semanas = {};
             F.slice().reverse().forEach(function (s) {
                 var fila = '<tr' + (s.tipo === 'match' ? ' class="par"' : '') + '><td>' + fecha(s.f, true) + (s.tipo === 'match' ? ' <span style="color:#fbbf24">⚽ ' + esc(s.rival) + '</span>' : '') + '</td><td>' + (s.md || '—') + '</td><td>' + fmt(s.min, 0) + '</td>';
@@ -456,7 +456,7 @@
         else {
             var baseP = media(pesos.slice(0, Math.min(10, pesos.length - 1)).map(function (w) { return w.peso; }));
             var pu = pesos[pesos.length - 1];
-            h += '<div style="display:flex;gap:16px;align-items:baseline;margin-bottom:4px"><span style="font-size:24px;font-weight:800;color:#fff">' + fmt(pu.peso, 1) + ' kg</span><span style="color:' + (Math.abs((pu.peso - baseP) / baseP * 100) >= 2 ? ST.ambar : '#94a3b8') + ';font-size:12.5px">' + ((pu.peso - baseP) >= 0 ? '+' : '') + fmt(pu.peso - baseP, 1) + ' kg (' + ((pu.peso - baseP) >= 0 ? '+' : '') + fmt((pu.peso - baseP) / baseP * 100, 1) + '%) vs referencia ' + fmt(baseP, 1) + ' kg · ' + fecha(pu.f) + '</span></div>'
+            h += '<div style="display:flex;gap:16px;align-items:baseline;margin-bottom:4px;flex-wrap:wrap"><span style="font-size:24px;font-weight:800;color:#fff;white-space:nowrap">' + fmt(pu.peso, 1) + ' kg</span><span style="color:' + (Math.abs((pu.peso - baseP) / baseP * 100) >= 2 ? ST.ambar : '#94a3b8') + ';font-size:12.5px">' + ((pu.peso - baseP) >= 0 ? '+' : '') + fmt(pu.peso - baseP, 1) + ' kg (' + ((pu.peso - baseP) >= 0 ? '+' : '') + fmt((pu.peso - baseP) / baseP * 100, 1) + '%) vs referencia ' + fmt(baseP, 1) + ' kg · ' + fecha(pu.f) + '</span></div>'
                + '<div class="cv s"><canvas id="ij-c-peso"></canvas></div>';
         }
         h += '</div></div></div>';
@@ -498,6 +498,29 @@
         });
         return Object.keys(porDia).map(function (k) { return porDia[k]; }).sort(function (a, b) { return a.f < b.f ? -1 : 1; });
     }
+    function sesionesGrupo(pids, M) {
+        var acc = {}, keys = ['min', 'vmax', 'nsprint', 'mmin'].concat(MET.map(function (m) { return m.k; }));
+        pids.forEach(function (pid) {
+            sesionesDe(pid, M).forEach(function (s) {
+                var k = s.f + '|' + s.tipo;
+                if (!acc[k]) { acc[k] = { f: s.f, tipo: s.tipo, md: s.md, n: 0, sum: {}, cnt: {} }; }
+                var a = acc[k]; a.n++;
+                keys.forEach(function (x) { var v = s[x]; if (v === null || v === undefined || isNaN(v)) return; a.sum[x] = (a.sum[x] || 0) + v; a.cnt[x] = (a.cnt[x] || 0) + 1; });
+            });
+        });
+        return Object.keys(acc).map(function (k) {
+            var a = acc[k], o = { f: a.f, tipo: a.tipo, md: a.md, n: a.n };
+            keys.forEach(function (x) { o[x] = a.cnt[x] ? a.sum[x] / a.cnt[x] : null; });
+            return o;
+        }).filter(function (o) { return o.n >= 2; }).sort(function (a, b) { return a.f < b.f ? -1 : 1; });
+    }
+    function serieVirtual(id, M, j) {
+        // 'equipo' o 'grp:Centrocampistas' -> media de ese grupo (sin el propio jugador)
+        var pids = Object.keys(M.porJug).filter(function (pid) { return pid !== j.id; });
+        var nombre = 'Media del equipo';
+        if (id.indexOf('grp:') === 0) { var g = id.slice(4); pids = pids.filter(function (pid) { return M.grupoDe(pid) === g; }); nombre = 'Media ' + g.toLowerCase(); }
+        return { nombre: nombre + ' (' + pids.length + ')', ss: sesionesGrupo(pids, M), virtual: true };
+    }
     function cmpMetricas() { return MET.concat(EXTRA.map(function (m) { return { k: m.k, lbl: m.lbl, dec: m.dec, uni: m.uni || '' }; })); }
     function renderCmp() {
         var c = document.getElementById('ij-cmp'); if (!c || !S.m) return;
@@ -507,10 +530,15 @@
         var desde = C.rango ? addDias(hoy, -C.rango) : '0000-00-00';
         var met = cmpMetricas().filter(function (m) { return m.k === C.met; })[0] || MET[0];
         var filtrar = function (ss) { return ss.filter(function (s) { if (s.f < desde) return false; if (C.tipo === 'training' && s.tipo === 'match') return false; if (C.tipo === 'match' && s.tipo !== 'match') return false; if (C.md && s.md !== C.md) return false; return s[met.k] !== null && s[met.k] !== undefined; }); };
-        var series = ids.map(function (pid, i) { var pj = S.d.jug[pid] || { name: pid === j.id ? j.name : '?' }; return { pid: pid, nombre: pj.name, col: CMPCOL[i], ss: filtrar(sesionesDe(pid, M)) }; });
+        var series = ids.map(function (pid, i) {
+            if (pid === 'equipo' || pid.indexOf('grp:') === 0) { var v = serieVirtual(pid, M, j); return { pid: pid, nombre: v.nombre, col: CMPCOL[i], ss: filtrar(v.ss), virtual: true }; }
+            var pj = S.d.jug[pid] || { name: pid === j.id ? j.name : '?' }; return { pid: pid, nombre: pj.name, col: CMPCOL[i], ss: filtrar(sesionesDe(pid, M)) };
+        });
         // selects
         var jugadores = Object.keys(S.d.jug).filter(function (pid) { return pid !== j.id; }).map(function (pid) { return S.d.jug[pid]; }).sort(function (a, b) { var ga = grupoPos(a.position_detail || (a.positions_main && a.positions_main[0])), gb = grupoPos(b.position_detail || (b.positions_main && b.positions_main[0])); return ga === gb ? (a.name < b.name ? -1 : 1) : (ga < gb ? -1 : 1); });
-        var optJug = function (sel) { var h = '<option value="">— nadie —</option>', g = ''; jugadores.forEach(function (p) { var gp = grupoPos(p.position_detail || (p.positions_main && p.positions_main[0])); if (gp !== g) { if (g) h += '</optgroup>'; h += '<optgroup label="' + esc(gp) + '">'; g = gp; } var tiene = M.porJug[p.id] ? '' : ' (sin GPS)'; h += '<option value="' + p.id + '"' + (sel === p.id ? ' selected' : '') + '>' + esc(p.name) + tiene + '</option>'; }); if (g) h += '</optgroup>'; return h; };
+        var grupos = {}; Object.keys(M.porJug).forEach(function (pid) { if (pid !== j.id) grupos[M.grupoDe(pid)] = (grupos[M.grupoDe(pid)] || 0) + 1; });
+        var optJug = function (sel) { var h = '<option value="">— nadie —</option>', g = '';
+            h += '<optgroup label="Medias"><option value="equipo"' + (sel === 'equipo' ? ' selected' : '') + '>Media del equipo</option>' + Object.keys(grupos).sort().map(function (gp) { return '<option value="grp:' + esc(gp) + '"' + (sel === 'grp:' + gp ? ' selected' : '') + '>Media ' + esc(gp.toLowerCase()) + ' (' + grupos[gp] + ')</option>'; }).join('') + '</optgroup>'; jugadores.forEach(function (p) { var gp = grupoPos(p.position_detail || (p.positions_main && p.positions_main[0])); if (gp !== g) { if (g) h += '</optgroup>'; h += '<optgroup label="' + esc(gp) + '">'; g = gp; } var tiene = M.porJug[p.id] ? '' : ' (sin GPS)'; h += '<option value="' + p.id + '"' + (sel === p.id ? ' selected' : '') + '>' + esc(p.name) + tiene + '</option>'; }); if (g) h += '</optgroup>'; return h; };
         var mds = {}; Object.keys(M.porJug).forEach(function (pid) { M.porJug[pid].training.forEach(function (s) { if (s.md) mds[s.md] = 1; }); });
         var ordenMd = ['MD-6', 'MD-5', 'MD-4', 'MD-3', 'MD-2', 'MD-1', 'MD', 'MD+1', 'MD+2', 'MD+3'];
         var h = '<div class="flt" style="margin-left:0;margin-bottom:10px">'
@@ -536,7 +564,7 @@
                     var dif = (mia && mu !== null && x.pid !== j.id) ? (mu - mia) / mia * 100 : null;
                     h += '<tr><td style="text-align:left"><i style="display:inline-block;width:9px;height:9px;border-radius:2px;background:' + x.col + ';margin-right:6px;vertical-align:middle"></i>' + esc(x.nombre) + '</td><td>' + v.length + '</td><td style="color:#fff;font-weight:700">' + fmt(mu, met.dec) + '</td><td>' + (v.length ? fmt(Math.max.apply(null, v), met.dec) : '—') + '</td><td>' + (v.length ? fmt(Math.min.apply(null, v), met.dec) : '—') + '</td><td>' + (met.k === 'vmax' || met.k === 'mmin' ? '—' : fmt(v.reduce(function (a, b) { return a + b; }, 0), met.dec)) + '</td><td style="color:' + (dif === null ? '#64748b' : (dif > 0 ? ST.ok : ST.rojo)) + '">' + (dif === null ? '—' : (dif > 0 ? '+' : '') + fmt(dif, 0) + '%') + '</td></tr>';
                 });
-                h += '</tbody></table></div><div class="nota">' + met.lbl + (met.uni ? ' (' + met.uni + ')' : '') + ' por sesión (las sesiones del mismo día se suman). "vs" = diferencia de la media frente a ' + esc(j.name) + '. Pasa el ratón por la gráfica para ver cada sesión.</div>';
+                h += '</tbody></table></div><div class="nota">' + met.lbl + (met.uni ? ' (' + met.uni + ')' : '') + ' por sesión (las sesiones del mismo día se suman; las "medias" de equipo o posición no incluyen a ' + esc(j.name) + ' y solo cuentan días con 2 o más jugadores con GPS). "vs" = diferencia de la media frente a ' + esc(j.name) + '. Pasa el ratón por la gráfica para ver cada sesión.</div>';
             }
         }
         c.innerHTML = h;
@@ -545,13 +573,13 @@
         if (S.chartCmp) { try { S.chartCmp.destroy(); } catch (e) {} S.chartCmp = null; }
         if (C.vista === 'media') {
             S.chartCmp = new Chart(ctx, { type: 'bar', data: { labels: series.map(function (x) { return x.nombre; }), datasets: [{ label: met.lbl, data: series.map(function (x) { return media(x.ss.map(function (s) { return s[met.k]; })); }), backgroundColor: series.map(function (x) { return x.col; }), borderRadius: 4, barPercentage: .45, categoryPercentage: .7 }] },
-                options: base({ indexAxis: 'y', plugins: { legend: { display: false }, tooltip: { callbacks: { label: function (it) { var x = series[it.dataIndex]; return 'Media: ' + fmt(it.raw, met.dec) + (met.uni ? ' ' + met.uni : '') + ' · ' + x.ss.length + ' sesiones'; } } } }, scales: { x: { grid: { color: 'rgba(148,163,184,.08)' }, ticks: { color: '#94a3b8', font: { size: 10 } }, beginAtZero: true }, y: { grid: { display: false }, ticks: { color: '#cbd5e1', font: { size: 12 } } } } }) });
+                options: base({ indexAxis: 'y', plugins: { legend: { display: false }, tooltip: { callbacks: { label: function (it) { var x = series[it.dataIndex]; return 'Media: ' + fmt(it.raw, met.dec) + (met.uni ? ' ' + met.uni : '') + ' · ' + x.ss.length + ' sesiones'; } } } }, scales: { x: { grid: { color: gridCol() }, ticks: { color: tickCol(), font: { size: 10 } }, beginAtZero: true }, y: { grid: { display: false }, ticks: { color: cc('#cbd5e1', '#1e293b'), font: { size: 12 } } } } }) });
         } else {
             var fechas = {}; series.forEach(function (x) { x.ss.forEach(function (s) { fechas[s.f + '|' + s.tipo] = s; }); });
             var keys = Object.keys(fechas).sort();
             var ds = series.map(function (x) { var map = {}; x.ss.forEach(function (s) { map[s.f + '|' + s.tipo] = s; }); return { label: x.nombre, data: keys.map(function (k) { return map[k] ? map[k][met.k] : null; }), borderColor: x.col, backgroundColor: x.col, borderWidth: 2, pointRadius: keys.map(function (k) { return fechas[k].tipo === 'match' ? 6 : 4; }), pointStyle: keys.map(function (k) { return fechas[k].tipo === 'match' ? 'rectRot' : 'circle'; }), tension: .2, spanGaps: false, _map: map }; });
             S.chartCmp = new Chart(ctx, { type: 'line', data: { labels: keys.map(function (k) { return fecha(k.slice(0, 10)); }), datasets: ds },
-                options: base({ plugins: { legend: { display: false }, tooltip: { callbacks: { title: function (it) { var s = fechas[keys[it[0].dataIndex]]; return fecha(s.f, true) + ' · ' + (s.tipo === 'match' ? 'Partido' : s.md); }, label: function (it) { var s = it.dataset._map[keys[it.dataIndex]]; return it.dataset.label + ': ' + fmt(it.raw, met.dec) + (met.uni ? ' ' + met.uni : '') + (s && s.min ? ' · ' + fmt(s.min, 0) + ' min' : ''); } } } } }) });
+                options: base({ plugins: { legend: { display: false }, tooltip: { callbacks: { title: function (it) { var s = fechas[keys[it[0].dataIndex]]; return fecha(s.f, true) + ' · ' + (s.tipo === 'match' ? 'Partido' : s.md); }, label: function (it) { var s = it.dataset._map[keys[it.dataIndex]]; return it.dataset.label + ': ' + fmt(it.raw, met.dec) + (met.uni ? ' ' + met.uni : '') + (s && s.n ? ' · ' + s.n + ' jugadores' : (s && s.min ? ' · ' + fmt(s.min, 0) + ' min' : '')); } } } } }) });
         }
     }
     window.cmIjCmp = function (k, v) { if (k === 'rango') v = parseInt(v, 10) || 0; S.cmp[k] = v; renderCmp(); };
@@ -569,10 +597,13 @@
     }
 
     /* ---------- Graficos (Chart.js) ---------- */
+    function cc(oscuro, claro) { return S.luz ? claro : oscuro; }
+    function gridCol() { return S.luz ? 'rgba(15,23,42,.1)' : 'rgba(148,163,184,.08)'; }
+    function tickCol() { return S.luz ? '#475569' : '#94a3b8'; }
     function base(extra) {
         return Object.assign({ responsive: true, maintainAspectRatio: false, animation: false, interaction: { mode: 'index', intersect: false },
-            plugins: { legend: { display: false }, tooltip: { backgroundColor: '#0f172a', borderColor: '#334155', borderWidth: 1, titleColor: '#fff', bodyColor: '#cbd5e1', padding: 10 } },
-            scales: { x: { grid: { color: 'rgba(148,163,184,.08)' }, ticks: { color: '#94a3b8', font: { size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } }, y: { grid: { color: 'rgba(148,163,184,.08)' }, ticks: { color: '#94a3b8', font: { size: 10 } }, beginAtZero: true } } }, extra || {});
+            plugins: { legend: { display: false }, tooltip: { backgroundColor: '#0f172a', borderColor: cc('#334155', '#cbd5e1'), borderWidth: 1, titleColor: '#fff', bodyColor: '#cbd5e1', padding: 10 } },
+            scales: { x: { grid: { color: gridCol() }, ticks: { color: tickCol(), font: { size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } }, y: { grid: { color: gridCol() }, ticks: { color: tickCol(), font: { size: 10 } }, beginAtZero: true } } }, extra || {});
     }
     function pintarCharts(M, F, wF, pF, conZ, zn) {
         if (typeof Chart === 'undefined') return;
@@ -586,17 +617,17 @@
             var mm = vals.map(function (v, i) { var sl = F.slice(Math.max(0, i - 4), i + 1).filter(function (s) { return s.tipo !== 'match'; }).map(function (s) { return s[m.k]; }); return sl.length >= 3 ? media(sl) : null; });
             var ref = M.ref[m.k] || (m.k === 'vmax' ? (M.perfil ? num(M.perfil.max_speed_kmh) : null) : null);
             var ds = [
-                { type: 'bar', data: vals, backgroundColor: F.map(function (s) { return s.tipo === 'match' ? '#fbbf24' : m.col; }), borderRadius: 3, barPercentage: .7, categoryPercentage: .8, order: 3, label: m.lbl },
-                { type: 'line', data: mm, borderColor: '#94a3b8', borderWidth: 2, borderDash: [4, 3], pointRadius: 0, tension: .3, spanGaps: true, order: 2, label: 'Media móvil 5' }
+                { type: 'bar', data: vals, backgroundColor: F.map(function (s) { return s.tipo === 'match' ? cc('#fbbf24', '#d97706') : m.col; }), borderRadius: 3, barPercentage: .7, categoryPercentage: .8, order: 3, label: m.lbl },
+                { type: 'line', data: mm, borderColor: cc('#94a3b8', '#64748b'), borderWidth: 2, borderDash: [4, 3], pointRadius: 0, tension: .3, spanGaps: true, order: 2, label: 'Media móvil 5' }
             ];
-            if (ref) ds.push({ type: 'line', data: vals.map(function () { return ref; }), borderColor: '#38bdf8', borderWidth: 1.5, pointRadius: 0, order: 1, label: 'Referencia partido' });
+            if (ref) ds.push({ type: 'line', data: vals.map(function () { return ref; }), borderColor: cc('#38bdf8', '#0284c7'), borderWidth: 1.5, pointRadius: 0, order: 1, label: 'Referencia partido' });
             S.charts.push(new Chart(ctx, { data: { labels: labels, datasets: ds }, options: base({ plugins: { legend: { display: false }, tooltip: { callbacks: { title: function (it) { var s = F[it[0].dataIndex]; return fecha(s.f, true) + ' · ' + (s.tipo === 'match' ? 'Partido vs ' + s.rival : s.md + ' · ' + s.titulo); }, label: function (it) { return it.dataset.label + ': ' + fmt(it.raw, m.dec || 1); } } } } }) }));
         }
         // Wellness
         ctx = document.getElementById('ij-c-well');
         if (ctx) {
             var ws = wF.filter(function (w) { return w.sueno !== null || w.fatiga !== null || w.estres !== null || w.musc !== null; });
-            S.charts.push(new Chart(ctx, { type: 'line', data: { labels: ws.map(function (w) { return fecha(w.f); }), datasets: WELL.map(function (w) { return { label: w.lbl, data: ws.map(function (x) { return x[w.k] === null ? null : num(x[w.k]); }), borderColor: w.col, backgroundColor: w.col, borderWidth: 2, pointRadius: 3, tension: .3, spanGaps: true }; }) }, options: base({ scales: { x: { grid: { color: 'rgba(148,163,184,.08)' }, ticks: { color: '#94a3b8', font: { size: 10 }, maxTicksLimit: 12 } }, y: { min: 0, max: 10, grid: { color: 'rgba(148,163,184,.08)' }, ticks: { color: '#94a3b8', font: { size: 10 }, stepSize: 2 } } } }) }));
+            S.charts.push(new Chart(ctx, { type: 'line', data: { labels: ws.map(function (w) { return fecha(w.f); }), datasets: WELL.map(function (w) { return { label: w.lbl, data: ws.map(function (x) { return x[w.k] === null ? null : num(x[w.k]); }), borderColor: w.col, backgroundColor: w.col, borderWidth: 2, pointRadius: 3, tension: .3, spanGaps: true }; }) }, options: base({ scales: { x: { grid: { color: gridCol() }, ticks: { color: tickCol(), font: { size: 10 }, maxTicksLimit: 12 } }, y: { min: 0, max: 10, grid: { color: gridCol() }, ticks: { color: tickCol(), font: { size: 10 }, stepSize: 2 } } } }) }));
         }
         // RPE
         ctx = document.getElementById('ij-c-rpe');
@@ -616,33 +647,52 @@
             S.charts.push(new Chart(ctx, { type: 'line', data: { labels: ps.map(function (w) { return fecha(w.f); }), datasets: [
                 { label: 'Peso', data: ps.map(function (w) { return w.peso; }), borderColor: '#3b82f6', backgroundColor: '#3b82f6', borderWidth: 2, pointRadius: 3, tension: .25 },
                 { label: 'Referencia', data: ps.map(function () { return baseP; }), borderColor: '#94a3b8', borderWidth: 1.5, borderDash: [4, 3], pointRadius: 0 }
-            ] }, options: base({ scales: { x: { grid: { color: 'rgba(148,163,184,.08)' }, ticks: { color: '#94a3b8', font: { size: 10 }, maxTicksLimit: 10 } }, y: { min: Math.floor(vmin), max: Math.ceil(vmax), grid: { color: 'rgba(148,163,184,.08)' }, ticks: { color: '#94a3b8', font: { size: 10 }, callback: function (v) { return v + ' kg'; } } } }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: function (it) { return it.dataset.label + ': ' + fmt(it.raw, 1) + ' kg'; } } } } }) }));
+            ] }, options: base({ scales: { x: { grid: { color: gridCol() }, ticks: { color: tickCol(), font: { size: 10 }, maxTicksLimit: 10 } }, y: { min: Math.floor(vmin), max: Math.ceil(vmax), grid: { color: gridCol() }, ticks: { color: tickCol(), font: { size: 10 }, callback: function (v) { return v + ' kg'; } } } }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: function (it) { return it.dataset.label + ': ' + fmt(it.raw, 1) + ' kg'; } } } } }) }));
         }
         // Zonas
         ctx = document.getElementById('ij-c-zonas');
         if (ctx && conZ.length) {
-            var cols = ['#334155', '#3b82f6', '#0d9488', '#d97706', '#e11d48'];
-            S.charts.push(new Chart(ctx, { type: 'bar', data: { labels: conZ.map(function (s) { return fecha(s.f); }), datasets: zn.map(function (n, i) { return { label: n, data: conZ.map(function (s) { return s.z[i]; }), backgroundColor: cols[i], borderColor: '#111c33', borderWidth: 1, borderRadius: 2, barPercentage: .75 }; }) }, options: base({ scales: { x: { stacked: true, grid: { color: 'rgba(148,163,184,.08)' }, ticks: { color: '#94a3b8', font: { size: 10 }, maxTicksLimit: 12 } }, y: { stacked: true, grid: { color: 'rgba(148,163,184,.08)' }, ticks: { color: '#94a3b8', font: { size: 10 } } } }, plugins: { legend: { display: false }, tooltip: { callbacks: { title: function (it) { var s = conZ[it[0].dataIndex]; return fecha(s.f, true) + ' · ' + (s.md || '') + ' · ' + fmt(s.td, 0) + ' m'; }, label: function (it) { return it.dataset.label + ': ' + fmt(it.raw, 0) + ' m (' + fmt(it.raw / (conZ[it.dataIndex].td || 1) * 100, 0) + '%)'; } } } } }) }));
+            var cols = [cc('#334155', '#cbd5e1'), '#3b82f6', '#0d9488', '#d97706', '#e11d48'];
+            S.charts.push(new Chart(ctx, { type: 'bar', data: { labels: conZ.map(function (s) { return fecha(s.f); }), datasets: zn.map(function (n, i) { return { label: n, data: conZ.map(function (s) { return s.z[i]; }), backgroundColor: cols[i], borderColor: '#111c33', borderWidth: 1, borderRadius: 2, barPercentage: .75 }; }) }, options: base({ scales: { x: { stacked: true, grid: { color: gridCol() }, ticks: { color: tickCol(), font: { size: 10 }, maxTicksLimit: 12 } }, y: { stacked: true, grid: { color: gridCol() }, ticks: { color: tickCol(), font: { size: 10 } } } }, plugins: { legend: { display: false }, tooltip: { callbacks: { title: function (it) { var s = conZ[it[0].dataIndex]; return fecha(s.f, true) + ' · ' + (s.md || '') + ' · ' + fmt(s.td, 0) + ' m'; }, label: function (it) { return it.dataset.label + ': ' + fmt(it.raw, 0) + ' m (' + fmt(it.raw / (conZ[it.dataIndex].td || 1) * 100, 0) + '%)'; } } } } }) }));
         }
     }
 
     /* ---------- PDF: vista de impresion con los graficos como imagen ---------- */
+    var PRINT_CSS = ''
+        + 'body{margin:0;padding:14px;background:#fff;color:#0f172a;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact}'
+        + '.ij{color:#1e293b}.ij .nm,.ij .sem b,.ij .kpi .v{color:#0f172a}.ij .sub,.ij .sub b,.ij .kpi .l,.ij .kpi .d,.ij .kpi .v small,.ij h4,.ij .leg,.ij .nota,.ij .t th,.ij .bul .n small,.ij .sem small,.ij .cl{color:#475569}'
+        + '.ij h4 span{color:#64748b}.ij .foto{background:#f1f5f9;border-color:#cbd5e1}.ij .foto.ini{color:#64748b}'
+        + '.ij .sem{background:#f8fafc;border-color:#cbd5e1}.ij .sem .dot{box-shadow:0 0 0 4px rgba(0,0,0,.05)}'
+        + '.ij .kpi{background:#f8fafc;border-top-color:#cbd5e1}.ij .card{background:#fff;border-color:#cbd5e1}'
+        + '.ij .t td{border-bottom-color:#e2e8f0;color:#1e293b}.ij .t th{border-bottom-color:#cbd5e1}.ij .t tr.par td{color:#b45309}.ij .t tr.sem td{background:#e0f2fe;color:#0369a1}'
+        + '.ij .bul .l,.ij .zs .l,.ij .zs .n{color:#1e293b}.ij .bul .bar,.ij .zs .ax{background:#e2e8f0}.ij .bul .obj{background:rgba(2,132,199,.18);border-color:#0284c7}.ij .zs .ax::before{background:#94a3b8}'
+        + '.ij .al{background:#f1f5f9;color:#1e293b}.ij .pill{filter:saturate(1.1)}'
+        + '.ij .cv{height:auto}.ij .card{break-inside:auto}.ij .kpis,.ij .g2,.ij .cv,.ij .bul,.ij tr{break-inside:avoid}.ij h4{break-after:avoid}@page{size:A4;margin:10mm}'
+        + '.ij .t td,.ij .t th{white-space:normal}.ij .t td:nth-child(2),.ij .t.obj td{white-space:nowrap}';
+    var MAPA_CLARO = [['#ffffff', '#0f172a'], ['#fff', '#0f172a'], ['#e2e8f0', '#1e293b'], ['#cbd5e1', '#1e293b'], ['#94a3b8', '#475569'], ['#1e293b', '#e2e8f0'], ['#111c33', '#ffffff'], ['#0f172a', '#ffffff'], ['#334155', '#cbd5e1'], ['#475569', '#94a3b8'], ['#fbbf24', '#d97706'], ['#38bdf8', '#0284c7'], ['rgba(255,255,255,.06)', 'rgba(0,0,0,.05)']];
+    function aclarar(style) {
+        // sustituye colores de tema oscuro por su equivalente claro en estilos en linea (de una vez, sin encadenar)
+        return style.replace(/#[0-9a-fA-F]{3,6}\b|rgba\([^)]*\)/g, function (c) { var lc = c.toLowerCase(); for (var i = 0; i < MAPA_CLARO.length; i++) if (MAPA_CLARO[i][0] === lc) return MAPA_CLARO[i][1]; return c; });
+    }
     window.cmIjPdf = function () {
         var root = document.getElementById('ij-root'); if (!root) return;
+        // 1) repintar las graficas en modo claro, 2) clonar, 3) volver al modo oscuro
+        S.luz = true;
+        try { render(); } catch (e) { S.luz = false; render(); return; }
         var clon = root.cloneNode(true);
         Array.prototype.forEach.call(clon.querySelectorAll('canvas'), function (c) {
             var orig = document.getElementById(c.id); var img = document.createElement('img');
             try { img.src = orig.toDataURL('image/png'); } catch (e) {}
             img.style.cssText = 'width:100%;height:auto;display:block'; c.parentNode.replaceChild(img, c);
         });
-        Array.prototype.forEach.call(clon.querySelectorAll('.flt, select'), function (e) { e.remove(); });
+        S.luz = false; render();
+        Array.prototype.forEach.call(clon.querySelectorAll('.flt, select, button'), function (e) { e.remove(); });
+        Array.prototype.forEach.call(clon.querySelectorAll('[style]'), function (e) { e.setAttribute('style', aclarar(e.getAttribute('style'))); });
         var w = window.open('', '_blank'); if (!w) { alert('El navegador ha bloqueado la ventana. Permite las ventanas emergentes para exportar.'); return; }
         w.document.write('<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>Informe · ' + esc(S.j.name) + '</title><style>'
-            + 'body{margin:0;padding:18px;background:#0f172a;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact}'
-            + CSS + '.ij .cv{height:auto}.ij .card{break-inside:auto}.ij .kpis,.ij .g2,.ij .cv,.ij .bul,.ij tr{break-inside:avoid}.ij h4{break-after:avoid}@page{size:A4;margin:10mm}'
-            + '.ij .t td,.ij .t th{white-space:normal}.ij .t td:nth-child(2){white-space:nowrap}'
+            + CSS + PRINT_CSS
             + '</style></head><body>' + clon.outerHTML
-            + '<div style="margin-top:16px;color:#94a3b8;font-size:11px">TopLiderCoach · Informe individual de carga</div>'
+            + '<div style="margin-top:16px;color:#64748b;font-size:11px">TopLiderCoach · Informe individual de carga · ' + new Date().toLocaleDateString('es-ES') + '</div>'
             + '<script>window.onload=function(){setTimeout(function(){window.print();},400);};<\/script></body></html>');
         w.document.close();
     };
