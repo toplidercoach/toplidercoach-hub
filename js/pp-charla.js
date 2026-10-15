@@ -136,16 +136,30 @@
         });
         var abps = ppGetAbpCards();
         abps.forEach(function (c, i) { L.push({ key: 'abp:' + (c.id || i), tipo: 'ABP', titulo: (c.name || 'ABP') + ' · ' + (c.tipo || ''), sub: (c.explicacion || '').slice(0, 90), equipo: 'own', abp: c }); });
-        L.push({ key: 'cierre', tipo: 'Cierre', titulo: 'Cierre: ¡vamos a por ellos!', sub: '', equipo: '', fijo: true });
+        var ci = cierreLeer();
+        L.push({ key: 'cierre', tipo: 'Cierre', titulo: 'Cierre: ' + ci.titulo, sub: (ci.texto || '').slice(0, 90) + (ci.media.length ? ' · ' + ci.media.length + ' medio' + (ci.media.length > 1 ? 's' : '') : ''), equipo: '', fijo: true, cierre: true });
         return L;
     }
     function cfgLeer() {
         var wm = pp.planActual.weekly_map || {};
         var c = wm.charla && typeof wm.charla === 'object' ? wm.charla : {};
-        return { off: c.off || {}, orden: Array.isArray(c.orden) ? c.orden : [] };
+        return { off: c.off || {}, orden: Array.isArray(c.orden) ? c.orden : [], cierre: c.cierre && typeof c.cierre === 'object' ? c.cierre : null };
+    }
+    // Cierre: frase, texto y medios (imagen, dibujo de pizarra o video). Si el partido no tiene, se usa el ultimo usado en este navegador
+    function cierreLeer() {
+        var c = cfgLeer().cierre;
+        if (!c) { try { c = JSON.parse(localStorage.getItem('tlc_charla_cierre') || 'null'); } catch (e) { c = null; } }
+        c = c || {};
+        return { titulo: c.titulo || 'VAMOS A POR ELLOS', texto: c.texto || '', media: Array.isArray(c.media) ? c.media : [] };
+    }
+    async function cierreGuardar(ci) {
+        var wm = pp.planActual.weekly_map || {}; wm.charla = wm.charla && typeof wm.charla === 'object' ? wm.charla : {}; wm.charla.cierre = ci;
+        try { localStorage.setItem('tlc_charla_cierre', JSON.stringify({ titulo: ci.titulo, texto: ci.texto, media: ci.media.filter(function (m) { return m.type !== 'image' || (m.url || '').length < 200; }) })); } catch (e) {}
+        try { await supabaseClient.from('match_plans').update({ weekly_map: wm, updated_at: new Date().toISOString() }).eq('id', pp.planActual.id); pp.planActual.weekly_map = wm; }
+        catch (e) { showToast('No se pudo guardar el cierre: ' + e.message); }
     }
     async function cfgGuardar(cfg) {
-        var wm = pp.planActual.weekly_map || {}; wm.charla = { off: cfg.off, orden: cfg.orden };
+        var wm = pp.planActual.weekly_map || {}; var ant = wm.charla && typeof wm.charla === 'object' ? wm.charla : {}; wm.charla = { off: cfg.off, orden: cfg.orden, cierre: ant.cierre || null };
         try { await supabaseClient.from('match_plans').update({ weekly_map: wm, updated_at: new Date().toISOString() }).eq('id', pp.planActual.id); pp.planActual.weekly_map = wm; }
         catch (e) { showToast('No se pudo guardar la selección: ' + e.message); }
     }
@@ -180,6 +194,7 @@
             h += '<div class="it' + (c.on ? '' : ' off') + '"><input type="checkbox"' + (c.on ? ' checked' : '') + (c.fijo ? ' disabled' : '') + ' onchange="chPrepToggle(' + i + ',this.checked)">'
                + '<span class="k" style="background:' + col + '22;color:' + col + ';border:1px solid ' + col + '66">' + esc(c.tipo) + '</span>'
                + '<div class="t">' + esc(c.titulo) + (c.sub ? '<small>' + esc(c.sub) + '</small>' : '') + '</div>'
+               + (c.cierre ? '<div class="mv"><button onclick="chCierreEditar()" style="width:auto;padding:0 10px" title="Cambiar la frase, el texto o añadir un vídeo">✏️ Editar cierre</button></div>' : '')
                + (c.fijo ? '' : '<div class="mv"><button onclick="chPrepMover(' + i + ',-1)" title="Subir">▲</button> <button onclick="chPrepMover(' + i + ',1)" title="Bajar">▼</button></div>')
                + '</div>';
         });
@@ -199,6 +214,38 @@
         var t = L[i]; L[i] = L[j]; L[j] = t; pintarPreparador(); guardarSel();
     };
     window.chPrepTodas = function (v) { C.lista.forEach(function (c) { if (!c.fijo) c.on = v; }); pintarPreparador(); guardarSel(); };
+    window.chCierreEditar = function () {
+        var ov = document.getElementById('ch-prep'); if (!ov) return;
+        C.cierre = cierreLeer();
+        pintarCierre();
+    };
+    function pintarCierre() {
+        var ov = document.getElementById('ch-prep'); if (!ov) return; var ci = C.cierre;
+        var ta = 'width:100%;padding:9px 11px;background:#0b1220;border:1px solid #334155;color:#e2e8f0;border-radius:8px;font:inherit;font-size:13px';
+        var ms = '';
+        (ci.media || []).forEach(function (m, k) {
+            var ico = m.type === 'image' ? '<img src="' + esc(m.url) + '" style="width:100%;height:100%;object-fit:cover">' : '<div style="display:flex;align-items:center;justify-content:center;height:100%;font-size:20px">🎞️</div>';
+            ms += '<div class="m" style="width:110px;height:70px;position:relative;border:1px solid #334155;border-radius:6px;overflow:hidden;background:#0b1220" title="' + esc(m.title || L.nombreDe(m)) + '">' + ico + '<span style="position:absolute;left:0;right:0;bottom:0;font-size:10px;padding:2px 4px;background:rgba(0,0,0,.7);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(m.title || L.nombreDe(m)) + '</span><b onclick="chCierreQuitar(' + k + ')" style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:rgba(127,29,29,.9);color:#fff;font-size:11px;line-height:18px;text-align:center;cursor:pointer">×</b></div>';
+        });
+        ov.innerHTML = '<div class="box" style="max-width:640px"><div class="cab"><div><h3>🏁 Diapositiva de cierre</h3><p>La frase que verán los jugadores al final. Puedes añadir una imagen, un dibujo de la pizarra o un vídeo motivador. Se guarda para este partido y se recuerda para los siguientes.</p></div></div>'
+            + '<div class="lst" style="display:flex;flex-direction:column;gap:12px">'
+            + '<label style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px">Frase principal<input id="ch-ci-t" value="' + esc(ci.titulo) + '" maxlength="90" style="' + ta + ';font-size:16px;font-weight:800;margin-top:4px" placeholder="Ej. HOY SE GANA EN LOS DUELOS"></label>'
+            + '<label style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px">Texto (opcional)<textarea id="ch-ci-x" rows="4" style="' + ta + ';margin-top:4px;resize:vertical" placeholder="Tres ideas con las que salir al campo, una cita, un recordatorio...">' + esc(ci.texto) + '</textarea></label>'
+            + '<div><div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Imagen o vídeo (opcional)</div><div style="display:flex;flex-wrap:wrap;gap:8px">' + ms + '</div><div class="ch-acc"><button onclick="chCierreImg()">📷 Imagen / vídeo</button><button onclick="chCierrePiz()">🎨 Dibujo de pizarra</button><button onclick="chCierreVid()">🎞️ Vídeo de mi carpeta</button></div></div>'
+            + '<div style="font-size:11.5px;color:#64748b">Ideas: una frase corta en mayúsculas funciona mejor que un párrafo. Si pones un solo vídeo, saldrá grande en el centro para reproducirlo al final de la charla.</div>'
+            + '</div><div class="pie"><button onclick="chCierreCancelar()">Cancelar</button><span class="n"></span><button class="p" onclick="chCierreGuardar()">💾 Guardar cierre</button></div></div>';
+    }
+    function cierreLeerForm() { var t = document.getElementById('ch-ci-t'), x = document.getElementById('ch-ci-x'); if (t) C.cierre.titulo = t.value.trim() || 'VAMOS A POR ELLOS'; if (x) C.cierre.texto = x.value.trim(); }
+    window.chCierreQuitar = function (k) { cierreLeerForm(); C.cierre.media.splice(k, 1); pintarCierre(); };
+    window.chCierreImg = function () { cierreLeerForm(); ppAbrirModalMedia('ch-media-ov', function (url, title, tipo) { C.cierre.media.push({ url: url, title: title || '', type: tipo }); pintarCierre(); }); };
+    window.chCierrePiz = function () { cierreLeerForm(); pickerPizarra(function (img, nombre, id) { C.cierre.media.push({ url: img, title: nombre, type: 'image', pizarra_item_id: id }); pintarCierre(); }); };
+    window.chCierreVid = function () { cierreLeerForm(); pickerVideoLocal(function (n) { C.cierre.media.push({ url: 'local:' + n, file: n, title: tituloVideo(n), type: 'local' }); pintarCierre(); }); };
+    window.chCierreCancelar = function () { pintarPreparador(); };
+    window.chCierreGuardar = async function () {
+        cierreLeerForm(); await cierreGuardar(C.cierre); showToast('Cierre guardado');
+        var ci = cierreLeer(); C.lista.forEach(function (c) { if (c.cierre) { c.titulo = 'Cierre: ' + ci.titulo; c.sub = (ci.texto || '').slice(0, 90) + (ci.media.length ? ' · ' + ci.media.length + ' medio' + (ci.media.length > 1 ? 's' : '') : ''); } });
+        pintarPreparador();
+    };
     window.chPrepCerrar = function () { clearTimeout(C.tGuardar); cfgGuardar(cfgDeLista()).then(function () { showToast('Selección de la charla guardada'); }); var ov = document.getElementById('ch-prep'); if (ov) ov.remove(); };
     window.chPrepEmpezar = function () {
         clearTimeout(C.tGuardar); cfgGuardar(cfgDeLista());
@@ -255,7 +302,15 @@
                 var tags = [a.subtipo, a.espacio, a.perfil].filter(Boolean).join(' · ');
                 S.push({ c: c, html: '<div class="ch-sec" style="color:' + col + '">ABP ' + esc(a.tipo || '') + (tags ? ' · <span style="color:#64748b">' + esc(tags) + '</span>' : '') + '</div><h1 class="ch-h1">' + esc(a.name || 'ABP') + '</h1><div style="display:grid;grid-template-columns:' + (img.length ? '1.3fr 1fr' : '1fr') + ';gap:26px;height:calc(100% - 100px)">' + (img.length ? '<div style="min-height:0;display:flex;align-items:center;justify-content:center"><img src="' + esc(img[0].url) + '" onclick="chVisorDirecto(this.src,\'' + esc(a.name || 'ABP').replace(/'/g, '') + '\')" style="max-width:100%;max-height:100%;border-radius:12px;border:3px solid ' + col + ';cursor:zoom-in"></div>' : '') + '<div style="overflow-y:auto">' + (roles.length ? '<div style="font-size:clamp(16px,1.7vw,21px);line-height:1.9;color:#e2e8f0">' + roles.join('<br>') + '</div>' : '') + (a.explicacion ? '<div class="' + tamTexto(a.explicacion) + '" style="margin-top:14px;color:#cbd5e1">' + esc(a.explicacion) + '</div>' : '') + '</div></div>' });
             } else if (c.key === 'cierre') {
-                S.push({ c: c, html: '<div class="ch-centro">' + logo(pL, true) + '<div style="font-size:clamp(34px,5vw,64px);font-weight:900;color:#f59e0b;letter-spacing:2px">VAMOS A POR ELLOS</div><div style="font-size:22px;color:#94a3b8">' + esc(pN) + ' · ' + fe + '</div></div>' });
+                var ci = cierreLeer(), ms = medias(ci.media), vids = ms.filter(function (m) { return m.type === 'local' || esVideoDirecto(m.url); }), imgs = ms.filter(function (m) { return m.type === 'image'; });
+                var cuerpo = '';
+                if (vids.length === 1 && !imgs.length) {
+                    // un solo video: grande y en el centro, se pulsa para reproducir
+                    var vm = vids[0], nmv = L.nombreDe(vm);
+                    C.visorData = C.visorData || {}; C.visorData.__cierre = { items: [vm], lado: '', texto: ci.texto, titulo: ci.titulo };
+                    cuerpo = '<div style="width:min(900px,70vw);max-height:46vh;aspect-ratio:16/9;border-radius:14px;overflow:hidden;border:2px solid #334155;background:#000;position:relative;cursor:pointer" onclick="chVisor(\'__cierre\',0)"' + (vm.type === 'local' && L.tiene(nmv) ? ' data-local="' + esc(nmv) + '"' : '') + '><div class="vid" style="display:flex;align-items:center;justify-content:center;height:100%;flex-direction:column;gap:8px;font-size:40px;color:#f97316">🎞️<span style="font-size:16px;color:#cbd5e1">' + esc(vm.title || nmv || 'Vídeo') + ' · pulsa para reproducir</span></div><div style="position:absolute;inset:0;display:grid;place-items:center;pointer-events:none"><span style="width:84px;height:84px;border-radius:50%;background:rgba(245,158,11,.92);display:grid;place-items:center;font-size:36px;color:#0f172a;padding-left:6px">▶</span></div></div>';
+                } else if (ms.length) cuerpo = '<div style="width:min(1000px,80vw)">' + minis(ms, '', ci.texto, ci.titulo).replace('class="ch-minis"', 'class="ch-minis" style="grid-template-columns:repeat(auto-fit,minmax(220px,320px));justify-content:center"') + '</div>';
+                S.push({ c: c, html: '<div class="ch-centro" style="gap:16px">' + (vids.length === 1 && !imgs.length ? logo(pL, false) : logo(pL, true)) + '<div style="font-size:clamp(30px,4.6vw,60px);font-weight:900;color:#f59e0b;letter-spacing:1px;line-height:1.1;max-width:1100px">' + esc(ci.titulo) + '</div>' + (ci.texto ? '<div class="' + tamTexto(ci.texto) + '" style="max-width:900px;color:#e2e8f0;text-align:center">' + esc(ci.texto) + '</div>' : '') + cuerpo + '<div style="font-size:18px;color:#94a3b8">' + esc(pN) + ' · ' + fe + '</div></div>' });
             }
         });
         return S;
@@ -286,7 +341,7 @@
         var s = C.slides[C.idx], b = document.getElementById('ch-body'); if (!b) return;
         b.innerHTML = '<div class="ch-slide" id="ch-slide">' + s.html + '</div>';
         // miniaturas de video local: poner el primer fotograma como portada
-        Array.prototype.forEach.call(b.querySelectorAll('.ch-mini[data-local]'), function (el) {
+        Array.prototype.forEach.call(b.querySelectorAll('[data-local]'), function (el) {
             L.url(el.getAttribute('data-local')).then(function (u) { if (!u || !el.isConnected) return; var vd = el.querySelector('.vid'); if (!vd) return; var v = document.createElement('video'); v.src = u + '#t=0.5'; v.muted = true; v.preload = 'metadata'; v.playsInline = true; v.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;background:#000'; v.onloadeddata = function () { vd.replaceWith(v); }; });
         });
         var cw = document.getElementById('ch-campo'); if (cw && cw.firstChild) { var hd = cw.clientHeight || 600; cw.firstChild.style.width = Math.min(600, Math.floor(hd * 68 / 105)) + 'px'; }
