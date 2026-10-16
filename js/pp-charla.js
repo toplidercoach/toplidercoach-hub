@@ -119,7 +119,9 @@
         var plan = pp.planActual, par = pp.partidoActual, L = [];
         var fases = ppGetFases(), our = ppGetOurPhases();
         L.push({ key: 'portada', tipo: 'Portada', titulo: 'Portada', sub: esc(par.opponent) + ' · ' + (par.competition || ''), equipo: '', fijo: true });
-        if (plan.rival_formation && ppParseFormacion(plan.rival_formation)) L.push({ key: 'sistema', tipo: 'Rival', titulo: 'Sistema del rival', sub: plan.rival_formation, equipo: 'rival' });
+        var sysOur = our.sys_inicial || {}, sis = sisLeer();
+        if (plan.rival_formation || plan.our_formation || (sysOur.notes && sysOur.notes.trim())) L.push({ key: 'sistema', tipo: 'Confrontación', titulo: 'Sistema del rival' + (plan.rival_formation ? ' ' + plan.rival_formation : '') + '  ⇄  Nuestro sistema inicial' + (plan.our_formation ? ' ' + plan.our_formation : ''), sub: (plan.rival_style || sysOur.notes || '').slice(0, 90), equipo: 'conf' });
+        if ((sis.notes && sis.notes.trim()) || medias(sis.media).length) L.push({ key: 'enfrentados', tipo: 'Confrontación', titulo: 'Sistemas enfrentados', sub: (sis.notes || '').slice(0, 90) + (medias(sis.media).length ? ' · ' + medias(sis.media).length + ' imagen/vídeo' : ''), equipo: 'conf' });
         if (plan.rival_strengths || plan.rival_weaknesses || plan.rival_style) L.push({ key: 'scouting', tipo: 'Rival', titulo: 'Scouting: fuertes y débiles', sub: (plan.rival_style || '').slice(0, 80), equipo: 'rival' });
         var usadas = {};
         fases.forEach(function (f, i) {
@@ -130,7 +132,7 @@
             L.push({ key: 'conf:' + (f.id || i), tipo: 'Confrontación', titulo: f.title + (sec ? '  ⇄  ' + sec.title : ''), sub: (f.notes || od.notes || '').slice(0, 90), equipo: 'conf', fi: i, sec: sec });
         });
         PP_OUR_SECTIONS.forEach(function (s) {
-            if (s.type || usadas[s.id]) return;
+            if (s.type || usadas[s.id] || s.id === 'sys_inicial') return; // sys_inicial ya va en la diapositiva de sistemas
             var d = our[s.id]; if (!d || (!(d.notes && d.notes.trim()) && !medias(d.media).length)) return;
             L.push({ key: 'our:' + s.id, tipo: 'Nosotros', titulo: s.title, sub: (d.notes || '').slice(0, 90), equipo: 'own', sec: s });
         });
@@ -146,6 +148,18 @@
         return { off: c.off || {}, orden: Array.isArray(c.orden) ? c.orden : [], cierre: c.cierre && typeof c.cierre === 'object' ? c.cierre : null };
     }
     // Cierre: frase, texto y medios (imagen, dibujo de pizarra o video). Si el partido no tiene, se usa el ultimo usado en este navegador
+    function sisLeer() { var wm = pp.planActual.weekly_map || {}; var x = wm.sistemas && typeof wm.sistemas === 'object' ? wm.sistemas : {}; return { notes: x.notes || '', media: Array.isArray(x.media) ? x.media : [], rival_media: Array.isArray(x.rival_media) ? x.rival_media : [] }; }
+    async function sisGuardar(x) {
+        var wm = pp.planActual.weekly_map || {}; wm.sistemas = x;
+        try { await supabaseClient.from('match_plans').update({ weekly_map: wm, updated_at: new Date().toISOString() }).eq('id', pp.planActual.id); pp.planActual.weekly_map = wm; }
+        catch (e) { showToast('No se pudo guardar: ' + e.message); }
+    }
+    window.chSisNotas = async function (v) { var x = sisLeer(); x.notes = v || ''; await sisGuardar(x); };
+    async function sisAddMedia(campo, m) { var x = sisLeer(); if (x[campo].length >= PP_MAX_MEDIA_POR_FASE) { showToast('Máximo ' + PP_MAX_MEDIA_POR_FASE); return; } x[campo].push(m); await sisGuardar(x); showToast('Añadido'); ppMostrarTab('confront'); }
+    window.chSisImg = function (campo) { ppAbrirModalMedia('ch-media-ov', function (url, title, tipo) { sisAddMedia(campo, { url: url, title: title || '', type: tipo }); }); };
+    window.chSisPiz = function (campo) { pickerPizarra(function (img, nombre, id) { sisAddMedia(campo, { url: img, title: nombre, type: 'image', pizarra_item_id: id }); }); };
+    window.chSisVid = function (campo) { pickerVideoLocal(function (n) { sisAddMedia(campo, { url: 'local:' + n, file: n, title: tituloVideo(n), type: 'local' }); }); };
+    window.chSisQuitar = async function (campo, k) { if (!confirm('¿Quitar?')) return; var x = sisLeer(); x[campo].splice(k, 1); await sisGuardar(x); ppMostrarTab('confront'); };
     function cierreLeer() {
         var c = cfgLeer().cierre;
         if (!c) { try { c = JSON.parse(localStorage.getItem('tlc_charla_cierre') || 'null'); } catch (e) { c = null; } }
@@ -282,8 +296,18 @@
             if (c.key === 'portada') {
                 S.push({ c: c, html: '<div class="ch-centro"><div style="display:flex;align-items:center;gap:40px"><div style="text-align:center">' + logo(pL, true) + '<div style="margin-top:10px;font-size:20px;font-weight:800;color:#86efac;text-transform:uppercase">' + esc(pN) + '</div></div><div style="font-size:54px;font-weight:900;color:#f59e0b">VS</div><div style="text-align:center">' + logo(rL, true) + '<div style="margin-top:10px;font-size:20px;font-weight:800;color:#fca5a5;text-transform:uppercase">' + esc(rN) + '</div></div></div><div style="font-size:clamp(28px,4vw,52px);font-weight:900;color:#fff;letter-spacing:1px;text-transform:uppercase">Plan de partido</div><div style="font-size:20px;color:#94a3b8">' + (par.competition ? esc(par.competition) + ' · ' : '') + fe + (par.kick_off_time ? ' · ' + String(par.kick_off_time).slice(0, 5) + 'h' : '') + '</div></div>' });
             } else if (c.key === 'sistema') {
-                var sP = ppParseFormacion(plan.rival_formation);
-                S.push({ c: c, html: '<div style="display:grid;grid-template-columns:1fr auto;gap:30px;height:100%;min-height:0"><div style="min-width:0"><div class="ch-sec" style="color:#fca5a5">Rival · Sistema</div><h1 class="ch-h1">' + esc(rN) + '</h1><div style="font-size:clamp(34px,5vw,64px);font-weight:900;color:#f59e0b;line-height:1">' + esc(plan.rival_formation) + '</div>' + (plan.rival_style ? '<div class="ch-txt" style="margin-top:18px;color:#cbd5e1">' + esc(plan.rival_style) + '</div>' : '') + '</div><div id="ch-campo" style="height:100%;min-height:0;display:flex;align-items:center"><div style="width:600px;max-width:40vw">' + ppRenderCampo(sP, (plan.weekly_map && plan.weekly_map.rival_lineup) || {}, plan.rival_players || [], 'big') + '</div></div></div>' });
+                var sPr = plan.rival_formation ? ppParseFormacion(plan.rival_formation) : null, sPo = plan.our_formation ? ppParseFormacion(plan.our_formation) : null;
+                var sysO = our.sys_inicial || {}, sisR = sisLeer();
+                var campo = function (sl, lu, jug) { return sl ? '<div class="ch-campo" style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;margin-top:10px"><div style="width:420px;max-width:100%">' + ppRenderCampo(sl, lu, jug, 'big') + '</div></div>' : ''; };
+                var izq = '<div class="ch-col r"><span class="tag">🔴 ' + esc(rN) + '</span><div class="tit">Sistema ' + esc(plan.rival_formation || '') + '</div>' + (plan.rival_style ? '<div class="ch-txt l" style="color:#cbd5e1">' + esc(plan.rival_style) + '</div>' : '') + minis(sisR.rival_media, 'r', plan.rival_style, 'Sistema del rival') + campo(sPr, (plan.weekly_map && plan.weekly_map.rival_lineup) || {}, plan.rival_players || []) + '</div>';
+                var der = '<div class="ch-col n"><span class="tag">🟢 ' + esc(pN) + '</span><div class="tit">Sistema inicial ' + esc(plan.our_formation || '') + '</div>' + (sysO.notes ? '<div class="ch-txt l">' + esc(sysO.notes) + '</div>' : '') + minis(sysO.media, 'n', sysO.notes, 'Sistema inicial') + campo(sPo, {}, []) + '</div>';
+                S.push({ c: c, html: '<div class="ch-split">' + izq + der + '</div>', split: true });
+            } else if (c.key === 'enfrentados') {
+                var sisE = sisLeer(), msE = medias(sisE.media), unaImg = msE.length === 1 && msE[0].type === 'image';
+                var grande = '';
+                if (unaImg) { C.visorData = C.visorData || {}; C.visorData.__enf = { items: msE, lado: '', texto: sisE.notes, titulo: 'Sistemas enfrentados' }; grande = '<div style="min-height:0;display:flex;align-items:center;justify-content:center"><img src="' + esc(msE[0].url) + '" onclick="chVisor(\'__enf\',0)" style="max-width:100%;max-height:100%;border-radius:12px;border:2px solid #334155;cursor:zoom-in"></div>'; }
+                S.push({ c: c, html: '<div class="ch-sec" style="color:#fbbf24">Confrontación</div><h1 class="ch-h1">Sistemas enfrentados <span style="font-size:.55em;color:#94a3b8;font-weight:600">' + esc(plan.our_formation || '') + (plan.our_formation && plan.rival_formation ? ' vs ' : '') + esc(plan.rival_formation || '') + '</span></h1>'
+                    + '<div style="display:grid;grid-template-columns:' + (unaImg ? '1.4fr 1fr' : '1fr') + ';gap:26px;height:calc(100% - 90px);min-height:0">' + grande + '<div style="overflow-y:auto">' + (sisE.notes ? '<div class="' + tamTexto(sisE.notes) + '">' + esc(sisE.notes) + '</div>' : '') + (unaImg ? '' : minis(msE, '', sisE.notes, 'Sistemas enfrentados')) + '</div></div>' });
             } else if (c.key === 'scouting') {
                 S.push({ c: c, html: '<div class="ch-sec" style="color:#fca5a5">Rival · Scouting</div><h1 class="ch-h1">' + esc(rN) + (plan.rival_style ? ' <span style="font-size:.5em;color:#94a3b8;font-weight:500">· ' + esc(plan.rival_style) + '</span>' : '') + '</h1><div class="ch-kv" style="height:calc(100% - 100px)"><div><h3 style="color:#22c55e">💪 Puntos fuertes</h3><div class="' + tamTexto(plan.rival_strengths) + '">' + esc(plan.rival_strengths || '—') + '</div></div><div><h3 style="color:#ef4444">🎯 Puntos débiles</h3><div class="' + tamTexto(plan.rival_weaknesses) + '">' + esc(plan.rival_weaknesses || '—') + '</div></div></div>' });
             } else if (c.key.indexOf('conf:') === 0) {
@@ -344,13 +368,13 @@
         Array.prototype.forEach.call(b.querySelectorAll('[data-local]'), function (el) {
             L.url(el.getAttribute('data-local')).then(function (u) { if (!u || !el.isConnected) return; var vd = el.querySelector('.vid'); if (!vd) return; var v = document.createElement('video'); v.src = u + '#t=0.5'; v.muted = true; v.preload = 'metadata'; v.playsInline = true; v.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;background:#000'; v.onloadeddata = function () { vd.replaceWith(v); }; });
         });
-        var cw = document.getElementById('ch-campo'); if (cw && cw.firstChild) { var hd = cw.clientHeight || 600; cw.firstChild.style.width = Math.min(600, Math.floor(hd * 68 / 105)) + 'px'; }
+        Array.prototype.forEach.call(b.querySelectorAll('.ch-campo'), function (cw) { if (!cw.firstChild) return; var hd = cw.clientHeight || 400; cw.firstChild.style.width = Math.max(160, Math.min(600, Math.floor(hd * 68 / 105))) + 'px'; });
         var p = document.getElementById('ch-prog'); if (p) p.style.width = ((C.idx + 1) / C.slides.length * 100) + '%';
         var cnt = document.getElementById('ch-cnt'); if (cnt) cnt.textContent = (C.idx + 1) + ' / ' + C.slides.length;
         var d = document.getElementById('ch-dots'); if (d) d.innerHTML = C.slides.map(function (x, i) { var eq = x.c.equipo === 'rival' ? 'r' : (x.c.equipo === 'own' ? 'n' : ''); return '<button class="ch-dot ' + eq + (i === C.idx ? ' a' : '') + '" onclick="chIr(' + i + ')" title="' + esc(x.c.titulo) + '"></button>'; }).join('');
     }
     window.chNav = function (d) { var n = C.idx + d; if (n < 0 || n >= C.slides.length) return; C.idx = n; pintar(); };
-    window.chIr = function (i) { var g = document.getElementById('ch-grid'); if (g) g.remove(); C.idx = i; pintar(); };
+    window.chIr = function (i) { if (i < 0 || i >= C.slides.length) return; var g = document.getElementById('ch-grid'); if (g) g.remove(); C.idx = i; pintar(); };
     window.chGrid = function () {
         var g = document.getElementById('ch-grid'); if (g) { g.remove(); return; }
         var b = document.getElementById('ch-body'); if (!b) return;
@@ -647,6 +671,28 @@
                     der.insertAdjacentHTML('beforeend', miniEdit(od.media, od.notes, function (mi) { return 'chQuitarOur(\'' + sec.id + '\',' + mi + ')'; }) + '<div class="ch-acc"><button onclick="chImgOur(\'' + sec.id + '\')">📷 Imagen / vídeo</button><button onclick="chPizOur(\'' + sec.id + '\')">🎨 Dibujo de pizarra</button><button onclick="chVidOur(\'' + sec.id + '\')">🎞️ Vídeo de mi carpeta</button></div>');
                 }
             });
+            // apartados propios sin pareja (Variantes / Plan B, etc.): tambien con imagen, pizarra y video
+            filas.forEach(function (fila) {
+                var cards = fila.children; if (cards.length < 2) return;
+                var izq = cards[0], der = cards[1];
+                if (izq.querySelector('textarea') || !der.querySelector('textarea')) return;
+                var tit = (der.firstChild && der.firstChild.textContent || '').trim();
+                var sec = PP_OUR_SECTIONS.filter(function (x) { return !x.type && x.title === tit; })[0]; if (!sec) return;
+                var od = our[sec.id] || {};
+                der.insertAdjacentHTML('beforeend', miniEdit(od.media, od.notes, function (mi) { return 'chQuitarOur(\'' + sec.id + '\',' + mi + ')'; }) + '<div class="ch-acc"><button onclick="chImgOur(\'' + sec.id + '\')">📷 Imagen / vídeo</button><button onclick="chPizOur(\'' + sec.id + '\')">🎨 Dibujo de pizarra</button><button onclick="chVidOur(\'' + sec.id + '\')">🎞️ Vídeo de mi carpeta</button></div>');
+            });
+            // bloque SISTEMAS (rival | nuestro) + sistemas enfrentados, antes de las fases
+            var plan = pp.planActual, sis = sisLeer(), so = our.sys_inicial || {};
+            var ta = 'width:100%;padding:8px 10px;background:#0f172a;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-size:13px;resize:vertical;font-family:inherit';
+            var acc = function (campo) { return '<div class="ch-acc"><button onclick="chSisImg(\'' + campo + '\')">📷 Imagen / vídeo</button><button onclick="chSisPiz(\'' + campo + '\')">🎨 Dibujo de pizarra</button><button onclick="chSisVid(\'' + campo + '\')">🎞️ Vídeo de mi carpeta</button></div>'; };
+            var bloque = '<div style="font-size:12px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;margin:4px 0 8px">⚙️ Sistemas</div>'
+                + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;align-items:stretch">'
+                + '<div style="background:#1e293b;border-left:4px solid #ef4444;border-radius:0 8px 8px 0;padding:12px"><div style="font-size:13px;font-weight:600;color:#e2e8f0;margin-bottom:8px">Sistema del rival</div>' + ppSelectFormacion('ch-rf', plan.rival_formation, "ppGuardarCampo('rival_formation',this.value)") + '<textarea rows="3" placeholder="Estilo del rival..." onchange="ppGuardarCampo(\'rival_style\',this.value)" style="' + ta + ';margin-top:8px">' + esc(plan.rival_style || '') + '</textarea>' + miniEdit(sis.rival_media, plan.rival_style, function (mi) { return 'chSisQuitar(\'rival_media\',' + mi + ')'; }) + acc('rival_media') + '</div>'
+                + '<div style="background:#1e293b;border-left:4px solid #22c55e;border-radius:0 8px 8px 0;padding:12px"><div style="font-size:13px;font-weight:600;color:#e2e8f0;margin-bottom:8px">Nuestro sistema inicial</div>' + ppSelectFormacion('ch-of', plan.our_formation, "ppGuardarCampo('our_formation',this.value)") + '<textarea rows="3" placeholder="Cómo nos colocamos, roles, matices..." onchange="ppGuardarOurFase(\'sys_inicial\',this.value)" style="' + ta + ';margin-top:8px">' + esc(so.notes || '') + '</textarea>' + miniEdit(so.media, so.notes, function (mi) { return 'chQuitarOur(\'sys_inicial\',' + mi + ')'; }) + '<div class="ch-acc"><button onclick="chImgOur(\'sys_inicial\')">📷 Imagen / vídeo</button><button onclick="chPizOur(\'sys_inicial\')">🎨 Dibujo de pizarra</button><button onclick="chVidOur(\'sys_inicial\')">🎞️ Vídeo de mi carpeta</button></div></div>'
+                + '</div>'
+                + '<div style="background:#1e293b;border-left:4px solid #f59e0b;border-radius:0 8px 8px 0;padding:12px;margin-bottom:18px"><div style="font-size:13px;font-weight:600;color:#e2e8f0;margin-bottom:2px">⚔️ Sistemas enfrentados</div><div style="font-size:11.5px;color:#64748b;margin-bottom:8px">Dibuja en la pizarra los dos sistemas sobre el mismo campo y añádelo aquí: saldrá como diapositiva propia en la charla. En la charla también se ven los dos campos uno al lado del otro con las formaciones de arriba.</div><textarea rows="3" placeholder="Dónde se producen los duelos, superioridades e inferioridades, qué espacios aparecen..." onchange="chSisNotas(this.value)" style="' + ta + '">' + esc(sis.notes || '') + '</textarea>' + miniEdit(sis.media, sis.notes, function (mi) { return 'chSisQuitar(\'media\',' + mi + ')'; }) + acc('media') + '</div>';
+            var cab = Array.prototype.filter.call(tmp.firstChild.children, function (el) { return el.style && el.style.gridTemplateColumns === '1fr 1fr' && !el.querySelector('textarea'); })[0];
+            if (cab) cab.insertAdjacentHTML('beforebegin', bloque);
             // aviso arriba
             var p = tmp.querySelector('p'); if (p) p.insertAdjacentHTML('afterend', '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:-6px 0 14px;padding:10px 12px;background:#111c33;border:1px solid #1e3a5f;border-radius:10px;font-size:12px;color:#94a3b8">📺 Lo que escribas y las imágenes de cada tarjeta son lo que verán los jugadores en la <b style="color:#e2e8f0">charla</b> (pantalla partida). <button onclick="ppPresentacion()" style="margin-left:auto;padding:6px 14px;background:#065f46;border:1px solid #10b981;color:#6ee7b7;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700">📺 Preparar charla</button></div>');
             return tmp.innerHTML;
