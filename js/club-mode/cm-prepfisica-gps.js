@@ -335,9 +335,10 @@ async function cmPfDevGuardar() {
 
     try {
         // Reutilizar sesion existente (misma fecha+tipo+titulo) o crearla
+        // (una sesion eliminada/archivada no se reutiliza: se crea una nueva limpia)
         var sr = await supabaseClient.from('cm_pf_gps_sessions').select('id')
             .eq('club_id', clubId).eq('session_date', fecha).eq('session_type', tipo)
-            .eq('title', titulo).maybeSingle();
+            .eq('title', titulo).or('archived.is.null,archived.eq.false').limit(1).maybeSingle();
         var sid;
         var durMax = 0;
         cmPfDev.filas.forEach(function (f) { if (f.minutos && f.minutos > durMax) durMax = f.minutos; });
@@ -365,7 +366,7 @@ async function cmPfDevGuardar() {
             if (!pid) return;
             if (yaExisten[pid]) { saltados++; return; }
             rows.push({
-                club_id: clubId, session_id: sid, player_id: pid, segment_name: 'TOTAL',
+                club_id: clubId, session_id: sid, player_id: pid, segment_name: 'TOTAL', archived: false, archived_at: null,
                 total_distance_m: f.total_distance_m !== null ? Math.round(f.total_distance_m) : null,
                 hsr_distance_m: f.hsr_distance_m !== null ? Math.round(f.hsr_distance_m) : null,
                 sprint_distance_m: f.sprint_distance_m !== null ? Math.round(f.sprint_distance_m) : null,
@@ -397,7 +398,8 @@ async function cmPfDevGuardar() {
             return;
         }
 
-        var res = await supabaseClient.from('cm_pf_gps_player_data').insert(rows);
+        // upsert: si el jugador tenia un registro archivado (borrado) en esta sesion, se sustituye por el nuevo
+        var res = await supabaseClient.from('cm_pf_gps_player_data').upsert(rows, { onConflict: 'session_id,player_id,segment_name' });
         if (res.error) throw res.error;
 
         showToast(rows.length + ' jugadores importados' + (saltados > 0 ? ' (' + saltados + ' ya existian)' : ''));
