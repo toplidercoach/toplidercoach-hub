@@ -212,7 +212,7 @@
     function campoSvg(formation, lineup, jug, w) {
         var slots = ppParseFormacion(formation); if (!slots) return '';
         var W = w || 300, H = Math.round(W * 1.45), lu = ppMigrarLineup(lineup || {});
-        var h = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="' + W + '" height="' + H + '" style="display:block;border-radius:8px">'
+        var h = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="display:block;border-radius:8px;width:100%;height:auto">'
             + '<rect x="0" y="0" width="' + W + '" height="' + H + '" fill="#2f9e4f"/>'
             + '<rect x="' + (W * .04) + '" y="' + (H * .03) + '" width="' + (W * .92) + '" height="' + (H * .94) + '" fill="none" stroke="#fff" stroke-width="1.5"/>'
             + '<line x1="' + (W * .04) + '" y1="' + (H / 2) + '" x2="' + (W * .96) + '" y2="' + (H / 2) + '" stroke="#fff" stroke-width="1.5"/>'
@@ -237,7 +237,8 @@
         var pasos = [estado(r, 0)].concat(m);
         var fecha = r.fecha ? r.fecha.split('-').reverse().join('/') : '';
         var h = '<div class="cab"><div><div class="k">Scouting · ' + esc(rN) + '</div><h1>' + esc(rN) + ' <span>vs</span> ' + esc(r.opponent || 'Rival') + '</h1><div class="sub">' + fecha + (r.local === 'visitante' ? ' · Visitante' : ' · Local') + ' · Sistema inicial <b>' + esc(r.formation || '—') + '</b>' + (r.notas ? ' · ' + esc(r.notas) : '') + '</div></div><div class="res">' + esc(r.resultado || '') + '</div></div>';
-        h += '<div class="grid">';
+        var cols = Math.min(5, Math.max(2, pasos.length));
+        h += '<div class="grid" style="grid-template-columns:repeat(' + cols + ',1fr)">';
         pasos.forEach(function (st, k) {
             var prev = k ? pasos[k - 1] : null, cambiaSis = prev && st.formation && st.formation !== prev.formation;
             var cs = (st.cambios || []).filter(function (c) { return c.sale !== null && c.entra !== null; });
@@ -249,7 +250,7 @@
         h += '</div>';
         // tabla cronologica
         if (m.length) {
-            h += '<h2>Cronología de cambios</h2><table><thead><tr><th>Min</th><th>Marcador</th><th>Sistema</th><th>Entra</th><th>Sale</th><th>Notas</th></tr></thead><tbody>';
+            h += '<div class="cron"><h2>Cronología de cambios</h2><table><thead><tr><th>Min</th><th>Marcador</th><th>Sistema</th><th>Entra</th><th>Sale</th><th>Notas</th></tr></thead><tbody>';
             var prevF = r.formation;
             m.forEach(function (mo) {
                 var cs = (mo.cambios || []).filter(function (c) { return c.sale !== null && c.entra !== null; });
@@ -257,14 +258,14 @@
                 if (mo.formation) prevF = mo.formation;
                 h += '<tr><td><b>' + mo.min + "'" + '</b></td><td>' + esc(mo.marcador || '') + '</td><td>' + sisTxt + '</td><td>' + (cs.map(function (c) { return esc(nombre(c.entra)); }).join('<br>') || '—') + '</td><td>' + (cs.map(function (c) { return esc(nombre(c.sale)); }).join('<br>') || '—') + '</td><td>' + esc(mo.notas || '') + '</td></tr>';
             });
-            h += '</tbody></table>';
+            h += '</tbody></table></div>';
         }
-        var CSSP = 'body{margin:0;padding:12mm 10mm;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#0f172a;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}'
+        var CSSP = 'body{margin:0;padding:9mm 10mm;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#0f172a;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}'
             + '.cab{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #0f172a;padding-bottom:8px;margin-bottom:12px}.cab .k{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#64748b}.cab h1{margin:2px 0;font-size:22px}.cab h1 span{color:#94a3b8;font-weight:500;font-size:16px}.cab .sub{font-size:12px;color:#475569}.cab .res{font-size:34px;font-weight:900;color:#0f172a;border:2px solid #0f172a;border-radius:10px;padding:4px 14px}'
-            + '.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px}.mom{break-inside:avoid;border:1px solid #cbd5e1;border-radius:10px;padding:8px;display:flex;flex-direction:column;align-items:center}.mh{display:flex;gap:10px;align-items:baseline;width:100%;margin-bottom:6px}.mh .min{font-size:20px;font-weight:900}.mh .mk{font-size:16px;font-weight:800;color:#b45309}.mh .sis{font-size:12px;color:#1d4ed8;font-weight:700}.mh em{color:#64748b;font-weight:500;font-style:normal;font-size:11px}'
-            + '.nt{width:100%;margin-top:6px;font-size:11.5px}.cb{display:block;margin:2px 0}.no{color:#475569;font-size:11px;margin-top:3px;border-left:3px solid #cbd5e1;padding-left:6px}'
+            + '.grid{display:grid;gap:8px}.mom{break-inside:avoid;border:1px solid #cbd5e1;border-radius:10px;padding:6px;display:flex;flex-direction:column;align-items:center;min-width:0}.mh{display:flex;gap:6px;align-items:baseline;width:100%;margin-bottom:4px;flex-wrap:wrap}.mh .min{font-size:16px;font-weight:900}.mh .mk{font-size:14px;font-weight:800;color:#b45309}.mh .sis{font-size:11px;color:#1d4ed8;font-weight:700}.mh em{color:#64748b;font-weight:500;font-style:normal;font-size:10px}'
+            + '.nt{width:100%;margin-top:5px;font-size:10.5px}.cb{display:block;margin:1px 0}.no{color:#475569;font-size:10px;margin-top:3px;border-left:3px solid #cbd5e1;padding-left:6px}'
             + 'h2{font-size:14px;margin:16px 0 6px;text-transform:uppercase;letter-spacing:1px;color:#334155}table{width:100%;border-collapse:collapse;font-size:11.5px}th{text-align:left;background:#f1f5f9;padding:5px 7px;border-bottom:1px solid #cbd5e1;font-size:10px;text-transform:uppercase;color:#475569}td{padding:5px 7px;border-bottom:1px solid #e2e8f0;vertical-align:top}'
-            + '.pie{margin-top:14px;font-size:10px;color:#94a3b8;text-align:right}@page{size:A4;margin:0}';
+            + 'h2,table{break-inside:avoid}.cron{break-inside:avoid}.pie{margin-top:10px;font-size:10px;color:#94a3b8;text-align:right}@page{size:A4 landscape;margin:0}';
         var w = window.open('', '_blank'); if (!w) { alert('El navegador ha bloqueado la ventana. Permite las ventanas emergentes.'); return; }
         w.document.write('<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>' + esc(rN) + ' vs ' + esc(r.opponent || '') + ' · cambios</title><style>' + CSSP + '</style></head><body>' + h + '<div class="pie">TopLiderCoach · Scouting · ' + new Date().toLocaleDateString('es-ES') + '</div><script>window.onload=function(){setTimeout(function(){window.print();},300);};<\/script></body></html>');
         w.document.close();
