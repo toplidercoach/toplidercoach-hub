@@ -140,7 +140,7 @@
     }
     function bloque(r, i) {
         var m = moms(r), k = Math.min(sel(i), m.length), st = estado(r, k);
-        var h = '<div class="pc-wrap"><div class="pc-cab"><div><h5>⏱️ Cambios y sistemas durante el partido</h5><p>Añade un momento por cada cambio de jugadores o de sistema, con el minuto y el marcador que había. El campo de arriba muestra el once del momento seleccionado.</p></div><button class="pc-add" onclick="pcAdd(' + i + ')">+ Añadir momento</button></div>';
+        var h = '<div class="pc-wrap"><div class="pc-cab"><div><h5>⏱️ Cambios y sistemas durante el partido</h5><p>Añade un momento por cada cambio de jugadores o de sistema, con el minuto y el marcador que había. El campo de arriba muestra el once del momento seleccionado.</p></div><div style="display:flex;gap:6px"><button class="pc-btn" onclick="pcPdf(' + i + ')" title="PDF imprimible de este partido: campos por momento, cambios y marcador">🖨️ PDF del partido</button><button class="pc-add" onclick="pcAdd(' + i + ')">+ Añadir momento</button></div></div>';
         h += '<div class="pc-tl">';
         h += '<div class="pc-chip' + (k === 0 ? ' a' : '') + '" onclick="pcSel(' + i + ',0)"><b>0\'</b><span class="sis">' + esc(r.formation || '—') + '</span><small>once inicial</small></div>';
         m.forEach(function (mo, idx) {
@@ -207,6 +207,68 @@
             + '<div class="k" style="grid-column:span 2"><div class="l">Cambios de sistema</div><div class="d" style="color:#e2e8f0;font-size:12px;margin-top:3px;line-height:1.5">' + sisTxt + '</div></div></div>'
             + '<table><thead><tr><th style="width:170px">Partido</th><th>Momentos (minuto · marcador · cambios)</th></tr></thead><tbody>' + filas + '</tbody></table></div>';
     }
+
+    /* ---------- PDF imprimible del partido (campos por momento) ---------- */
+    function campoSvg(formation, lineup, jug, w) {
+        var slots = ppParseFormacion(formation); if (!slots) return '';
+        var W = w || 300, H = Math.round(W * 1.45), lu = ppMigrarLineup(lineup || {});
+        var h = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="' + W + '" height="' + H + '" style="display:block;border-radius:8px">'
+            + '<rect x="0" y="0" width="' + W + '" height="' + H + '" fill="#2f9e4f"/>'
+            + '<rect x="' + (W * .04) + '" y="' + (H * .03) + '" width="' + (W * .92) + '" height="' + (H * .94) + '" fill="none" stroke="#fff" stroke-width="1.5"/>'
+            + '<line x1="' + (W * .04) + '" y1="' + (H / 2) + '" x2="' + (W * .96) + '" y2="' + (H / 2) + '" stroke="#fff" stroke-width="1.5"/>'
+            + '<circle cx="' + (W / 2) + '" cy="' + (H / 2) + '" r="' + (W * .12) + '" fill="none" stroke="#fff" stroke-width="1.5"/>'
+            + '<rect x="' + (W * .25) + '" y="' + (H * .03) + '" width="' + (W * .5) + '" height="' + (H * .14) + '" fill="none" stroke="#fff" stroke-width="1.5"/>'
+            + '<rect x="' + (W * .25) + '" y="' + (H * .83) + '" width="' + (W * .5) + '" height="' + (H * .14) + '" fill="none" stroke="#fff" stroke-width="1.5"/>';
+        slots.forEach(function (sl) {
+            var ids = lu[sl.slotId] || [], j = jug[ids[0]];
+            var cx = W * sl.x / 100, cy = H * sl.y / 100 * .9 + H * .05, r = W * .055;
+            h += '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="' + (j ? (sl.lineIdx === 0 ? '#f59e0b' : '#1d4ed8') : '#ffffff55') + '" stroke="#fff" stroke-width="1.5"/>';
+            if (j) {
+                h += '<text x="' + cx + '" y="' + (cy + r * .38) + '" text-anchor="middle" font-size="' + (r * 1.05) + '" font-weight="800" fill="#fff" font-family="Arial,sans-serif">' + esc(j.number || '') + '</text>'
+                   + '<text x="' + cx + '" y="' + (cy + r + W * .04) + '" text-anchor="middle" font-size="' + (W * .034) + '" font-weight="700" fill="#0f172a" font-family="Arial,sans-serif" style="paint-order:stroke;stroke:#fff;stroke-width:2.5px">' + esc(String(j.name || '').split(' ').slice(0, 2).join(' ')) + '</text>';
+                if (ids.length > 1) h += '<text x="' + cx + '" y="' + (cy + r + W * .075) + '" text-anchor="middle" font-size="' + (W * .028) + '" fill="#1e293b" font-family="Arial,sans-serif" style="paint-order:stroke;stroke:#fff;stroke-width:2px">o ' + esc(ids.slice(1).map(function (x) { var q = jug[x]; return q ? (q.number || q.name) : ''; }).join(', ')) + '</text>';
+            }
+        });
+        return h + '</svg>';
+    }
+    window.pcPdf = function (i) {
+        var r = recs()[i]; if (!r) return;
+        var jug = jugadores(), m = moms(r), rN = nombreRival();
+        var pasos = [estado(r, 0)].concat(m);
+        var fecha = r.fecha ? r.fecha.split('-').reverse().join('/') : '';
+        var h = '<div class="cab"><div><div class="k">Scouting · ' + esc(rN) + '</div><h1>' + esc(rN) + ' <span>vs</span> ' + esc(r.opponent || 'Rival') + '</h1><div class="sub">' + fecha + (r.local === 'visitante' ? ' · Visitante' : ' · Local') + ' · Sistema inicial <b>' + esc(r.formation || '—') + '</b>' + (r.notas ? ' · ' + esc(r.notas) : '') + '</div></div><div class="res">' + esc(r.resultado || '') + '</div></div>';
+        h += '<div class="grid">';
+        pasos.forEach(function (st, k) {
+            var prev = k ? pasos[k - 1] : null, cambiaSis = prev && st.formation && st.formation !== prev.formation;
+            var cs = (st.cambios || []).filter(function (c) { return c.sale !== null && c.entra !== null; });
+            h += '<div class="mom"><div class="mh"><span class="min">' + (k ? st.min + "'" : "0'") + '</span><span class="mk">' + esc(st.marcador || (k ? '' : '0-0')) + '</span><span class="sis">' + esc(st.formation || '') + (cambiaSis ? ' <em>(cambio de sistema, antes ' + esc(prev.formation) + ')</em>' : '') + '</span></div>'
+               + campoSvg(st.formation, st.lineup, jug, 240)
+               + (k === 0 ? '<div class="nt">Once inicial</div>' : '<div class="nt">' + (cs.length ? cs.map(function (c) { return '<span class="cb"><b style="color:#15803d">↑ ' + esc(nombre(c.entra)) + '</b> por <b style="color:#b91c1c">↓ ' + esc(nombre(c.sale)) + '</b></span>'; }).join('') : '<span class="cb">Sin cambios de jugadores</span>') + (st.notas ? '<div class="no">' + esc(st.notas) + '</div>' : '') + '</div>')
+               + '</div>';
+        });
+        h += '</div>';
+        // tabla cronologica
+        if (m.length) {
+            h += '<h2>Cronología de cambios</h2><table><thead><tr><th>Min</th><th>Marcador</th><th>Sistema</th><th>Entra</th><th>Sale</th><th>Notas</th></tr></thead><tbody>';
+            var prevF = r.formation;
+            m.forEach(function (mo) {
+                var cs = (mo.cambios || []).filter(function (c) { return c.sale !== null && c.entra !== null; });
+                var sisTxt = mo.formation && mo.formation !== prevF ? '<b>' + esc(prevF) + ' → ' + esc(mo.formation) + '</b>' : esc(mo.formation || '');
+                if (mo.formation) prevF = mo.formation;
+                h += '<tr><td><b>' + mo.min + "'" + '</b></td><td>' + esc(mo.marcador || '') + '</td><td>' + sisTxt + '</td><td>' + (cs.map(function (c) { return esc(nombre(c.entra)); }).join('<br>') || '—') + '</td><td>' + (cs.map(function (c) { return esc(nombre(c.sale)); }).join('<br>') || '—') + '</td><td>' + esc(mo.notas || '') + '</td></tr>';
+            });
+            h += '</tbody></table>';
+        }
+        var CSSP = 'body{margin:0;padding:12mm 10mm;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#0f172a;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}'
+            + '.cab{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #0f172a;padding-bottom:8px;margin-bottom:12px}.cab .k{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#64748b}.cab h1{margin:2px 0;font-size:22px}.cab h1 span{color:#94a3b8;font-weight:500;font-size:16px}.cab .sub{font-size:12px;color:#475569}.cab .res{font-size:34px;font-weight:900;color:#0f172a;border:2px solid #0f172a;border-radius:10px;padding:4px 14px}'
+            + '.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px}.mom{break-inside:avoid;border:1px solid #cbd5e1;border-radius:10px;padding:8px;display:flex;flex-direction:column;align-items:center}.mh{display:flex;gap:10px;align-items:baseline;width:100%;margin-bottom:6px}.mh .min{font-size:20px;font-weight:900}.mh .mk{font-size:16px;font-weight:800;color:#b45309}.mh .sis{font-size:12px;color:#1d4ed8;font-weight:700}.mh em{color:#64748b;font-weight:500;font-style:normal;font-size:11px}'
+            + '.nt{width:100%;margin-top:6px;font-size:11.5px}.cb{display:block;margin:2px 0}.no{color:#475569;font-size:11px;margin-top:3px;border-left:3px solid #cbd5e1;padding-left:6px}'
+            + 'h2{font-size:14px;margin:16px 0 6px;text-transform:uppercase;letter-spacing:1px;color:#334155}table{width:100%;border-collapse:collapse;font-size:11.5px}th{text-align:left;background:#f1f5f9;padding:5px 7px;border-bottom:1px solid #cbd5e1;font-size:10px;text-transform:uppercase;color:#475569}td{padding:5px 7px;border-bottom:1px solid #e2e8f0;vertical-align:top}'
+            + '.pie{margin-top:14px;font-size:10px;color:#94a3b8;text-align:right}@page{size:A4;margin:0}';
+        var w = window.open('', '_blank'); if (!w) { alert('El navegador ha bloqueado la ventana. Permite las ventanas emergentes.'); return; }
+        w.document.write('<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>' + esc(rN) + ' vs ' + esc(r.opponent || '') + ' · cambios</title><style>' + CSSP + '</style></head><body>' + h + '<div class="pie">TopLiderCoach · Scouting · ' + new Date().toLocaleDateString('es-ES') + '</div><script>window.onload=function(){setTimeout(function(){window.print();},300);};<\/script></body></html>');
+        w.document.close();
+    };
 
     /* ---------- Enganche en ppRenderRecientes ---------- */
     var orig = window.ppRenderRecientes;
