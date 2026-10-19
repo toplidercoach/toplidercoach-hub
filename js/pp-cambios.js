@@ -43,6 +43,8 @@
     function jugadores() { return (pp.planActual && pp.planActual.rival_players) || []; }
     function nombre(idx) { var j = jugadores()[idx]; if (!j) return '?'; return (j.number ? j.number + ' ' : '') + (j.name || '?'); }
     function moms(r) { return Array.isArray(r.momentos) ? r.momentos : []; }
+    // El equipo que estamos analizando (el rival de nuestro proximo partido)
+    function nombreRival(corto) { var n = (pp.partidoActual && pp.partidoActual.opponent) || 'Rival'; return corto ? n.split(' ').filter(function (w) { return w.length > 2 && !/^(de|del|la|el|los|las|c\.d\.|cf|ud|cd|sd|ad)$/i.test(w); })[0] || n : n; }
     function sel(i) { pp.pcSel = pp.pcSel || {}; return pp.pcSel[i] || 0; }
     function clon(o) { return JSON.parse(JSON.stringify(o || {})); }
     // Estado del partido en el momento k (k=0 es el inicio)
@@ -152,7 +154,7 @@
             var mo = st;
             h += '<div class="pc-ed"><div class="pc-g">'
                 + '<div><label>Minuto</label><input type="number" min="1" max="130" value="' + (mo.min || 0) + '" onchange="pcCampo(' + i + ',' + k + ',\'min\',this.value)"></div>'
-                + '<div><label>Marcador (el rival primero)</label><input type="text" value="' + esc(mo.marcador || '') + '" placeholder="1-0" onchange="pcCampo(' + i + ',' + k + ',\'marcador\',this.value)"></div>'
+                + '<div><label title="Primero los goles de ' + esc(nombreRival()) + ', después los de ' + esc(r.opponent || 'su rival') + '">Marcador (' + esc(nombreRival(true)) + ' - ' + esc(r.opponent ? r.opponent.split(' ')[0] : 'ellos') + ')</label><input type="text" value="' + esc(mo.marcador || '') + '" placeholder="1-0" onchange="pcCampo(' + i + ',' + k + ',\'marcador\',this.value)"></div>'
                 + '<div><label>Sistema en ese momento</label>' + ppSelectFormacion('pc-f' + i + '_' + k, mo.formation || '', 'pcCampo(' + i + ',' + k + ',\'formation\',this.value)') + '</div>'
                 + '<div><label>Notas</label><input type="text" value="' + esc(mo.notas || '') + '" placeholder="Por qué cambia, lesión, qué busca..." onchange="pcCampo(' + i + ',' + k + ',\'notas\',this.value)"></div>'
                 + '</div>';
@@ -197,7 +199,7 @@
         var med = function (a) { return a.length ? Math.round(a.reduce(function (x, y) { return x + y; }, 0) / a.length) : null; };
         var top = function (o) { return Object.keys(o).sort(function (a, b) { return o[b] - o[a]; }).slice(0, 3).map(function (k) { return esc(nombre(+k)) + ' (' + o[k] + ')'; }).join(', '); };
         var sisTxt = sisCambios.length ? sisCambios.map(function (s) { return esc(s.de) + ' → <b>' + esc(s.a) + '</b> en el ' + s.min + '\' ' + (s.estado ? s.estado + ' ' : '') + esc(s.marcador || ''); }).join('<br>') : 'No cambia de sistema en los partidos registrados';
-        return '<div class="pc-res"><h5>📊 Cómo gestiona los cambios el rival</h5><p>A partir de los momentos que has registrado en ' + conDatos.length + ' partido' + (conDatos.length > 1 ? 's' : '') + '. Verde = iba ganando en ese momento, rojo = perdiendo; borde azul = cambio de sistema.</p>'
+        return '<div class="pc-res"><h5>📊 Cómo gestiona los cambios el rival</h5><p>A partir de los momentos que has registrado en ' + conDatos.length + ' partido' + (conDatos.length > 1 ? 's' : '') + '. El marcador se lee siempre con los goles de ' + esc(nombreRival()) + ' primero. Verde = iba ganando en ese momento, rojo = perdiendo; borde azul = cambio de sistema.</p>'
             + '<div class="kp"><div class="k"><div class="l">Primer cambio</div><div class="v">' + (med(primeros) !== null ? med(primeros) + '\'' : '—') + '</div><div class="d">minuto medio</div></div>'
             + '<div class="k"><div class="l">Cambios por partido</div><div class="v">' + (med(nCambios) !== null ? (nCambios.reduce(function (a, b) { return a + b; }, 0) / nCambios.length).toFixed(1) : '—') + '</div><div class="d">de media</div></div>'
             + '<div class="k"><div class="l">Entran más</div><div class="d" style="color:#86efac;font-size:12px;margin-top:3px">' + (top(entran) || '—') + '</div></div>'
