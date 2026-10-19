@@ -209,24 +209,29 @@
     }
 
     /* ---------- PDF imprimible del partido (campos por momento) ---------- */
-    function campoSvg(formation, lineup, jug, w) {
+    function campoSvg(formation, lineup, jug, w, nuevos) {
+        // Campo blanco con lineas negras (ahorra tinta). Circulos: blanco = ya estaba, rojo = acaba de entrar, portero gris
         var slots = ppParseFormacion(formation); if (!slots) return '';
-        var W = w || 300, H = Math.round(W * 1.45), lu = ppMigrarLineup(lineup || {});
-        var h = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="display:block;border-radius:8px;width:100%;height:auto">'
-            + '<rect x="0" y="0" width="' + W + '" height="' + H + '" fill="#2f9e4f"/>'
-            + '<rect x="' + (W * .04) + '" y="' + (H * .03) + '" width="' + (W * .92) + '" height="' + (H * .94) + '" fill="none" stroke="#fff" stroke-width="1.5"/>'
-            + '<line x1="' + (W * .04) + '" y1="' + (H / 2) + '" x2="' + (W * .96) + '" y2="' + (H / 2) + '" stroke="#fff" stroke-width="1.5"/>'
-            + '<circle cx="' + (W / 2) + '" cy="' + (H / 2) + '" r="' + (W * .12) + '" fill="none" stroke="#fff" stroke-width="1.5"/>'
-            + '<rect x="' + (W * .25) + '" y="' + (H * .03) + '" width="' + (W * .5) + '" height="' + (H * .14) + '" fill="none" stroke="#fff" stroke-width="1.5"/>'
-            + '<rect x="' + (W * .25) + '" y="' + (H * .83) + '" width="' + (W * .5) + '" height="' + (H * .14) + '" fill="none" stroke="#fff" stroke-width="1.5"/>';
+        var W = w || 300, H = Math.round(W * 1.45), lu = ppMigrarLineup(lineup || {}), nv = nuevos || {};
+        var L = '#111827', sw = 1.6;
+        var h = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="display:block;border-radius:6px;width:100%;height:auto">'
+            + '<rect x="0" y="0" width="' + W + '" height="' + H + '" fill="#fff"/>'
+            + '<rect x="' + (W * .04) + '" y="' + (H * .03) + '" width="' + (W * .92) + '" height="' + (H * .94) + '" fill="none" stroke="' + L + '" stroke-width="' + sw + '"/>'
+            + '<line x1="' + (W * .04) + '" y1="' + (H / 2) + '" x2="' + (W * .96) + '" y2="' + (H / 2) + '" stroke="' + L + '" stroke-width="' + sw + '"/>'
+            + '<circle cx="' + (W / 2) + '" cy="' + (H / 2) + '" r="' + (W * .12) + '" fill="none" stroke="' + L + '" stroke-width="' + sw + '"/>'
+            + '<rect x="' + (W * .25) + '" y="' + (H * .03) + '" width="' + (W * .5) + '" height="' + (H * .14) + '" fill="none" stroke="' + L + '" stroke-width="' + sw + '"/>'
+            + '<rect x="' + (W * .25) + '" y="' + (H * .83) + '" width="' + (W * .5) + '" height="' + (H * .14) + '" fill="none" stroke="' + L + '" stroke-width="' + sw + '"/>';
         slots.forEach(function (sl) {
-            var ids = lu[sl.slotId] || [], j = jug[ids[0]];
+            var ids = lu[sl.slotId] || [], idx = ids[0], j = jug[idx];
             var cx = W * sl.x / 100, cy = H * sl.y / 100 * .9 + H * .05, r = W * .055;
-            h += '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="' + (j ? (sl.lineIdx === 0 ? '#f59e0b' : '#1d4ed8') : '#ffffff55') + '" stroke="#fff" stroke-width="1.5"/>';
+            var esNuevo = j && nv[idx], esPortero = sl.lineIdx === 0;
+            var fill = !j ? '#f1f5f9' : (esNuevo ? '#dc2626' : (esPortero ? '#e5e7eb' : '#fff'));
+            var txt = esNuevo ? '#fff' : '#111827';
+            h += '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="' + fill + '" stroke="' + (j ? L : '#9ca3af') + '" stroke-width="' + (esNuevo ? 2.2 : 1.6) + '"' + (j ? '' : ' stroke-dasharray="3 2"') + '/>';
             if (j) {
-                h += '<text x="' + cx + '" y="' + (cy + r * .38) + '" text-anchor="middle" font-size="' + (r * 1.05) + '" font-weight="800" fill="#fff" font-family="Arial,sans-serif">' + esc(j.number || '') + '</text>'
-                   + '<text x="' + cx + '" y="' + (cy + r + W * .04) + '" text-anchor="middle" font-size="' + (W * .034) + '" font-weight="700" fill="#0f172a" font-family="Arial,sans-serif" style="paint-order:stroke;stroke:#fff;stroke-width:2.5px">' + esc(String(j.name || '').split(' ').slice(0, 2).join(' ')) + '</text>';
-                if (ids.length > 1) h += '<text x="' + cx + '" y="' + (cy + r + W * .075) + '" text-anchor="middle" font-size="' + (W * .028) + '" fill="#1e293b" font-family="Arial,sans-serif" style="paint-order:stroke;stroke:#fff;stroke-width:2px">o ' + esc(ids.slice(1).map(function (x) { var q = jug[x]; return q ? (q.number || q.name) : ''; }).join(', ')) + '</text>';
+                h += '<text x="' + cx + '" y="' + (cy + r * .38) + '" text-anchor="middle" font-size="' + (r * 1.05) + '" font-weight="800" fill="' + txt + '" font-family="Arial,sans-serif">' + esc(j.number || '') + '</text>'
+                   + '<text x="' + cx + '" y="' + (cy + r + W * .04) + '" text-anchor="middle" font-size="' + (W * .034) + '" font-weight="' + (esNuevo ? '800' : '700') + '" fill="' + (esNuevo ? '#b91c1c' : '#111827') + '" font-family="Arial,sans-serif" style="paint-order:stroke;stroke:#fff;stroke-width:2.5px">' + esc(String(j.name || '').split(' ').slice(0, 2).join(' ')) + '</text>';
+                if (ids.length > 1) h += '<text x="' + cx + '" y="' + (cy + r + W * .075) + '" text-anchor="middle" font-size="' + (W * .028) + '" fill="#374151" font-family="Arial,sans-serif" style="paint-order:stroke;stroke:#fff;stroke-width:2px">o ' + esc(ids.slice(1).map(function (x) { var q = jug[x]; return q ? (q.number || q.name) : ''; }).join(', ')) + '</text>';
             }
         });
         return h + '</svg>';
@@ -236,14 +241,15 @@
         var jug = jugadores(), m = moms(r), rN = nombreRival();
         var pasos = [estado(r, 0)].concat(m);
         var fecha = r.fecha ? r.fecha.split('-').reverse().join('/') : '';
-        var h = '<div class="cab"><div><div class="k">Scouting · ' + esc(rN) + '</div><h1>' + esc(rN) + ' <span>vs</span> ' + esc(r.opponent || 'Rival') + '</h1><div class="sub">' + fecha + (r.local === 'visitante' ? ' · Visitante' : ' · Local') + ' · Sistema inicial <b>' + esc(r.formation || '—') + '</b>' + (r.notas ? ' · ' + esc(r.notas) : '') + '</div></div><div class="res">' + esc(r.resultado || '') + '</div></div>';
+        var h = '<div class="cab"><div><div class="k">Scouting · ' + esc(rN) + '</div><h1>' + esc(rN) + ' <span>vs</span> ' + esc(r.opponent || 'Rival') + '</h1><div class="sub">' + fecha + (r.local === 'visitante' ? ' · Visitante' : ' · Local') + ' · Sistema inicial <b>' + esc(r.formation || '—') + '</b>' + (r.notas ? ' · ' + esc(r.notas) : '') + '</div></div><div style="display:flex;align-items:center;gap:14px"><div class="ley"><span class="c" style="background:#dc2626;border-color:#dc2626"></span> acaba de entrar &nbsp; <span class="c"></span> ya estaba &nbsp; <span class="c" style="background:#e5e7eb"></span> portero</div><div class="res">' + esc(r.resultado || '') + '</div></div></div>';
         var cols = Math.min(5, Math.max(2, pasos.length));
         h += '<div class="grid" style="grid-template-columns:repeat(' + cols + ',1fr)">';
         pasos.forEach(function (st, k) {
             var prev = k ? pasos[k - 1] : null, cambiaSis = prev && st.formation && st.formation !== prev.formation;
             var cs = (st.cambios || []).filter(function (c) { return c.sale !== null && c.entra !== null; });
+            var nuevos = {}; cs.forEach(function (c) { nuevos[c.entra] = true; });
             h += '<div class="mom"><div class="mh"><span class="min">' + (k ? st.min + "'" : "0'") + '</span><span class="mk">' + esc(st.marcador || (k ? '' : '0-0')) + '</span><span class="sis">' + esc(st.formation || '') + (cambiaSis ? ' <em>(cambio de sistema, antes ' + esc(prev.formation) + ')</em>' : '') + '</span></div>'
-               + campoSvg(st.formation, st.lineup, jug, 240)
+               + campoSvg(st.formation, st.lineup, jug, 240, nuevos)
                + (k === 0 ? '<div class="nt">Once inicial</div>' : '<div class="nt">' + (cs.length ? cs.map(function (c) { return '<span class="cb"><b style="color:#15803d">↑ ' + esc(nombre(c.entra)) + '</b> por <b style="color:#b91c1c">↓ ' + esc(nombre(c.sale)) + '</b></span>'; }).join('') : '<span class="cb">Sin cambios de jugadores</span>') + (st.notas ? '<div class="no">' + esc(st.notas) + '</div>' : '') + '</div>')
                + '</div>';
         });
@@ -262,7 +268,7 @@
         }
         var CSSP = 'body{margin:0;padding:9mm 10mm;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#0f172a;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}'
             + '.cab{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #0f172a;padding-bottom:8px;margin-bottom:12px}.cab .k{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#64748b}.cab h1{margin:2px 0;font-size:22px}.cab h1 span{color:#94a3b8;font-weight:500;font-size:16px}.cab .sub{font-size:12px;color:#475569}.cab .res{font-size:34px;font-weight:900;color:#0f172a;border:2px solid #0f172a;border-radius:10px;padding:4px 14px}'
-            + '.grid{display:grid;gap:8px}.mom{break-inside:avoid;border:1px solid #cbd5e1;border-radius:10px;padding:6px;display:flex;flex-direction:column;align-items:center;min-width:0}.mh{display:flex;gap:6px;align-items:baseline;width:100%;margin-bottom:4px;flex-wrap:wrap}.mh .min{font-size:16px;font-weight:900}.mh .mk{font-size:14px;font-weight:800;color:#b45309}.mh .sis{font-size:11px;color:#1d4ed8;font-weight:700}.mh em{color:#64748b;font-weight:500;font-style:normal;font-size:10px}'
+            + '.ley{font-size:10px;color:#475569}.ley .c{display:inline-block;width:11px;height:11px;border-radius:50%;border:1.5px solid #111827;vertical-align:-2px;background:#fff}.grid{display:grid;gap:8px}.mom{break-inside:avoid;border:1px solid #cbd5e1;border-radius:10px;padding:6px;display:flex;flex-direction:column;align-items:center;min-width:0}.mh{display:flex;gap:6px;align-items:baseline;width:100%;margin-bottom:4px;flex-wrap:wrap}.mh .min{font-size:16px;font-weight:900}.mh .mk{font-size:14px;font-weight:800;color:#b45309}.mh .sis{font-size:11px;color:#1d4ed8;font-weight:700}.mh em{color:#64748b;font-weight:500;font-style:normal;font-size:10px}'
             + '.nt{width:100%;margin-top:5px;font-size:10.5px}.cb{display:block;margin:1px 0}.no{color:#475569;font-size:10px;margin-top:3px;border-left:3px solid #cbd5e1;padding-left:6px}'
             + 'h2{font-size:14px;margin:16px 0 6px;text-transform:uppercase;letter-spacing:1px;color:#334155}table{width:100%;border-collapse:collapse;font-size:11.5px}th{text-align:left;background:#f1f5f9;padding:5px 7px;border-bottom:1px solid #cbd5e1;font-size:10px;text-transform:uppercase;color:#475569}td{padding:5px 7px;border-bottom:1px solid #e2e8f0;vertical-align:top}'
             + 'h2,table{break-inside:avoid}.cron{break-inside:avoid}.pie{margin-top:10px;font-size:10px;color:#94a3b8;text-align:right}@page{size:A4 landscape;margin:0}';
