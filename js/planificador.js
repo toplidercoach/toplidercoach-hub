@@ -31,8 +31,10 @@ registrarSubTab('planificador', 'calendario', cargarCalendarioUnificado);
                 const equipo = document.getElementById('filtro-equipo')?.value;
                 const tema = document.getElementById('filtro-tema')?.value;
                 const dificultad = document.getElementById('filtro-dificultad')?.value;
+                const numJugadores = document.getElementById('filtro-jugadores')?.value;
                 
                 if (buscar) url += `&search=${encodeURIComponent(buscar)}`;
+                if (numJugadores) url += `&num_jugadores=${encodeURIComponent(numJugadores)}`;
                 if (entrenador) url += `&entrenador=${encodeURIComponent(entrenador)}`;
                 if (equipo) url += `&equipo=${encodeURIComponent(equipo)}`;
                 if (tema) url += `&tema=${encodeURIComponent(tema)}`;
@@ -62,6 +64,7 @@ registrarSubTab('planificador', 'calendario', cargarCalendarioUnificado);
                             <div class="tags">
                                 ${ej.tema ? `<span class="tag">${ej.tema}</span>` : ''}
                                 ${ej.dificultad ? `<span class="tag dificultad">Dif: ${ej.dificultad}</span>` : ''}
+                                ${ej.num_jugadores ? `<span class="tag" title="Número de jugadores">👥 ${ej.num_jugadores}</span>` : ''}
                             </div>
                         </div>
                         <button class="btn-agregar" 
@@ -555,6 +558,7 @@ registrarSubTab('planificador', 'calendario', cargarCalendarioUnificado);
             document.getElementById('filtro-equipo').value = '';
             document.getElementById('filtro-tema').value = '';
             document.getElementById('filtro-dificultad').value = '';
+            var fj = document.getElementById('filtro-jugadores'); if (fj) fj.value = '';
             cargarEjercicios(1);
         }
         
