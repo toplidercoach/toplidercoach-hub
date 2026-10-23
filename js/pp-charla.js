@@ -95,6 +95,7 @@
         + '#ch-prep .pie button.p{background:#059669;border-color:#10b981;color:#fff;font-size:14px;padding:10px 22px}'
         + '#ch-prep .pie .n{margin-left:auto;font-size:12px;color:#94a3b8}'
         // botones en la pestana confrontacion
+        + '.ch-en{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:#86efac;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.35);border-radius:999px;padding:2px 9px;cursor:pointer;white-space:nowrap;flex-shrink:0}.ch-en input{accent-color:#22c55e;margin:0;cursor:pointer}.ch-en:has(input:not(:checked)){color:#94a3b8;background:#0f172a;border-color:#334155}'
         + '.ch-acc{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}'
         + '.ch-acc button{padding:4px 10px;border-radius:6px;border:1px solid #334155;background:#0f172a;color:#94a3b8;font-size:11px;cursor:pointer}'
         + '.ch-acc button:hover{border-color:#7c3aed;color:#c4b5fd}'
@@ -559,6 +560,25 @@
     }
     window.chCarpetaClick = async function () { if (await L.reconectar()) { pintarEstadoCarpeta(); pintar(); } };
 
+    /* ---------- Casilla "En la charla" en cada bloque de Confrontacion ---------- */
+    function chkCharla(key, titulo) {
+        var off = cfgLeer().off || {};
+        return '<label class="ch-en" title="Marcado: este bloque entra en la charla. Desmárcalo para dejarlo fuera."><input type="checkbox"' + (off[key] ? '' : ' checked') + ' onchange="chEnCharla(\'' + key + '\',this.checked)"> 📺 En la charla</label>';
+    }
+    window.chEnCharla = async function (key, on) {
+        var cfg = cfgLeer(); cfg.off = cfg.off || {};
+        if (on) delete cfg.off[key]; else cfg.off[key] = true;
+        await cfgGuardar(cfg);
+        var n = candidatas().filter(function (c) { return !cfg.off[c.key]; }).length;
+        var e = document.getElementById('ch-conf-n'); if (e) e.textContent = n + ' diapositivas marcadas';
+        showToast(on ? 'Entra en la charla' : 'Fuera de la charla');
+    };
+    function tituloConChk(div, key) {
+        if (!div) return;
+        div.style.display = 'flex'; div.style.justifyContent = 'space-between'; div.style.alignItems = 'center'; div.style.gap = '8px';
+        div.insertAdjacentHTML('beforeend', chkCharla(key));
+    }
+
     /* ---------- Pestana Confrontacion: imagenes y pizarra en cada fase ---------- */
     function pickerPizarra(cb) {
         var prev = document.getElementById('ch-piz'); if (prev) prev.remove();
@@ -661,6 +681,7 @@
                 var izq = cards[0], der = cards[1];
                 if (!izq.querySelector('textarea') || izq.style.borderLeftColor !== 'rgb(239, 68, 68)') return; // filas de "apartados sueltos" no entran
                 var i = k++; var f = fases[i]; if (!f) return;
+                tituloConChk(izq.firstElementChild, 'conf:' + (f.id || i));
                 // quitar las miniaturas que ya pinta el original (dentro de la tarjeta) y poner las editables
                 Array.prototype.forEach.call(izq.querySelectorAll('div[style*="flex-wrap"]'), function (d) { d.remove(); });
                 izq.insertAdjacentHTML('beforeend', miniEdit(f.media, f.notes, function (mi) { return 'chQuitarRival(' + i + ',' + mi + ')'; }) + '<div class="ch-acc"><button onclick="chImgRival(' + i + ')">📷 Imagen / vídeo</button><button onclick="chPizRival(' + i + ')">🎨 Dibujo de pizarra</button><button onclick="chVidRival(' + i + ')">🎞️ Vídeo de mi carpeta</button></div>');
@@ -679,6 +700,7 @@
                 var tit = (der.firstChild && der.firstChild.textContent || '').trim();
                 var sec = PP_OUR_SECTIONS.filter(function (x) { return !x.type && x.title === tit; })[0]; if (!sec) return;
                 var od = our[sec.id] || {};
+                tituloConChk(der.firstElementChild, 'our:' + sec.id);
                 der.insertAdjacentHTML('beforeend', miniEdit(od.media, od.notes, function (mi) { return 'chQuitarOur(\'' + sec.id + '\',' + mi + ')'; }) + '<div class="ch-acc"><button onclick="chImgOur(\'' + sec.id + '\')">📷 Imagen / vídeo</button><button onclick="chPizOur(\'' + sec.id + '\')">🎨 Dibujo de pizarra</button><button onclick="chVidOur(\'' + sec.id + '\')">🎞️ Vídeo de mi carpeta</button></div>');
             });
             // bloque SISTEMAS (rival | nuestro) + sistemas enfrentados, antes de las fases
@@ -687,14 +709,14 @@
             var acc = function (campo) { return '<div class="ch-acc"><button onclick="chSisImg(\'' + campo + '\')">📷 Imagen / vídeo</button><button onclick="chSisPiz(\'' + campo + '\')">🎨 Dibujo de pizarra</button><button onclick="chSisVid(\'' + campo + '\')">🎞️ Vídeo de mi carpeta</button></div>'; };
             var bloque = '<div style="font-size:12px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;margin:4px 0 8px">⚙️ Sistemas</div>'
                 + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;align-items:stretch">'
-                + '<div style="background:#1e293b;border-left:4px solid #ef4444;border-radius:0 8px 8px 0;padding:12px"><div style="font-size:13px;font-weight:600;color:#e2e8f0;margin-bottom:8px">Sistema del rival</div>' + ppSelectFormacion('ch-rf', plan.rival_formation, "ppGuardarCampo('rival_formation',this.value)") + '<textarea rows="3" placeholder="Estilo del rival..." onchange="ppGuardarCampo(\'rival_style\',this.value)" style="' + ta + ';margin-top:8px">' + esc(plan.rival_style || '') + '</textarea>' + miniEdit(sis.rival_media, plan.rival_style, function (mi) { return 'chSisQuitar(\'rival_media\',' + mi + ')'; }) + acc('rival_media') + '</div>'
+                + '<div style="background:#1e293b;border-left:4px solid #ef4444;border-radius:0 8px 8px 0;padding:12px"><div style="font-size:13px;font-weight:600;color:#e2e8f0;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:8px">Sistema del rival ' + chkCharla('sistema') + '</div>' + ppSelectFormacion('ch-rf', plan.rival_formation, "ppGuardarCampo('rival_formation',this.value)") + '<textarea rows="3" placeholder="Estilo del rival..." onchange="ppGuardarCampo(\'rival_style\',this.value)" style="' + ta + ';margin-top:8px">' + esc(plan.rival_style || '') + '</textarea>' + miniEdit(sis.rival_media, plan.rival_style, function (mi) { return 'chSisQuitar(\'rival_media\',' + mi + ')'; }) + acc('rival_media') + '</div>'
                 + '<div style="background:#1e293b;border-left:4px solid #22c55e;border-radius:0 8px 8px 0;padding:12px"><div style="font-size:13px;font-weight:600;color:#e2e8f0;margin-bottom:8px">Nuestro sistema inicial</div>' + ppSelectFormacion('ch-of', plan.our_formation, "ppGuardarCampo('our_formation',this.value)") + '<textarea rows="3" placeholder="Cómo nos colocamos, roles, matices..." onchange="ppGuardarOurFase(\'sys_inicial\',this.value)" style="' + ta + ';margin-top:8px">' + esc(so.notes || '') + '</textarea>' + miniEdit(so.media, so.notes, function (mi) { return 'chQuitarOur(\'sys_inicial\',' + mi + ')'; }) + '<div class="ch-acc"><button onclick="chImgOur(\'sys_inicial\')">📷 Imagen / vídeo</button><button onclick="chPizOur(\'sys_inicial\')">🎨 Dibujo de pizarra</button><button onclick="chVidOur(\'sys_inicial\')">🎞️ Vídeo de mi carpeta</button></div></div>'
                 + '</div>'
-                + '<div style="background:#1e293b;border-left:4px solid #f59e0b;border-radius:0 8px 8px 0;padding:12px;margin-bottom:18px"><div style="font-size:13px;font-weight:600;color:#e2e8f0;margin-bottom:2px">⚔️ Sistemas enfrentados</div><div style="font-size:11.5px;color:#64748b;margin-bottom:8px">Dibuja en la pizarra los dos sistemas sobre el mismo campo y añádelo aquí: saldrá como diapositiva propia en la charla. En la charla también se ven los dos campos uno al lado del otro con las formaciones de arriba.</div><textarea rows="3" placeholder="Dónde se producen los duelos, superioridades e inferioridades, qué espacios aparecen..." onchange="chSisNotas(this.value)" style="' + ta + '">' + esc(sis.notes || '') + '</textarea>' + miniEdit(sis.media, sis.notes, function (mi) { return 'chSisQuitar(\'media\',' + mi + ')'; }) + acc('media') + '</div>';
+                + '<div style="background:#1e293b;border-left:4px solid #f59e0b;border-radius:0 8px 8px 0;padding:12px;margin-bottom:18px"><div style="font-size:13px;font-weight:600;color:#e2e8f0;margin-bottom:2px;display:flex;justify-content:space-between;align-items:center;gap:8px">⚔️ Sistemas enfrentados ' + chkCharla('enfrentados') + '</div><div style="font-size:11.5px;color:#64748b;margin-bottom:8px">Dibuja en la pizarra los dos sistemas sobre el mismo campo y añádelo aquí: saldrá como diapositiva propia en la charla. En la charla también se ven los dos campos uno al lado del otro con las formaciones de arriba.</div><textarea rows="3" placeholder="Dónde se producen los duelos, superioridades e inferioridades, qué espacios aparecen..." onchange="chSisNotas(this.value)" style="' + ta + '">' + esc(sis.notes || '') + '</textarea>' + miniEdit(sis.media, sis.notes, function (mi) { return 'chSisQuitar(\'media\',' + mi + ')'; }) + acc('media') + '</div>';
             var cab = Array.prototype.filter.call(tmp.firstChild.children, function (el) { return el.style && el.style.gridTemplateColumns === '1fr 1fr' && !el.querySelector('textarea'); })[0];
             if (cab) cab.insertAdjacentHTML('beforebegin', bloque);
             // aviso arriba
-            var p = tmp.querySelector('p'); if (p) p.insertAdjacentHTML('afterend', '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:-6px 0 14px;padding:10px 12px;background:#111c33;border:1px solid #1e3a5f;border-radius:10px;font-size:12px;color:#94a3b8">📺 Lo que escribas y las imágenes de cada tarjeta son lo que verán los jugadores en la <b style="color:#e2e8f0">charla</b> (pantalla partida). <button onclick="ppPresentacion()" style="margin-left:auto;padding:6px 14px;background:#065f46;border:1px solid #10b981;color:#6ee7b7;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700">📺 Preparar charla</button></div>');
+            var p = tmp.querySelector('p'); if (p) p.insertAdjacentHTML('afterend', '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:-6px 0 14px;padding:10px 12px;background:#111c33;border:1px solid #1e3a5f;border-radius:10px;font-size:12px;color:#94a3b8">📺 Lo que escribas y las imágenes de cada tarjeta son lo que verán los jugadores en la <b style="color:#e2e8f0">charla</b> (pantalla partida). Con la casilla <b style="color:#86efac">📺 En la charla</b> de cada bloque eliges qué entra; al marcar la fase del rival entra también nuestra respuesta de enfrente. <span id="ch-conf-n" style="color:#fbbf24;font-weight:700">' + candidatas().filter(function (c) { return !(cfgLeer().off || {})[c.key]; }).length + ' diapositivas marcadas</span> <button onclick="ppPresentacion()" style="margin-left:auto;padding:6px 14px;background:#065f46;border:1px solid #10b981;color:#6ee7b7;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700">📺 Preparar charla</button></div>');
             return tmp.innerHTML;
         } catch (e) { console.warn('[charla] confrontacion', e); return html; }
     };
