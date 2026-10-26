@@ -5419,3 +5419,11 @@ async function ejMontajeGuardar() {
         if (btn) { btn.disabled = false; btn.textContent = 'Guardar'; }
     }
 }
+function ejProyPlegar() {
+    var b = document.getElementById('ej-proy-body');
+    var btn = document.getElementById('ej-proy-min');
+    if (!b) return;
+    var plegado = b.style.display === 'none';
+    b.style.display = plegado ? '' : 'none';
+    if (btn) { btn.textContent = plegado ? '—' : '▢'; btn.title = plegado ? 'Plegar' : 'Desplegar'; }
+}
