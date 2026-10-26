@@ -729,6 +729,8 @@ registrarSubTab('planificador', 'calendario', cargarCalendarioUnificado);
                 const lista = document.getElementById(`lista-${seccion}`);
                 const tiempo = document.getElementById(`tiempo-${seccion}`);
                 
+                if (!Array.isArray(sesion[seccion])) sesion[seccion] = [];
+                if (!lista || !tiempo) return;
                 const totalMin = sesion[seccion].reduce((sum, ej) => sum + (ej.duracion || 0), 0);
                 if (seccion !== 'porteros') duracionTotal += totalMin;
                 tiempo.textContent = `${totalMin} min`;
