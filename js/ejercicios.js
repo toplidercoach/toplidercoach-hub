@@ -2304,7 +2304,7 @@ ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin
                 ${['num','name','both','nofoto','solotexto'].map(opt => {
                     const lbl = opt==='num'?'Nº':opt==='name'?'Nombre':opt==='both'?'Nº+Nombre':opt==='nofoto'?'Sin foto':'Solo texto';
                     const active = (ejP._plantillaLabel||'num') === opt;
-                    return `<button onclick="ejP._plantillaLabel='${opt}';ejRenderToolbar()" style="flex:1;padding:3px;font-size:9px;border-radius:4px;border:1px solid ${active?'#3b82f6':'#334155'};background:${active?'#1e3a5f':'transparent'};color:${active?'#93c5fd':'#64748b'};cursor:pointer">${lbl}</button>`;
+                    return `<button onclick="ejSetPlantillaLabel('${opt}')" style="flex:1;padding:3px;font-size:9px;border-radius:4px;border:1px solid ${active?'#3b82f6':'#334155'};background:${active?'#1e3a5f':'transparent'};color:${active?'#93c5fd':'#64748b'};cursor:pointer">${lbl}</button>`;
                 }).join('')}
             </div>
             <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;max-height:220px;overflow-y:auto">
@@ -4535,7 +4535,7 @@ async function ejCargarPlantilla() {
         const { data, error } = await qPlantilla;
 
         if (error) throw error;
-        ejP._plantilla = (data || []).filter(sp => !(sp.players && sp.players.status === 'baja')).map(sp => ({
+        ejP._plantillaEsRival = false; ejP._plantilla = (data || []).filter(sp => !(sp.players && sp.players.status === 'baja')).map(sp => ({
             playerId: sp.player_id,
             number: sp.shirt_number,
             name: sp.players?.name || '?',
@@ -4604,6 +4604,24 @@ async function ejCargarJugadoresRival(equipoId, nombreEquipo) {
     }
 }
 
+function ejSetPlantillaLabel(opt) {
+    ejP._plantillaLabel = opt;
+    var cols = ejP._plantillaEsRival ? [ejP.rivalColor, ejP.rivalGkColor] : [ejP.myColor, ejP.myGkColor];
+    var fotos = {};
+    (ejP._plantilla || []).forEach(function(j) { if (j.number !== undefined && j.number !== '') fotos[String(j.number)] = j.photo || null; });
+    var cambiados = 0;
+    ejP.players.forEach(function(p) {
+        if (!p.name || cols.indexOf(p.color) < 0) return;
+        p.photo = (opt === 'nofoto' || opt === 'solotexto') ? null : (fotos[String(p.number)] || null);
+        p.showNumber = opt !== 'name' && opt !== 'solotexto';
+        p.showName = opt !== 'num';
+        p.soloTexto = opt === 'solotexto';
+        cambiados++;
+    });
+    if (cambiados > 0) { ejSaveHistory(); if (ejP.animMode) ejFrameSaveCurrent(); }
+    ejRenderSVG();
+    ejRenderToolbar();
+}
 function ejColocarJugadorPlantilla(idx) {
     const p = ejP._plantilla[idx];
     if (!p) return;
