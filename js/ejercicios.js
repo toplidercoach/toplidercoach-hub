@@ -488,7 +488,7 @@ function ejRenderSVG() {
         const fillAttr = tc.striped ? `url(#stp-${p.id})` : tc.fill;
 
         if (p.soloTexto) {
-            const _stName = (p.name || '').split(' ')[0];
+            const _stName = ejEscXml(p.name || '');
             const _stFs = 12 * scale;
             const _stW = Math.max(30, _stName.length * _stFs * 0.62);
             html += `<g data-id="${p.id}" data-type="player" transform="translate(${p.x},${p.y})" style="cursor:move">
@@ -513,7 +513,7 @@ function ejRenderSVG() {
             <ellipse cx="0" cy="${-r*0.32}" rx="${r*0.62}" ry="${r*0.40}" fill="rgba(255,255,255,0.16)" style="pointer-events:none"/>
             ${p.showNumber && p.number ? `<text text-anchor="middle" dominant-baseline="central" fill="${textColor}" font-size="${fs}" font-weight="700" font-family="system-ui">${p.number}</text>` : ''}`;
         }
-        html += `${p.showName && p.name ? `<text text-anchor="middle" y="${r+11}" fill="#ffffff" font-size="9" font-weight="600" font-family="system-ui" style="text-shadow:0 1px 2px rgba(0,0,0,.8)">${p.name.split(' ')[0]}</text>` : ''}
+        html += `${p.showName && p.name ? `<text text-anchor="middle" y="${r+11}" fill="#ffffff" font-size="9" font-weight="600" font-family="system-ui" style="text-shadow:0 1px 2px rgba(0,0,0,.8)">${ejEscXml(p.name)}</text>` : ''}
         </g>`;
     }
 // Fantasmas del frame anterior - no mostrar durante exportación
@@ -2318,7 +2318,7 @@ ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin
                     const avatar = p.photo
                         ? `<div style="width:30px;height:30px;border-radius:50%;background-image:url('${p.photo}');background-size:cover;background-position:center;border:2px solid ${col?.stroke||'#2563eb'}"></div>`
                         : `<div style="width:30px;height:30px;border-radius:50%;background:${col?.fill||'#3b82f6'};border:2px solid ${col?.stroke||'#2563eb'};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff">${p.number}</div>`;
-                    return `<div onclick="ejColocarJugadorPlantilla(${i})" title="${p.name}" style="display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 2px;border-radius:6px;cursor:pointer;background:${active?'#1e3a5f':'transparent'};border:1px solid ${active?'#3b82f6':'transparent'}">${avatar}<span style="font-size:8px;color:#9ca3af;text-align:center;line-height:1.1;max-width:40px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name.split(' ')[0]}</span></div>`;
+                    return `<div onclick="ejColocarJugadorPlantilla(${i})" title="${p.name}" style="display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 2px;border-radius:6px;cursor:pointer;background:${active?'#1e3a5f':'transparent'};border:1px solid ${active?'#3b82f6':'transparent'}">${avatar}<span style="font-size:8px;color:#9ca3af;text-align:center;line-height:1.1;max-width:40px;overflow:hidden;text-overflow:ellipsis;white-space:normal;word-break:break-word">${p.name}</span></div>`;
                 }).join('')}
             </div>
         </div>` : ''}
