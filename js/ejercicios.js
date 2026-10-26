@@ -1224,7 +1224,7 @@ function ejProyPanel() {
     p.style.cssText = 'position:fixed;right:16px;bottom:16px;width:360px;max-height:70vh;background:#0f172a;border:1px solid #334155;border-radius:12px;z-index:99998;display:flex;flex-direction:column;box-shadow:0 10px 40px rgba(0,0,0,.5);overflow:hidden';
     p.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#1e3a5f;">' +
         '<strong style="color:#93c5fd;font-size:13px">📁 Proyectos de pizarra</strong>' +
-        '<button onclick="document.getElementById(\'ej-proy-panel\').style.display=\'none\'" style="background:none;border:none;color:#94a3b8;font-size:16px;cursor:pointer">✕</button></div>' +
+        '<span><button id="ej-proy-min" onclick="ejProyPlegar()" title="Plegar" style="background:none;border:none;color:#94a3b8;font-size:16px;cursor:pointer;margin-right:6px">—</button><button onclick="document.getElementById(\'ej-proy-panel\').style.display=\'none\'" style="background:none;border:none;color:#94a3b8;font-size:16px;cursor:pointer">✕</button></span></div>' +
         '<div id="ej-proy-body" style="padding:12px;overflow:auto;color:#e2e8f0;font-size:13px"></div>';
     document.body.appendChild(p);
     (function() {
