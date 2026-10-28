@@ -3110,10 +3110,10 @@ async function abrirModoVestuario(id) {
                     color: sec.color,
                     num: n,
                     total: totalEj,
-                    titulo: 'Ejercicio ' + n,
+                    titulo: ej.titulo || ('Ejercicio ' + n),
                     imagen: ej.imagen || null,
                     duracion: ej.duracion || null,
-                    texto: (ej.tipo === 'libre' && ej.titulo) ? (ej.titulo + (ej.notas ? ' · ' + ej.notas : '')) : (ej.objetivo || ej.notas || '')
+                    texto: (ej.tipo === 'libre') ? (ej.notas || '') : (ej.objetivo || ej.notas || '')
                 });
             });
         });
