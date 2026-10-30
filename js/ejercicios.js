@@ -1470,7 +1470,8 @@ function ejProyBoardDataActual() {
         equipment: ejP.equipment, connections: ejP.connections,
         fieldType: ejP.fieldType, showCarriles: ejP.showCarriles, showZonas: ejP.showZonas, showRejilla: ejP.showRejilla,
         animFrames: ejP.animMode ? ejP.frames : [],
-        animMode: ejP.animMode
+        animMode: ejP.animMode,
+        teamColors: { my: ejP.myColor, myGk: ejP.myGkColor, rival: ejP.rivalColor, rivalGk: ejP.rivalGkColor }
     };
 }
 
@@ -1528,6 +1529,13 @@ function ejProyCargarFase(it) {
     ejP.showCarriles = !!bd.showCarriles;
     ejP.showZonas = !!bd.showZonas;
     ejP.showRejilla = !!bd.showRejilla;
+    if (bd.teamColors) {
+        ejP.myColor = bd.teamColors.my || ejP.myColor;
+        ejP.myGkColor = bd.teamColors.myGk || ejP.myGkColor;
+        ejP.rivalColor = bd.teamColors.rival || ejP.rivalColor;
+        ejP.rivalGkColor = bd.teamColors.rivalGk || ejP.rivalGkColor;
+    }
+    ejEtiquetarEquipos();
     ejP.selectedId = null;
     ejP.nextId = [].concat(ejP.players, ejP.lines, ejP.shapes, ejP.texts, ejP.equipment, ejP.connections).reduce(function(max, e) { return (e.id > max ? e.id : max); }, 0) + 1;
     if (bd.animFrames && bd.animFrames.length > 0) {
@@ -2589,7 +2597,37 @@ function ejEsRival(p) {
     return p.color === ejP.rivalColor || p.color === ejP.rivalGkColor;
 }
 function ejEtiquetarEquipos() {
-    ejP.players.forEach(function(p) { if (!p.team) p.team = ejEsRival(p) ? 'rival' : 'my'; });
+    var sinEquipo = ejP.players.filter(function(p) { return !p.team; });
+    if (!sinEquipo.length) return;
+    var misCols = [ejP.myColor, ejP.myGkColor], rivCols = [ejP.rivalColor, ejP.rivalGkColor];
+    var pendientes = [];
+    sinEquipo.forEach(function(p) {
+        if (misCols.indexOf(p.color) >= 0) p.team = 'my';
+        else if (rivCols.indexOf(p.color) >= 0) p.team = 'rival';
+        else pendientes.push(p);
+    });
+    if (pendientes.length) {
+        var hayMy = ejP.players.some(function(p) { return p.team === 'my'; });
+        var hayRival = ejP.players.some(function(p) { return p.team === 'rival'; });
+        if (hayMy && !hayRival) {
+            pendientes.forEach(function(p) { p.team = 'rival'; });
+        } else if (hayRival && !hayMy) {
+            pendientes.forEach(function(p) { p.team = 'my'; });
+        } else {
+            // Ninguno identificado: el color mas repetido es mi equipo, el resto rival
+            var cuenta = {};
+            pendientes.forEach(function(p) { if (p.number != 1) cuenta[p.color] = (cuenta[p.color] || 0) + 1; });
+            var colMy = Object.keys(cuenta).sort(function(a, b) { return cuenta[b] - cuenta[a]; })[0];
+            pendientes.forEach(function(p) { p.team = (p.color === colMy || p.number == 1 && colMy === undefined) ? 'my' : 'rival'; });
+        }
+    }
+    // Que las muestras de color reflejen lo que hay en la pizarra
+    ['my', 'rival'].forEach(function(t) {
+        var cuenta = {};
+        ejP.players.forEach(function(p) { if (p.team === t && p.number != 1 && p.color) cuenta[p.color] = (cuenta[p.color] || 0) + 1; });
+        var col = Object.keys(cuenta).sort(function(a, b) { return cuenta[b] - cuenta[a]; })[0];
+        if (col) { if (t === 'my') ejP.myColor = col; else ejP.rivalColor = col; }
+    });
 }
 function ejJugadoresDelEquipo(rival) {
     ejEtiquetarEquipos();
