@@ -476,7 +476,7 @@ function ejRenderSVG() {
     // Jugadores (encima de todo)
     for (const p of ejP.players) {
         const isGk = p.number == 1;
-        const gkColor = p.color === ejP.rivalColor ? ejP.rivalGkColor : ejP.myGkColor;
+        const gkColor = ejEsRival(p) ? ejP.rivalGkColor : ejP.myGkColor;
         const effectiveColor = isGk ? gkColor : p.color;
         const tc = EJ_TEAM_COLORS[effectiveColor] || EJ_TEAM_COLORS.blue;
         const vc = EJ_TEAM_COLORS[p.vestColor] || EJ_TEAM_COLORS.yellow;
@@ -760,7 +760,7 @@ if (ejP.activeTool === 'connect') { if (!isBackground && el) { var _cid = parseI
                 ? (isGk ? ejP.rivalGkColor : ejP.rivalColor)
                 : (isGk ? ejP.myGkColor : ejP.myColor);
             ejP.players.push({
-                id, x: pos.x, y: pos.y, color,
+                id, x: pos.x, y: pos.y, color, team: ejP._plantillaEsRival ? 'rival' : 'my',
                 scale, number: p.number, name: p.name,
                 photo: (ejP._plantillaLabel === 'nofoto' || ejP._plantillaLabel === 'solotexto') ? null : (p.photo || null),
                 showNumber: ejP._plantillaLabel !== 'name' && ejP._plantillaLabel !== 'solotexto',
@@ -775,7 +775,7 @@ if (ejP.activeTool === 'connect') { if (!isBackground && el) { var _cid = parseI
             const counts = ejP.playerCounts;
             counts[color] = (counts[color] || 0) + 1;
             ejP.players.push({
-                id, x: pos.x, y: pos.y, color,
+                id, x: pos.x, y: pos.y, color, team: ejP._addingRival ? 'rival' : 'my',
                 scale, number: ejP.showNumbers ? counts[color] : '',
                 showNumber: ejP.showNumbers,
                 hasVest: ejP.hasVest, vestColor: ejP.vestColor
@@ -1996,10 +1996,7 @@ function ejApplyFormation(key, isRival) {
     const ts = Date.now();
     if (!isRival) {
         // Reemplazar mi equipo
-        ejP.players = ejP.players.filter(p => {
-            const tc = EJ_TEAM_COLORS[p.color];
-            return tc && ejP.rivalColor === p.color; // mantener solo rivales
-        });
+        ejP.players = ejP.players.filter(p => ejEsRival(p)); // mantener solo rivales
         ejP.playerCounts[color] = 0;
     }
     const offset = ejP.nextId;
@@ -2007,7 +2004,7 @@ function ejApplyFormation(key, isRival) {
         id: ejP.nextId++,
         x: isRival ? (1 - pos.x) * ejP.svgW : pos.x * ejP.svgW,
         y: pos.y * ejP.svgH,
-        color,
+        color, team: isRival ? 'rival' : 'my',
         scale,
         number: i + 1,
         showNumber: ejP.showNumbers,
@@ -2330,18 +2327,19 @@ ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin
             <label style="font-size:11px;color:#9ca3af;margin-top:4px;display:block">🧤 Portero (nº1):</label>
             ${colorSwatches(ejP._addingRival?ejP.rivalGkColor:ejP.myGkColor, true, false, ejP._addingRival?'ejSetRivalGkColor':'ejSetMyGkColor')}
             <div class="ej-size-row" style="margin-top:6px">
-                <span>Tamaño nuevo:</span>
+                <span>Tamaño:</span>
                 ${['small','medium','large'].map(s=>
-                    `<button class="ej-sz${ejP.selectedSize===s?' active':''}" onclick="ejP.selectedSize='${s}';ejRenderToolbar()">${s==='small'?'S':s==='medium'?'M':'L'}</button>`
+                    `<button class="ej-sz${ejP.selectedSize===s?' active':''}" onclick="ejSetSize('${s}')">${s==='small'?'S':s==='medium'?'M':'L'}</button>`
                 ).join('')}
             </div>
-            <label class="ej-check"><input type="checkbox" ${ejP.showNumbers?'checked':''} onchange="ejP.showNumbers=this.checked"> Mostrar números</label>
-            <label class="ej-check"><input type="checkbox" ${ejP.hasVest?'checked':''} onchange="ejP.hasVest=this.checked;ejRenderToolbar()"> Con peto</label>
+            <label class="ej-check"><input type="checkbox" ${ejP.showNumbers?'checked':''} onchange="ejSetShowNumbers(this.checked)"> Mostrar números</label>
+            <label class="ej-check"><input type="checkbox" ${ejP.hasVest?'checked':''} onchange="ejSetVest(this.checked)"> Con peto</label>
             ${ejP.hasVest ? `<div class="ej-swatches">${
                 Object.entries(EJ_TEAM_COLORS).filter(([,v])=>!v.striped).map(([k,v])=>
-                    `<div class="ej-swatch${ejP.vestColor===k?' active':''}" style="background:${v.fill}" onclick="ejP.vestColor='${k}';ejRenderToolbar()"></div>`
+                    `<div class="ej-swatch${ejP.vestColor===k?' active':''}" style="background:${v.fill}" onclick="ejSetVestColor('${k}')"></div>`
                 ).join('')
             }</div>` : ''}
+            <div style="font-size:10px;color:#64748b;margin-top:4px">Se aplica a los jugadores ${ejP._addingRival?'del rival':'de mi equipo'} que ya están en la pizarra y a los nuevos.</div>
         </div>` : ''}
         ${selPlayer ? `
         <div class="ej-selected-block">
@@ -2585,8 +2583,59 @@ function ejToggleSection(id) {
 // Wrappers para onclick (no se puede pasar booleano directamente)
 function ejApplyFormation_my(key)    { ejApplyFormation(key, false); }
 function ejApplyFormation_rival(key) { ejApplyFormation(key, true);  }
-function ejSetMyColor(c)      { ejP.myColor     = c; ejRenderToolbar(); ejRenderSVG(); }
-function ejSetRivalColor(c)   { ejP.rivalColor  = c; ejRenderToolbar(); ejRenderSVG(); }
+// ---- Equipo de un jugador (pizarras antiguas no tienen el campo team: se deduce por color) ----
+function ejEsRival(p) {
+    if (p.team) return p.team === 'rival';
+    return p.color === ejP.rivalColor || p.color === ejP.rivalGkColor;
+}
+function ejEtiquetarEquipos() {
+    ejP.players.forEach(function(p) { if (!p.team) p.team = ejEsRival(p) ? 'rival' : 'my'; });
+}
+function ejJugadoresDelEquipo(rival) {
+    ejEtiquetarEquipos();
+    return ejP.players.filter(function(p) { return (p.team === 'rival') === !!rival; });
+}
+function ejSetMyColor(c) {
+    ejSaveHistory();
+    ejJugadoresDelEquipo(false).forEach(function(p) { p.color = c; });
+    ejP.myColor = c; ejRenderToolbar(); ejRenderSVG();
+}
+function ejSetRivalColor(c) {
+    ejSaveHistory();
+    ejJugadoresDelEquipo(true).forEach(function(p) { p.color = c; });
+    ejP.rivalColor = c; ejRenderToolbar(); ejRenderSVG();
+}
+// Apariencia: aplican al equipo seleccionado (pestaña Mi equipo / Rival), a los que ya están y a los nuevos
+function ejSetSize(s) {
+    ejSaveHistory();
+    ejP.selectedSize = s;
+    var scale = s === 'small' ? 0.6 : s === 'large' ? 1.4 : 1.0;
+    ejJugadoresDelEquipo(ejP._addingRival).forEach(function(p) { p.scale = scale; });
+    ejRenderToolbar(); ejRenderSVG();
+}
+function ejSetShowNumbers(v) {
+    ejSaveHistory();
+    ejP.showNumbers = !!v;
+    var n = 0;
+    ejJugadoresDelEquipo(ejP._addingRival).forEach(function(p) {
+        n++;
+        if (v && (p.number === undefined || p.number === null || p.number === '')) p.number = n;
+        p.showNumber = !!v;
+    });
+    ejRenderToolbar(); ejRenderSVG();
+}
+function ejSetVest(v) {
+    ejSaveHistory();
+    ejP.hasVest = !!v;
+    ejJugadoresDelEquipo(ejP._addingRival).forEach(function(p) { p.hasVest = !!v; if (v) p.vestColor = ejP.vestColor; });
+    ejRenderToolbar(); ejRenderSVG();
+}
+function ejSetVestColor(c) {
+    ejSaveHistory();
+    ejP.vestColor = c;
+    ejJugadoresDelEquipo(ejP._addingRival).forEach(function(p) { if (p.hasVest) p.vestColor = c; });
+    ejRenderToolbar(); ejRenderSVG();
+}
 function ejSetMyGkColor(c)    { ejP.myGkColor   = c; ejRenderToolbar(); ejRenderSVG(); }
 function ejSetRivalGkColor(c) { ejP.rivalGkColor = c; ejRenderToolbar(); ejRenderSVG(); }
 
@@ -4606,12 +4655,12 @@ async function ejCargarJugadoresRival(equipoId, nombreEquipo) {
 
 function ejSetPlantillaLabel(opt) {
     ejP._plantillaLabel = opt;
-    var cols = ejP._plantillaEsRival ? [ejP.rivalColor, ejP.rivalGkColor] : [ejP.myColor, ejP.myGkColor];
+    var _esRivalPl = !!ejP._plantillaEsRival;
     var fotos = {};
     (ejP._plantilla || []).forEach(function(j) { if (j.number !== undefined && j.number !== '') fotos[String(j.number)] = j.photo || null; });
     var cambiados = 0;
     ejP.players.forEach(function(p) {
-        if (!p.name || cols.indexOf(p.color) < 0) return;
+        if (!p.name || ejEsRival(p) !== _esRivalPl) return;
         p.photo = (opt === 'nofoto' || opt === 'solotexto') ? null : (fotos[String(p.number)] || null);
         p.showNumber = opt !== 'name' && opt !== 'solotexto';
         p.showName = opt !== 'num';
