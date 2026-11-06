@@ -3434,6 +3434,26 @@ async function exportarSesionPDFResumida(id) {
     const equipo = (typeof cmState !== 'undefined' && cmState.activo && cmState.equipoSeleccionado) ? cmState.equipoSeleccionado.name : '';
     const temporada = (function () { try { const sel = document.getElementById('plantilla-temporada') || document.querySelector('#temporada-select, #dash-temporada'); return sel && sel.selectedOptions[0] ? sel.selectedOptions[0].textContent.replace('(activa)', '').trim() : ''; } catch (e) { return ''; } })();
     const entrenador = (typeof usuario !== 'undefined' && usuario) ? (usuario.display_name || usuario.name || '') : '';
+        // Datos de cabecera leidos de Supabase (si algo falla se quedan los valores anteriores)
+    const datosPDF = { categoria: limpiar(s.team_category) || equipo, temporada: temporada, entrenador: entrenador };
+    try {
+        const sinTildes = t => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+        if (s.season_id) {
+            const rT = await supabaseClient.from('seasons').select('name').eq('id', s.season_id).single();
+            if (rT.data && rT.data.name) datosPDF.temporada = rT.data.name;
+        }
+        if (!limpiar(s.team_category) && s.team_id) {
+            const rE = await supabaseClient.from('club_teams').select('name, category').eq('id', s.team_id).single();
+            if (rE.data) {
+                const nom = rE.data.name || '', cat = rE.data.category || '';
+                datosPDF.categoria = (cat && sinTildes(nom).indexOf(sinTildes(cat)) === -1) ? cat : (nom || cat || datosPDF.categoria);
+            }
+        }
+        if (typeof usuario !== 'undefined' && usuario && usuario.id) {
+            const rM = await supabaseClient.from('club_members').select('display_name').eq('club_id', clubId).eq('wp_user_id', usuario.id).eq('active', true).limit(1);
+            if (rM.data && rM.data[0] && rM.data[0].display_name) datosPDF.entrenador = rM.data[0].display_name;
+        }
+    } catch (e) { console.warn('Cabecera PDF resumido:', e); }
 
     const tareas = [];
     [['warm_up', 'Calentamiento'], ['main_part', 'Parte principal'], ['cool_down', 'Vuelta a la calma']].forEach(([k, sec]) => {
@@ -3475,7 +3495,7 @@ async function exportarSesionPDFResumida(id) {
         doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
         doc.text(fecha + (s.session_time ? '  ·  ' + s.session_time.substring(0, 5) : ''), W - M, 14, { align: 'right' });
         const y = 20.5, h = 8;
-        const cols = [['Microciclo', s.microciclo || '—'], ['Sesión', limpiar(s.name)], ['Fecha', fecha], ['Categoría', equipo || '—'], ['Temporada', temporada || '—'], ['Entrenador', entrenador || '—']];
+        const cols = [['Microciclo', s.microciclo || '—'], ['Sesión', limpiar(s.name)], ['Fecha', fecha], ['Categoría', datosPDF.categoria || '—'], ['Temporada', datosPDF.temporada || '—'], ['Entrenador', datosPDF.entrenador || '—']];
         if (s.objective) cols.push(['Objetivo de la sesión', limpiar(s.objective)]);
         const ws = cols.map(c => c[0].startsWith('Objetivo') ? 3 : 1), tot = ws.reduce((a, b) => a + b, 0);
         let x = M; cols.forEach((c, i) => { const cw = CW * ws[i] / tot; celda(x, y, cw, h, c[0], c[1], SOFT); x += cw; });
@@ -3512,6 +3532,43 @@ async function exportarSesionPDFResumida(id) {
         const cw = w / datos.length; datos.forEach((d, i) => celda(x + i * cw, fy, cw, strip, d[0], d[1], SOFT));
     }
 
+        // Franja compacta de jugadores disponibles (solo en la primera hoja)
+    function disponibles(yIni) {
+        const lista = Array.isArray(s.players) ? s.players.filter(j => j && j.name) : [];
+        if (!lista.length) return yIni;
+        const grupos = [['POR', ['POR']], ['DEF', ['LD','LI','CAD','CAI','DCD','DCC','DCI']], ['MED', ['PIV','MCD','MC','MCI','MD','MI','ID','II','MP']], ['ATA', ['ED','EI','DC']]];
+        const porDorsal = (a, b) => (parseInt(a.shirt_number) || 999) - (parseInt(b.shirt_number) || 999);
+        const usados = new Set(), piezas = [];
+        const anadirGrupo = (nombre, js) => {
+            if (!js.length) return;
+            piezas.push({ t: nombre + ' ' + js.length, b: true });
+            js.forEach(j => { usados.add(j); piezas.push({ t: (j.shirt_number || '?') + '.' + limpiar(j.name), b: false }); });
+        };
+        grupos.forEach(g => anadirGrupo(g[0], lista.filter(j => g[1].indexOf(planPosCodigo(j.position)) > -1).sort(porDorsal)));
+        anadirGrupo('OTROS', lista.filter(j => !usados.has(j)).sort(porDorsal));
+        // Medir y repartir en lineas
+        const FS = 6.8, LH = 3.4, x0 = M + 26, xMax = M + CW - 2;
+        piezas.forEach(pz => { doc.setFont('helvetica', pz.b ? 'bold' : 'normal'); doc.setFontSize(pz.b ? 6.2 : FS); pz.w = doc.getTextWidth(pz.t); });
+        let px = x0, linea = 0;
+        piezas.forEach((pz, i) => {
+            if (pz.b && px > x0) px += 2.5;
+            const need = pz.w + (pz.b && piezas[i + 1] ? 1.8 + piezas[i + 1].w : 0);
+            if (px + need > xMax && px > x0) { linea++; px = x0; }
+            pz.x = px; pz.l = linea;
+            px += pz.w + (pz.b ? 1.8 : 2.6);
+        });
+        // Dibujar (pegada a la fila de tipos de tareas)
+        const y0 = yIni - 2, alto = (linea + 1) * LH + 2.4;
+        doc.setFillColor(255, 255, 255); doc.setDrawColor(...LINE); doc.rect(M, y0, CW, alto, 'FD');
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(6); doc.setTextColor(...GREY);
+        doc.text('DISPONIBLES (' + lista.length + ')', M + 2, y0 + 3.8);
+        piezas.forEach(pz => {
+            doc.setFont('helvetica', pz.b ? 'bold' : 'normal'); doc.setFontSize(pz.b ? 6.2 : FS);
+            if (pz.b) doc.setTextColor(180, 83, 9); else doc.setTextColor(...NAVY);
+            doc.text(pz.t, pz.x, y0 + 3.8 + pz.l * LH);
+        });
+        return y0 + alto + 2;
+    }
     const porPagina = tareas.length <= 4 ? 4 : 6, total = Math.ceil(tareas.length / porPagina);
     for (let p = 0; p < total; p++) {
         if (p > 0) doc.addPage();
@@ -3530,7 +3587,7 @@ async function exportarSesionPDFResumida(id) {
         lote.forEach((t, i) => doc.text(recortar(limpiar(t.tema || t.titulo), tw - 3), M + lw + i * tw + tw / 2, y + 3.8, { align: 'center' }));
         y += 7.5;
         // Cuadrícula
-        const gap = 3, cw = (CW - gap * (cols - 1)) / cols, ch = (H - 6 - y - gap * (rows - 1)) / rows;
+        if (p === 0) y = disponibles(y); const gap = 3, cw = (CW - gap * (cols - 1)) / cols, ch = (H - 6 - y - gap * (rows - 1)) / rows;
         lote.forEach((t, i) => { const c = i % cols, r = Math.floor(i / cols); tarea(t, imgs[p * porPagina + i], p * porPagina + i, M + c * (cw + gap), y + r * (ch + gap), cw, ch, cols); });
         doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); doc.setTextColor(...GREY);
         doc.text('Generado con TopLiderCoach · toplidercoach.com', M, H - 2.5);
