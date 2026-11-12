@@ -62,6 +62,35 @@ const EQ_COLORES = [
     { bg: '#FDF2F8', txt: '#9d174d' }
 ];
 const EQ_COLOR_COMODIN = { bg: '#f3f4f6', txt: '#374151' };
+// Colores de peto que puede elegir el entrenador (clave guardada en equipo.peto)
+const EQ_PETOS = {
+    amarillo: { nombre: 'Amarillo', hex: '#facc15', rgb: [250, 204, 21] },
+    naranja:  { nombre: 'Naranja',  hex: '#f97316', rgb: [249, 115, 22] },
+    rojo:     { nombre: 'Rojo',     hex: '#dc2626', rgb: [220, 38, 38] },
+    azul:     { nombre: 'Azul',     hex: '#2563eb', rgb: [37, 99, 235] },
+    verde:    { nombre: 'Verde',    hex: '#16a34a', rgb: [22, 163, 74] },
+    blanco:   { nombre: 'Blanco',   hex: '#ffffff', rgb: [255, 255, 255] },
+    negro:    { nombre: 'Negro',    hex: '#111827', rgb: [17, 24, 39] },
+    morado:   { nombre: 'Morado',   hex: '#7c3aed', rgb: [124, 58, 237] },
+    rosa:     { nombre: 'Rosa',     hex: '#ec4899', rgb: [236, 72, 153] },
+    celeste:  { nombre: 'Celeste',  hex: '#38bdf8', rgb: [56, 189, 248] }
+};
+function eqPetoOpciones(sel) {
+    let h = '<option value="">Sin peto</option>';
+    Object.keys(EQ_PETOS).forEach(k => { h += '<option value="' + k + '"' + (sel === k ? ' selected' : '') + '>' + EQ_PETOS[k].nombre + '</option>'; });
+    return h;
+}
+function eqPetoPunto(k) {
+    const p = k && EQ_PETOS[k];
+    if (!p) return '';
+    return '<span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:' + p.hex + ';border:1px solid #9ca3af;margin-right:5px;vertical-align:-1px"></span>';
+}
+function eqSetPeto(i, v) {
+    const s = eqSerie();
+    if (!s.equipos[i]) return;
+    if (v) s.equipos[i].peto = v; else delete s.equipos[i].peto;
+    eqRender();
+}
 
 function eqSerieNueva(numEquipos) {
     const equipos = [];
@@ -179,7 +208,7 @@ function eqRender() {
         equiposHtml += `
             <div class="eq-equipo ${activo ? 'activo' : ''}">
                 <div class="eq-equipo-cab" style="background:${color.bg};color:${color.txt};" onclick="eqActivarEquipo(${i})">
-                    <span>${eqEscapar(e.nombre)} (${e.jugadores.length})</span>
+                    <span>${eqPetoPunto(e.peto)}${eqEscapar(e.nombre)} (${e.jugadores.length})</span><select onclick="event.stopPropagation()" onchange="eqSetPeto(${i}, this.value)" title="Color del peto" style="font-size:11px;padding:2px 4px;border:1px solid #d1d5db;border-radius:6px;background:#fff;color:#374151;cursor:pointer;">${eqPetoOpciones(e.peto)}</select>
                     ${activo ? '<span class="pista">← asignando aquí</span>' : ''}
                 </div>
                 <div class="eq-equipo-body">${jugsHtml}</div>
@@ -338,7 +367,7 @@ function eqCerrar() {
 
 // ========== CAPA 2: DIBUJAR LOS EQUIPOS EN EL PDF DE LA SESION ==========
 // Llamado desde exportarSesionPDF. Devuelve la nueva posicion Y.
-// jugadoresSesion = s.players (array con {id, name, shirt_number})
+// Una linea por equipo: punto del color del peto + nombre + jugadores separados por comas.
 
 function eqDibujarEquiposPDF(doc, ej, jugadoresSesion, y, espacioAmplio) {
     if (!ej.equipos || !ej.equipos.series || ej.equipos.series.length === 0) return y;
@@ -349,78 +378,60 @@ function eqDibujarEquiposPDF(doc, ej, jugadoresSesion, y, espacioAmplio) {
         return (j.shirt_number ? j.shirt_number + '. ' : '') + (j.name || 'Jugador');
     }
 
-    const margen = 10;
-    const anchoTotal = 190;
-    const coloresEq = [
-        [24, 95, 165],   // azul
-        [163, 45, 45],   // rojo
-        [15, 110, 86],   // verde
-        [133, 79, 11],   // marron
-        [124, 58, 237],  // morado
-        [157, 23, 77]    // rosa oscuro
-    ];
-    const fuenteJug = espacioAmplio ? 8 : 7;
-    const altoFilaJug = espacioAmplio ? 4.5 : 3.8;
-    const altoCabEq = espacioAmplio ? 6 : 5;
+    const coloresEq = [[24, 95, 165], [163, 45, 45], [15, 110, 86], [133, 79, 11], [124, 58, 237], [157, 23, 77]];
+    const margen = 10, anchoTotal = 190, xTexto = margen + 5;
+    const fuente = espacioAmplio ? 8 : 7.5;
+    const altoLinea = espacioAmplio ? 4.2 : 3.8;
+    const factorLinea = altoLinea / (fuente * 0.3528);
 
     ej.equipos.series.forEach((serie, si) => {
-        // Columnas: equipos + comodines (si tiene)
-        const columnas = serie.equipos.map((e, i) => ({
-            nombre: e.nombre,
-            jugadores: e.jugadores,
-            color: coloresEq[i % coloresEq.length]
-        }));
+        const filas = serie.equipos.map((e, i) => {
+            const peto = (e.peto && EQ_PETOS[e.peto]) ? EQ_PETOS[e.peto] : null;
+            return {
+                titulo: e.nombre + (peto ? ' (' + peto.nombre.toLowerCase() + ')' : ''),
+                jugadores: e.jugadores,
+                color: peto ? peto.rgb : coloresEq[i % coloresEq.length],
+                borde: e.peto === 'blanco'
+            };
+        });
         if (serie.comodines && serie.comodines.length > 0) {
-            columnas.push({ nombre: 'COMODINES', jugadores: serie.comodines, color: [107, 114, 128] });
+            filas.push({ titulo: 'Comodines', jugadores: serie.comodines, color: [107, 114, 128], borde: false });
         }
-        if (columnas.every(c => c.jugadores.length === 0)) return; // serie vacia, saltar
+        if (filas.every(f => f.jugadores.length === 0)) return; // serie vacia
 
-        const maxJug = Math.max(...columnas.map(c => c.jugadores.length), 1);
-        const porFila = Math.min(columnas.length, 4);
-        const anchoCol = (anchoTotal - (porFila - 1) * 3) / porFila;
-        const filasDeColumnas = Math.ceil(columnas.length / porFila);
-        const altoBloqueFila = altoCabEq + maxJug * altoFilaJug + 3;
-        const altoSerie = 6 + filasDeColumnas * altoBloqueFila;
-
-        // Salto de pagina si no cabe
-        if (y + altoSerie > 280) {
-            doc.addPage();
-            y = 20;
-        }
+        // Preparar las lineas de cada equipo
+        doc.setFontSize(fuente);
+        const bloques = filas.filter(f => f.jugadores.length > 0).map(f => {
+            doc.setFont('helvetica', 'bold');
+            const tit = f.titulo + ':';
+            const wTit = doc.getTextWidth(tit) + 2;
+            doc.setFont('helvetica', 'normal');
+            const lineas = doc.splitTextToSize(f.jugadores.map(nombreDe).join(', '), anchoTotal - 5 - wTit);
+            return { f: f, tit: tit, wTit: wTit, lineas: lineas };
+        });
+        const altoSerie = 5 + bloques.reduce((a, b) => a + b.lineas.length * altoLinea, 0) + 2;
+        if (y + altoSerie > 280) { doc.addPage(); y = 20; }
 
         // Etiqueta de la serie
-        doc.setFontSize(8);
+        doc.setFontSize(7);
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(80, 80, 80);
-        const etiqueta = ej.equipos.series.length > 1 ? ('EQUIPOS - SERIE ' + (si + 1)) : 'EQUIPOS';
-        doc.text(etiqueta, margen, y + 4);
-        y += 6;
+        doc.text(ej.equipos.series.length > 1 ? ('EQUIPOS - SERIE ' + (si + 1)) : 'EQUIPOS', margen, y + 3);
+        y += 5;
 
-        // Dibujar columnas en filas de hasta 4
-        for (let f = 0; f < filasDeColumnas; f++) {
-            const grupo = columnas.slice(f * porFila, (f + 1) * porFila);
-            const maxJugGrupo = Math.max(...grupo.map(c => c.jugadores.length), 1);
-            grupo.forEach((col, ci) => {
-                const x = margen + ci * (anchoCol + 3);
-                // Cabecera del equipo
-                doc.setFillColor(col.color[0], col.color[1], col.color[2]);
-                doc.rect(x, y, anchoCol, altoCabEq, 'F');
-                doc.setTextColor(255, 255, 255);
-                doc.setFontSize(fuenteJug);
-                doc.setFont('helvetica', 'bold');
-                doc.text(String(col.nombre).substring(0, 22), x + 2, y + altoCabEq - 1.5);
-                // Cuerpo con jugadores
-                const altoCuerpo = maxJugGrupo * altoFilaJug + 2;
-                doc.setDrawColor(210, 210, 210);
-                doc.rect(x, y + altoCabEq, anchoCol, altoCuerpo);
-                doc.setFont('helvetica', 'normal');
-                doc.setTextColor(40, 40, 40);
-                col.jugadores.forEach((spId, ji) => {
-                    doc.text(nombreDe(spId).substring(0, 26), x + 2, y + altoCabEq + 3.5 + ji * altoFilaJug);
-                });
-            });
-            y += altoCabEq + maxJugGrupo * altoFilaJug + 2 + 3;
-        }
+        doc.setFontSize(fuente);
+        bloques.forEach(b => {
+            doc.setFillColor(b.f.color[0], b.f.color[1], b.f.color[2]);
+            doc.setDrawColor(150, 150, 150);
+            doc.circle(margen + 2, y + 1.7, 1.4, b.f.borde ? 'FD' : 'F');
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(30, 41, 59);
+            doc.text(b.tit, xTexto, y + 2.6);
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(40, 40, 40);
+            doc.text(b.lineas, xTexto + b.wTit, y + 2.6, { lineHeightFactor: factorLinea });
+            y += b.lineas.length * altoLinea;
+        });
         y += 2;
     });
 
