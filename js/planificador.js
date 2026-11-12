@@ -2440,7 +2440,7 @@ function seleccionarMiEjercicio(id) {
             };
             // Convertir SVG a PNG para que funcione en el PDF
             if (ej.thumbnail_svg) {
-                ejSvgToPng(ej.thumbnail_svg).then(function(pngData) {
+                (ej.thumbnail_svg.indexOf('data:') === 0 ? Promise.resolve(ej.thumbnail_svg) : ejSvgToPng(ej.thumbnail_svg)).then(function(pngData) {
                     ejercicioSeleccionado.imagen = pngData;
                 });
             }
@@ -2495,7 +2495,7 @@ async function agregarMiEjercicioDesdeBoton(btn) {
             var res = await supabaseClient.from('custom_exercises').select('thumbnail_svg, objectives, description, players_count, field_width, field_length, tema, category, materials').eq('id', data.id).single();
             if (res.data) {
                 if (res.data.thumbnail_svg) {
-                    imagen = await ejSvgToPng(res.data.thumbnail_svg);
+                    imagen = res.data.thumbnail_svg.indexOf('data:') === 0 ? res.data.thumbnail_svg : await ejSvgToPng(res.data.thumbnail_svg);
                 }
                 objetivo = (res.data.objectives ? res.data.objectives + '\n\n' : '') + (res.data.description || '');
                 data.jugadores = res.data.players_count || '';
@@ -3471,6 +3471,7 @@ async function exportarSesionPDFResumida(id) {
             img.src = url;
         });
     }
+    for (const t of tareas) { if ((!t.imagen || t.imagen.indexOf('data:') !== 0) && typeof t.id === 'string' && t.id.indexOf('-') > 0) { try { const rI = await supabaseClient.from('custom_exercises').select('thumbnail_svg').eq('id', t.id).single(); const th = rI.data && rI.data.thumbnail_svg; if (th) t.imagen = th.indexOf('data:') === 0 ? th : await ejSvgToPng(th); } catch (e) {} } }
     const imgs = await Promise.all(tareas.map(t => cargarImagen(t.imagen)));
     const escudo = club && club.logo_url ? await cargarImagen(club.logo_url) : null;
 
@@ -3512,7 +3513,7 @@ async function exportarSesionPDFResumida(id) {
         doc.setFont('helvetica', 'bold'); doc.setFontSize(cols === 3 ? 8 : 9); doc.setTextColor(255, 255, 255);
         doc.text(recortar('TAREA ' + (idx + 1) + '  ·  ' + limpiar(t.titulo), w - secW - 6), x + 2, y + 4.6);
         // Zonas: dibujo arriba, texto abajo, franja al pie
-        const strip = 8.5, textH = cols === 3 ? 16 : 18;
+        const eqS = ((t.equipos && t.equipos.series) || []).filter(sr => (sr.equipos || []).some(e => e.jugadores && e.jugadores.length) || (sr.comodines || []).length); const strip = 8.5, textH = eqS.length ? (cols === 3 ? 24 : 26) : (cols === 3 ? 16 : 18);
         const iy = y + 7.5, ih = h - 7.5 - textH - strip - 1, pad = 1.5;
         if (img) {
             const r = Math.min((w - 2 * pad) / img.w, (ih - 2 * pad) / img.h); const dw = img.w * r, dh = img.h * r;
@@ -3522,11 +3523,11 @@ async function exportarSesionPDFResumida(id) {
             doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(...GREY); doc.text('Sin dibujo', x + w / 2, iy + ih / 2, { align: 'center' });
         }
         const ty = iy + ih + 1, tx = x + 2, tw = w - 4;
-        doc.setFont('helvetica', 'bold'); doc.setFontSize(6); doc.setTextColor(...GREY); doc.text('OBJETIVO / DESCRIPCIÓN', tx, ty + 2.6);
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(6); doc.setTextColor(...GREY); doc.text(eqS.length ? 'EQUIPOS' : 'OBJETIVO / DESCRIPCIÓN', tx, ty + 2.6);
         doc.setFont('helvetica', 'normal'); doc.setFontSize(cols === 3 ? 6.8 : 7.4); doc.setTextColor(...NAVY);
         const lineas = doc.splitTextToSize(limpiar(t.objetivo) || '—', tw); const lh = cols === 3 ? 2.9 : 3.1; const maxL = Math.max(1, Math.floor((textH - 4) / lh));
         const mostrar = lineas.slice(0, maxL); if (lineas.length > maxL) mostrar[maxL - 1] = recortar(mostrar[maxL - 1] + '…', tw);
-        doc.text(mostrar, tx, ty + 6, { lineHeightFactor: 1.12 });
+        if (!eqS.length) { doc.text(mostrar, tx, ty + 6, { lineHeightFactor: 1.12 }); } else { const nomDe = id => { const j = (s.players || []).find(p => String(p.id) === String(id)); return j ? ((j.shirt_number ? j.shirt_number + '.' : '') + limpiar(j.name)) : '?'; }; const pal = [[24, 95, 165], [163, 45, 45], [15, 110, 86], [133, 79, 11], [124, 58, 237], [157, 23, 77]]; const fsE = cols === 3 ? 6.2 : 6.8, lhE = cols === 3 ? 2.75 : 3.0, maxE = Math.max(1, Math.floor((textH - 4) / lhE)); let ly = ty + 6, usadas = 0, corte = false; eqS.forEach((sr, si) => { const pre = eqS.length > 1 ? 'S' + (si + 1) + ' ' : ''; const filas = (sr.equipos || []).map((e, i) => { const pt = (e.peto && typeof EQ_PETOS !== 'undefined' && EQ_PETOS[e.peto]) ? EQ_PETOS[e.peto] : null; return { tit: pre + e.nombre + (pt ? ' (' + pt.nombre.toLowerCase() + ')' : ''), jug: e.jugadores || [], col: pt ? pt.rgb : pal[i % pal.length], bl: e.peto === 'blanco' }; }); if ((sr.comodines || []).length) filas.push({ tit: pre + 'Comodines', jug: sr.comodines, col: [107, 114, 128], bl: false }); filas.filter(f => f.jug.length).forEach(f => { if (corte) return; doc.setFontSize(fsE); doc.setFont('helvetica', 'bold'); const tit = f.tit + ':'; const wT = doc.getTextWidth(tit) + 1.5; doc.setFont('helvetica', 'normal'); let ls = doc.splitTextToSize(f.jug.map(nomDe).join(', '), tw - 4 - wT); if (usadas + ls.length > maxE) { ls = ls.slice(0, Math.max(0, maxE - usadas)); if (!ls.length) { corte = true; return; } ls[ls.length - 1] = recortar(ls[ls.length - 1] + '…', tw - 4 - wT); corte = true; } doc.setFillColor(f.col[0], f.col[1], f.col[2]); doc.setDrawColor(150, 150, 150); doc.circle(tx + 1.2, ly - 0.9, 1.1, f.bl ? 'FD' : 'F'); doc.setFont('helvetica', 'bold'); doc.setTextColor(...NAVY); doc.text(tit, tx + 3.2, ly); doc.setFont('helvetica', 'normal'); doc.text(ls, tx + 3.2 + wT, ly, { lineHeightFactor: lhE / (fsE * 0.3528) }); ly += ls.length * lhE; usadas += ls.length; }); }); }
         const fy = y + h - strip;
         const datos = [['Tiempo', (t.duracion || 0) + "'"], ['Jugadores', t.jugadores || '—'], ['Espacio', t.espacio || '—'], ['Tema', t.tema || '—']];
         const cw = w / datos.length; datos.forEach((d, i) => celda(x + i * cw, fy, cw, strip, d[0], d[1], SOFT));
