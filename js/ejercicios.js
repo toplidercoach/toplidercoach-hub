@@ -1907,7 +1907,7 @@ function ejGetFieldSVG(type, color) {
     }
     // Líneas según tipo
     var L = 'fill="none" stroke="'+lineCol+'" stroke-width="2"';
-    s += '<g '+L+' stroke-linecap="round" stroke-linejoin="round">';
+    s += '<defs><pattern id="ejNet" width="3.2" height="3.2" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path d="M3.2 0 L0 0 0 3.2" fill="none" stroke="'+lineCol+'" stroke-width="0.5"/></pattern></defs>'; s += '<g '+L+' stroke-linecap="round" stroke-linejoin="round">';
     s += '<rect x="20" y="15" width="760" height="470" rx="1"/>';
     if (type === 'full') {
         s += '<line x1="400" y1="15" x2="400" y2="485"/>';
@@ -1916,8 +1916,8 @@ function ejGetFieldSVG(type, color) {
         s += '<rect x="661" y="105" width="119" height="290"/>';
         s += '<rect x="20" y="184" width="40" height="132"/>';
         s += '<rect x="740" y="184" width="40" height="132"/>';
-        s += '<rect x="10" y="220" width="10" height="60"/>';
-        s += '<rect x="780" y="220" width="10" height="60"/>';
+        s += '<rect x="10" y="220" width="10" height="60" fill="url(#ejNet)"/>';
+        s += '<rect x="780" y="220" width="10" height="60" fill="url(#ejNet)"/>';
         s += '<path d="M139 198 A65 65 0 0 1 139 302"/>';
         s += '<path d="M661 198 A65 65 0 0 0 661 302"/>';
         s += '<path d="M20 22 A7 7 0 0 1 27 15"/><path d="M773 15 A7 7 0 0 1 780 22"/>';
@@ -1925,7 +1925,7 @@ function ejGetFieldSVG(type, color) {
         s += '</g><circle cx="400" cy="250" r="3.5" fill="'+dotCol+'"/>';
         s += '<circle cx="100" cy="250" r="3.5" fill="'+dotCol+'"/><circle cx="700" cy="250" r="3.5" fill="'+dotCol+'"/>';
     } else if (type === 'half') {
-        s += '<rect x="359" y="2" width="82" height="13"/>';
+        s += '<rect x="359" y="2" width="82" height="13" fill="url(#ejNet)"/>';
         s += '<rect x="175" y="15" width="450" height="148"/>';
         s += '<rect x="298" y="15" width="204" height="50"/>';
         s += '<path d="M319 163 A102 82 0 0 0 481 163"/>';
@@ -1939,8 +1939,8 @@ function ejGetFieldSVG(type, color) {
         s += '<rect x="661" y="105" width="119" height="290"/>';
         s += '<rect x="20" y="184" width="40" height="132"/>';
         s += '<rect x="740" y="184" width="40" height="132"/>';
-        s += '<rect x="10" y="220" width="10" height="60"/>';
-        s += '<rect x="780" y="220" width="10" height="60"/>';
+        s += '<rect x="10" y="220" width="10" height="60" fill="url(#ejNet)"/>';
+        s += '<rect x="780" y="220" width="10" height="60" fill="url(#ejNet)"/>';
         s += '<path d="M139 198 A65 65 0 0 1 139 302"/>';
         s += '<path d="M661 198 A65 65 0 0 0 661 302"/>';
         s += '<path d="M20 22 A7 7 0 0 1 27 15"/><path d="M773 15 A7 7 0 0 1 780 22"/>';
@@ -1963,7 +1963,7 @@ function ejGetFieldSVG(type, color) {
         s += '<circle cx="400" cy="250" r="3.5" fill="'+dotCol+'"/>';
         s += '<circle cx="100" cy="250" r="3.5" fill="'+dotCol+'"/><circle cx="700" cy="250" r="3.5" fill="'+dotCol+'"/>';
 } else if (type === 'halfDown') {
-        s += '<rect x="359" y="485" width="82" height="13"/>';
+        s += '<rect x="359" y="485" width="82" height="13" fill="url(#ejNet)"/>';
         s += '<rect x="175" y="337" width="450" height="148"/>';
         s += '<rect x="298" y="435" width="204" height="50"/>';
         s += '<path d="M319 337 A102 82 0 0 1 481 337"/>';
@@ -5028,6 +5028,7 @@ function ejInit() {
     <div class="ej-module">
         <!-- Sub-navegación interna -->
         <div class="ej-nav">
+            <button class="ej-nav-btn ej-hub-btn" title="Mostrar u ocultar el menú del HUB" onclick="document.body.classList.toggle('tlc-hub-abierto')">☰</button>
             <button class="ej-nav-btn active" onclick="ejShowTab('pizarra',this)">🎯 Pizarra</button>
             <button class="ej-nav-btn" onclick="ejShowTab('ficha',this)">📋 Ficha</button>
             <button class="ej-nav-btn" onclick="ejShowTab('banco',this)">🗂 Banco</button>

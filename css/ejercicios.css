@@ -199,3 +199,14 @@
 .ej-sec-campo { background:#143a22 !important; border-left-color:#22c55e !important; border-left-width:6px !important; }
 .ej-sec-campo.open { background:#1a5230 !important; }
 .ej-sec-campo.open + .ej-section-body { border-left:3px solid #22c55e; }
+/* ===== REDISEÑO PIZARRA · Entrega 1: plegar el HUB y dar espacio al campo ===== */
+@media (min-width: 901px) {
+  body:has(#modulo-pizarra.active):not(.tlc-hub-abierto) .app-header,
+  body:has(#modulo-pizarra.active):not(.tlc-hub-abierto) .main-tabs,
+  body:has(#modulo-pizarra.active):not(.tlc-hub-abierto) #tlc-sidebar { display: none !important; }
+  body:has(#modulo-pizarra.active):not(.tlc-hub-abierto) #app-container { margin-left: 0 !important; }
+  body:has(#modulo-pizarra.active):not(.tlc-hub-abierto) #ej-canvas-area svg { max-height: calc(100vh - 130px); }
+  body:has(#modulo-pizarra.active):not(.tlc-hub-abierto) #ej-toolbar { max-height: calc(100vh - 125px); }
+}
+.ej-hub-btn { padding: 7px 12px !important; font-size: 15px !important; line-height: 1; }
+@media (max-width: 900px) { .ej-hub-btn { display: none; } }
