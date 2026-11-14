@@ -2292,7 +2292,7 @@ ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin
             <button onclick="ejP._addingRival=false;ejRenderToolbar()" style="flex:1;padding:8px;border-radius:6px;border:none;cursor:pointer;font-size:12px;font-weight:700;background:${!ejP._addingRival?'#1d4ed8':'transparent'};color:${!ejP._addingRival?'#fff':'#64748b'}">🔵 Mi equipo</button>
             <button onclick="ejP._addingRival=true;ejRenderToolbar()" style="flex:1;padding:8px;border-radius:6px;border:none;cursor:pointer;font-size:12px;font-weight:700;background:${ejP._addingRival?'#b91c1c':'transparent'};color:${ejP._addingRival?'#fff':'#64748b'}">🔴 Rival</button>
         </div>
-        <button class="ej-btn-tool${t==='player'&&!ejP._plantillaMode?' active':''}" onclick="ejSetTool('player');ejP._plantillaMode=false;ejRenderToolbar()" style="justify-content:center;font-weight:600">
+        <button class="ej-btn-tool${t==='player'&&!ejP._plantillaMode?' active':''}" onclick="ejSetTool(ejP.activeTool==='player'&&!ejP._plantillaMode?'select':'player');ejP._plantillaMode=false;ejRenderToolbar()" style="justify-content:center;font-weight:600">
             ➕ Añadir jugador ${ejP._addingRival?'(rival)':'(mi equipo)'}
         </button>
         ${ejP._addingRival
@@ -2443,7 +2443,7 @@ ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin
                 {k:'ellipse', ico:'⭕', lbl:'Círculo'},
                 {k:'text',    ico:'T',  lbl:'Texto'},
                 {k:'connect', ico:'🔗', lbl:'Conectar'}
-            ].map(item=>`<button class="ej-btn-equipment${t===item.k?' active':''}" onclick="ejSetTool('${item.k}')" title="${item.lbl}"><span style="font-size:18px;line-height:1">${item.ico}</span><span>${item.lbl}</span></button>`).join('')}
+            ].map(item=>`<button class="ej-btn-equipment${t===item.k?' active':''}" onclick="ejSetTool(ejP.activeTool==='${item.k}'?'select':'${item.k}')" title="${item.lbl}"><span style="font-size:18px;line-height:1">${item.ico}</span><span>${item.lbl}</span></button>`).join('')}
         </div>
         <div class="ej-draw-opts" style="margin-top:8px">
             <span>Grosor: <input type="range" min="1" max="10" value="${ejP.lineWidth}" oninput="ejP.lineWidth=+this.value" style="width:80px;vertical-align:middle;accent-color:#22c55e"></span>
@@ -2492,7 +2492,7 @@ ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin
         <div class="ej-equipment-grid">
             ${EJ_EQUIPMENT_TYPES.map(eq => `
             <button class="ej-btn-equipment${ejP.selectedEquipmentType===eq.key&&t==='equipment'?' active':''}"
-                onclick="ejP.selectedEquipmentType='${eq.key}';ejSetTool('equipment')"
+                onclick="if(ejP.activeTool==='equipment'&&ejP.selectedEquipmentType==='${eq.key}'){ejSetTool('select')}else{ejP.selectedEquipmentType='${eq.key}';ejSetTool('equipment')}"
                 title="${eq.name}">
                 <img src="${EJ_EQUIPMENT_IMAGES[eq.key]}" alt="${eq.name}" class="ej-eq-thumb"/>
                 <span>${eq.name}</span>

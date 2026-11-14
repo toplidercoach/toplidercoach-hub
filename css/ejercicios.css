@@ -199,14 +199,71 @@
 .ej-sec-campo { background:#143a22 !important; border-left-color:#22c55e !important; border-left-width:6px !important; }
 .ej-sec-campo.open { background:#1a5230 !important; }
 .ej-sec-campo.open + .ej-section-body { border-left:3px solid #22c55e; }
-/* ===== REDISEÑO PIZARRA · Entrega 1: plegar el HUB y dar espacio al campo ===== */
+/* ===== REDISEÑO PIZARRA · Entregas 1 y 2 (solo pantallas de más de 900 px) ===== */
 @media (min-width: 901px) {
+  /* -- 1. Plegar el HUB al entrar en la pizarra -- */
   body:has(#modulo-pizarra.active):not(.tlc-hub-abierto) .app-header,
   body:has(#modulo-pizarra.active):not(.tlc-hub-abierto) .main-tabs,
   body:has(#modulo-pizarra.active):not(.tlc-hub-abierto) #tlc-sidebar { display: none !important; }
   body:has(#modulo-pizarra.active):not(.tlc-hub-abierto) #app-container { margin-left: 0 !important; }
-  body:has(#modulo-pizarra.active):not(.tlc-hub-abierto) #ej-canvas-area svg { max-height: calc(100vh - 130px); }
-  body:has(#modulo-pizarra.active):not(.tlc-hub-abierto) #ej-toolbar { max-height: calc(100vh - 125px); }
+  #ej-canvas-area svg { max-height: calc(100vh - 190px); }
+  body:has(#modulo-pizarra.active):not(.tlc-hub-abierto) #ej-canvas-area svg { max-height: calc(100vh - 118px); }
+
+  /* -- 2. Carril de iconos -- */
+  #ej-tab-pizarra { padding: 8px 10px; }
+  #ej-pizarra-wrap { position: relative; gap: 8px; }
+  #ej-pizarra-wrap > div:first-child { width: 56px; flex: none; }
+  #ej-pizarra-topbar { position: absolute; top: -47px; right: 0; margin: 0 !important; padding: 3px 8px !important; z-index: 5; }
+  #ej-toolbar { width: 56px; min-width: 56px; box-sizing: border-box; padding: 6px 5px; gap: 4px; overflow: visible; max-height: none !important; }
+  #ej-toolbar > .ej-btn-tool,
+  #ej-toolbar > .ej-section-header,
+  #ej-toolbar > div:not(.ej-section-body) > button[onclick] {
+    position: relative; box-sizing: border-box; width: 44px !important; height: 44px; flex: none !important;
+    padding: 0 !important; margin: 0 !important; display: flex; align-items: center; justify-content: center;
+    font-size: 0 !important; gap: 0; border-radius: 10px !important; letter-spacing: 0; transform: none !important;
+  }
+  #ej-toolbar > .ej-btn-tool > svg { width: 20px; height: 20px; }
+  #ej-toolbar > .ej-section-header { border-left-width: 1px !important; color: #e5ecf7; }
+  #ej-toolbar > .ej-section-header.open { box-shadow: 0 0 0 2px #e5ecf7; }
+  #ej-toolbar > .ej-section-header::before,
+  #ej-toolbar > div:not(.ej-section-body) > button[onclick]::before {
+    content: ""; display: block; width: 22px; height: 22px; background: currentColor;
+    -webkit-mask: var(--ej-i) center / contain no-repeat; mask: var(--ej-i) center / contain no-repeat;
+  }
+  #ej-toolbar > .ej-sec-players  { --ej-i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='9' cy='8' r='3.5'/%3E%3Cpath d='M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6M16 5a3.5 3.5 0 010 7M18 14c2.2.7 3.5 2.6 3.5 6'/%3E%3C/svg%3E"); --ej-t: "Jugadores"; }
+  #ej-toolbar > .ej-sec-campo    { --ej-i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='5' width='18' height='14' rx='1'/%3E%3Cpath d='M12 5v14'/%3E%3Ccircle cx='12' cy='12' r='2.5'/%3E%3C/svg%3E"); --ej-t: "Campo"; }
+  #ej-toolbar > .ej-sec-draw     { --ej-i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 20l4-1L20 7l-3-3L5 16z'/%3E%3Cpath d='M14 6l4 4'/%3E%3C/svg%3E"); --ej-t: "Dibujo"; }
+  #ej-toolbar > .ej-sec-material { --ej-i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 4h4l4 14H6zM4 20h16M8.5 11h7'/%3E%3C/svg%3E"); --ej-t: "Material"; }
+  #ej-toolbar > div > button[onclick="ejUndo()"] { --ej-i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 7L4 12l5 5'/%3E%3Cpath d='M4 12h10a5 5 0 010 10h-2'/%3E%3C/svg%3E"); }
+  #ej-toolbar > div > button[onclick="ejRedo()"] { --ej-i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15 7l5 5-5 5'/%3E%3Cpath d='M20 12H10a5 5 0 000 10h2'/%3E%3C/svg%3E"); }
+  #ej-toolbar > div > button[onclick="ejCapturarParaFicha()"] { --ej-i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 3h11l3 3v15H5z'/%3E%3Cpath d='M8 3v6h7V3M8 21v-7h8v7'/%3E%3C/svg%3E"); --ej-t: "Guardar ejercicio"; }
+  #ej-toolbar > div > button[onclick="ejExportPNG()"] { --ej-i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 4v11M7 11l5 5 5-5M5 20h14'/%3E%3C/svg%3E"); --ej-t: "Exportar PNG"; }
+  #ej-toolbar > div > button[onclick="ejMontajeAbrir()"] { --ej-i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='16' rx='2'/%3E%3Cpath d='M3 10h18M9 10v10'/%3E%3C/svg%3E"); --ej-t: "Guardar montaje de sesión"; }
+  #ej-toolbar > div > button[onclick="ejDelete()"] { --ej-i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13'/%3E%3C/svg%3E"); --ej-t: "Eliminar seleccionado"; }
+  #ej-toolbar > div > button[onclick="ejDelete()"]:disabled { opacity: .4; }
+  /* nombre al pasar el ratón */
+  #ej-toolbar > .ej-section-header:hover::after,
+  #ej-toolbar > div:not(.ej-section-body) > button[onclick]:not([title]):hover::after {
+    content: var(--ej-t); position: absolute; left: 52px; top: 50%; transform: translateY(-50%);
+    background: #0f172a; color: #fff; border: 1px solid #334155; padding: 6px 10px; border-radius: 8px;
+    font-size: 13px; font-weight: 600; white-space: nowrap; z-index: 20; pointer-events: none;
+    box-shadow: 0 8px 24px rgba(0,0,0,.4);
+  }
+  /* grupos del carril */
+  #ej-toolbar > div:has(> button[onclick="ejUndo()"]) { flex-direction: column; gap: 4px !important; margin: 0 !important; }
+  #ej-toolbar > div:has(> button[onclick="ejExportPNG()"]) { margin-top: 6px !important; padding-top: 8px; border-top: 1px solid #2f405c; gap: 4px !important; }
+  #ej-toolbar > div[style^="background:#7c3aed"] { display: none; }
+  #ej-toolbar > div:has(> div > button[onclick^="ejResizeMultiSel"]) { position: absolute; left: 64px; top: 0; width: 210px; box-sizing: border-box; margin: 0 !important; z-index: 7; box-shadow: 0 10px 30px rgba(0,0,0,.35); }
+  #ej-toolbar:has(> div > div > button[onclick^="ejResizeMultiSel"]) > .ej-section-body { top: 86px; }
+  /* -- cajón con las opciones de la sección abierta: empuja el campo, no lo tapa -- */
+  #ej-toolbar > .ej-section-body {
+    position: absolute; left: 64px; top: 0; width: 300px; box-sizing: border-box; margin: 0;
+    max-height: calc(100vh - 110px); overflow-y: auto; border-top: 1px solid #2f405c; border-radius: 12px;
+    z-index: 6; box-shadow: 0 10px 30px rgba(0,0,0,.35);
+  }
+  #ej-pizarra-wrap:has(#ej-toolbar > .ej-section-body) #ej-canvas-area { margin-left: 308px; }
 }
+/* El campo no es texto seleccionable: sin esto, arrastrar para dibujar inicia una seleccion de texto y el navegador corta el trazo */
+#ej-canvas-area, #ej-canvas-area svg { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 .ej-hub-btn { padding: 7px 12px !important; font-size: 15px !important; line-height: 1; }
 @media (max-width: 900px) { .ej-hub-btn { display: none; } }
