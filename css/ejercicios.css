@@ -280,6 +280,8 @@
   }
   #ej-pizarra-wrap:has(#ej-toolbar > .ej-section-body) #ej-canvas-area { margin-left: 308px; }
   /* Si hay hueco de césped detrás de la portería, el panel se abre ahí encima y el campo no se mueve */
+  /* El carril va por encima del área de trabajo: así sus rótulos y paneles nunca quedan tapados */
+  #ej-toolbar { position: relative; z-index: 13; }
   #ej-pizarra-wrap.ej-panel-encima:has(#ej-toolbar > .ej-section-body) #ej-canvas-area { margin-left: 0; }
   #ej-pizarra-wrap.ej-panel-encima #ej-toolbar > .ej-section-body { width: var(--ej-hueco, 180px); box-sizing: border-box; overflow-x: hidden; padding: 8px; z-index: 12; box-shadow: 0 8px 24px rgba(0,0,0,.45); }
   #ej-pizarra-wrap.ej-panel-encima #ej-toolbar > .ej-section-body * { min-width: 0; max-width: 100%; box-sizing: border-box; }
@@ -311,6 +313,14 @@
 .ej-jb-dot.on { outline: 2px solid #22c55e; outline-offset: 2px; }
 .ej-jb-a { width: 30px; padding: 0; font-size: 14px; font-weight: 800; }
 .ej-jb-dat { width: 104px; }
+/* Fondos de campo */
+.ej-fondos-t { font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: .5px; margin: 8px 0 4px; }
+.ej-fondos { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }
+.ej-fondos button { padding: 0; border: 2px solid transparent; border-radius: 6px; background: none; cursor: pointer; overflow: hidden; aspect-ratio: 16 / 10; display: block; }
+.ej-fondos button svg { display: block; width: 100%; height: 100%; max-height: none; }
+.ej-fondos button.on { border-color: #22c55e; }
+.ej-fondos button:hover { border-color: #94a3b8; }
+#ej-pizarra-wrap.ej-panel-encima .ej-fondos { grid-template-columns: repeat(3, 1fr); }
 /* Opciones junto al objeto seleccionado */
 #ej-objbar { position: absolute; z-index: 9; display: none; align-items: center; gap: 2px; padding: 4px; background: #0f172a; border: 1px solid #334155; border-radius: 10px; box-shadow: 0 6px 18px rgba(0,0,0,.45); flex-wrap: wrap; max-width: 330px; }
 #ej-objbar > button { width: 32px; height: 32px; padding: 0; border: none; border-radius: 7px; background: transparent; color: #e2e8f0; cursor: pointer; display: flex; align-items: center; justify-content: center; }

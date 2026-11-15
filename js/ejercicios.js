@@ -293,7 +293,7 @@ function ejRenderSVG() {
 
     // Campo
     let html = defs;
-    html += ejGetFieldSVG(ejP.fieldType, ejP.fieldColor);
+    html += ejGetFieldSVG(ejP.fieldType, ejFondoColor());
     html += ejCarrilesZonasSVG();
     html += ejRejillaMetrosSVG();
 
@@ -1468,7 +1468,7 @@ function ejProyBoardDataActual() {
         players: ejP.players, lines: ejP.lines,
         shapes: ejP.shapes, texts: ejP.texts,
         equipment: ejP.equipment, connections: ejP.connections,
-        fieldType: ejP.fieldType, showCarriles: ejP.showCarriles, showZonas: ejP.showZonas, showRejilla: ejP.showRejilla,
+        fieldType: ejP.fieldType, fondo: ejP.fieldFondo, fondoColor: ejP.fieldColor, showCarriles: ejP.showCarriles, showZonas: ejP.showZonas, showRejilla: ejP.showRejilla,
         animFrames: ejP.animMode ? ejP.frames : [],
         animMode: ejP.animMode,
         teamColors: { my: ejP.myColor, myGk: ejP.myGkColor, rival: ejP.rivalColor, rivalGk: ejP.rivalGkColor }
@@ -1525,7 +1525,7 @@ function ejProyCargarFase(it) {
     ejP.texts = bd.texts || [];
     ejP.equipment = bd.equipment || [];
     ejP.connections = bd.connections || [];
-    ejP.fieldType = bd.fieldType || 'full';
+    ejP.fieldType = bd.fieldType || 'full'; ejFondoCargar(bd);
     ejP.showCarriles = !!bd.showCarriles;
     ejP.showZonas = !!bd.showZonas;
     ejP.showRejilla = !!bd.showRejilla;
@@ -1896,7 +1896,7 @@ function ejGetFieldSVG(type, color) {
         s += '<rect x="20" y="15" width="760" height="470" fill="url(#ejGridSmall)"/>';
         s += '<rect x="20" y="15" width="760" height="470" fill="url(#ejGridBig)"/>';
     } else {
-        for (var i = 0; i < 12; i++) {
+        s += ejFondoSVG(c1, c2); for (var i = 0; i < 0; i++) {
             s += '<rect x="'+(20+i*63.3)+'" y="15" width="63" height="470" fill="'+(i%2===0?c2:c1)+'"/>';
         }
     }
@@ -3501,7 +3501,7 @@ async function ejEditarDibujo() {
         ejP.texts     = data.board_data.texts   || [];
         ejP.equipment = data.board_data.equipment || [];
         ejP.connections = data.board_data.connections || [];
-        ejP.fieldType = data.board_data.fieldType || 'full'; ejP.showCarriles = !!data.board_data.showCarriles; ejP.showZonas = !!data.board_data.showZonas; ejP.showRejilla = !!data.board_data.showRejilla;
+        ejP.fieldType = data.board_data.fieldType || 'full'; ejFondoCargar(data.board_data); ejP.showCarriles = !!data.board_data.showCarriles; ejP.showZonas = !!data.board_data.showZonas; ejP.showRejilla = !!data.board_data.showRejilla;
         ejP.selectedId = null;
         ejP._lastVideoUrl = data.animation_url || null;
 
@@ -3594,7 +3594,7 @@ let thumbnailSvg = window.ejThumbnailPendiente || null;
             players: ejP.players, lines: ejP.lines,
             shapes: ejP.shapes, texts: ejP.texts,
             equipment: ejP.equipment,connections: ejP.connections,
-            fieldType: ejP.fieldType, showCarriles: ejP.showCarriles, showZonas: ejP.showZonas, showRejilla: ejP.showRejilla, showCarriles: ejP.showCarriles, showZonas: ejP.showZonas, showRejilla: ejP.showRejilla,
+            fieldType: ejP.fieldType, fondo: ejP.fieldFondo, fondoColor: ejP.fieldColor, showCarriles: ejP.showCarriles, showZonas: ejP.showZonas, showRejilla: ejP.showRejilla, showCarriles: ejP.showCarriles, showZonas: ejP.showZonas, showRejilla: ejP.showRejilla,
             animFrames: ejP.animMode ? ejP.frames : [],
             animMode: ejP.animMode
         } : null,
@@ -4008,7 +4008,7 @@ async function ejBancoCargar(id) {
             ejP.texts     = data.board_data.texts   || [];
             ejP.equipment = data.board_data.equipment || [];
             ejP.connections = data.board_data.connections || [];
-            ejP.fieldType = data.board_data.fieldType || 'full'; ejP.showCarriles = !!data.board_data.showCarriles; ejP.showZonas = !!data.board_data.showZonas; ejP.showRejilla = !!data.board_data.showRejilla;
+            ejP.fieldType = data.board_data.fieldType || 'full'; ejFondoCargar(data.board_data); ejP.showCarriles = !!data.board_data.showCarriles; ejP.showZonas = !!data.board_data.showZonas; ejP.showRejilla = !!data.board_data.showRejilla;
             ejP.selectedId = null;
             ejP._lastVideoUrl = data.animation_url || null;
 
@@ -4750,7 +4750,7 @@ function ejColocarJugadorPlantilla(idx) {
                 players: ejP.players, lines: ejP.lines,
                 shapes: ejP.shapes, texts: ejP.texts,
                 equipment: ejP.equipment,connections: ejP.connections,
-                fieldType: ejP.fieldType, showCarriles: ejP.showCarriles, showZonas: ejP.showZonas, showRejilla: ejP.showRejilla, showCarriles: ejP.showCarriles, showZonas: ejP.showZonas, showRejilla: ejP.showRejilla,
+                fieldType: ejP.fieldType, fondo: ejP.fieldFondo, fondoColor: ejP.fieldColor, showCarriles: ejP.showCarriles, showZonas: ejP.showZonas, showRejilla: ejP.showRejilla, showCarriles: ejP.showCarriles, showZonas: ejP.showZonas, showRejilla: ejP.showRejilla,
                 animFrames: ejP.frames,
                 animMode: ejP.animMode
             },
@@ -5516,7 +5516,7 @@ function ejProyPlegar() {
     if (btn) { btn.textContent = plegado ? '—' : '▢'; btn.title = plegado ? 'Plegar' : 'Desplegar'; }
 }
 // =====================================================================
-// REDISEÑO PIZARRA · Entregas 3, 4 y 5
+// REDISEÑO PIZARRA · Entregas 3, 4, 5 y 6a
 // Barra de jugadores arriba (equipos, colores de tarea, estilo de ficha, anónimo
 // y ventana de plantilla),
 // animación a demanda, sin pregunta inicial y fondo del color del campo.
@@ -5726,11 +5726,13 @@ function ejJugModalAnadir() {
 // Qué datos se ven en las fichas con nombre (dorsal, nombre, los dos o solo el nombre escrito)
 function ejJugDatos(v) {
     ejP._plantillaLabel = v;
-    var conNombre = ejP.players.filter(function (p) { return p.name; });
-    if (conNombre.length) {
+    ejP.showNumbers = v === 'num' || v === 'both';
+    var afectados = ejP.players.filter(function (p) { return p.team !== 'tarea'; });
+    if (afectados.length) {
         ejSaveHistory();
-        conNombre.forEach(function (p) {
-            p.showNumber = v !== 'name' && v !== 'solotexto';
+        afectados.forEach(function (p) {
+            p.showNumber = ejP.showNumbers;
+            if (!p.name) return;
             p.showName = v !== 'num';
             p.soloTexto = v === 'solotexto';
         });
@@ -5751,6 +5753,8 @@ function ejJugLimpiarPanel(tb) {
         else if (h.tagName === 'DIV' && h.querySelector(':scope > button[onclick^="ejP._addingRival="], :scope > .ej-formations, [onclick^="ejSetPlantillaLabel"], [onclick^="ejColocarJugadorPlantilla"]')) quitar.push(h);
     });
     quitar.forEach(function (h) { h.remove(); });
+    var num = body.querySelector('input[onchange^="ejSetShowNumbers"]');
+    if (num && num.closest('label')) num.closest('label').remove();
 }
 function ejRenderJugBar() {
     var nav = document.querySelector('.ej-nav');
@@ -6050,7 +6054,10 @@ function ejObjFranja(ver, encima) {
     var downOriginal = ejSvgPointerDown, moveOriginal = ejSvgPointerMove, upOriginal = ejSvgPointerUp;
     ejSvgPointerDown = function (e) {
         ejP._objPaleta = false;
+        var nJug = ejP.players.length;
         downOriginal(e);
+        // Las fichas de tarea no llevan dorsal
+        if (ejP._tareaColor && ejP.players.length > nJug) { ejP.players[ejP.players.length - 1].showNumber = false; ejRenderSVG(); }
         var mueve = ejP.isDragging && ejP.activeTool === 'select' && !ejP._ctrlId && !ejP._epDrag && !ejP._rszId && !ejP._trajCtrlId && !ejP._marquee && (ejP.selectedId || ejP._blockDrag);
         ejP._arr = mueve ? {
             x: e.clientX, y: e.clientY, movido: false,
@@ -6084,6 +6091,141 @@ function ejObjFranja(ver, encima) {
     };
     window.addEventListener('resize', function () { ejPanelHueco(); ejObjBar(); });
 })();
+// =====================================================================
+// Entrega 6a · Fondos de campo
+// Doce fondos. Los siete de césped usan el color elegido; los otros
+// cinco traen su propio color. Por defecto, corte cruzado.
+// =====================================================================
+var EJ_FONDOS = [
+    { k: 'cruzado', n: 'Corte cruzado' },
+    { k: 'verticales', n: 'Franjas verticales' },
+    { k: 'horizontales', n: 'Franjas horizontales' },
+    { k: 'damero', n: 'Damero' },
+    { k: 'anillos', n: 'Anillos' },
+    { k: 'diagonales', n: 'Diagonales' },
+    { k: 'rombos', n: 'Rombos' },
+    { k: 'noche', n: 'Noche con focos', color: '#0b3d20' },
+    { k: 'tactico', n: 'Táctico oscuro', color: '#111a2b' },
+    { k: 'tiza', n: 'Pizarra de tiza', color: '#23372f' },
+    { k: 'cuaderno', n: 'Cuaderno cuadriculado', color: 'grid' },
+    { k: 'claro', n: 'Claro técnico', color: '#eef2f6' }
+];
+function ejFondoDef(k) {
+    k = k || ejP.fieldFondo || 'cruzado';
+    return EJ_FONDOS.find(function (f) { return f.k === k; }) || EJ_FONDOS[0];
+}
+// Color con el que se pinta el campo según el fondo activo
+function ejFondoColor(k) {
+    var f = ejFondoDef(k);
+    if (f.color) return f.color;
+    return (!ejP.fieldColor || ejP.fieldColor === 'grid') ? '#1a6b30' : ejP.fieldColor;
+}
+// Dibujo del fondo dentro del terreno (x 20–780, y 15–485)
+function ejFondoSVG(c1, c2, k, sfx) {
+    k = k || ejFondoDef().k;
+    sfx = sfx || '';
+    var X = 20, Y = 15, W = 760, H = 470, s = '', i, j;
+    var R = function (x, y, w, h, fill, extra) { return '<rect x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + w.toFixed(1) + '" height="' + h.toFixed(1) + '" fill="' + fill + '"' + (extra || '') + '/>'; };
+    var clip = '<defs><clipPath id="ejFoClip' + sfx + '"><rect x="' + X + '" y="' + Y + '" width="' + W + '" height="' + H + '"/></clipPath></defs>';
+    var vert = function (n) { var o = '', w = W / n; for (var a = 0; a < n; a++) if (a % 2 === 0) o += R(X + a * w, Y, w, H, c2); return o; };
+    var claro = 'rgba(255,255,255,0.075)', oscuro = 'rgba(0,0,0,0.10)';
+    if (k === 'verticales') return vert(12);
+    if (k === 'cruzado') {
+        s = vert(12);
+        var hb = H / 8;
+        for (i = 0; i < 8; i++) s += R(X, Y + i * hb, W, hb, i % 2 === 0 ? claro : oscuro);
+        return s;
+    }
+    if (k === 'horizontales') { var h8 = H / 8; for (i = 0; i < 8; i++) if (i % 2 === 0) s += R(X, Y + i * h8, W, h8, c2); return s; }
+    if (k === 'damero') {
+        var cw = W / 12, ch = H / 8;
+        for (i = 0; i < 12; i++) for (j = 0; j < 8; j++) if ((i + j) % 2 === 0) s += R(X + i * cw, Y + j * ch, cw, ch, c2);
+        return s;
+    }
+    if (k === 'anillos') {
+        s = clip + '<g clip-path="url(#ejFoClip' + sfx + ')">';
+        for (i = 12; i >= 1; i--) s += '<circle cx="400" cy="250" r="' + (i * 38) + '" fill="' + (i % 2 === 0 ? c2 : c1) + '"/>';
+        return s + '</g>';
+    }
+    if (k === 'diagonales' || k === 'rombos') {
+        s = clip + '<g clip-path="url(#ejFoClip' + sfx + ')">';
+        var banda = function (ang, fill) {
+            var o = '<g transform="rotate(' + ang + ' 400 250)">';
+            for (var a = -8; a < 20; a++) if (a % 2 === 0) o += R(-200 + a * 48, -300, 48, 1100, fill);
+            return o + '</g>';
+        };
+        s += k === 'diagonales' ? banda(35, c2) : banda(35, claro) + banda(-35, oscuro);
+        return s + '</g>';
+    }
+    if (k === 'noche') {
+        s = vert(12);
+        s += '<defs><radialGradient id="ejFoFoco' + sfx + '"><stop offset="0%" stop-color="#ffffff" stop-opacity="0.34"/><stop offset="100%" stop-color="#ffffff" stop-opacity="0"/></radialGradient></defs>';
+        s += '<g clip-path="none">';
+        [[X, Y], [X + W, Y], [X, Y + H], [X + W, Y + H]].forEach(function (p) {
+            s += '<svg x="' + X + '" y="' + Y + '" width="' + W + '" height="' + H + '" viewBox="' + X + ' ' + Y + ' ' + W + ' ' + H + '" overflow="hidden"><ellipse cx="' + p[0] + '" cy="' + p[1] + '" rx="330" ry="250" fill="url(#ejFoFoco' + sfx + ')"/></svg>';
+        });
+        return s + '</g>';
+    }
+    if (k === 'tactico') {
+        for (i = 1; i < 12; i++) s += R(X + i * W / 12 - 0.4, Y, 0.8, H, 'rgba(148,163,184,0.16)');
+        for (i = 1; i < 8; i++) s += R(X, Y + i * H / 8 - 0.4, W, 0.8, 'rgba(148,163,184,0.16)');
+        return s;
+    }
+    if (k === 'tiza') {
+        s = '<defs><radialGradient id="ejFoTiza' + sfx + '"><stop offset="0%" stop-color="#ffffff" stop-opacity="0.07"/><stop offset="100%" stop-color="#ffffff" stop-opacity="0"/></radialGradient></defs>';
+        [[210, 150, 230, 120], [560, 330, 260, 130], [420, 110, 170, 70], [150, 380, 150, 70]].forEach(function (e) {
+            s += '<ellipse cx="' + e[0] + '" cy="' + e[1] + '" rx="' + e[2] + '" ry="' + e[3] + '" fill="url(#ejFoTiza' + sfx + ')"/>';
+        });
+        return s;
+    }
+    if (k === 'claro') { var wv = W / 12; for (i = 0; i < 12; i++) if (i % 2 === 0) s += R(X + i * wv, Y, wv, H, '#e2e8f0'); return s; }
+    return vert(12);
+}
+// Al abrir un ejercicio guardado se recupera el fondo con el que se guardó
+function ejFondoCargar(bd) {
+    if (!bd || !bd.fondo || !EJ_FONDOS.some(function (f) { return f.k === bd.fondo; })) return;
+    ejP.fieldFondo = bd.fondo;
+    if (bd.fondoColor && bd.fondoColor !== 'grid') ejP.fieldColor = bd.fondoColor;
+}
+function ejSetFondo(k) {
+    ejP.fieldFondo = k;
+    ejRenderSVG();
+    ejRenderToolbar();
+}
+// Miniaturas de los fondos en el panel Campo, encima de los colores
+function ejFondoPanel(tb) {
+    var cab = tb.querySelector('.ej-section-header.ej-sec-campo');
+    var body = cab ? cab.nextElementSibling : null;
+    if (!body || !body.classList.contains('ej-section-body') || body.querySelector('.ej-fondos')) return;
+    var cuad = body.querySelector('[onclick="ejSetFieldColor(\'grid\')"]');
+    if (!cuad) return;
+    var fila = cuad.parentNode, rotulo = fila.previousElementSibling;
+    cuad.remove();
+    var act = ejFondoDef();
+    var caja = document.createElement('div');
+    caja.innerHTML = '<div class="ej-fondos-t">Fondo del campo</div><div class="ej-fondos">' + EJ_FONDOS.map(function (f) {
+        var col = ejFondoColor(f.k), dibujo;
+        if (col === 'grid') dibujo = '<rect x="20" y="15" width="760" height="470" fill="#fbfcfe"/><path d="M20 132h760M20 250h760M20 367h760M210 15v470M400 15v470M590 15v470" stroke="#b9c8de" stroke-width="5" fill="none"/>';
+        else dibujo = '<rect x="20" y="15" width="760" height="470" fill="' + col + '"/>' + ejFondoSVG(col, ejLightenColor(col, 12), f.k, '_' + f.k);
+        var linea = (f.k === 'claro' || f.k === 'cuaderno') ? '#334155' : '#ffffff';
+        return '<button type="button" class="' + (act.k === f.k ? 'on' : '') + '" onclick="ejSetFondo(\'' + f.k + '\')" title="' + f.n + '"><svg viewBox="20 15 760 470" preserveAspectRatio="none">' + dibujo
+            + '<g fill="none" stroke="' + linea + '" stroke-width="9" opacity="0.9"><rect x="24" y="19" width="752" height="462"/><path d="M400 19v462"/><circle cx="400" cy="250" r="70"/></g></svg></button>';
+    }).join('') + '</div>';
+    fila.parentNode.insertBefore(caja, rotulo || fila);
+    if (act.color) { fila.style.opacity = '0.35'; fila.title = 'Este fondo tiene su propio color. Al elegir un color se vuelve al césped.'; }
+}
+(function () {
+    if (!ejP.fieldFondo) ejP.fieldFondo = ejP.fieldColor === 'grid' ? 'cuaderno' : 'cruzado';
+    // El selector de datos de la barra manda sobre los dorsales: por defecto, dorsal y nombre
+    var lab0 = ejP._plantillaLabel || 'both';
+    ejP.showNumbers = lab0 !== 'name' && lab0 !== 'solotexto';
+    var setColorOriginal = ejSetFieldColor;
+    ejSetFieldColor = function (color) {
+        if (color === 'grid') { ejSetFondo('cuaderno'); return; }
+        if (ejFondoDef().color) ejP.fieldFondo = 'cruzado';
+        setColorOriginal(color);
+    };
+})();
 (function () {
     var renderToolbarOriginal = ejRenderToolbar;
     ejRenderToolbar = function () {
@@ -6095,6 +6237,7 @@ function ejObjFranja(ver, encima) {
         renderToolbarOriginal();
         var tb = document.getElementById('ej-toolbar');
         if (tb) ejJugLimpiarPanel(tb);
+        if (tb) ejFondoPanel(tb);
         if (tb && !tb.querySelector('.ej-anim-btn')) {
             var b = document.createElement('button');
             b.type = 'button';
@@ -6122,6 +6265,6 @@ function ejObjFranja(ver, encima) {
         // El área de trabajo toma el color del campo: así no quedan franjas oscuras a los lados
         if (ejP._presentOn) return;
         var area = document.getElementById('ej-canvas-area');
-        if (area) area.style.background = (ejP.fieldColor === 'grid') ? '#fbfcfe' : (ejP.fieldColor || '');
+        if (area) { var cf = ejFondoColor(); area.style.background = cf === 'grid' ? '#fbfcfe' : cf; }
     };
 })();
