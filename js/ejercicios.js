@@ -478,14 +478,14 @@ function ejRenderSVG() {
         const isGk = p.number == 1 && p.team !== 'tarea';
         const gkColor = ejEsRival(p) ? ejP.rivalGkColor : ejP.myGkColor;
         const effectiveColor = isGk ? gkColor : p.color;
-        const tc = EJ_TEAM_COLORS[effectiveColor] || EJ_TEAM_COLORS.blue;
+        const tc = ejFichaColores(p, effectiveColor);
         const vc = EJ_TEAM_COLORS[p.vestColor] || EJ_TEAM_COLORS.yellow;
         const sel = p.id === ejP.selectedId;
         const scale = p.scale ?? 1.0;
         const r = 14 * scale;
         const fs = 11 * scale;
-        const textColor = ['yellow','white','atletico','juventus'].includes(p.color) ? '#1e293b' : '#ffffff';
-        const fillAttr = tc.striped ? `url(#stp-${p.id})` : tc.fill;
+        const textColor = tc.texto || (['yellow','white','atletico','juventus'].includes(p.color) ? '#1e293b' : '#ffffff');
+        const fillAttr = tc.kitFill || (tc.striped ? `url(#stp-${p.id})` : tc.fill); html += tc.defs || '';
 
         if (p.soloTexto && !p.anon) {
             const _stName = ejEscXml(p.name || '');
@@ -5645,7 +5645,8 @@ function ejJugModalPintar() {
             var j = lista[i];
             var enCampo = ejJugEnCampo(j, rival);
             var esGk = g[0] === 'POR';
-            var col = EJ_TEAM_COLORS[rival ? (esGk ? ejP.rivalGkColor : ejP.rivalColor) : (esGk ? ejP.myGkColor : ejP.myColor)] || EJ_TEAM_COLORS.blue;
+            var claveCol = rival ? (esGk ? ejP.rivalGkColor : ejP.rivalColor) : (esGk ? ejP.myGkColor : ejP.myColor);
+            var col = ejFichaColores({ team: rival ? 'rival' : 'my', color: claveCol, number: esGk ? 1 : 0 }, claveCol);
             var num = (j.number === null || j.number === undefined) ? '' : j.number;
             var avatar = j.photo
                 ? '<div class="ej-jm-av" style="background-image:url(\'' + String(j.photo).replace(/'/g, '%27') + '\');border-color:' + col.stroke + '"></div>'
@@ -5753,6 +5754,22 @@ function ejJugLimpiarPanel(tb) {
         else if (h.tagName === 'DIV' && h.querySelector(':scope > button[onclick^="ejP._addingRival="], :scope > .ej-formations, [onclick^="ejSetPlantillaLabel"], [onclick^="ejColocarJugadorPlantilla"]')) quitar.push(h);
     });
     quitar.forEach(function (h) { h.remove(); });
+    if (!ejP._addingRival && ejEqCfg()) {
+        var cabAp = body.querySelector('.ej-section-header.ej-sec-apariencia');
+        var ap = cabAp ? cabAp.nextElementSibling : null;
+        if (ap && ap.classList.contains('ej-section-body')) {
+            Array.prototype.slice.call(ap.children).forEach(function (h) {
+                if (!h.classList.contains('ej-swatches')) return;
+                var rot = h.previousElementSibling;
+                if (rot && rot.tagName === 'LABEL') rot.remove();
+                h.remove();
+            });
+            var nota = document.createElement('div');
+            nota.className = 'ej-eq-nota';
+            nota.innerHTML = 'Tu equipo se dibuja con la equipación del club.<button type="button" onclick="ejIrEquipacion()">Cambiar en Mi Club</button>';
+            ap.insertBefore(nota, ap.firstChild);
+        }
+    }
     var num = body.querySelector('input[onchange^="ejSetShowNumbers"]');
     if (num && num.closest('label')) num.closest('label').remove();
 }
@@ -5766,6 +5783,7 @@ function ejRenderJugBar() {
         nav.appendChild(bar);
     }
     var rival = !!ejP._addingRival;
+    var eq = ejEqCfg();
     var tarea = ejP.activeTool === 'player' ? (ejP._tareaColor || null) : null;
     var anadiendo = ejP.activeTool === 'player' && !ejP._plantillaMode && !tarea;
     ejFichaSync();
@@ -5775,12 +5793,21 @@ function ejRenderJugBar() {
     var estilos = ['foto', 'circulo', 'camiseta'].map(function (e) {
         return '<button type="button" class="' + (estilo === e ? 'on' : '') + '" onclick="ejFichaEstilo(\'' + e + '\')" title="' + NOM[e] + '"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + IC[e] + '</svg></button>';
     }).join('');
-    var puntos = Object.keys(EJ_TEAM_COLORS).filter(function (k) {
-        return !EJ_TEAM_COLORS[k].striped && k !== ejP.myColor && k !== ejP.rivalColor;
-    }).map(function (k) {
-        var c = EJ_TEAM_COLORS[k];
-        return '<button type="button" class="ej-jb-dot' + (tarea === k ? ' on' : '') + '" style="background:' + c.fill + ';border-color:' + c.stroke + '" onclick="ejJugTarea(\'' + k + '\')" title="Fichas de color ' + c.name.toLowerCase() + ': cada clic en el campo coloca una. Pulsa otra vez para soltar"></button>';
-    }).join('');
+    var puntos;
+    if (eq) {
+        // Papeles de tarea con los colores del club: portero, comodín y petos
+        puntos = EQ_ROLES.map(function (r) {
+            var c = eq.tarea[r[0]];
+            return '<button type="button" class="ej-jb-dot' + (tarea === r[0] ? ' on' : '') + '" style="background:' + c + ';border-color:' + ejHexBorde(c) + '" onclick="ejJugTarea(\'' + r[0] + '\')" title="' + r[1] + ': cada clic en el campo coloca una ficha. Pulsa otra vez para soltar"></button>';
+        }).join('');
+    } else {
+        puntos = Object.keys(EJ_TEAM_COLORS).filter(function (k) {
+            return !EJ_TEAM_COLORS[k].striped && k !== ejP.myColor && k !== ejP.rivalColor;
+        }).map(function (k) {
+            var c = EJ_TEAM_COLORS[k];
+            return '<button type="button" class="ej-jb-dot' + (tarea === k ? ' on' : '') + '" style="background:' + c.fill + ';border-color:' + c.stroke + '" onclick="ejJugTarea(\'' + k + '\')" title="Fichas de color ' + c.name.toLowerCase() + ': cada clic en el campo coloca una. Pulsa otra vez para soltar"></button>';
+        }).join('');
+    }
     var lab = ejP._plantillaLabel || 'both';
     if (lab === 'nofoto') lab = 'both';
     var datos = [['num', 'Dorsal'], ['name', 'Nombre'], ['both', 'Dorsal y nombre'], ['solotexto', 'Solo texto']].map(function (o) { return '<option value="' + o[0] + '"' + (lab === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('');
@@ -5790,6 +5817,7 @@ function ejRenderJugBar() {
         + '<button type="button" class="' + (!rival ? 'on my' : '') + '" onclick="ejJugEquipo(false)">Mi equipo</button>'
         + '<button type="button" class="' + (rival ? 'on riv' : '') + '" onclick="ejJugEquipo(true)">Rival</button>'
         + '</div>'
+        + (eq && !rival ? '<button type="button" class="ej-jb-btn ej-jb-kit" onclick="ejJugKit()" title="' + (ejP.miKit === 2 ? 'Segunda equipación. Pulsa para cambiar a la primera' : 'Primera equipación. Pulsa para cambiar a la segunda') + '">' + eqCamisetaSVG(eq.kits[ejP.miKit === 2 ? 'jug2' : 'jug1'], 19) + (ejP.miKit === 2 ? '2ª' : '1ª') + '</button>' : '')
         + '<button type="button" class="ej-jb-btn' + (anadiendo ? ' on' : '') + '" onclick="ejJugAnadir()" title="Cada clic en el campo coloca un jugador. Pulsa otra vez para soltar">+<span class="ej-jb-txt"> Jugador</span></button>'
         + '<select class="ej-jb-sel ej-jb-x" onchange="ejJugFormacion(this)" title="Colocar el equipo en una formación"><option value="">Formación</option>' + formaciones + '</select>'
         + '<button type="button" class="ej-jb-btn ej-jb-x" onclick="ejJugPlantilla()" title="Abrir la plantilla, marcar varios jugadores y añadirlos de golpe">Plantilla</button>'
@@ -5967,7 +5995,7 @@ function ejObjBar() {
     if (hay('equipment')) { h += B('gi', 'ejObjGirar(-15)', 'Girar a la izquierda'); h += B('gd', 'ejObjGirar(15)', 'Girar a la derecha'); }
     if (hay('equipment') || hay('player')) { h += B('me', 'ejObjTam(\'down\')', 'Más pequeño'); h += B('ma', 'ejObjTam(\'up\')', 'Más grande'); }
     if (uno) {
-        var col = uno.type === 'player' ? (EJ_TEAM_COLORS[uno.obj.color] || EJ_TEAM_COLORS.blue).fill : (uno.obj.color || '#94a3b8');
+        var col = uno.type === 'player' ? ejFichaColores(uno.obj, uno.obj.color).fill : (uno.obj.color || '#94a3b8');
         h += '<button type="button" class="ej-ob-col' + (ejP._objPaleta ? ' on' : '') + '" onclick="ejObjPaleta()" title="Color"><i style="background:' + col + '"></i></button>';
         if (uno.type === 'text') h += B('ed', 'ejEditarTexto()', 'Editar el texto');
         h += B('mas', 'ejObjMas()', 'Más opciones en el panel');
@@ -6049,8 +6077,8 @@ function ejObjFranja(ver, encima) {
     var deleteOriginal = ejDelete;
     ejDelete = function () { deleteOriginal(); ejSaveHistory(); if (ejP.animMode) ejFrameSaveCurrent(); ejObjBar(); };
     var undoOriginal = ejUndo, redoOriginal = ejRedo;
-    ejUndo = function () { undoOriginal(); ejObjBar(); };
-    ejRedo = function () { redoOriginal(); ejObjBar(); };
+    ejUndo = function () { undoOriginal(); ejRenderToolbar(); ejObjBar(); };
+    ejRedo = function () { redoOriginal(); ejRenderToolbar(); ejObjBar(); };
 
     var downOriginal = ejSvgPointerDown, moveOriginal = ejSvgPointerMove, upOriginal = ejSvgPointerUp;
     ejSvgPointerDown = function (e) {
@@ -6058,7 +6086,12 @@ function ejObjFranja(ver, encima) {
         var nJug = ejP.players.length;
         downOriginal(e);
         // Las fichas de tarea no llevan dorsal
-        if (ejP._tareaColor && ejP.players.length > nJug) { ejP.players[ejP.players.length - 1].showNumber = false; ejRenderSVG(); }
+        if (ejP._tareaColor && ejP.players.length > nJug) {
+            var ficha = ejP.players[ejP.players.length - 1];
+            ficha.showNumber = false;
+            if (typeof EQ_ROLES !== 'undefined' && EQ_ROLES.some(function (r) { return r[0] === ejP._tareaColor; })) { ficha.rol = ejP._tareaColor; ficha.color = 'white'; }
+            ejRenderSVG();
+        }
         var mueve = ejP.isDragging && ejP.activeTool === 'select' && !ejP._ctrlId && !ejP._epDrag && !ejP._rszId && !ejP._trajCtrlId && !ejP._marquee && (ejP.selectedId || ejP._blockDrag);
         ejP._arr = mueve ? {
             x: e.clientX, y: e.clientY, movido: false,
@@ -6184,6 +6217,7 @@ function ejFondoSVG(c1, c2, k, sfx) {
 }
 // Al abrir un ejercicio guardado se recupera el fondo con el que se guardó
 function ejFondoCargar(bd) {
+    ejP.miKit = 1; // la equipación la dirán los jugadores del ejercicio, si la llevan apuntada
     if (!bd || !bd.fondo || !EJ_FONDOS.some(function (f) { return f.k === bd.fondo; })) return;
     ejP.fieldFondo = bd.fondo;
     if (bd.fondoColor && bd.fondoColor !== 'grid') ejP.fieldColor = bd.fondoColor;
@@ -6250,6 +6284,7 @@ function ejCfgActual() {
 function ejCfgAplicar() {
     var club = ejCfgClub();
     var c = (club && club.pizarra_config) || {};
+    ejP.miKit = 1;
     var col = function (v) { return v && EJ_TEAM_COLORS[v] ? v : null; };
     if (c.fondo && EJ_FONDOS.some(function (f) { return f.k === c.fondo; })) ejP.fieldFondo = c.fondo;
     if (c.color && /^#[0-9a-f]{6}$/i.test(c.color)) ejP.fieldColor = c.color;
@@ -6315,18 +6350,9 @@ function ejCfgPintar() {
     var m = document.getElementById('ej-cfg-modal');
     if (!m) return;
     var club = ejCfgClub();
-    var muestras = function (actual, fn, rayas) {
-        return '<div class="ej-cfg-cols">' + Object.keys(EJ_TEAM_COLORS).filter(function (k) { return rayas || !EJ_TEAM_COLORS[k].striped; }).map(function (k) {
-            var c = EJ_TEAM_COLORS[k];
-            var bg = c.striped ? 'repeating-linear-gradient(90deg,' + c.fill + ' 0 5px,' + (c.fill2 || '#fff') + ' 5px 10px)' : c.fill;
-            return '<button type="button" class="' + (actual === k ? 'on' : '') + '" style="background:' + bg + '" title="' + c.name + '" onclick="ejCfgHacer(\'' + fn + '\',\'' + k + '\')"></button>';
-        }).join('') + '</div>';
-    };
     var cesped = ['#1a6b30', '#1a8540', '#2d8a4e', '#0f4c2a', '#1e3a5f', '#0a1628', '#2c2c2c', '#ffffff'];
+    var eqc = ejEqCfg();
     var propio = !!ejFondoDef().color;
-    var est = ejP.fichaEstilo || 'foto', lab = ejP._plantillaLabel || 'both';
-    if (lab === 'nofoto') lab = 'both';
-    var op = function (v, t, act, fn) { return '<button type="button" class="' + (act === v ? 'on' : '') + '" onclick="ejCfgHacer(\'' + fn + '\',\'' + v + '\')">' + t + '</button>'; };
     var h = '<div class="ej-cfg-caja">'
         + '<div class="ej-jm-cab"><strong>Configuración de la pizarra</strong><button type="button" class="ej-jm-x" onclick="ejCfgCerrar()" title="Cerrar">✕</button></div>'
         + '<div class="ej-cfg-cuerpo">'
@@ -6342,17 +6368,12 @@ function ejCfgPintar() {
     } else {
         h += '<div class="ej-cfg-nota">Tu club todavía no tiene escudo. Súbelo en Mi Club y aparecerá aquí.</div>';
     }
-    h += '<h4>Equipación</h4>'
-        + '<div class="ej-cfg-l">Mi equipo</div>' + muestras(ejP.myColor, 'ejSetMyColor', true)
-        + '<div class="ej-cfg-l">Mi portero</div>' + muestras(ejP.myGkColor, 'ejSetMyGkColor', false)
-        + '<div class="ej-cfg-l">Rival</div>' + muestras(ejP.rivalColor, 'ejSetRivalColor', true)
-        + '<div class="ej-cfg-l">Portero rival</div>' + muestras(ejP.rivalGkColor, 'ejSetRivalGkColor', false)
-        + '<h4>Fichas</h4>'
-        + '<div class="ej-cfg-l">Formato</div><div class="ej-cfg-seg">' + op('foto', 'Foto', est, 'ejFichaEstilo') + op('circulo', 'Círculo', est, 'ejFichaEstilo') + op('camiseta', 'Camiseta', est, 'ejFichaEstilo') + '</div>'
-        + '<div class="ej-cfg-l">Datos</div><div class="ej-cfg-seg">' + op('num', 'Dorsal', lab, 'ejJugDatos') + op('name', 'Nombre', lab, 'ejJugDatos') + op('both', 'Los dos', lab, 'ejJugDatos') + op('solotexto', 'Solo texto', lab, 'ejJugDatos') + '</div>'
-        + '<div class="ej-cfg-l">Tamaño al colocar</div><div class="ej-cfg-seg">' + op('small', 'Pequeña', ejP.selectedSize, 'ejSetSize') + op('medium', 'Mediana', ejP.selectedSize, 'ejSetSize') + op('large', 'Grande', ejP.selectedSize, 'ejSetSize') + '</div>'
+    h += '<h4>Equipación y colores de tarea</h4>'
+        + (eqc ? '<div class="ej-cfg-kits">' + ['jug1', 'jug2', 'por1', 'por2'].map(function (k) { return eqCamisetaSVG(eqc.kits[k], 40); }).join('') + '<button type="button" onclick="ejIrEquipacion()">Cambiar en Mi Club</button></div>'
+            + '<div class="ej-cfg-nota">Las camisetas del club y los colores de portero, comodín y petos se eligen en Mi Club.</div>'
+            : '<div class="ej-cfg-nota">Falta cargar equipacion.js para elegir la equipación del club.</div>')
         + '</div>'
-        + '<div class="ej-jm-pie"><span>Los cambios se ven al momento. Guárdalos para que la pizarra abra siempre así.</span>'
+        + '<div class="ej-jm-pie"><span>Se guardan también el formato de ficha, los datos y los colores del rival que tengas puestos ahora.</span>'
         + '<button type="button" class="ej-jm-ok" onclick="ejCfgGuardar()">Guardar para el club</button></div></div>';
     m.innerHTML = h;
 }
@@ -6366,6 +6387,89 @@ async function ejCfgGuardar() {
     if (club) club.pizarra_config = cfg;
     ejToast('Configuración guardada para el club', 'success');
     ejCfgCerrar();
+}
+// =====================================================================
+// Equipación del club en la pizarra
+// Mi equipo se dibuja con la camiseta definida en Mi Club (equipacion.js)
+// y las fichas de tarea usan los colores de portero, comodín y petos.
+// Se resuelve al pintar: si el club cambia de equipación, los ejercicios
+// guardados la siguen.
+// =====================================================================
+function ejHexLum(hex) {
+    var r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
+    return (r * 299 + g * 587 + b * 114) / 1000;
+}
+function ejHexContraste(hex) { return ejHexLum(hex) > 150 ? '#1e293b' : '#ffffff'; }
+function ejHexBorde(hex) {
+    var l = ejHexLum(hex);
+    if (l < 55) return '#cbd5e1';
+    var f = function (i) { return Math.round(parseInt(hex.slice(i, i + 2), 16) * 0.62).toString(16).padStart(2, '0'); };
+    return '#' + f(1) + f(3) + f(5);
+}
+function ejEqCfg() {
+    if (typeof eqConfig !== 'function') return null;
+    var club = ejCfgClub();
+    var origen = club ? club.pizarra_config : null;
+    if (!ejP._eqCache || ejP._eqCacheDe !== origen) { ejP._eqCache = eqConfig(); ejP._eqCacheDe = origen; }
+    return ejP._eqCache;
+}
+// ¿Este jugador va con la equipación del club? Los de mi equipo que conservan el color de equipo.
+// Si a uno se le cambia el color a mano, deja de llevarla.
+function ejKitDe(p) {
+    var cfg = ejEqCfg();
+    if (!cfg || p.team === 'tarea' || ejEsRival(p)) return null;
+    var esColorGk = p.color === ejP.myGkColor && ejP.myGkColor !== ejP.myColor;
+    if (p.color !== ejP.myColor && !esColorGk) return null;
+    var portero = esColorGk || p.number == 1;
+    return cfg.kits[(portero ? 'por' : 'jug') + ((p.eq || ejP.miKit) === 2 ? '2' : '1')];
+}
+// Colores con los que se pinta una ficha. Sustituye a la consulta directa de EJ_TEAM_COLORS.
+function ejFichaColores(p, colorClave) {
+    var base = EJ_TEAM_COLORS[colorClave] || EJ_TEAM_COLORS.blue;
+    var cfg = ejEqCfg();
+    if (!cfg) return base;
+    if (p.team === 'tarea') {
+        var c = p.rol && cfg.tarea[p.rol];
+        return c ? { fill: c, stroke: ejHexBorde(c), texto: ejHexContraste(c), name: p.rol } : base;
+    }
+    var kit = ejKitDe(p);
+    if (!kit) return base;
+    var out = { fill: kit.c1, stroke: ejHexBorde(kit.c1), texto: ejHexContraste(kit.c1), name: 'Equipación del club' };
+    if (kit.d !== 'liso') {
+        var R = 14 * (p.scale == null ? 1 : p.scale) * 1.45;
+        // Parche liso detrás del dorsal, para que se lea sobre rayas o cuadros
+        var r0 = R / 1.45, parche = '';
+        if (p.showNumber && p.number && !p.anon && (p.estilo === 'camiseta' || p.estilo === 'circulo' || !p.photo)) {
+            parche = '<circle cx="' + R.toFixed(1) + '" cy="' + (R + (p.estilo === 'camiseta' ? 0.275 * r0 : 0)).toFixed(1) + '" r="' + (r0 * 0.56).toFixed(1) + '" fill="' + kit.c1 + '"/>';
+        }
+        out.kitFill = 'url(#kit-' + p.id + ')';
+        out.defs = '<defs><pattern id="kit-' + p.id + '" patternUnits="userSpaceOnUse" x="' + (-R).toFixed(1) + '" y="' + (-R).toFixed(1) + '" width="' + (2 * R).toFixed(1) + '" height="' + (2 * R).toFixed(1) + '">'
+            + eqDibujo(kit.d, kit.c1, kit.c2, 0, 0, 2 * R, 2 * R) + parche + '</pattern></defs>';
+    }
+    return out;
+}
+// Primera o segunda equipación. Se apunta en cada jugador de mi equipo (eq: 1 o 2),
+// así viaja con el ejercicio y con deshacer, igual que el formato de ficha.
+function ejKitSync() {
+    var mios = ejP.players.filter(function (p) { return p.team !== 'tarea' && !ejEsRival(p); });
+    var ref = mios.find(function (p) { return p.eq; });
+    if (ref) ejP.miKit = ref.eq;
+    mios.forEach(function (p) { if (!p.eq) p.eq = ejP.miKit === 2 ? 2 : 1; });
+}
+function ejJugKit() {
+    ejSaveHistory();
+    ejP.miKit = ejP.miKit === 2 ? 1 : 2;
+    ejP.players.forEach(function (p) { if (p.team !== 'tarea' && !ejEsRival(p)) p.eq = ejP.miKit; });
+    ejSaveHistory();
+    ejRenderSVG();
+    ejRenderToolbar();
+}
+function ejIrEquipacion() {
+    ejCfgCerrar();
+    var tab = document.querySelector('.main-tab.config');
+    if (tab) tab.click();
+    var sub = document.querySelector('#modulo-config .sub-tab[onclick*="equipacion"]');
+    if (sub) sub.click();
 }
 (function () {
     var renderToolbarOriginal = ejRenderToolbar;
@@ -6401,6 +6505,7 @@ async function ejCfgGuardar() {
     };
     var renderSVGOriginal = ejRenderSVG;
     ejRenderSVG = function () {
+        if (ejEqCfg()) ejKitSync();
         renderSVGOriginal();
         ejObjBar();
         // El área de trabajo toma el color del campo: así no quedan franjas oscuras a los lados
