@@ -293,7 +293,7 @@ function ejRenderSVG() {
 
     // Campo
     let html = defs;
-    html += ejGetFieldSVG(ejP.fieldType, ejFondoColor());
+    html += ejGetFieldSVG(ejP.fieldType, ejFondoColor()) + ejEscudoSVG();
     html += ejCarrilesZonasSVG();
     html += ejRejillaMetrosSVG();
 
@@ -5516,7 +5516,7 @@ function ejProyPlegar() {
     if (btn) { btn.textContent = plegado ? '—' : '▢'; btn.title = plegado ? 'Plegar' : 'Desplegar'; }
 }
 // =====================================================================
-// REDISEÑO PIZARRA · Entregas 3, 4, 5 y 6a
+// REDISEÑO PIZARRA · Entregas 3, 4, 5 y 6
 // Barra de jugadores arriba (equipos, colores de tarea, estilo de ficha, anónimo
 // y ventana de plantilla),
 // animación a demanda, sin pregunta inicial y fondo del color del campo.
@@ -5796,7 +5796,8 @@ function ejRenderJugBar() {
         + '<div class="ej-jb-dots">' + puntos + '</div>'
         + '<select class="ej-jb-sel ej-jb-dat" onchange="ejJugDatos(this.value)" title="Qué se ve en las fichas de los jugadores con nombre">' + datos + '</select>'
         + '<div class="ej-jb-est">' + estilos + '</div>'
-        + '<button type="button" class="ej-jb-btn ej-jb-a' + (!ejP.fichaAnon ? ' on' : '') + '" onclick="ejFichaAnonimo()" title="' + (ejP.fichaAnon ? 'Fichas anónimas. Pulsa para ver fotos, dorsales y nombres' : 'Pulsa para dejar las fichas anónimas: sin foto, dorsal ni nombre') + '">A</button>';
+        + '<button type="button" class="ej-jb-btn ej-jb-a' + (!ejP.fichaAnon ? ' on' : '') + '" onclick="ejFichaAnonimo()" title="' + (ejP.fichaAnon ? 'Fichas anónimas. Pulsa para ver fotos, dorsales y nombres' : 'Pulsa para dejar las fichas anónimas: sin foto, dorsal ni nombre') + '">A</button>'
+        + '<button type="button" class="ej-jb-btn ej-jb-cfg" onclick="ejCfgAbrir()" title="Configuración de la pizarra: campo, escudo, equipación y fichas"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="6.5"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg></button>';
 }
 // =====================================================================
 // Entrega 5 · Opciones junto al objeto seleccionado
@@ -6192,6 +6193,17 @@ function ejSetFondo(k) {
     ejRenderSVG();
     ejRenderToolbar();
 }
+function ejFondoMiniaturas(accion) {
+    var act = ejFondoDef();
+    return '<div class="ej-fondos">' + EJ_FONDOS.map(function (f) {
+        var col = ejFondoColor(f.k), dibujo;
+        if (col === 'grid') dibujo = '<rect x="20" y="15" width="760" height="470" fill="#fbfcfe"/><path d="M20 132h760M20 250h760M20 367h760M210 15v470M400 15v470M590 15v470" stroke="#b9c8de" stroke-width="5" fill="none"/>';
+        else dibujo = '<rect x="20" y="15" width="760" height="470" fill="' + col + '"/>' + ejFondoSVG(col, ejLightenColor(col, 12), f.k, '_' + f.k);
+        var linea = (f.k === 'claro' || f.k === 'cuaderno') ? '#334155' : '#ffffff';
+        return '<button type="button" class="' + (act.k === f.k ? 'on' : '') + '" onclick="' + accion.replace('$k', f.k) + '" title="' + f.n + '"><svg viewBox="20 15 760 470" preserveAspectRatio="none">' + dibujo
+            + '<g fill="none" stroke="' + linea + '" stroke-width="9" opacity="0.9"><rect x="24" y="19" width="752" height="462"/><path d="M400 19v462"/><circle cx="400" cy="250" r="70"/></g></svg></button>';
+    }).join('') + '</div>';
+}
 // Miniaturas de los fondos en el panel Campo, encima de los colores
 function ejFondoPanel(tb) {
     var cab = tb.querySelector('.ej-section-header.ej-sec-campo');
@@ -6203,19 +6215,13 @@ function ejFondoPanel(tb) {
     cuad.remove();
     var act = ejFondoDef();
     var caja = document.createElement('div');
-    caja.innerHTML = '<div class="ej-fondos-t">Fondo del campo</div><div class="ej-fondos">' + EJ_FONDOS.map(function (f) {
-        var col = ejFondoColor(f.k), dibujo;
-        if (col === 'grid') dibujo = '<rect x="20" y="15" width="760" height="470" fill="#fbfcfe"/><path d="M20 132h760M20 250h760M20 367h760M210 15v470M400 15v470M590 15v470" stroke="#b9c8de" stroke-width="5" fill="none"/>';
-        else dibujo = '<rect x="20" y="15" width="760" height="470" fill="' + col + '"/>' + ejFondoSVG(col, ejLightenColor(col, 12), f.k, '_' + f.k);
-        var linea = (f.k === 'claro' || f.k === 'cuaderno') ? '#334155' : '#ffffff';
-        return '<button type="button" class="' + (act.k === f.k ? 'on' : '') + '" onclick="ejSetFondo(\'' + f.k + '\')" title="' + f.n + '"><svg viewBox="20 15 760 470" preserveAspectRatio="none">' + dibujo
-            + '<g fill="none" stroke="' + linea + '" stroke-width="9" opacity="0.9"><rect x="24" y="19" width="752" height="462"/><path d="M400 19v462"/><circle cx="400" cy="250" r="70"/></g></svg></button>';
-    }).join('') + '</div>';
+    caja.innerHTML = '<div class="ej-fondos-t">Fondo del campo</div>' + ejFondoMiniaturas('ejSetFondo(\'$k\')');
     fila.parentNode.insertBefore(caja, rotulo || fila);
     if (act.color) { fila.style.opacity = '0.35'; fila.title = 'Este fondo tiene su propio color. Al elegir un color se vuelve al césped.'; }
 }
 (function () {
     if (!ejP.fieldFondo) ejP.fieldFondo = ejP.fieldColor === 'grid' ? 'cuaderno' : 'cruzado';
+    if (!ejP.escudo) ejP.escudo = { ver: true, op: 0.18, tam: 1 };
     // El selector de datos de la barra manda sobre los dorsales: por defecto, dorsal y nombre
     var lab0 = ejP._plantillaLabel || 'both';
     ejP.showNumbers = lab0 !== 'name' && lab0 !== 'solotexto';
@@ -6226,12 +6232,147 @@ function ejFondoPanel(tb) {
         setColorOriginal(color);
     };
 })();
+// =====================================================================
+// Entrega 6b · Configuración de la pizarra, guardada por club
+// Fondo y color, escudo en el círculo central, equipación y fichas.
+// Se guarda en clubs.pizarra_config y se aplica al abrir la pizarra
+// y al empezar una pizarra nueva.
+// =====================================================================
+function ejCfgClub() { return (typeof clubData !== 'undefined' && clubData) ? clubData : null; }
+function ejCfgActual() {
+    return {
+        fondo: ejP.fieldFondo, color: ejP.fieldColor,
+        escudo: { ver: !!ejP.escudo.ver, op: ejP.escudo.op, tam: ejP.escudo.tam },
+        miColor: ejP.myColor, miGk: ejP.myGkColor, rivalColor: ejP.rivalColor, rivalGk: ejP.rivalGkColor,
+        estilo: ejP.fichaEstilo || 'foto', datos: ejP._plantillaLabel || 'both', tam: ejP.selectedSize
+    };
+}
+function ejCfgAplicar() {
+    var club = ejCfgClub();
+    var c = (club && club.pizarra_config) || {};
+    var col = function (v) { return v && EJ_TEAM_COLORS[v] ? v : null; };
+    if (c.fondo && EJ_FONDOS.some(function (f) { return f.k === c.fondo; })) ejP.fieldFondo = c.fondo;
+    if (c.color && /^#[0-9a-f]{6}$/i.test(c.color)) ejP.fieldColor = c.color;
+    if (c.escudo) ejP.escudo = { ver: c.escudo.ver !== false, op: Math.max(0.05, Math.min(0.8, +c.escudo.op || 0.18)), tam: Math.max(0.4, Math.min(1.8, +c.escudo.tam || 1)) };
+    if (col(c.miColor)) ejP.myColor = c.miColor;
+    if (col(c.miGk)) ejP.myGkColor = c.miGk;
+    if (col(c.rivalColor)) ejP.rivalColor = c.rivalColor;
+    if (col(c.rivalGk)) ejP.rivalGkColor = c.rivalGk;
+    if (['foto', 'circulo', 'camiseta'].indexOf(c.estilo) >= 0) ejP.fichaEstilo = c.estilo;
+    if (['num', 'name', 'both', 'solotexto'].indexOf(c.datos) >= 0) { ejP._plantillaLabel = c.datos; ejP.showNumbers = c.datos === 'num' || c.datos === 'both'; }
+    if (['small', 'medium', 'large'].indexOf(c.tam) >= 0) ejP.selectedSize = c.tam;
+    ejEscudoPrecargar();
+}
+// El escudo se pasa a datos incrustados para que salga también en el PNG y en el vídeo
+function ejEscudoPrecargar() {
+    var club = ejCfgClub();
+    var url = club && club.logo_url;
+    if (!url || ejP._escudoUrl === url) return;
+    ejP._escudoUrl = url;
+    ejP._escudoData = null;
+    if (url.indexOf('data:') === 0) { ejP._escudoData = url; return; }
+    fetch(url).then(function (r) { return r.ok ? r.blob() : null; }).then(function (b) {
+        if (!b) return;
+        var fr = new FileReader();
+        fr.onload = function () { ejP._escudoData = fr.result; ejRenderSVG(); };
+        fr.readAsDataURL(b);
+    }).catch(function () { /* si no se puede incrustar, se usa la dirección directa */ });
+}
+function ejEscudoSVG() {
+    var club = ejCfgClub();
+    var src = ejP._escudoData || (club && club.logo_url);
+    if (!src || !ejP.escudo || !ejP.escudo.ver) return '';
+    if (ejP.fieldType !== 'full' && ejP.fieldType !== 'artificial') return '';
+    var lado = 104 * ejP.escudo.tam;
+    return '<image href="' + ejEscXml(src) + '" x="' + (400 - lado / 2).toFixed(1) + '" y="' + (250 - lado / 2).toFixed(1) + '" width="' + lado.toFixed(1) + '" height="' + lado.toFixed(1)
+        + '" opacity="' + ejP.escudo.op + '" preserveAspectRatio="xMidYMid meet" pointer-events="none"/>';
+}
+function ejCfgEscudo(campo, valor) {
+    if (campo === 'ver') ejP.escudo.ver = !!valor;
+    else ejP.escudo[campo] = +valor;
+    ejRenderSVG();
+    var e = document.getElementById('ej-cfg-' + campo);
+    if (e) e.textContent = campo === 'op' ? Math.round(ejP.escudo.op * 100) + ' %' : Math.round(ejP.escudo.tam * 100) + ' %';
+}
+function ejCfgCerrar() { var m = document.getElementById('ej-cfg-modal'); if (m) m.remove(); }
+function ejCfgAbrir() {
+    ejCfgCerrar();
+    var m = document.createElement('div');
+    m.id = 'ej-cfg-modal';
+    m.onclick = function (e) { if (e.target === m) ejCfgCerrar(); };
+    document.body.appendChild(m);
+    ejCfgPintar();
+}
+function ejCfgHacer(fn, arg) {
+    window[fn](arg);
+    var caja = document.querySelector('#ej-cfg-modal .ej-cfg-cuerpo');
+    var sc = caja ? caja.scrollTop : 0;
+    ejCfgPintar();
+    caja = document.querySelector('#ej-cfg-modal .ej-cfg-cuerpo');
+    if (caja) caja.scrollTop = sc;
+}
+function ejCfgPintar() {
+    var m = document.getElementById('ej-cfg-modal');
+    if (!m) return;
+    var club = ejCfgClub();
+    var muestras = function (actual, fn, rayas) {
+        return '<div class="ej-cfg-cols">' + Object.keys(EJ_TEAM_COLORS).filter(function (k) { return rayas || !EJ_TEAM_COLORS[k].striped; }).map(function (k) {
+            var c = EJ_TEAM_COLORS[k];
+            var bg = c.striped ? 'repeating-linear-gradient(90deg,' + c.fill + ' 0 5px,' + (c.fill2 || '#fff') + ' 5px 10px)' : c.fill;
+            return '<button type="button" class="' + (actual === k ? 'on' : '') + '" style="background:' + bg + '" title="' + c.name + '" onclick="ejCfgHacer(\'' + fn + '\',\'' + k + '\')"></button>';
+        }).join('') + '</div>';
+    };
+    var cesped = ['#1a6b30', '#1a8540', '#2d8a4e', '#0f4c2a', '#1e3a5f', '#0a1628', '#2c2c2c', '#ffffff'];
+    var propio = !!ejFondoDef().color;
+    var est = ejP.fichaEstilo || 'foto', lab = ejP._plantillaLabel || 'both';
+    if (lab === 'nofoto') lab = 'both';
+    var op = function (v, t, act, fn) { return '<button type="button" class="' + (act === v ? 'on' : '') + '" onclick="ejCfgHacer(\'' + fn + '\',\'' + v + '\')">' + t + '</button>'; };
+    var h = '<div class="ej-cfg-caja">'
+        + '<div class="ej-jm-cab"><strong>Configuración de la pizarra</strong><button type="button" class="ej-jm-x" onclick="ejCfgCerrar()" title="Cerrar">✕</button></div>'
+        + '<div class="ej-cfg-cuerpo">'
+        + '<h4>Campo</h4><div class="ej-cfg-l">Fondo</div>' + ejFondoMiniaturas('ejCfgHacer(\'ejSetFondo\',\'$k\')')
+        + '<div class="ej-cfg-l">Color del césped' + (propio ? ' <em>(este fondo trae el suyo)</em>' : '') + '</div><div class="ej-cfg-cols redondo' + (propio ? ' off' : '') + '">'
+        + cesped.map(function (c) { return '<button type="button" class="' + (!propio && ejP.fieldColor === c ? 'on' : '') + '" style="background:' + c + '" onclick="ejCfgHacer(\'ejSetFieldColor\',\'' + c + '\')"></button>'; }).join('') + '</div>'
+        + '<h4>Escudo en el círculo central</h4>';
+    if (club && club.logo_url) {
+        h += '<label class="ej-cfg-chk"><input type="checkbox"' + (ejP.escudo.ver ? ' checked' : '') + ' onchange="ejCfgEscudo(\'ver\', this.checked)"> Mostrar el escudo del club</label>'
+            + '<div class="ej-cfg-rango"><span>Opacidad</span><input type="range" min="0.05" max="0.8" step="0.01" value="' + ejP.escudo.op + '" oninput="ejCfgEscudo(\'op\', this.value)"><b id="ej-cfg-op">' + Math.round(ejP.escudo.op * 100) + ' %</b></div>'
+            + '<div class="ej-cfg-rango"><span>Tamaño</span><input type="range" min="0.4" max="1.8" step="0.02" value="' + ejP.escudo.tam + '" oninput="ejCfgEscudo(\'tam\', this.value)"><b id="ej-cfg-tam">' + Math.round(ejP.escudo.tam * 100) + ' %</b></div>'
+            + '<div class="ej-cfg-nota">Se ve en el campo completo y en el artificial.</div>';
+    } else {
+        h += '<div class="ej-cfg-nota">Tu club todavía no tiene escudo. Súbelo en Mi Club y aparecerá aquí.</div>';
+    }
+    h += '<h4>Equipación</h4>'
+        + '<div class="ej-cfg-l">Mi equipo</div>' + muestras(ejP.myColor, 'ejSetMyColor', true)
+        + '<div class="ej-cfg-l">Mi portero</div>' + muestras(ejP.myGkColor, 'ejSetMyGkColor', false)
+        + '<div class="ej-cfg-l">Rival</div>' + muestras(ejP.rivalColor, 'ejSetRivalColor', true)
+        + '<div class="ej-cfg-l">Portero rival</div>' + muestras(ejP.rivalGkColor, 'ejSetRivalGkColor', false)
+        + '<h4>Fichas</h4>'
+        + '<div class="ej-cfg-l">Formato</div><div class="ej-cfg-seg">' + op('foto', 'Foto', est, 'ejFichaEstilo') + op('circulo', 'Círculo', est, 'ejFichaEstilo') + op('camiseta', 'Camiseta', est, 'ejFichaEstilo') + '</div>'
+        + '<div class="ej-cfg-l">Datos</div><div class="ej-cfg-seg">' + op('num', 'Dorsal', lab, 'ejJugDatos') + op('name', 'Nombre', lab, 'ejJugDatos') + op('both', 'Los dos', lab, 'ejJugDatos') + op('solotexto', 'Solo texto', lab, 'ejJugDatos') + '</div>'
+        + '<div class="ej-cfg-l">Tamaño al colocar</div><div class="ej-cfg-seg">' + op('small', 'Pequeña', ejP.selectedSize, 'ejSetSize') + op('medium', 'Mediana', ejP.selectedSize, 'ejSetSize') + op('large', 'Grande', ejP.selectedSize, 'ejSetSize') + '</div>'
+        + '</div>'
+        + '<div class="ej-jm-pie"><span>Los cambios se ven al momento. Guárdalos para que la pizarra abra siempre así.</span>'
+        + '<button type="button" class="ej-jm-ok" onclick="ejCfgGuardar()">Guardar para el club</button></div></div>';
+    m.innerHTML = h;
+}
+async function ejCfgGuardar() {
+    var club = ejCfgClub();
+    var id = club ? club.id : (typeof clubId !== 'undefined' ? clubId : null);
+    if (!id) { ejToast('No se ha podido identificar el club.', 'error'); return; }
+    var cfg = ejCfgActual();
+    var r = await supabaseClient.from('clubs').update({ pizarra_config: cfg }).eq('id', id);
+    if (r && r.error) { console.error('pizarra_config:', r.error); ejToast('No se ha podido guardar la configuración. Revisa que la columna pizarra_config exista.', 'error'); return; }
+    if (club) club.pizarra_config = cfg;
+    ejToast('Configuración guardada para el club', 'success');
+    ejCfgCerrar();
+}
 (function () {
     var renderToolbarOriginal = ejRenderToolbar;
     ejRenderToolbar = function () {
         // Sin pregunta inicial: si la pizarra espera a que se elija modo, se abre en estático
         var ov = document.getElementById('ej-modo-overlay');
-        if (ov && ov.style.display !== 'none') { ejElegirModo('estatico'); return; }
+        if (ov && ov.style.display !== 'none') { ejCfgAplicar(); ejElegirModo('estatico'); return; }
         if (ejP.activeTool !== 'player') ejP._tareaColor = null;
         if (ejP._apariencia === undefined) ejP._apariencia = true;
         renderToolbarOriginal();
