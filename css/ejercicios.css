@@ -199,8 +199,8 @@
 .ej-sec-campo { background:#143a22 !important; border-left-color:#22c55e !important; border-left-width:6px !important; }
 .ej-sec-campo.open { background:#1a5230 !important; }
 .ej-sec-campo.open + .ej-section-body { border-left:3px solid #22c55e; }
-/* ===== REDISEÑO PIZARRA · Entregas 1 y 2 (solo pantallas de más de 900 px) ===== */
-@media (min-width: 901px) {
+/* ===== REDISEÑO PIZARRA · Entregas 1 y 2 (pantallas de 600 px de ancho en adelante) ===== */
+@media (min-width: 600px) {
   /* -- 1. Plegar el HUB al entrar en la pizarra -- */
   body:has(#modulo-pizarra.active):not(.tlc-hub-abierto) .app-header,
   body:has(#modulo-pizarra.active):not(.tlc-hub-abierto) .main-tabs,
@@ -343,6 +343,17 @@
 .ej-cfg-kits button { margin-left: auto; padding: 7px 10px; border-radius: 7px; border: 1px solid #94a3b8; background: #fff; color: #0f172a; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; }
 .ej-eq-nota { font-size: 11px; color: #94a3b8; line-height: 1.35; margin-bottom: 8px; }
 .ej-eq-nota button { display: block; margin-top: 6px; padding: 5px 9px; border-radius: 6px; border: 1px solid #2f405c; background: #1c2638; color: #e2e8f0; font-size: 11px; font-weight: 600; cursor: pointer; }
+/* Ventana de formaciones */
+#ej-form-modal { position: fixed; inset: 0; z-index: 99990; background: rgba(2,6,23,.72); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.ej-fm-caja { max-width: 860px; }
+.ej-fm-tabs { display: flex; gap: 6px; padding: 10px 16px 0; }
+.ej-fm-tabs button { padding: 6px 12px; border-radius: 8px; border: 1px solid #2f405c; background: transparent; color: #94a3b8; font-size: 12px; font-weight: 600; cursor: pointer; }
+.ej-fm-tabs button.on { background: #1d4ed8; border-color: #3b82f6; color: #fff; }
+.ej-fm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; padding-top: 10px; }
+.ej-fm-card { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 8px 9px; background: #1e293b; border: 2px solid transparent; border-radius: 12px; color: #e2e8f0; cursor: pointer; font-family: inherit; }
+.ej-fm-card:hover { border-color: #22c55e; background: #14532d; }
+.ej-fm-card svg { width: 100%; height: auto; display: block; border-radius: 6px; }
+.ej-fm-card b { font-size: 14px; font-weight: 700; letter-spacing: .5px; }
 /* Fondos de campo */
 .ej-fondos-t { font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: .5px; margin: 8px 0 4px; }
 .ej-fondos { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }
@@ -390,7 +401,7 @@
 .ej-jb-est button { width: 27px; height: 24px; padding: 0; border: none; border-radius: 6px; background: transparent; color: #94a3b8; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .ej-jb-est button.on { background: #334155; color: #fff; }
 .ej-jb-a.on { background: #1d4ed8; border-color: #3b82f6; color: #fff; }
-@media (max-width: 900px) { #ej-jugbar { display: none; } }
+@media (max-width: 599px) { #ej-jugbar { display: none; } }
 @media (max-width: 1500px) {
   #ej-jugbar { margin-left: 6px; padding-left: 8px; gap: 5px; }
   .ej-jb-txt { display: none; }
@@ -425,4 +436,60 @@
 /* El campo no es texto seleccionable: sin esto, arrastrar para dibujar inicia una seleccion de texto y el navegador corta el trazo */
 #ej-canvas-area, #ej-canvas-area svg { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 .ej-hub-btn { padding: 7px 12px !important; font-size: 15px !important; line-height: 1; }
-@media (max-width: 900px) { .ej-hub-btn { display: none; } }
+@media (max-width: 599px) { .ej-hub-btn { display: none; } }
+/* ============================================================
+   Tablet en vertical: el campo arriba a todo el ancho y las
+   herramientas debajo, con botones grandes y con su nombre.
+   ============================================================ */
+@media (min-width: 600px) and (max-width: 900px) and (orientation: portrait) {
+  .ej-nav { flex-wrap: wrap; row-gap: 6px; }
+  #ej-jugbar { order: 10; flex: 1 0 100%; height: 34px; margin: 0; padding: 0 0 2px; border-left: none; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+  #ej-jugbar::-webkit-scrollbar { display: none; }
+  #ej-jugbar > * { flex: none; }
+  .ej-jb-dots { display: flex; }
+  #ej-pizarra-topbar { top: -89px; }
+  #ej-pizarra-wrap { flex-direction: column-reverse; align-items: stretch; gap: 8px; }
+  #ej-pizarra-wrap > div:first-child { width: 100%; }
+  #ej-pizarra-wrap #ej-canvas-area { width: 100%; box-sizing: border-box; }
+  #ej-pizarra-wrap #ej-canvas-area { flex-direction: column; align-items: stretch; margin-left: 0 !important; }
+  #ej-canvas-area > svg { flex: none; width: 100% !important; max-height: none !important; }
+  /* fotogramas: una fila bajo el campo */
+  #ej-pizarra-wrap #ej-timeline-bar { position: static; width: 100%; max-height: none; overflow: visible; padding: 6px 8px; }
+  #ej-timeline-bar > div:first-child { flex-direction: row; flex-wrap: wrap !important; align-items: center !important; }
+  #ej-timeline-bar > div:first-child > div { flex-direction: row; align-items: center !important; }
+  #ej-timeline-bar > div:first-child > div:nth-child(2) { max-height: none; overflow-x: auto !important; overflow-y: hidden !important; }
+  #ej-timeline-bar button { width: auto; padding: 8px 10px !important; white-space: nowrap; }
+  /* herramientas: fila de botones con icono y nombre */
+  #ej-toolbar { width: 100%; min-width: 0; flex-direction: row; flex-wrap: wrap; align-items: flex-start; gap: 5px; padding: 8px; }
+  #ej-toolbar > .ej-btn-tool,
+  #ej-toolbar > .ej-section-header,
+  #ej-toolbar > .ej-anim-btn,
+  #ej-toolbar > div:not(.ej-section-body) > button[onclick] { width: calc((100vw - 112px) / 12) !important; height: 56px; flex-direction: column; gap: 4px; margin: 0 !important; }
+  #ej-toolbar > .ej-btn-tool { --ej-t: "Seleccionar"; }
+  #ej-toolbar > div > button[onclick="ejUndo()"] { --ej-t: "Deshacer"; }
+  #ej-toolbar > div > button[onclick="ejRedo()"] { --ej-t: "Rehacer"; }
+  #ej-toolbar > .ej-anim-btn { --ej-t: "Animar"; }
+  #ej-toolbar > .ej-anim-btn.on { --ej-t: "Quitar anim."; }
+  #ej-toolbar > div > button[onclick="ejCapturarParaFicha()"] { --ej-t: "Guardar"; }
+  #ej-toolbar > div > button[onclick="ejExportPNG()"] { --ej-t: "PNG"; }
+  #ej-toolbar > div > button[onclick="ejMontajeAbrir()"] { --ej-t: "Montaje"; }
+  #ej-toolbar > div > button[onclick="ejDelete()"] { --ej-t: "Borrar"; }
+  #ej-toolbar > .ej-btn-tool::after,
+  #ej-toolbar > .ej-section-header::after,
+  #ej-toolbar > .ej-anim-btn::after,
+  #ej-toolbar > div:not(.ej-section-body) > button[onclick]::after,
+  #ej-toolbar > .ej-section-header:hover::after,
+  #ej-toolbar > .ej-anim-btn:hover::after,
+  #ej-toolbar > div:not(.ej-section-body) > button[onclick]:not([title]):hover::after {
+    content: var(--ej-t); position: static; transform: none; display: block; background: none; border: none; padding: 0;
+    box-shadow: none; font-size: 9px; font-weight: 600; line-height: 1; color: inherit; white-space: nowrap; pointer-events: none;
+  }
+  #ej-toolbar > div:has(> button[onclick="ejUndo()"]) { flex-direction: row; gap: 5px !important; }
+  #ej-toolbar > div:has(> button[onclick="ejExportPNG()"]) { display: flex !important; flex-direction: row !important; width: auto !important; gap: 5px !important; margin: 0 !important; padding: 0 0 0 5px; border-top: none; border-left: 1px solid #2f405c; }
+  #ej-toolbar > .ej-anim-btn { margin-top: 0 !important; }
+  /* el panel de la sección abierta va debajo de los botones, a todo el ancho: no toca el campo */
+  #ej-pizarra-wrap #ej-toolbar > .ej-section-body { position: static; order: 50; flex: 1 0 100%; width: 100%; max-height: 46vh; box-shadow: none; }
+  #ej-toolbar > .ej-section-body .ej-fondos { grid-template-columns: repeat(6, 1fr); }
+  #ej-toolbar > .ej-section-body .ej-equipment-grid { grid-template-columns: repeat(8, 1fr); }
+  .ej-cfg-caja { top: auto; left: 10px; right: 10px; bottom: 10px; width: auto; max-height: 58vh; }
+}
