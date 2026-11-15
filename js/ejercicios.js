@@ -533,8 +533,9 @@ if (ejP.animMode && !ejP._exporting && ejP.currentFrame > 0) {
     if (prevF) {
         for (const fp of prevF.players) {
             const cur = ejP.players.find(p => p.id === fp.id);
-            if (cur && (Math.abs(cur.x - fp.x) > 3 || Math.abs(cur.y - fp.y) > 3)) {
-                html += `<circle cx="${fp.x}" cy="${fp.y}" r="14" fill="none" stroke="#facc15" stroke-width="1.5" stroke-dasharray="3 3" opacity="0.25"/>`;
+            const movido = cur && (Math.abs(cur.x - fp.x) > 3 || Math.abs(cur.y - fp.y) > 3);
+            if (movido || (cur && ejP.isPlaying)) {
+                html += `<circle${ejP.isPlaying ? ` data-fant="${fp.id}"` : ''} cx="${fp.x}" cy="${fp.y}" r="14" fill="none" stroke="#facc15" stroke-width="1.5" stroke-dasharray="3 3" opacity="0.25"${movido ? '' : ' style="display:none"'}/>`;
             }
         }
     }
@@ -4356,6 +4357,7 @@ function ejFramePlay(fromFrame) {
         ejP.currentFrame = startIdx;
     }
     ejP.isPlaying = true;
+    ejP._animDom = null;
     ejP._animFrame = ejP.currentFrame;
     ejP._animProgress = 0;
     ejP._globalProgress = ejP.currentFrame; // progreso global continuo
@@ -4366,6 +4368,7 @@ function ejFramePlay(fromFrame) {
 
 function ejFrameStop() {
     ejP.isPlaying = false;
+    ejP._animDom = null;
     ejP._globalProgress = 0;
     if (ejP._animId) {
         cancelAnimationFrame(ejP._animId);
@@ -4507,9 +4510,71 @@ function ejFrameAnimate(now) {
         ejInterpolateElem(fA.equipment[i].id, fA, fB, frac, seg, 'equipment');
     }
 
-    ejRenderSVG();
-    ejRenderTimeline();
+    // Solo se redibuja la pizarra al cambiar de tramo; dentro del tramo se mueven las fichas ya dibujadas
+    if (!ejAnimMover(seg)) {
+        ejRenderSVG();
+        ejRenderTimeline();
+        ejAnimPreparar(seg);
+    }
     ejP._animId = requestAnimationFrame(ejFrameAnimate);
+}
+
+// Reproducción fluida: tras dibujar la pizarra una vez por tramo, se guardan las piezas que se mueven
+// (fichas, material, uniones y marcas de posición anterior) para desplazarlas sin volver a dibujarlo todo.
+function ejAnimPreparar(seg) {
+    const svg = document.getElementById('ej-svg');
+    ejP._animDom = null;
+    if (!svg) return;
+    const d = { seg: seg, svg: svg, jug: [], mat: [], uni: [], fant: [] };
+    ejP.players.forEach(function (p) {
+        const g = svg.querySelector('g[data-type="player"][data-id="' + p.id + '"]');
+        if (g) d.jug.push({ p: p, g: g, x: p.x, y: p.y });
+    });
+    ejP.equipment.forEach(function (q) {
+        const g = svg.querySelector('g[data-type="equipment"][data-id="' + q.id + '"]');
+        if (g) d.mat.push({ q: q, g: g, x0: q.x, y0: q.y, x: q.x, y: q.y, base: g.getAttribute('transform') || '' });
+    });
+    ejP.connections.forEach(function (c) {
+        const g = svg.querySelector('g[data-type="connection"][data-id="' + c.id + '"]');
+        const a = ejP.players.find(function (p) { return p.id === c.from; });
+        const b = ejP.players.find(function (p) { return p.id === c.to; });
+        if (g && a && b) d.uni.push({ a: a, b: b, lineas: g.querySelectorAll('line') });
+    });
+    svg.querySelectorAll('circle[data-fant]').forEach(function (c) {
+        const id = c.getAttribute('data-fant');
+        const p = ejP.players.find(function (x) { return String(x.id) === id; });
+        if (p) d.fant.push({ p: p, c: c, x: parseFloat(c.getAttribute('cx')), y: parseFloat(c.getAttribute('cy')), ver: c.style.display !== 'none' });
+    });
+    d.centinela = svg.firstElementChild;
+    ejP._animDom = d;
+}
+function ejAnimMover(seg) {
+    const d = ejP._animDom;
+    // Si ha cambiado el tramo o alguien ha redibujado la pizarra, hay que volver a prepararla
+    if (!d || d.seg !== seg || !d.centinela || !d.centinela.isConnected || d.svg.firstElementChild !== d.centinela
+        || d.jug.length !== ejP.players.length || d.mat.length !== ejP.equipment.length) return false;
+    var i, o;
+    for (i = 0; i < d.jug.length; i++) {
+        o = d.jug[i];
+        if (o.p.x !== o.x || o.p.y !== o.y) { o.x = o.p.x; o.y = o.p.y; o.g.setAttribute('transform', 'translate(' + o.x + ',' + o.y + ')'); }
+    }
+    for (i = 0; i < d.mat.length; i++) {
+        o = d.mat[i];
+        if (o.q.x !== o.x || o.q.y !== o.y) { o.x = o.q.x; o.y = o.q.y; o.g.setAttribute('transform', 'translate(' + (o.x - o.x0) + ',' + (o.y - o.y0) + ') ' + o.base); }
+    }
+    for (i = 0; i < d.uni.length; i++) {
+        o = d.uni[i];
+        for (var k = 0; k < o.lineas.length; k++) {
+            var ln = o.lineas[k];
+            ln.setAttribute('x1', o.a.x); ln.setAttribute('y1', o.a.y); ln.setAttribute('x2', o.b.x); ln.setAttribute('y2', o.b.y);
+        }
+    }
+    for (i = 0; i < d.fant.length; i++) {
+        o = d.fant[i];
+        var ver = Math.abs(o.p.x - o.x) > 3 || Math.abs(o.p.y - o.y) > 3;
+        if (ver !== o.ver) { o.ver = ver; o.c.style.display = ver ? '' : 'none'; }
+    }
+    return true;
 }
 
 function ejFrameSetSpeed(ms) {
@@ -4567,7 +4632,8 @@ function ejRenderTimeline() {
             <button onclick="ejFrameSetSpeed(400)" style="background:${ejP.playSpeed<800?'#1e3a5f':'#0f172a'};border:1px solid #334155;color:#9ca3af;padding:3px 6px;border-radius:4px;cursor:pointer;font-size:10px">2x</button>
         </div>
         <span style="color:#64748b;font-size:11px;white-space:nowrap">Frame ${cur+1}/${total}</span>
-        ${ejEditandoId ? `<button onclick="ejGuardarYExportar()" style="background:#22c55e;border:none;color:#fff;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600">${ejP._exportingVideo ? '⏳ Generando...' : '💾 Guardar cambios'}</button>` : `<button onclick="ejExportarAnimacionMP4()" style="background:#f97316;border:none;color:#fff;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600">${ejP._exportingVideo ? '⏳ Generando...' : '🎬 MP4'}</button>`}
+        <button onclick="ejVideoAbrir()" title="Descargar la animación como vídeo MP4" style="background:#f97316;border:none;color:#fff;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600" ${total<2?'disabled':''}>⬇ Vídeo</button>
+        ${ejEditandoId ? `<button onclick="ejGuardarYExportar()" style="background:#22c55e;border:none;color:#fff;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600">${ejP._exportingVideo ? '⏳ Generando...' : '💾 Guardar cambios'}</button>` : ''}
     </div>
     <div id="ej-anim-msg" style="font-size:11px;color:#9ca3af;margin-top:4px;text-align:center">${ejP._exportingVideo ? '⏳ Generando vídeo... (no toques nada)' : ejP._lastVideoUrl ? '<span style="color:#22c55e">✅ Vídeo MP4 guardado</span> — <a href="'+ejP._lastVideoUrl+'" target="_blank" style="color:#93c5fd;text-decoration:underline">Ver vídeo ▶</a> · <a href="https://toplidercoach.com/wp-content/uploads/ejercicios/download-video.php?url='+encodeURIComponent(ejP._lastVideoUrl)+'" target="_blank" style="color:#f97316;text-decoration:underline">📥 Descargar</a>' : ''}</div>`;
 }
@@ -6470,3 +6536,172 @@ function ejBarrasSync() {
     if (ejP._jugModalPend && ejP._plantilla && ejP._plantilla.length && !!ejP._plantillaEsRival === !!ejP._addingRival) { ejP._jugModalPend = false; ejJugModalAbrir(); }
 }
 window.addEventListener('resize', function () { ejPanelHueco(); ejObjBar(); });
+
+// =====================================================================
+// PIZARRA · VÍDEO DE LA ANIMACIÓN
+// El MP4 se fabrica en el navegador imagen a imagen (cada una en su instante
+// exacto), sin grabar la pantalla y sin pasar por el servidor. Se puede
+// descargar sin tener el ejercicio guardado.
+// Usa js/tlc-video.min.js (Mediabunny), que solo se carga al exportar.
+// =====================================================================
+var EJ_VIDEO_FORMATOS = {
+    horizontal: { w: 1920, h: 1080, n: 'Horizontal', d: '1920 × 1080 · para proyectar o mandar por WhatsApp' },
+    vertical:   { w: 1080, h: 1920, n: 'Vertical', d: '1080 × 1920 · para historias y reels' }
+};
+var EJ_VIDEO_FPS = 30;
+function ejVideoLib() {
+    if (window.TLCVideo) return Promise.resolve(window.TLCVideo);
+    if (ejP._videoLibProm) return ejP._videoLibProm;
+    ejP._videoLibProm = new Promise(function (ok, mal) {
+        var s = document.createElement('script');
+        s.src = 'js/tlc-video.min.js';
+        s.onload = function () { window.TLCVideo ? ok(window.TLCVideo) : mal(new Error('La librería de vídeo no se ha cargado bien')); };
+        s.onerror = function () { ejP._videoLibProm = null; mal(new Error('No se ha podido cargar js/tlc-video.min.js')); };
+        document.head.appendChild(s);
+    });
+    return ejP._videoLibProm;
+}
+function ejVideoCaja(html) {
+    ejVideoCerrar();
+    var m = document.createElement('div');
+    m.id = 'ej-video-modal';
+    m.style.cssText = 'position:fixed;inset:0;z-index:99990;background:rgba(2,6,23,.72);display:flex;align-items:center;justify-content:center;padding:12px';
+    m.innerHTML = '<div style="background:#111a2b;border:1px solid #2f405c;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.6);width:460px;max-width:100%;max-height:96vh;overflow:auto;padding:18px 20px;color:#e2e8f0;font-family:system-ui,sans-serif">' + html + '</div>';
+    document.body.appendChild(m);
+    return m;
+}
+function ejVideoCerrar() {
+    var m = document.getElementById('ej-video-modal');
+    if (m) m.remove();
+    if (ejP._videoUrlLocal) { URL.revokeObjectURL(ejP._videoUrlLocal); ejP._videoUrlLocal = null; }
+}
+function ejVideoAbrir() {
+    if (ejP._videoHaciendo) return;
+    if (!ejP.animMode || ejP.frames.length < 2) { ejToast('Para sacar un vídeo hacen falta al menos 2 fotogramas.', 'warning'); return; }
+    var tarjetas = Object.keys(EJ_VIDEO_FORMATOS).map(function (k) {
+        var f = EJ_VIDEO_FORMATOS[k], vert = f.h > f.w;
+        return '<button type="button" onclick="ejVideoExportar(\'' + k + '\')" style="display:flex;align-items:center;gap:14px;width:100%;text-align:left;background:#0b1220;border:1px solid #2f405c;border-radius:10px;padding:12px 14px;color:#e2e8f0;cursor:pointer;margin-top:8px">'
+            + '<span style="flex:none;display:block;width:' + (vert ? 20 : 34) + 'px;height:' + (vert ? 34 : 20) + 'px;border:2px solid #93c5fd;border-radius:4px;margin:0 ' + (vert ? 7 : 0) + 'px"></span>'
+            + '<span><b style="display:block;font-size:14px">' + f.n + '</b><span style="font-size:12px;color:#94a3b8">' + f.d + '</span></span></button>';
+    }).join('');
+    ejVideoCaja('<div style="display:flex;align-items:center;justify-content:space-between"><b style="font-size:16px">Descargar vídeo</b>'
+        + '<button type="button" onclick="ejVideoCerrar()" style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;line-height:1">✕</button></div>'
+        + '<div style="font-size:12px;color:#94a3b8;margin-top:4px">' + ejP.frames.length + ' fotogramas. No hace falta guardar el ejercicio.</div>' + tarjetas);
+}
+// Coloca fichas y material en un punto de la animación: t va de 0 (primer fotograma) a 1 (último).
+// Mismo movimiento que la reproducción: arranca y frena suave, y entre medias va a velocidad constante.
+function ejAnimPosicionar(t) {
+    var totalSegs = ejP.frames.length - 1, zona = 0.15, s, l;
+    t = Math.max(0, Math.min(1, t));
+    if (t < zona) { l = t / zona; s = zona * (l * l * (3 - 2 * l)); }
+    else if (t > 1 - zona) { l = (t - (1 - zona)) / zona; s = (1 - zona) + zona * (l * l * (3 - 2 * l)); }
+    else s = t;
+    var pos = s * totalSegs, seg = Math.min(Math.floor(pos), totalSegs - 1), frac = pos - seg;
+    var fA = ejP.frames[seg], fB = ejP.frames[seg + 1], i;
+    for (i = 0; i < fA.players.length; i++) ejInterpolateElem(fA.players[i].id, fA, fB, frac, seg, 'player');
+    for (i = 0; i < fA.equipment.length; i++) ejInterpolateElem(fA.equipment[i].id, fA, fB, frac, seg, 'equipment');
+    ejP.currentFrame = seg;
+}
+function ejVideoNombre() {
+    var lbl = document.getElementById('ej-pizarra-nombre-label');
+    var n = (lbl && lbl.textContent && lbl.textContent !== 'Pizarra libre') ? lbl.textContent : 'animacion';
+    n = n.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '').toLowerCase();
+    return (n || 'animacion') + '.mp4';
+}
+function ejVideoCancelar() { ejP._videoCancelar = true; }
+async function ejVideoExportar(formato) {
+    var f = EJ_VIDEO_FORMATOS[formato];
+    if (!f || ejP._videoHaciendo) return;
+    if (!ejP.animMode || ejP.frames.length < 2) { ejVideoCerrar(); return; }
+    ejP._videoHaciendo = true; ejP._videoCancelar = false;
+    ejVideoCaja('<b style="font-size:16px">Creando el vídeo…</b>'
+        + '<div style="height:10px;background:#0b1220;border:1px solid #2f405c;border-radius:6px;margin-top:14px;overflow:hidden"><div id="ej-video-barra" style="height:100%;width:0%;background:#22c55e;transition:width .15s linear"></div></div>'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px"><span id="ej-video-txt" style="font-size:12px;color:#94a3b8">Preparando…</span>'
+        + '<button type="button" onclick="ejVideoCancelar()" style="background:#0b1220;border:1px solid #2f405c;color:#e2e8f0;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:13px">Cancelar</button></div>');
+    var estado = null, salida = null, blob = null, fallo = null;
+    try {
+        var M = await ejVideoLib();
+        if (typeof VideoEncoder === 'undefined' || !(await M.canEncodeVideo('avc', { width: f.w, height: f.h }))) {
+            throw new Error('Este navegador no puede crear el vídeo. Prueba con Chrome o Edge actualizados.');
+        }
+        if (ejP.isPlaying) ejFrameStop();
+        ejFrameSaveCurrent();
+        await ejPrecargarFotosJugadores();
+        estado = { frame: ejP.currentFrame, sel: ejP.selectedId, tipo: ejP.selectedType, multi: ejP.multiSel, exp: ejP._exporting };
+        ejP.selectedId = null; ejP.multiSel = []; ejP._exporting = true; ejP._animDom = null;
+
+        var svg = document.getElementById('ej-svg');
+        var lienzo = document.createElement('canvas');
+        lienzo.width = f.w; lienzo.height = f.h;
+        var ctx = lienzo.getContext('2d');
+        var fondo = ejFondoColor(); if (fondo === 'grid') fondo = '#fbfcfe';
+        // El campo entra entero, centrado, sin deformarse
+        var esc = Math.min(f.w / ejP.svgW, f.h / ejP.svgH);
+        var dw = Math.round(ejP.svgW * esc), dh = Math.round(ejP.svgH * esc), dx = Math.round((f.w - dw) / 2), dy = Math.round((f.h - dh) / 2);
+        var pintar = async function () {
+            ejRenderSVG();
+            var copia = svg.cloneNode(true);
+            copia.setAttribute('width', dw); copia.setAttribute('height', dh);
+            copia.removeAttribute('style');
+            var img = new Image();
+            img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(new XMLSerializer().serializeToString(copia));
+            await img.decode();
+            ctx.fillStyle = fondo; ctx.fillRect(0, 0, f.w, f.h);
+            ctx.drawImage(img, dx, dy, dw, dh);
+        };
+
+        salida = new M.Output({ format: new M.Mp4OutputFormat(), target: new M.BufferTarget() });
+        var fuente = new M.CanvasSource(lienzo, { codec: 'avc', bitrate: 8e6 });
+        salida.addVideoTrack(fuente, { frameRate: EJ_VIDEO_FPS });
+        await salida.start();
+
+        // Medio segundo quieto al principio, el movimiento, y casi un segundo quieto al final
+        var segs = ejP.frames.length - 1;
+        var nIni = Math.round(0.5 * EJ_VIDEO_FPS), nFin = Math.round(0.8 * EJ_VIDEO_FPS);
+        var nMov = Math.max(2, Math.round(segs * (ejP.playSpeed * 1.2 / 1000) * EJ_VIDEO_FPS));
+        var total = nIni + nMov + nFin, barra = document.getElementById('ej-video-barra'), txt = document.getElementById('ej-video-txt');
+        for (var i = 0; i < total; i++) {
+            if (ejP._videoCancelar) break;
+            var quieto = (i > 0 && i < nIni) || i > nIni + nMov;      // misma imagen que la anterior: no hace falta repintar
+            if (!quieto) { ejAnimPosicionar(i < nIni ? 0 : Math.min(1, (i - nIni) / nMov)); await pintar(); }
+            await fuente.add(i / EJ_VIDEO_FPS, 1 / EJ_VIDEO_FPS);
+            if (i % 3 === 0 || i === total - 1) {
+                var pc = Math.round((i + 1) / total * 100);
+                if (barra) barra.style.width = pc + '%';
+                if (txt) txt.textContent = pc + ' %';
+            }
+        }
+        if (ejP._videoCancelar) { await salida.cancel(); }
+        else { await salida.finalize(); blob = new Blob([salida.target.buffer], { type: 'video/mp4' }); }
+    } catch (e) {
+        console.error('ejVideoExportar:', e);
+        fallo = e;
+        try { if (salida && salida.state !== 'finalized' && salida.state !== 'canceled') await salida.cancel(); } catch (e2) {}
+    }
+    // La pizarra vuelve a como estaba
+    if (estado) {
+        ejP._exporting = estado.exp || false;
+        ejP.currentFrame = Math.min(estado.frame, ejP.frames.length - 1);
+        ejFrameRestore(ejP.frames[ejP.currentFrame]);
+        ejP.selectedId = estado.sel; ejP.selectedType = estado.tipo; ejP.multiSel = estado.multi || [];
+        ejRenderSVG(); ejRenderTimeline();
+    }
+    ejP._videoHaciendo = false;
+    if (fallo) {
+        ejVideoCaja('<b style="font-size:16px">No se ha podido crear el vídeo</b><div style="font-size:13px;color:#fca5a5;margin-top:8px">' + ejEscXml(fallo.message || String(fallo)) + '</div>'
+            + '<div style="text-align:right;margin-top:14px"><button type="button" onclick="ejVideoCerrar()" style="background:#0b1220;border:1px solid #2f405c;color:#e2e8f0;border-radius:8px;padding:7px 16px;cursor:pointer">Cerrar</button></div>');
+        return;
+    }
+    if (!blob) { ejVideoCerrar(); ejToast('Vídeo cancelado.', 'info'); return; }
+    var nombre = ejVideoNombre();
+    ejVideoCaja('<div style="display:flex;align-items:center;justify-content:space-between"><b style="font-size:16px">Vídeo listo</b>'
+        + '<button type="button" onclick="ejVideoCerrar()" style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;line-height:1">✕</button></div>'
+        + '<video id="ej-video-previa" controls autoplay loop muted playsinline style="display:block;width:100%;max-height:56vh;background:#000;border-radius:8px;margin-top:10px"></video>'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px"><span style="font-size:12px;color:#94a3b8">' + f.n + ' · ' + (blob.size / 1048576).toFixed(1) + ' MB</span>'
+        + '<a id="ej-video-bajar" download="' + nombre + '" style="background:#22c55e;color:#04210f;font-weight:700;border-radius:8px;padding:8px 18px;text-decoration:none;font-size:14px">⬇ Descargar</a></div>');
+    ejP._videoUrlLocal = URL.createObjectURL(blob);
+    document.getElementById('ej-video-previa').src = ejP._videoUrlLocal;
+    var a = document.getElementById('ej-video-bajar');
+    a.href = ejP._videoUrlLocal;
+    a.click();
+}
