@@ -279,6 +279,17 @@
     z-index: 6; box-shadow: 0 10px 30px rgba(0,0,0,.35);
   }
   #ej-pizarra-wrap:has(#ej-toolbar > .ej-section-body) #ej-canvas-area { margin-left: 308px; }
+  /* Si hay hueco de césped detrás de la portería, el panel se abre ahí encima y el campo no se mueve */
+  #ej-pizarra-wrap.ej-panel-encima:has(#ej-toolbar > .ej-section-body) #ej-canvas-area { margin-left: 0; }
+  #ej-pizarra-wrap.ej-panel-encima #ej-toolbar > .ej-section-body { width: var(--ej-hueco, 180px); box-sizing: border-box; overflow-x: hidden; padding: 8px; z-index: 12; box-shadow: 0 8px 24px rgba(0,0,0,.45); }
+  #ej-pizarra-wrap.ej-panel-encima #ej-toolbar > .ej-section-body * { min-width: 0; max-width: 100%; box-sizing: border-box; }
+  #ej-pizarra-wrap.ej-panel-encima #ej-toolbar > .ej-section-body div[style*="display:flex"]:not([style*="flex-direction:column"]) { flex-wrap: wrap; }
+  #ej-pizarra-wrap.ej-panel-encima #ej-toolbar > .ej-section-body .ej-field-btns { display: grid; grid-template-columns: repeat(3, 1fr); }
+  #ej-pizarra-wrap.ej-panel-encima #ej-toolbar > .ej-section-body div:not(.ej-field-btns) > .ej-btn-sm { min-width: 34px; }
+  #ej-pizarra-wrap.ej-panel-encima #ej-toolbar > .ej-section-body .ej-field-btns > .ej-btn-sm { font-size: 10px; padding: 4px 1px; }
+  #ej-pizarra-wrap.ej-panel-encima #ej-toolbar > .ej-section-body .ej-field-btns > :only-child { grid-column: 1 / -1; }
+  /* Con hueco de césped, los fotogramas también van encima del margen derecho y el campo no se mueve al animar */
+  #ej-pizarra-wrap.ej-panel-encima #ej-timeline-bar { position: absolute; right: 6px; top: 6px; z-index: 7; }
 }
 /* Sin pregunta inicial "estático o animado" */
 #ej-modo-overlay { display: none !important; }
@@ -300,6 +311,21 @@
 .ej-jb-dot.on { outline: 2px solid #22c55e; outline-offset: 2px; }
 .ej-jb-a { width: 30px; padding: 0; font-size: 14px; font-weight: 800; }
 .ej-jb-dat { width: 104px; }
+/* Opciones junto al objeto seleccionado */
+#ej-objbar { position: absolute; z-index: 9; display: none; align-items: center; gap: 2px; padding: 4px; background: #0f172a; border: 1px solid #334155; border-radius: 10px; box-shadow: 0 6px 18px rgba(0,0,0,.45); flex-wrap: wrap; max-width: 330px; }
+#ej-objbar > button { width: 32px; height: 32px; padding: 0; border: none; border-radius: 7px; background: transparent; color: #e2e8f0; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+#ej-objbar svg { width: 18px; height: 18px; max-height: none; flex: none; }
+#ej-objbar > button:hover { background: #1e293b; }
+#ej-objbar > button.ej-ob-del { color: #f87171; }
+#ej-objbar > button.ej-ob-del:hover { background: #7f1d1d; color: #fff; }
+#ej-objbar .ej-ob-col i { width: 16px; height: 16px; border-radius: 50%; border: 2px solid #e2e8f0; display: block; }
+#ej-objbar .ej-ob-col.on { background: #1e293b; }
+#ej-objbar .ej-ob-n { min-width: 22px; height: 22px; margin: 0 4px 0 2px; padding: 0 5px; border-radius: 11px; background: #22c55e; color: #052e14; font-size: 12px; font-weight: 800; display: flex; align-items: center; justify-content: center; }
+#ej-objbar .ej-ob-pal { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 5px; padding: 6px 4px 3px; border-top: 1px solid #1e293b; margin-top: 3px; }
+#ej-objbar .ej-ob-pal button { width: 20px; height: 20px; padding: 0; border-radius: 50%; border: 1px solid #64748b; cursor: pointer; }
+#ej-objdel { position: absolute; z-index: 8; display: none; align-items: center; justify-content: center; pointer-events: none; background: rgba(127,29,29,.82); color: #fecaca; font-size: 11px; font-weight: 700; letter-spacing: .3px; border-top: 1px dashed #f87171; }
+#ej-objdel.on { background: #dc2626; color: #fff; }
+#ej-toolbar > div[style*="border:1px solid #22c55e"] { display: none; }
 #ej-jug-modal { position: fixed; inset: 0; z-index: 99990; background: rgba(2,6,23,.72); display: flex; align-items: center; justify-content: center; padding: 16px; }
 .ej-jm-caja { width: 100%; max-width: 780px; max-height: 88vh; display: flex; flex-direction: column; background: #0f172a; border: 1px solid #334155; border-radius: 14px; box-shadow: 0 20px 60px rgba(0,0,0,.6); overflow: hidden; }
 .ej-jm-cab { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid #1e293b; color: #e2e8f0; font-size: 15px; }

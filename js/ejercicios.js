@@ -708,7 +708,7 @@ function ejSvgPointerDown(e) {
     ejP.selectedId = id;
     ejP.isDragging = true;
     ejP._ctrlId = null;
-    if (type === 'player') ejP.expandedSection = 'players';
+    if (!ejP._abrirPanelAlSeleccionar) { /* las opciones salen junto al objeto */ } else if (type === 'player') ejP.expandedSection = 'players';
     else if (type === 'equipment') ejP.expandedSection = 'material';
     else ejP.expandedSection = 'draw';
 
@@ -5516,7 +5516,7 @@ function ejProyPlegar() {
     if (btn) { btn.textContent = plegado ? '—' : '▢'; btn.title = plegado ? 'Plegar' : 'Desplegar'; }
 }
 // =====================================================================
-// REDISEÑO PIZARRA · Entregas 3 y 4
+// REDISEÑO PIZARRA · Entregas 3, 4 y 5
 // Barra de jugadores arriba (equipos, colores de tarea, estilo de ficha, anónimo
 // y ventana de plantilla),
 // animación a demanda, sin pregunta inicial y fondo del color del campo.
@@ -5561,6 +5561,7 @@ function ejFichaEstilo(est) {
     ejSaveHistory();
     ejP.fichaEstilo = est;
     ejP.players.forEach(function (p) { p.estilo = est; p.anon = !!ejP.fichaAnon; });
+    ejSaveHistory();
     ejRenderSVG();
     ejRenderToolbar();
 }
@@ -5568,6 +5569,7 @@ function ejFichaAnonimo() {
     ejSaveHistory();
     ejP.fichaAnon = !ejP.fichaAnon;
     ejP.players.forEach(function (p) { p.anon = ejP.fichaAnon; p.estilo = ejP.fichaEstilo || 'foto'; });
+    ejSaveHistory();
     ejRenderSVG();
     ejRenderToolbar();
 }
@@ -5714,6 +5716,7 @@ function ejJugModalAnadir() {
         });
     });
     ejP.selectedId = null;
+    ejSaveHistory();
     if (ejP.animMode) ejFrameSaveCurrent();
     ejJugModalCerrar();
     ejRenderSVG();
@@ -5731,6 +5734,7 @@ function ejJugDatos(v) {
             p.showName = v !== 'num';
             p.soloTexto = v === 'solotexto';
         });
+        ejSaveHistory();
         if (ejP.animMode) ejFrameSaveCurrent();
     }
     ejRenderSVG();
@@ -5790,6 +5794,296 @@ function ejRenderJugBar() {
         + '<div class="ej-jb-est">' + estilos + '</div>'
         + '<button type="button" class="ej-jb-btn ej-jb-a' + (!ejP.fichaAnon ? ' on' : '') + '" onclick="ejFichaAnonimo()" title="' + (ejP.fichaAnon ? 'Fichas anónimas. Pulsa para ver fotos, dorsales y nombres' : 'Pulsa para dejar las fichas anónimas: sin foto, dorsal ni nombre') + '">A</button>';
 }
+// =====================================================================
+// Entrega 5 · Opciones junto al objeto seleccionado
+// Barra flotante (duplicar, voltear, girar, tamaño, color, borrar),
+// borrar arrastrando al borde inferior y deshacer coherente.
+// =====================================================================
+function ejObjBuscar(id, type) {
+    var en = function (lista, t) { var o = lista.find(function (x) { return x.id === id; }); return o ? { type: t, obj: o, lista: lista } : null; };
+    if (type === 'player') return en(ejP.players, 'player');
+    if (type === 'equipment') return en(ejP.equipment, 'equipment');
+    if (type === 'text') return en(ejP.texts, 'text');
+    if (type === 'shape') return en(ejP.shapes, 'shape');
+    if (type === 'line') return en(ejP.lines, 'line');
+    return en(ejP.players, 'player') || en(ejP.equipment, 'equipment') || en(ejP.texts, 'text') || en(ejP.shapes, 'shape') || en(ejP.lines, 'line');
+}
+function ejObjSel() {
+    if (ejP.multiSel && ejP.multiSel.length > 0) {
+        var items = ejP.multiSel.map(function (m) { return ejObjBuscar(m.id, m.type); }).filter(Boolean);
+        return items.length ? { varios: true, items: items } : null;
+    }
+    if (!ejP.selectedId) return null;
+    var it = ejObjBuscar(ejP.selectedId);
+    return it ? { varios: false, items: [it] } : null;
+}
+// Puntos que definen la posición de un objeto (para moverlo, voltearlo o medir su caja)
+function ejObjPuntos(it) {
+    var o = it.obj;
+    if (it.type === 'shape') {
+        if (o.type === 'ellipse') return [{ x: o.cx - o.rx, y: o.cy - o.ry }, { x: o.cx + o.rx, y: o.cy + o.ry }];
+        return [{ x: o.x, y: o.y }, { x: o.x + o.w, y: o.y + o.h }];
+    }
+    if (it.type === 'line') {
+        if (o.points) return o.points;
+        return [{ x: o.x1, y: o.y1 }, { x: o.x2, y: o.y2 }];
+    }
+    return [{ x: o.x, y: o.y }];
+}
+function ejObjMover(it, dx, dy) {
+    var o = it.obj;
+    if (it.type === 'shape' && o.type === 'ellipse') { o.cx += dx; o.cy += dy; return; }
+    if (it.type === 'line') {
+        if (o.points) { o.points = o.points.map(function (p) { return { x: p.x + dx, y: p.y + dy }; }); return; }
+        o.x1 += dx; o.y1 += dy; o.x2 += dx; o.y2 += dy;
+        if (o.cx !== undefined) { o.cx += dx; o.cy += dy; }
+        return;
+    }
+    o.x += dx; o.y += dy;
+}
+function ejObjEspejo(it, eje, c) {
+    var o = it.obj;
+    var f = function (v) { return 2 * c - v; };
+    var X = eje === 'h';
+    if (it.type === 'shape') {
+        if (o.type === 'ellipse') { if (X) o.cx = f(o.cx); else o.cy = f(o.cy); }
+        else if (X) o.x = f(o.x) - o.w; else o.y = f(o.y) - o.h;
+    } else if (it.type === 'line') {
+        if (o.points) o.points = o.points.map(function (p) { return X ? { x: f(p.x), y: p.y } : { x: p.x, y: f(p.y) }; });
+        else if (X) { o.x1 = f(o.x1); o.x2 = f(o.x2); if (o.cx !== undefined) o.cx = f(o.cx); }
+        else { o.y1 = f(o.y1); o.y2 = f(o.y2); if (o.cy !== undefined) o.cy = f(o.cy); }
+    } else {
+        if (X) o.x = f(o.x); else o.y = f(o.y);
+        if (it.type === 'equipment' && o.rotation) o.rotation = ((X ? 360 - o.rotation : 180 - o.rotation) % 360 + 360) % 360;
+    }
+}
+function ejObjTrasCambio() {
+    ejSaveHistory();
+    if (ejP.animMode) ejFrameSaveCurrent();
+    ejRenderSVG();
+    ejRenderToolbar();
+}
+function ejObjDuplicar() {
+    var s = ejObjSel();
+    if (!s) return;
+    ejSaveHistory();
+    var nuevos = [];
+    s.items.forEach(function (it) {
+        var copia = JSON.parse(JSON.stringify(it.obj));
+        copia.id = ejP.nextId++;
+        var c = { type: it.type, obj: copia, lista: it.lista };
+        ejObjMover(c, 20, 20);
+        it.lista.push(copia);
+        nuevos.push({ id: copia.id, type: it.type });
+    });
+    if (s.varios) ejP.multiSel = nuevos; else ejP.selectedId = nuevos[0].id;
+    ejObjTrasCambio();
+}
+function ejObjVoltear(eje) {
+    var s = ejObjSel();
+    if (!s) return;
+    ejSaveHistory();
+    var min = Infinity, max = -Infinity;
+    s.items.forEach(function (it) { ejObjPuntos(it).forEach(function (p) { var v = eje === 'h' ? p.x : p.y; if (v < min) min = v; if (v > max) max = v; }); });
+    var c = (min + max) / 2;
+    s.items.forEach(function (it) { ejObjEspejo(it, eje, c); });
+    ejObjTrasCambio();
+}
+function ejObjGirar(grados) {
+    var s = ejObjSel();
+    if (!s) return;
+    ejSaveHistory();
+    s.items.forEach(function (it) { if (it.type === 'equipment') it.obj.rotation = (((it.obj.rotation || 0) + grados) % 360 + 360) % 360; });
+    ejObjTrasCambio();
+}
+function ejObjTam(dir) {
+    var s = ejObjSel();
+    if (!s) return;
+    ejSaveHistory();
+    s.items.forEach(function (it) {
+        if (it.type !== 'player' && it.type !== 'equipment') return;
+        var tope = it.type === 'player' ? 2.5 : 3.0;
+        var v = (it.obj.scale != null ? it.obj.scale : 1) + (dir === 'up' ? 0.15 : -0.15);
+        it.obj.scale = Math.round(Math.max(0.3, Math.min(tope, v)) * 100) / 100;
+    });
+    ejObjTrasCambio();
+}
+function ejObjColor(valor) {
+    var s = ejObjSel();
+    if (!s || s.varios) return;
+    var it = s.items[0];
+    ejSaveHistory();
+    it.obj.color = valor === 'null' ? null : valor;
+    ejP._objPaleta = false;
+    ejObjTrasCambio();
+}
+function ejObjPaleta() { ejP._objPaleta = !ejP._objPaleta; ejObjBar(); }
+function ejObjMas() {
+    var s = ejObjSel();
+    if (!s) return;
+    var t = s.items[0].type;
+    var sec = t === 'player' ? 'players' : t === 'equipment' ? 'material' : 'draw';
+    ejP.expandedSection = ejP.expandedSection === sec ? null : sec;
+    ejRenderToolbar();
+}
+function ejObjBorrar() { ejP._objPaleta = false; ejDelete(); }
+var EJ_OBJ_IC = {
+    dup: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M4 16V6a2 2 0 0 1 2-2h10"/>',
+    fh: '<path d="M12 3v18"/><path d="M8 7 3 12l5 5z"/><path d="m16 7 5 5-5 5z"/>',
+    fv: '<path d="M3 12h18"/><path d="M7 8l5-5 5 5z"/><path d="m7 16 5 5 5-5z"/>',
+    gi: '<path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/>',
+    gd: '<path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/>',
+    me: '<circle cx="12" cy="12" r="8"/><path d="M8 12h8"/>',
+    ma: '<circle cx="12" cy="12" r="8"/><path d="M8 12h8M12 8v8"/>',
+    ed: '<path d="M4 20h4L19 9l-4-4L4 16z"/>',
+    mas: '<circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/>',
+    del: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>'
+};
+function ejObjBar() {
+    var area = document.getElementById('ej-canvas-area');
+    var svg = document.getElementById('ej-svg');
+    if (!area || !svg) return;
+    var bar = document.getElementById('ej-objbar');
+    if (!bar) { bar = document.createElement('div'); bar.id = 'ej-objbar'; area.appendChild(bar); }
+    var s = ejObjSel();
+    if (!s || ejP.activeTool !== 'select' || ejP.isDragging || ejP.isDrawing || ejP.isPlaying || ejP._presentOn || ejP._marquee) { bar.style.display = 'none'; ejP._objPaleta = false; return; }
+    var uno = s.varios ? null : s.items[0];
+    var hay = function (t) { return s.items.some(function (it) { return it.type === t; }); };
+    var B = function (ic, fn, titulo, cls) {
+        return '<button type="button"' + (cls ? ' class="' + cls + '"' : '') + ' onclick="' + fn + '" title="' + titulo + '"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + EJ_OBJ_IC[ic] + '</svg></button>';
+    };
+    var h = '';
+    if (s.varios) h += '<span class="ej-ob-n">' + s.items.length + '</span>';
+    h += B('dup', 'ejObjDuplicar()', 'Duplicar');
+    if (s.varios || (uno && uno.type === 'line')) {
+        h += B('fh', 'ejObjVoltear(\'h\')', s.varios ? 'Voltear el grupo en horizontal (espejo izquierda-derecha)' : 'Voltear en horizontal');
+        h += B('fv', 'ejObjVoltear(\'v\')', s.varios ? 'Voltear el grupo en vertical (espejo arriba-abajo)' : 'Voltear en vertical');
+    }
+    if (hay('equipment')) { h += B('gi', 'ejObjGirar(-15)', 'Girar a la izquierda'); h += B('gd', 'ejObjGirar(15)', 'Girar a la derecha'); }
+    if (hay('equipment') || hay('player')) { h += B('me', 'ejObjTam(\'down\')', 'Más pequeño'); h += B('ma', 'ejObjTam(\'up\')', 'Más grande'); }
+    if (uno) {
+        var col = uno.type === 'player' ? (EJ_TEAM_COLORS[uno.obj.color] || EJ_TEAM_COLORS.blue).fill : (uno.obj.color || '#94a3b8');
+        h += '<button type="button" class="ej-ob-col' + (ejP._objPaleta ? ' on' : '') + '" onclick="ejObjPaleta()" title="Color"><i style="background:' + col + '"></i></button>';
+        if (uno.type === 'text') h += B('ed', 'ejEditarTexto()', 'Editar el texto');
+        h += B('mas', 'ejObjMas()', 'Más opciones en el panel');
+    }
+    h += B('del', 'ejObjBorrar()', 'Borrar (también arrastrando al borde inferior del campo)', 'ej-ob-del');
+    if (uno && ejP._objPaleta) {
+        var ops = uno.type === 'player'
+            ? Object.keys(EJ_TEAM_COLORS).map(function (k) { var c = EJ_TEAM_COLORS[k]; return [k, c.striped ? 'repeating-linear-gradient(90deg,' + c.fill + ' 0 4px,' + (c.fill2 || '#fff') + ' 4px 8px)' : c.fill, c.name]; })
+            : uno.type === 'equipment'
+                ? EJ_EQUIP_COLORS.map(function (c) { return [c.c === null ? 'null' : c.c, c.c || 'conic-gradient(#ef4444,#eab308,#22c55e,#3b82f6,#ef4444)', c.n]; })
+                : EJ_LINE_COLORS.map(function (c) { return [c.c, c.c, c.n]; });
+        h += '<div class="ej-ob-pal">' + ops.map(function (o) { return '<button type="button" style="background:' + o[1] + '" title="' + o[2] + '" onclick="ejObjColor(\'' + o[0] + '\')"></button>'; }).join('') + '</div>';
+    }
+    bar.innerHTML = h;
+    bar.style.display = 'flex';
+    // Colocarla encima del objeto (o debajo si no cabe), sin salirse del área de trabajo
+    var ar = area.getBoundingClientRect();
+    var x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    s.items.forEach(function (it) {
+        var n = svg.querySelector('[data-id="' + it.obj.id + '"][data-type="' + it.type + '"]');
+        if (!n) return;
+        var r = n.getBoundingClientRect();
+        if (r.left < x0) x0 = r.left; if (r.top < y0) y0 = r.top; if (r.right > x1) x1 = r.right; if (r.bottom > y1) y1 = r.bottom;
+    });
+    if (x0 === Infinity) { bar.style.display = 'none'; return; }
+    var bw = bar.offsetWidth, bh = bar.offsetHeight;
+    var left = (x0 + x1) / 2 - bw / 2 - ar.left;
+    var top = y0 - ar.top - bh - 14;
+    if (top < 4) top = y1 - ar.top + 14;
+    if (top + bh > ar.height - 4) top = Math.max(4, ar.height - bh - 4);
+    left = Math.max(4, Math.min(left, ar.width - bw - 4));
+    bar.style.left = left + 'px';
+    bar.style.top = top + 'px';
+}
+// ---- El panel lateral se abre sobre el césped de detrás de la portería, si hay sitio ----
+function ejPanelHueco() {
+    var wrap = document.getElementById('ej-pizarra-wrap');
+    var svg = document.getElementById('ej-svg');
+    if (!wrap || !svg) return;
+    wrap.classList.add('ej-panel-encima');
+    var r = svg.getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    var escala = Math.min(r.width / ejP.svgW, r.height / ejP.svgH);
+    var hueco = Math.floor((r.width - ejP.svgW * escala) / 2 + 9 * escala - 6);
+    if (hueco < 160) { wrap.classList.remove('ej-panel-encima'); return; }
+    wrap.style.setProperty('--ej-hueco', Math.min(hueco, 260) + 'px');
+}
+// ---- Borrar arrastrando al borde inferior del campo ----
+function ejObjZonaBorrar(e) {
+    if ((ejP.zoom || 1) !== 1 || (ejP.camAngle || 0) > 0) return false;
+    return ejGetPos(e).y > 486;
+}
+function ejObjFranja(ver, encima) {
+    var area = document.getElementById('ej-canvas-area');
+    var svg = document.getElementById('ej-svg');
+    if (!area || !svg) return;
+    var f = document.getElementById('ej-objdel');
+    if (!ver) { if (f) f.style.display = 'none'; return; }
+    if (!f) { f = document.createElement('div'); f.id = 'ej-objdel'; f.textContent = '✕  Suelta aquí para borrar'; area.appendChild(f); }
+    var m = svg.getScreenCTM(), ar = area.getBoundingClientRect();
+    var p0 = svg.createSVGPoint(); p0.x = 0; p0.y = 486; p0 = p0.matrixTransform(m);
+    var p1 = svg.createSVGPoint(); p1.x = ejP.svgW; p1.y = ejP.svgH; p1 = p1.matrixTransform(m);
+    f.style.left = (p0.x - ar.left) + 'px';
+    f.style.top = (p0.y - ar.top) + 'px';
+    f.style.width = (p1.x - p0.x) + 'px';
+    f.style.height = (p1.y - p0.y) + 'px';
+    f.style.display = 'flex';
+    f.className = encima ? 'on' : '';
+}
+(function () {
+    // Deshacer coherente: no se guardan dos pasos iguales seguidos, y borrar deja guardado el resultado
+    var saveOriginal = ejSaveHistory;
+    ejSaveHistory = function () {
+        var t = ejP.history[ejP.histIdx];
+        if (t && !ejP.isUndoRedo && t.players === JSON.stringify(ejP.players) && t.lines === JSON.stringify(ejP.lines) && t.shapes === JSON.stringify(ejP.shapes)
+            && t.texts === JSON.stringify(ejP.texts) && t.equipment === JSON.stringify(ejP.equipment) && t.connections === JSON.stringify(ejP.connections)) return;
+        saveOriginal();
+    };
+    var deleteOriginal = ejDelete;
+    ejDelete = function () { deleteOriginal(); ejSaveHistory(); if (ejP.animMode) ejFrameSaveCurrent(); ejObjBar(); };
+    var undoOriginal = ejUndo, redoOriginal = ejRedo;
+    ejUndo = function () { undoOriginal(); ejObjBar(); };
+    ejRedo = function () { redoOriginal(); ejObjBar(); };
+
+    var downOriginal = ejSvgPointerDown, moveOriginal = ejSvgPointerMove, upOriginal = ejSvgPointerUp;
+    ejSvgPointerDown = function (e) {
+        ejP._objPaleta = false;
+        downOriginal(e);
+        var mueve = ejP.isDragging && ejP.activeTool === 'select' && !ejP._ctrlId && !ejP._epDrag && !ejP._rszId && !ejP._trajCtrlId && !ejP._marquee && (ejP.selectedId || ejP._blockDrag);
+        ejP._arr = mueve ? {
+            x: e.clientX, y: e.clientY, movido: false,
+            copia: { players: JSON.stringify(ejP.players), lines: JSON.stringify(ejP.lines), shapes: JSON.stringify(ejP.shapes), texts: JSON.stringify(ejP.texts), equipment: JSON.stringify(ejP.equipment) }
+        } : null;
+        ejObjBar();
+    };
+    ejSvgPointerMove = function (e) {
+        moveOriginal(e);
+        var a = ejP._arr;
+        if (!a || !ejP.isDragging) return;
+        if (!a.movido && Math.abs(e.clientX - a.x) + Math.abs(e.clientY - a.y) > 8) a.movido = true;
+        if (a.movido && (ejP.zoom || 1) === 1 && !((ejP.camAngle || 0) > 0)) ejObjFranja(true, ejObjZonaBorrar(e));
+    };
+    ejSvgPointerUp = function (e) {
+        var a = ejP._arr;
+        ejP._arr = null;
+        if (a && a.movido && ejP.isDragging && ejObjZonaBorrar(e)) {
+            // Se suelta en la franja: el objeto vuelve a donde estaba y se borra, así deshacer lo recupera en su sitio
+            ejP.players = JSON.parse(a.copia.players); ejP.lines = JSON.parse(a.copia.lines); ejP.shapes = JSON.parse(a.copia.shapes);
+            ejP.texts = JSON.parse(a.copia.texts); ejP.equipment = JSON.parse(a.copia.equipment);
+            ejP.isDragging = false; ejP._blockDrag = false;
+            ejObjFranja(false);
+            ejDelete();
+            ejToast('Borrado. Puedes recuperarlo con Deshacer.', 'info');
+            return;
+        }
+        upOriginal(e);
+        ejObjFranja(false);
+        ejObjBar();
+    };
+    window.addEventListener('resize', function () { ejPanelHueco(); ejObjBar(); });
+})();
 (function () {
     var renderToolbarOriginal = ejRenderToolbar;
     ejRenderToolbar = function () {
@@ -5812,6 +6106,8 @@ function ejRenderJugBar() {
             else tb.appendChild(b);
         }
         ejRenderJugBar();
+        ejPanelHueco();
+        ejObjBar();
         if (ejP._jugModalPend && ejP._plantilla && ejP._plantilla.length && !!ejP._plantillaEsRival === !!ejP._addingRival) { ejP._jugModalPend = false; ejJugModalAbrir(); }
     };
     var showTabOriginal = ejShowTab;
@@ -5822,6 +6118,7 @@ function ejRenderJugBar() {
     var renderSVGOriginal = ejRenderSVG;
     ejRenderSVG = function () {
         renderSVGOriginal();
+        ejObjBar();
         // El área de trabajo toma el color del campo: así no quedan franjas oscuras a los lados
         if (ejP._presentOn) return;
         var area = document.getElementById('ej-canvas-area');
