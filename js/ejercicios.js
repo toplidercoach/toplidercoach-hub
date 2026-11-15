@@ -151,6 +151,8 @@ const ejP = {
     panX: 0,
     panY: 0,
     fieldColor: '#1a6b30',
+    fieldFondo: 'cruzado',
+    escudo: { ver: true, op: 0.18, tam: 1 },
     svgW: 800, svgH: 500,
     fieldRealW: 105, fieldRealH: 68,
     showEII: false,
@@ -162,7 +164,7 @@ const ejP = {
     myGkColor: 'yellow',
     rivalGkColor: 'orange',
     selectedSize: 'small',
-    showNumbers: false,
+    showNumbers: true,            // manda el selector de datos de la barra de jugadores
     hasVest: false,
     vestColor: 'yellow',
 
@@ -212,6 +214,10 @@ nextId: 1,
 // =============================================
 function ejSaveHistory() {
     if (ejP.isUndoRedo) return;
+    // No se guardan dos pasos iguales seguidos
+    const ult = ejP.history[ejP.histIdx];
+    if (ult && ult.players === JSON.stringify(ejP.players) && ult.lines === JSON.stringify(ejP.lines) && ult.shapes === JSON.stringify(ejP.shapes)
+        && ult.texts === JSON.stringify(ejP.texts) && ult.equipment === JSON.stringify(ejP.equipment) && ult.connections === JSON.stringify(ejP.connections)) return;
     if (ejP.animMode) ejP._videoDesactualizado = true;
     const snap = {
         players: JSON.stringify(ejP.players),
@@ -227,7 +233,7 @@ function ejSaveHistory() {
 }
 
 function ejUndo() {
-    if (ejP.histIdx <= 0) return;
+    if (ejP.histIdx <= 0) { ejRenderToolbar(); ejObjBar(); return; }
     ejP.histIdx--;
     const s = ejP.history[ejP.histIdx];
     ejP.isUndoRedo = true;
@@ -239,10 +245,12 @@ function ejUndo() {
     ejP.selectedId = null;
     ejP.isUndoRedo = false;
     ejRenderSVG();
+    ejRenderToolbar();
+    ejObjBar();
 }
 
 function ejRedo() {
-    if (ejP.histIdx >= ejP.history.length - 1) return;
+    if (ejP.histIdx >= ejP.history.length - 1) { ejRenderToolbar(); ejObjBar(); return; }
     ejP.histIdx++;
     const s = ejP.history[ejP.histIdx];
     ejP.isUndoRedo = true;
@@ -254,14 +262,17 @@ function ejRedo() {
     ejP.selectedId = null;
     ejP.isUndoRedo = false;
     ejRenderSVG();
+    ejRenderToolbar();
+    ejObjBar();
 }
 
 // =============================================
 // RENDER SVG
 // =============================================
 function ejRenderSVG() {
+    if (ejEqCfg()) ejKitSync();
     const svg = document.getElementById('ej-svg');
-    if (!svg) return;
+    if (!svg) { ejObjBar(); return; }
     const W = ejP.svgW, H = ejP.svgH;
 
     let defs = '<defs>';
@@ -605,6 +616,12 @@ for (const l of trajs) {
     svg.innerHTML = html;
     ejAplicarViewBox();
     ejAplicarCamara();
+    ejObjBar();
+    // El área de trabajo toma el color del campo: así no quedan franjas oscuras a los lados
+    if (!ejP._presentOn) {
+        const areaCampo = document.getElementById('ej-canvas-area');
+        if (areaCampo) { const cf = ejFondoColor(); areaCampo.style.background = cf === 'grid' ? '#fbfcfe' : cf; }
+    }
 }
 
 // =============================================
@@ -645,7 +662,7 @@ function ejHitElemento(pos) {
     return null;
 }
 
-function ejSvgPointerDown(e) {
+function ejPunteroBajar(e) {
     const svg = document.getElementById('ej-svg');
     if (!svg) return;
     svg.setPointerCapture && svg.setPointerCapture(e.pointerId);
@@ -888,7 +905,7 @@ if (snapElem) {
     }
 }
 
-function ejSvgPointerMove(e) {
+function ejPunteroMover(e) {
     const pos = ejGetPos(e);
 
     // Recuadro de selección múltiple en curso
@@ -1010,7 +1027,7 @@ function ejSvgPointerMove(e) {
     }
 }
 
-function ejSvgPointerUp(e) {
+function ejPunteroSoltar(e) {
     const pos = ejGetPos(e);
 
     // Fin del recuadro de selección múltiple
@@ -1131,7 +1148,7 @@ function ejSvgPointerUp(e) {
 // =============================================
 // ACCIONES
 // =============================================
-function ejDelete() {
+function ejBorrarSeleccion() {
     if (ejP.multiSel && ejP.multiSel.length > 0) {
         ejSaveHistory();
         var _ids = {};
@@ -1985,6 +2002,8 @@ function ejLightenColor(hex, pct) {
 }
 
 function ejSetFieldColor(color) {
+    if (color === 'grid') { ejSetFondo('cuaderno'); return; }
+    if (ejFondoDef().color) ejP.fieldFondo = 'cruzado';
     ejP.fieldColor = color;
     ejRenderSVG();
     ejRenderToolbar();
@@ -2214,7 +2233,12 @@ async function ejExportPNG() {
 // =============================================
 function ejRenderToolbar() {
     const tb = document.getElementById('ej-toolbar');
-    if (!tb) return;
+    // Sin pregunta inicial: si la pizarra espera a que se elija modo, se abre en estático
+    const ovModo = document.getElementById('ej-modo-overlay');
+    if (ovModo && ovModo.style.display !== 'none') { ejCfgAplicar(); ejElegirModo('estatico'); return; }
+    if (ejP.activeTool !== 'player') ejP._tareaColor = null;
+    if (ejP._apariencia === undefined) ejP._apariencia = true;
+    if (!tb) { ejBarrasSync(); return; }
 
     const t = ejP.activeTool;
     const sel = ejP.selectedId;
@@ -2240,12 +2264,6 @@ function ejRenderToolbar() {
             }
         }
         return html + '</div>';
-    }
-
-    function formationBtns(fn) {
-        return Object.keys(EJ_FORMATIONS).map(k =>
-            `<button class="ej-btn-formation" onclick="${fn}('${k}')">${k}</button>`
-        ).join('');
     }
 
     function sectionHeader(id, icon, label) {
@@ -2288,59 +2306,20 @@ ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin
     ${sectionHeader('players','⚽','Jugadores')}
     ${playersOpen ? `
     <div class="ej-section-body">
-        <div style="display:flex;gap:6px;background:#0b1220;border:1px solid #2f405c;border-radius:8px;padding:4px">
-            <button onclick="ejP._addingRival=false;ejRenderToolbar()" style="flex:1;padding:8px;border-radius:6px;border:none;cursor:pointer;font-size:12px;font-weight:700;background:${!ejP._addingRival?'#1d4ed8':'transparent'};color:${!ejP._addingRival?'#fff':'#64748b'}">🔵 Mi equipo</button>
-            <button onclick="ejP._addingRival=true;ejRenderToolbar()" style="flex:1;padding:8px;border-radius:6px;border:none;cursor:pointer;font-size:12px;font-weight:700;background:${ejP._addingRival?'#b91c1c':'transparent'};color:${ejP._addingRival?'#fff':'#64748b'}">🔴 Rival</button>
-        </div>
-        <button class="ej-btn-tool${t==='player'&&!ejP._plantillaMode?' active':''}" onclick="ejSetTool(ejP.activeTool==='player'&&!ejP._plantillaMode?'select':'player');ejP._plantillaMode=false;ejRenderToolbar()" style="justify-content:center;font-weight:600">
-            ➕ Añadir jugador ${ejP._addingRival?'(rival)':'(mi equipo)'}
-        </button>
-        ${ejP._addingRival
-            ? `<button onclick="ejCargarPlantillaRival()" style="width:100%;padding:11px;background:#5f1e1e;border:1px solid #dc2626;color:#fca5a5;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600">🛡️ Cargar plantilla rival</button>`
-            : `<button onclick="ejCargarPlantilla()" style="width:100%;padding:11px;background:#1e3a5f;border:1px solid #2563eb;color:#93c5fd;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600">👥 Cargar mi plantilla</button>`}
-        <div>
-            <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin:2px 0 4px">Formación rápida ${ejP._addingRival?'· rival':'· mi equipo'}</div>
-            <div class="ej-formations${ejP._addingRival?' rival':''}">${formationBtns(ejP._addingRival?'ejApplyFormation_rival':'ejApplyFormation_my')}</div>
-        </div>
-        ${ejP._plantilla && ejP._plantilla.length ? `
-        <div style="background:#0b1220;border:1px solid #2f405c;border-radius:8px;padding:8px">
-            <div style="font-size:10px;color:#64748b;margin-bottom:4px;text-transform:uppercase">${ejP._plantillaEsRival ? '🛡️ Plantilla rival' : 'Mi plantilla'} — clic para colocar</div>
-            <div style="display:flex;gap:4px;margin-bottom:6px">
-                ${['num','name','both','nofoto','solotexto'].map(opt => {
-                    const lbl = opt==='num'?'Nº':opt==='name'?'Nombre':opt==='both'?'Nº+Nombre':opt==='nofoto'?'Sin foto':'Solo texto';
-                    const active = (ejP._plantillaLabel||'num') === opt;
-                    return `<button onclick="ejSetPlantillaLabel('${opt}')" style="flex:1;padding:3px;font-size:9px;border-radius:4px;border:1px solid ${active?'#3b82f6':'#334155'};background:${active?'#1e3a5f':'transparent'};color:${active?'#93c5fd':'#64748b'};cursor:pointer">${lbl}</button>`;
-                }).join('')}
-            </div>
-            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;max-height:220px;overflow-y:auto">
-                ${ejP._plantilla.map((p, i) => {
-                    const posTxt = (p.position || '').toLowerCase();
-                    const isGk = posTxt.includes('portero') || posTxt === 'por';
-                    const col = ejP._plantillaEsRival
-                        ? (isGk ? EJ_TEAM_COLORS[ejP.rivalGkColor] : EJ_TEAM_COLORS[ejP.rivalColor])
-                        : (isGk ? EJ_TEAM_COLORS[ejP.myGkColor] : EJ_TEAM_COLORS[ejP.myColor]);
-                    const active = ejP._plantillaSelIdx === i;
-                    const avatar = p.photo
-                        ? `<div style="width:30px;height:30px;border-radius:50%;background-image:url('${p.photo}');background-size:cover;background-position:center;border:2px solid ${col?.stroke||'#2563eb'}"></div>`
-                        : `<div style="width:30px;height:30px;border-radius:50%;background:${col?.fill||'#3b82f6'};border:2px solid ${col?.stroke||'#2563eb'};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff">${p.number}</div>`;
-                    return `<div onclick="ejColocarJugadorPlantilla(${i})" title="${p.name}" style="display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 2px;border-radius:6px;cursor:pointer;background:${active?'#1e3a5f':'transparent'};border:1px solid ${active?'#3b82f6':'transparent'}">${avatar}<span style="font-size:8px;color:#9ca3af;text-align:center;line-height:1.1;max-width:40px;overflow:hidden;text-overflow:ellipsis;white-space:normal;word-break:break-word">${p.name}</span></div>`;
-                }).join('')}
-            </div>
-        </div>` : ''}
         <div class="ej-section-header ej-sec-apariencia${ejP._apariencia?' open':''}" onclick="ejP._apariencia=!ejP._apariencia;ejRenderToolbar()" style="margin-top:2px">🎨 Apariencia</div>
         ${ejP._apariencia ? `
         <div class="ej-section-body">
+            ${!ejP._addingRival && ejEqCfg() ? `<div class="ej-eq-nota">Tu equipo se dibuja con la equipación del club.<button type="button" onclick="ejIrEquipacion()">Cambiar en Mi Club</button></div>` : `
             <label style="font-size:11px;color:#9ca3af">Color ${ejP._addingRival?'rival':'mi equipo'}:</label>
             ${colorSwatches(ejP._addingRival?ejP.rivalColor:ejP.myColor, true, true, ejP._addingRival?'ejSetRivalColor':'ejSetMyColor')}
             <label style="font-size:11px;color:#9ca3af;margin-top:4px;display:block">🧤 Portero (nº1):</label>
-            ${colorSwatches(ejP._addingRival?ejP.rivalGkColor:ejP.myGkColor, true, false, ejP._addingRival?'ejSetRivalGkColor':'ejSetMyGkColor')}
+            ${colorSwatches(ejP._addingRival?ejP.rivalGkColor:ejP.myGkColor, true, false, ejP._addingRival?'ejSetRivalGkColor':'ejSetMyGkColor')}`}
             <div class="ej-size-row" style="margin-top:6px">
                 <span>Tamaño:</span>
                 ${['small','medium','large'].map(s=>
                     `<button class="ej-sz${ejP.selectedSize===s?' active':''}" onclick="ejSetSize('${s}')">${s==='small'?'S':s==='medium'?'M':'L'}</button>`
                 ).join('')}
             </div>
-            <label class="ej-check"><input type="checkbox" ${ejP.showNumbers?'checked':''} onchange="ejSetShowNumbers(this.checked)"> Mostrar números</label>
             <label class="ej-check"><input type="checkbox" ${ejP.hasVest?'checked':''} onchange="ejSetVest(this.checked)"> Con peto</label>
             ${ejP.hasVest ? `<div class="ej-swatches">${
                 Object.entries(EJ_TEAM_COLORS).filter(([,v])=>!v.striped).map(([k,v])=>
@@ -2400,12 +2379,12 @@ ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin
         <div style="font-size:10px;color:#64748b;margin-top:2px">Consejo: Ctrl + rueda del ratón para hacer zoom donde apunta el cursor</div>
         <div style="display:none">
         </div>
+        <div><div class="ej-fondos-t">Fondo del campo</div>${ejFondoMiniaturas("ejSetFondo('$k')")}</div>
         <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin:8px 0 2px">Color del césped</div>
-        <div style="display:flex;gap:4px">
+        <div style="display:flex;gap:4px${ejFondoDef().color ? ';opacity:0.35' : ''}"${ejFondoDef().color ? ' title="Este fondo tiene su propio color. Al elegir un color se vuelve al césped."' : ''}>
             ${['#1a6b30','#1a8540','#2d8a4e','#0f4c2a','#1e3a5f','#0a1628','#2c2c2c','#ffffff'].map(c =>
                 '<div onclick="ejSetFieldColor(\''+c+'\')" style="width:22px;height:22px;border-radius:50%;background:'+c+';cursor:pointer;border:2px solid '+(ejP.fieldColor===c?(c==='#ffffff'?'#3b82f6':'#fff'):'transparent')+(c==='#ffffff'?';box-shadow:inset 0 0 0 1px #cbd5e1':'')+'"></div>'
             ).join('')}
-            <div onclick="ejSetFieldColor('grid')" title="Cuaderno cuadriculado" style="width:22px;height:22px;border-radius:50%;cursor:pointer;border:2px solid ${ejP.fieldColor==='grid'?'#3b82f6':'#cbd5e1'};background-color:#fff;background-image:linear-gradient(#c7d2e3 1px,transparent 1px),linear-gradient(90deg,#c7d2e3 1px,transparent 1px);background-size:6px 6px"></div>
         </div>
         <div style="margin-top:8px;padding-top:8px;border-top:1px solid #334155">
             <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#9ca3af;margin-bottom:6px">
@@ -2530,6 +2509,7 @@ ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin
 
 
     <!-- BOTONES PRINCIPALES -->
+    <button type="button" class="ej-anim-btn${ejP.animMode ? ' on' : ''}" onclick="ejAnimConmutar()">${ejP.animMode ? '🎬 Quitar animación' : '🎬 Animar'}</button>
     <div style="margin-top:10px;display:flex;flex-direction:column;gap:6px">
         ${ejP.animMode && ejEditandoId ? '' : '<button class="ej-act-btn purple full" onclick="ejCapturarParaFicha()" style="width:100%;padding:10px;background:#7c3aed;border:none;color:#fff;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600">📋 Guardar ejercicio</button>'}
         <button class="ej-act-btn green full" onclick="ejExportPNG()" style="width:100%;padding:8px;background:#0f172a;border:1px solid #334155;color:#94a3b8;border-radius:8px;cursor:pointer;font-size:12px">📥 Exportar PNG</button>
@@ -2537,6 +2517,7 @@ ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin
         <button class="ej-act-btn red full" onclick="ejDelete()" ${!sel?'disabled':''} style="width:100%;padding:8px;background:#7f1d1d;border:1px solid #dc2626;color:#fca5a5;border-radius:8px;cursor:pointer;font-size:12px">🗑 Eliminar seleccionado</button>
     </div>
     `;
+    ejBarrasSync();
 }
 
 function ejSvgDblClick(e) {
@@ -5055,6 +5036,7 @@ function ejShowTab(tab, btn) {
     document.getElementById('ej-tab-' + tab).style.display = 'block';
     if (btn) btn.classList.add('active');
     if (tab === 'banco' && ejBancoCache.length === 0) ejBancoLoad();
+    if (tab === 'pizarra') ejRenderToolbar();
 }
 
 // =============================================
@@ -5515,12 +5497,12 @@ function ejProyPlegar() {
     b.style.display = plegado ? '' : 'none';
     if (btn) { btn.textContent = plegado ? '—' : '▢'; btn.title = plegado ? 'Plegar' : 'Desplegar'; }
 }
+
 // =====================================================================
-// REDISEÑO PIZARRA · Entregas 3, 4, 5 y 6
-// Barra de jugadores arriba (equipos, colores de tarea, estilo de ficha, anónimo
-// y ventana de plantilla),
-// animación a demanda, sin pregunta inicial y fondo del color del campo.
-// Todo va en este bloque: para deshacerlo basta con borrarlo.
+// PIZARRA · BARRA DE JUGADORES, OBJETOS, FONDOS, CONFIGURACIÓN Y EQUIPACIÓN
+// Barra superior de jugadores (equipos, fichas de tarea, formato de ficha, anónimo),
+// ventanas de formación y plantilla, opciones junto al objeto, fondos de campo,
+// configuración por club y equipación.
 // =====================================================================
 function ejAnimConmutar() {
     if (ejP.animMode && ejP.frames.length > 1) {
@@ -5580,9 +5562,77 @@ function ejCamisetaSVG(r, fill, stroke, sel, numero, colorTexto, fs) {
     return '<path d="' + d + '" fill="' + fill + '" stroke="' + stroke + '" stroke-width="' + (sel ? 3 : 2) + '" stroke-linejoin="round"/>'
         + (numero !== '' && numero !== undefined && numero !== null ? '<text y="' + (0.22 * k).toFixed(1) + '" text-anchor="middle" dominant-baseline="central" fill="' + colorTexto + '" font-size="' + fs + '" font-weight="700" font-family="system-ui" style="pointer-events:none">' + numero + '</text>' : '');
 }
-function ejJugFormacion(sel) {
-    if (sel.value) ejApplyFormation(sel.value, !!ejP._addingRival);
-    sel.value = '';
+// ---- Ventana de formaciones: campos en miniatura para elegir sistema ----
+var EJ_FORM_GRUPOS = [
+    ['11', 'Fútbol 11', ['4-4-2', '4-3-3', '4-2-3-1', '4-1-4-1', '4-5-1', '4-4-1-1', '4-3-2-1', '4-2-2-2', '3-5-2', '3-4-3', '3-4-2-1', '3-4-1-2', '5-3-2', '5-4-1', '5-2-3']],
+    ['8', 'Fútbol 8', ['3-3-1', '3-2-2', '2-3-2', '2-4-1', '3-1-3', '3-1-2-1']],
+    ['7', 'Fútbol 7', ['3-2-1', '2-3-1', '3-1-2', '2-2-2', '2-1-2-1', '1-3-2']],
+    ['5', 'Fútbol sala', ['2-2', '1-2-1', '3-1', '1-3', '4-0']]
+];
+// Posiciones de un sistema a partir de sus líneas. Los cinco sistemas clásicos conservan su colocación afinada.
+function ejFormacionPos(clave) {
+    if (EJ_FORMATIONS[clave]) return EJ_FORMATIONS[clave];
+    var lineas = clave.split('-').map(Number).filter(function (n) { return n > 0; });
+    var reparto = { 1: [0.5], 2: [0.35, 0.65], 3: [0.25, 0.5, 0.75], 4: [0.15, 0.38, 0.62, 0.85], 5: [0.1, 0.3, 0.5, 0.7, 0.9] };
+    var pos = [{ x: 0.06, y: 0.5 }];
+    var x0 = 0.2, x1 = lineas.length > 3 ? 0.66 : 0.6;
+    lineas.forEach(function (n, i) {
+        var x = lineas.length === 1 ? 0.4 : x0 + i * (x1 - x0) / (lineas.length - 1);
+        (reparto[n] || reparto[5]).forEach(function (y) { pos.push({ x: +x.toFixed(3), y: y }); });
+    });
+    EJ_FORMATIONS[clave] = pos;
+    return pos;
+}
+function ejFormCerrar() { var m = document.getElementById('ej-form-modal'); if (m) m.remove(); }
+function ejFormAbrir() {
+    ejFormCerrar();
+    var club = ejCfgClub();
+    var fmt = club && club.team_format ? String(club.team_format) : '11';
+    if (!ejP._formGrupo) ejP._formGrupo = EJ_FORM_GRUPOS.some(function (g) { return g[0] === fmt; }) ? fmt : '11';
+    var m = document.createElement('div');
+    m.id = 'ej-form-modal';
+    m.onclick = function (e) { if (e.target === m) ejFormCerrar(); };
+    document.body.appendChild(m);
+    ejFormPintar();
+}
+function ejFormGrupo(g) { ejP._formGrupo = g; ejFormPintar(); }
+function ejFormPintar() {
+    var m = document.getElementById('ej-form-modal');
+    if (!m) return;
+    var rival = !!ejP._addingRival;
+    var grupo = EJ_FORM_GRUPOS.find(function (g) { return g[0] === ejP._formGrupo; }) || EJ_FORM_GRUPOS[0];
+    var cJug = ejFichaColores({ team: rival ? 'rival' : 'my', color: rival ? ejP.rivalColor : ejP.myColor, number: 0 }, rival ? ejP.rivalColor : ejP.myColor);
+    var cGk = ejFichaColores({ team: rival ? 'rival' : 'my', color: rival ? ejP.rivalGkColor : ejP.myGkColor, number: 1 }, rival ? ejP.rivalGkColor : ejP.myGkColor);
+    var campo = '<rect width="160" height="100" rx="5" fill="#1a6b30"/>'
+        + [0, 2, 4, 6].map(function (i) { return '<rect x="' + (6 + i * 18.5) + '" y="5" width="18.5" height="90" fill="#217a38"/>'; }).join('')
+        + '<g fill="none" stroke="#ffffff" stroke-width="1.2" opacity="0.85"><rect x="6" y="5" width="148" height="90"/><path d="M80 5v90"/><circle cx="80" cy="50" r="12"/><rect x="6" y="24" width="22" height="52"/><rect x="132" y="24" width="22" height="52"/></g>';
+    var tarjetas = grupo[2].map(function (clave) {
+        var pos = ejFormacionPos(clave);
+        var puntos = pos.map(function (p, i) {
+            var c = i === 0 ? cGk : cJug;
+            var x = 6 + (rival ? 1 - p.x : p.x) * 148, y = 5 + p.y * 90;
+            return '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="4.6" fill="' + c.fill + '" stroke="' + c.stroke + '" stroke-width="1.2"/>';
+        }).join('');
+        return '<button type="button" class="ej-fm-card" onclick="ejFormElegir(\'' + clave + '\')"><svg viewBox="0 0 160 100">' + campo + puntos + '</svg><b>' + clave + '</b></button>';
+    }).join('');
+    m.innerHTML = '<div class="ej-jm-caja ej-fm-caja">'
+        + '<div class="ej-jm-cab"><strong>' + (rival ? 'Formación del rival' : 'Formación de mi equipo') + '</strong><button type="button" class="ej-jm-x" onclick="ejFormCerrar()" title="Cerrar">✕</button></div>'
+        + '<div class="ej-fm-tabs">' + EJ_FORM_GRUPOS.map(function (g) { return '<button type="button" class="' + (g[0] === grupo[0] ? 'on' : '') + '" onclick="ejFormGrupo(\'' + g[0] + '\')">' + g[1] + '</button>'; }).join('') + '</div>'
+        + '<div class="ej-jm-cuerpo"><div class="ej-fm-grid">' + tarjetas + '</div></div>'
+        + '<div class="ej-jm-pie"><span>Al elegir una, sustituye a los jugadores ' + (rival ? 'del rival' : 'de tu equipo') + ' que haya en el campo. Las fichas de tarea no se tocan.</span>'
+        + '<button type="button" class="ej-jm-cancel" onclick="ejFormCerrar()">Cancelar</button></div></div>';
+}
+function ejFormElegir(clave) {
+    var rival = !!ejP._addingRival;
+    ejFormacionPos(clave);
+    ejSaveHistory();
+    // Con el rival también se sustituye, igual que con mi equipo
+    if (rival) ejP.players = ejP.players.filter(function (p) { return !ejEsRival(p); });
+    ejApplyFormation(clave, rival);
+    ejSaveHistory();
+    if (ejP.animMode) ejFrameSaveCurrent();
+    ejFormCerrar();
+    ejRenderToolbar();
 }
 // ---- Ventana de jugadores: la plantilla por líneas, se marcan varios y entran de golpe ----
 var EJ_JUG_GRUPOS = [['POR', 'Porteros', 0.06], ['DEF', 'Defensas', 0.20], ['MED', 'Centrocampistas', 0.36], ['DEL', 'Delanteros', 0.47], ['OTR', 'Sin posición', 0.28]];
@@ -5744,35 +5794,6 @@ function ejJugDatos(v) {
     ejRenderToolbar();
 }
 // El panel de jugadores se queda con lo que no está en la barra de arriba: apariencia y jugador seleccionado
-function ejJugLimpiarPanel(tb) {
-    var cab = tb.querySelector('.ej-section-header.ej-sec-players');
-    var body = cab ? cab.nextElementSibling : null;
-    if (!body || !body.classList.contains('ej-section-body')) return;
-    var quitar = [];
-    Array.prototype.forEach.call(body.children, function (h) {
-        if (h.matches('button.ej-btn-tool, button[onclick^="ejCargarPlantilla"]')) quitar.push(h);
-        else if (h.tagName === 'DIV' && h.querySelector(':scope > button[onclick^="ejP._addingRival="], :scope > .ej-formations, [onclick^="ejSetPlantillaLabel"], [onclick^="ejColocarJugadorPlantilla"]')) quitar.push(h);
-    });
-    quitar.forEach(function (h) { h.remove(); });
-    if (!ejP._addingRival && ejEqCfg()) {
-        var cabAp = body.querySelector('.ej-section-header.ej-sec-apariencia');
-        var ap = cabAp ? cabAp.nextElementSibling : null;
-        if (ap && ap.classList.contains('ej-section-body')) {
-            Array.prototype.slice.call(ap.children).forEach(function (h) {
-                if (!h.classList.contains('ej-swatches')) return;
-                var rot = h.previousElementSibling;
-                if (rot && rot.tagName === 'LABEL') rot.remove();
-                h.remove();
-            });
-            var nota = document.createElement('div');
-            nota.className = 'ej-eq-nota';
-            nota.innerHTML = 'Tu equipo se dibuja con la equipación del club.<button type="button" onclick="ejIrEquipacion()">Cambiar en Mi Club</button>';
-            ap.insertBefore(nota, ap.firstChild);
-        }
-    }
-    var num = body.querySelector('input[onchange^="ejSetShowNumbers"]');
-    if (num && num.closest('label')) num.closest('label').remove();
-}
 function ejRenderJugBar() {
     var nav = document.querySelector('.ej-nav');
     if (!nav) return;
@@ -5811,7 +5832,6 @@ function ejRenderJugBar() {
     var lab = ejP._plantillaLabel || 'both';
     if (lab === 'nofoto') lab = 'both';
     var datos = [['num', 'Dorsal'], ['name', 'Nombre'], ['both', 'Dorsal y nombre'], ['solotexto', 'Solo texto']].map(function (o) { return '<option value="' + o[0] + '"' + (lab === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('');
-    var formaciones = Object.keys(EJ_FORMATIONS).map(function (k) { return '<option value="' + k + '">' + k + '</option>'; }).join('');
     bar.innerHTML =
         '<div class="ej-jb-seg">'
         + '<button type="button" class="' + (!rival ? 'on my' : '') + '" onclick="ejJugEquipo(false)">Mi equipo</button>'
@@ -5819,7 +5839,7 @@ function ejRenderJugBar() {
         + '</div>'
         + (eq && !rival ? '<button type="button" class="ej-jb-btn ej-jb-kit" onclick="ejJugKit()" title="' + (ejP.miKit === 2 ? 'Segunda equipación. Pulsa para cambiar a la primera' : 'Primera equipación. Pulsa para cambiar a la segunda') + '">' + eqCamisetaSVG(eq.kits[ejP.miKit === 2 ? 'jug2' : 'jug1'], 19) + (ejP.miKit === 2 ? '2ª' : '1ª') + '</button>' : '')
         + '<button type="button" class="ej-jb-btn' + (anadiendo ? ' on' : '') + '" onclick="ejJugAnadir()" title="Cada clic en el campo coloca un jugador. Pulsa otra vez para soltar">+<span class="ej-jb-txt"> Jugador</span></button>'
-        + '<select class="ej-jb-sel ej-jb-x" onchange="ejJugFormacion(this)" title="Colocar el equipo en una formación"><option value="">Formación</option>' + formaciones + '</select>'
+        + '<button type="button" class="ej-jb-btn ej-jb-x" onclick="ejFormAbrir()" title="Elegir una formación y colocar el equipo">Formación</button>'
         + '<button type="button" class="ej-jb-btn ej-jb-x" onclick="ejJugPlantilla()" title="Abrir la plantilla, marcar varios jugadores y añadirlos de golpe">Plantilla</button>'
         + '<div class="ej-jb-dots">' + puntos + '</div>'
         + '<select class="ej-jb-sel ej-jb-dat" onchange="ejJugDatos(this.value)" title="Qué se ve en las fichas de los jugadores con nombre">' + datos + '</select>'
@@ -6065,66 +6085,57 @@ function ejObjFranja(ver, encima) {
     f.style.display = 'flex';
     f.className = encima ? 'on' : '';
 }
-(function () {
-    // Deshacer coherente: no se guardan dos pasos iguales seguidos, y borrar deja guardado el resultado
-    var saveOriginal = ejSaveHistory;
-    ejSaveHistory = function () {
-        var t = ejP.history[ejP.histIdx];
-        if (t && !ejP.isUndoRedo && t.players === JSON.stringify(ejP.players) && t.lines === JSON.stringify(ejP.lines) && t.shapes === JSON.stringify(ejP.shapes)
-            && t.texts === JSON.stringify(ejP.texts) && t.equipment === JSON.stringify(ejP.equipment) && t.connections === JSON.stringify(ejP.connections)) return;
-        saveOriginal();
-    };
-    var deleteOriginal = ejDelete;
-    ejDelete = function () { deleteOriginal(); ejSaveHistory(); if (ejP.animMode) ejFrameSaveCurrent(); ejObjBar(); };
-    var undoOriginal = ejUndo, redoOriginal = ejRedo;
-    ejUndo = function () { undoOriginal(); ejRenderToolbar(); ejObjBar(); };
-    ejRedo = function () { redoOriginal(); ejRenderToolbar(); ejObjBar(); };
-
-    var downOriginal = ejSvgPointerDown, moveOriginal = ejSvgPointerMove, upOriginal = ejSvgPointerUp;
-    ejSvgPointerDown = function (e) {
-        ejP._objPaleta = false;
-        var nJug = ejP.players.length;
-        downOriginal(e);
-        // Las fichas de tarea no llevan dorsal
-        if (ejP._tareaColor && ejP.players.length > nJug) {
-            var ficha = ejP.players[ejP.players.length - 1];
-            ficha.showNumber = false;
-            if (typeof EQ_ROLES !== 'undefined' && EQ_ROLES.some(function (r) { return r[0] === ejP._tareaColor; })) { ficha.rol = ejP._tareaColor; ficha.color = 'white'; }
-            ejRenderSVG();
-        }
-        var mueve = ejP.isDragging && ejP.activeTool === 'select' && !ejP._ctrlId && !ejP._epDrag && !ejP._rszId && !ejP._trajCtrlId && !ejP._marquee && (ejP.selectedId || ejP._blockDrag);
-        ejP._arr = mueve ? {
-            x: e.clientX, y: e.clientY, movido: false,
-            copia: { players: JSON.stringify(ejP.players), lines: JSON.stringify(ejP.lines), shapes: JSON.stringify(ejP.shapes), texts: JSON.stringify(ejP.texts), equipment: JSON.stringify(ejP.equipment) }
-        } : null;
-        ejObjBar();
-    };
-    ejSvgPointerMove = function (e) {
-        moveOriginal(e);
-        var a = ejP._arr;
-        if (!a || !ejP.isDragging) return;
-        if (!a.movido && Math.abs(e.clientX - a.x) + Math.abs(e.clientY - a.y) > 8) a.movido = true;
-        if (a.movido && (ejP.zoom || 1) === 1 && !((ejP.camAngle || 0) > 0)) ejObjFranja(true, ejObjZonaBorrar(e));
-    };
-    ejSvgPointerUp = function (e) {
-        var a = ejP._arr;
-        ejP._arr = null;
-        if (a && a.movido && ejP.isDragging && ejObjZonaBorrar(e)) {
-            // Se suelta en la franja: el objeto vuelve a donde estaba y se borra, así deshacer lo recupera en su sitio
-            ejP.players = JSON.parse(a.copia.players); ejP.lines = JSON.parse(a.copia.lines); ejP.shapes = JSON.parse(a.copia.shapes);
-            ejP.texts = JSON.parse(a.copia.texts); ejP.equipment = JSON.parse(a.copia.equipment);
-            ejP.isDragging = false; ejP._blockDrag = false;
-            ejObjFranja(false);
-            ejDelete();
-            ejToast('Borrado. Puedes recuperarlo con Deshacer.', 'info');
-            return;
-        }
-        upOriginal(e);
+// Borrar deja guardado el resultado, para que deshacer lo recupere
+function ejDelete() {
+    ejBorrarSeleccion();
+    ejSaveHistory();
+    if (ejP.animMode) ejFrameSaveCurrent();
+    ejObjBar();
+}
+// Puntero sobre el campo: a la lógica de dibujo (ejPuntero…) se añaden las fichas de tarea,
+// la barrita del objeto y el borrado arrastrando a la franja inferior
+function ejSvgPointerDown(e) {
+    ejP._objPaleta = false;
+    var nJug = ejP.players.length;
+    ejPunteroBajar(e);
+    // Las fichas de tarea no llevan dorsal
+    if (ejP._tareaColor && ejP.players.length > nJug) {
+        var ficha = ejP.players[ejP.players.length - 1];
+        ficha.showNumber = false;
+        if (typeof EQ_ROLES !== 'undefined' && EQ_ROLES.some(function (r) { return r[0] === ejP._tareaColor; })) { ficha.rol = ejP._tareaColor; ficha.color = 'white'; }
+        ejRenderSVG();
+    }
+    var mueve = ejP.isDragging && ejP.activeTool === 'select' && !ejP._ctrlId && !ejP._epDrag && !ejP._rszId && !ejP._trajCtrlId && !ejP._marquee && (ejP.selectedId || ejP._blockDrag);
+    ejP._arr = mueve ? {
+        x: e.clientX, y: e.clientY, movido: false,
+        copia: { players: JSON.stringify(ejP.players), lines: JSON.stringify(ejP.lines), shapes: JSON.stringify(ejP.shapes), texts: JSON.stringify(ejP.texts), equipment: JSON.stringify(ejP.equipment) }
+    } : null;
+    ejObjBar();
+}
+function ejSvgPointerMove(e) {
+    ejPunteroMover(e);
+    var a = ejP._arr;
+    if (!a || !ejP.isDragging) return;
+    if (!a.movido && Math.abs(e.clientX - a.x) + Math.abs(e.clientY - a.y) > 8) a.movido = true;
+    if (a.movido && (ejP.zoom || 1) === 1 && !((ejP.camAngle || 0) > 0)) ejObjFranja(true, ejObjZonaBorrar(e));
+}
+function ejSvgPointerUp(e) {
+    var a = ejP._arr;
+    ejP._arr = null;
+    if (a && a.movido && ejP.isDragging && ejObjZonaBorrar(e)) {
+        // Se suelta en la franja: el objeto vuelve a donde estaba y se borra, así deshacer lo recupera en su sitio
+        ejP.players = JSON.parse(a.copia.players); ejP.lines = JSON.parse(a.copia.lines); ejP.shapes = JSON.parse(a.copia.shapes);
+        ejP.texts = JSON.parse(a.copia.texts); ejP.equipment = JSON.parse(a.copia.equipment);
+        ejP.isDragging = false; ejP._blockDrag = false;
         ejObjFranja(false);
-        ejObjBar();
-    };
-    window.addEventListener('resize', function () { ejPanelHueco(); ejObjBar(); });
-})();
+        ejDelete();
+        ejToast('Borrado. Puedes recuperarlo con Deshacer.', 'info');
+        return;
+    }
+    ejPunteroSoltar(e);
+    ejObjFranja(false);
+    ejObjBar();
+}
 // =====================================================================
 // Entrega 6a · Fondos de campo
 // Doce fondos. Los siete de césped usan el color elegido; los otros
@@ -6239,33 +6250,6 @@ function ejFondoMiniaturas(accion) {
     }).join('') + '</div>';
 }
 // Miniaturas de los fondos en el panel Campo, encima de los colores
-function ejFondoPanel(tb) {
-    var cab = tb.querySelector('.ej-section-header.ej-sec-campo');
-    var body = cab ? cab.nextElementSibling : null;
-    if (!body || !body.classList.contains('ej-section-body') || body.querySelector('.ej-fondos')) return;
-    var cuad = body.querySelector('[onclick="ejSetFieldColor(\'grid\')"]');
-    if (!cuad) return;
-    var fila = cuad.parentNode, rotulo = fila.previousElementSibling;
-    cuad.remove();
-    var act = ejFondoDef();
-    var caja = document.createElement('div');
-    caja.innerHTML = '<div class="ej-fondos-t">Fondo del campo</div>' + ejFondoMiniaturas('ejSetFondo(\'$k\')');
-    fila.parentNode.insertBefore(caja, rotulo || fila);
-    if (act.color) { fila.style.opacity = '0.35'; fila.title = 'Este fondo tiene su propio color. Al elegir un color se vuelve al césped.'; }
-}
-(function () {
-    if (!ejP.fieldFondo) ejP.fieldFondo = ejP.fieldColor === 'grid' ? 'cuaderno' : 'cruzado';
-    if (!ejP.escudo) ejP.escudo = { ver: true, op: 0.18, tam: 1 };
-    // El selector de datos de la barra manda sobre los dorsales: por defecto, dorsal y nombre
-    var lab0 = ejP._plantillaLabel || 'both';
-    ejP.showNumbers = lab0 !== 'name' && lab0 !== 'solotexto';
-    var setColorOriginal = ejSetFieldColor;
-    ejSetFieldColor = function (color) {
-        if (color === 'grid') { ejSetFondo('cuaderno'); return; }
-        if (ejFondoDef().color) ejP.fieldFondo = 'cruzado';
-        setColorOriginal(color);
-    };
-})();
 // =====================================================================
 // Entrega 6b · Configuración de la pizarra, guardada por club
 // Fondo y color, escudo en el círculo central, equipación y fichas.
@@ -6381,7 +6365,14 @@ async function ejCfgGuardar() {
     var club = ejCfgClub();
     var id = club ? club.id : (typeof clubId !== 'undefined' ? clubId : null);
     if (!id) { ejToast('No se ha podido identificar el club.', 'error'); return; }
-    var cfg = ejCfgActual();
+    // Se parte de lo que el club tiene guardado ahora mismo (equipaciones y colores de tarea incluidos)
+    // y solo se cambian los datos de la pizarra. Nunca se sustituye la configuración entera.
+    var previo = (club && club.pizarra_config) || {};
+    try {
+        var leido = await supabaseClient.from('clubs').select('pizarra_config').eq('id', id).maybeSingle();
+        if (leido && !leido.error && leido.data && leido.data.pizarra_config) previo = leido.data.pizarra_config;
+    } catch (e) { /* si no se puede leer, se usa lo que hay en memoria */ }
+    var cfg = Object.assign({}, previo, ejCfgActual());
     var r = await supabaseClient.from('clubs').update({ pizarra_config: cfg }).eq('id', id);
     if (r && r.error) { console.error('pizarra_config:', r.error); ejToast('No se ha podido guardar la configuración. Revisa que la columna pizarra_config exista.', 'error'); return; }
     if (club) club.pizarra_config = cfg;
@@ -6471,46 +6462,11 @@ function ejIrEquipacion() {
     var sub = document.querySelector('#modulo-config .sub-tab[onclick*="equipacion"]');
     if (sub) sub.click();
 }
-(function () {
-    var renderToolbarOriginal = ejRenderToolbar;
-    ejRenderToolbar = function () {
-        // Sin pregunta inicial: si la pizarra espera a que se elija modo, se abre en estático
-        var ov = document.getElementById('ej-modo-overlay');
-        if (ov && ov.style.display !== 'none') { ejCfgAplicar(); ejElegirModo('estatico'); return; }
-        if (ejP.activeTool !== 'player') ejP._tareaColor = null;
-        if (ejP._apariencia === undefined) ejP._apariencia = true;
-        renderToolbarOriginal();
-        var tb = document.getElementById('ej-toolbar');
-        if (tb) ejJugLimpiarPanel(tb);
-        if (tb) ejFondoPanel(tb);
-        if (tb && !tb.querySelector('.ej-anim-btn')) {
-            var b = document.createElement('button');
-            b.type = 'button';
-            b.className = 'ej-anim-btn' + (ejP.animMode ? ' on' : '');
-            b.setAttribute('onclick', 'ejAnimConmutar()');
-            b.textContent = ejP.animMode ? '🎬 Quitar animación' : '🎬 Animar';
-            var acciones = tb.querySelector('button[onclick="ejExportPNG()"]');
-            if (acciones && acciones.parentNode && acciones.parentNode.parentNode === tb) tb.insertBefore(b, acciones.parentNode);
-            else tb.appendChild(b);
-        }
-        ejRenderJugBar();
-        ejPanelHueco();
-        ejObjBar();
-        if (ejP._jugModalPend && ejP._plantilla && ejP._plantilla.length && !!ejP._plantillaEsRival === !!ejP._addingRival) { ejP._jugModalPend = false; ejJugModalAbrir(); }
-    };
-    var showTabOriginal = ejShowTab;
-    ejShowTab = function (tab, btn) {
-        showTabOriginal(tab, btn);
-        if (tab === 'pizarra') ejRenderToolbar();
-    };
-    var renderSVGOriginal = ejRenderSVG;
-    ejRenderSVG = function () {
-        if (ejEqCfg()) ejKitSync();
-        renderSVGOriginal();
-        ejObjBar();
-        // El área de trabajo toma el color del campo: así no quedan franjas oscuras a los lados
-        if (ejP._presentOn) return;
-        var area = document.getElementById('ej-canvas-area');
-        if (area) { var cf = ejFondoColor(); area.style.background = cf === 'grid' ? '#fbfcfe' : cf; }
-    };
-})();
+// Barras que acompañan a la pizarra: jugadores arriba, hueco del panel y opciones del objeto
+function ejBarrasSync() {
+    ejRenderJugBar();
+    ejPanelHueco();
+    ejObjBar();
+    if (ejP._jugModalPend && ejP._plantilla && ejP._plantilla.length && !!ejP._plantillaEsRival === !!ejP._addingRival) { ejP._jugModalPend = false; ejJugModalAbrir(); }
+}
+window.addEventListener('resize', function () { ejPanelHueco(); ejObjBar(); });
