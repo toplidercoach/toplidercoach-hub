@@ -206,8 +206,20 @@
   body:has(#modulo-pizarra.active):not(.tlc-hub-abierto) .main-tabs,
   body:has(#modulo-pizarra.active):not(.tlc-hub-abierto) #tlc-sidebar { display: none !important; }
   body:has(#modulo-pizarra.active):not(.tlc-hub-abierto) #app-container { margin-left: 0 !important; }
-  #ej-canvas-area svg { max-height: calc(100vh - 190px); }
-  body:has(#modulo-pizarra.active):not(.tlc-hub-abierto) #ej-canvas-area svg { max-height: calc(100vh - 118px); }
+  #ej-canvas-area svg { max-height: calc(100vh - 130px); }
+  body:has(#modulo-pizarra.active):not(.tlc-hub-abierto) #ej-canvas-area svg { max-height: calc(100vh - 58px); }
+
+  /* -- 3. Fotogramas en un carril a la derecha: no quitan altura al campo -- */
+  #ej-canvas-area { flex-direction: row; align-items: flex-start; gap: 8px; border-radius: 10px; }
+  #ej-canvas-area > svg { flex: 1 1 0; min-width: 0; }
+  #ej-timeline-bar { position: static; width: 68px; flex: none; box-sizing: border-box; margin: 0; padding: 6px 5px; max-height: calc(100vh - 58px); overflow-y: auto; overflow-x: hidden; }
+  #ej-timeline-bar > div:first-child { flex-direction: column; flex-wrap: nowrap !important; align-items: stretch !important; gap: 8px !important; }
+  #ej-timeline-bar > div:first-child > div { flex-direction: column; align-items: stretch !important; gap: 4px !important; flex: none !important; overflow: visible !important; padding: 0 !important; }
+  #ej-timeline-bar > div:first-child > div:nth-child(2) { align-items: center !important; max-height: 34vh; overflow-y: auto !important; padding: 2px 0 !important; }
+  #ej-timeline-bar button { width: 100%; box-sizing: border-box; padding: 7px 2px !important; font-size: 11px !important; line-height: 1.15; white-space: normal; }
+  #ej-timeline-bar > div:first-child > span, #ej-timeline-bar > div:first-child > div > span { text-align: center; white-space: normal !important; }
+  #ej-anim-msg:empty { display: none; }
+  #ej-anim-msg { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); margin: 0 !important; background: #0f172a; border: 1px solid #334155; padding: 6px 12px; border-radius: 8px; white-space: nowrap; z-index: 8; }
 
   /* -- 2. Carril de iconos -- */
   #ej-tab-pizarra { padding: 8px 10px; }
@@ -217,6 +229,7 @@
   #ej-toolbar { width: 56px; min-width: 56px; box-sizing: border-box; padding: 6px 5px; gap: 4px; overflow: visible; max-height: none !important; }
   #ej-toolbar > .ej-btn-tool,
   #ej-toolbar > .ej-section-header,
+  #ej-toolbar > .ej-anim-btn,
   #ej-toolbar > div:not(.ej-section-body) > button[onclick] {
     position: relative; box-sizing: border-box; width: 44px !important; height: 44px; flex: none !important;
     padding: 0 !important; margin: 0 !important; display: flex; align-items: center; justify-content: center;
@@ -226,6 +239,7 @@
   #ej-toolbar > .ej-section-header { border-left-width: 1px !important; color: #e5ecf7; }
   #ej-toolbar > .ej-section-header.open { box-shadow: 0 0 0 2px #e5ecf7; }
   #ej-toolbar > .ej-section-header::before,
+  #ej-toolbar > .ej-anim-btn::before,
   #ej-toolbar > div:not(.ej-section-body) > button[onclick]::before {
     content: ""; display: block; width: 22px; height: 22px; background: currentColor;
     -webkit-mask: var(--ej-i) center / contain no-repeat; mask: var(--ej-i) center / contain no-repeat;
@@ -234,6 +248,8 @@
   #ej-toolbar > .ej-sec-campo    { --ej-i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='5' width='18' height='14' rx='1'/%3E%3Cpath d='M12 5v14'/%3E%3Ccircle cx='12' cy='12' r='2.5'/%3E%3C/svg%3E"); --ej-t: "Campo"; }
   #ej-toolbar > .ej-sec-draw     { --ej-i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 20l4-1L20 7l-3-3L5 16z'/%3E%3Cpath d='M14 6l4 4'/%3E%3C/svg%3E"); --ej-t: "Dibujo"; }
   #ej-toolbar > .ej-sec-material { --ej-i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 4h4l4 14H6zM4 20h16M8.5 11h7'/%3E%3C/svg%3E"); --ej-t: "Material"; }
+  #ej-toolbar > .ej-anim-btn { --ej-i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='5' width='18' height='14' rx='2'/%3E%3Cpath d='M10 9l5 3-5 3z'/%3E%3C/svg%3E"); --ej-t: "Animación: añadir fotogramas"; margin-top: 6px !important; }
+  #ej-toolbar > .ej-anim-btn.on { --ej-t: "Quitar la animación"; }
   #ej-toolbar > div > button[onclick="ejUndo()"] { --ej-i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 7L4 12l5 5'/%3E%3Cpath d='M4 12h10a5 5 0 010 10h-2'/%3E%3C/svg%3E"); }
   #ej-toolbar > div > button[onclick="ejRedo()"] { --ej-i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15 7l5 5-5 5'/%3E%3Cpath d='M20 12H10a5 5 0 000 10h2'/%3E%3C/svg%3E"); }
   #ej-toolbar > div > button[onclick="ejCapturarParaFicha()"] { --ej-i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 3h11l3 3v15H5z'/%3E%3Cpath d='M8 3v6h7V3M8 21v-7h8v7'/%3E%3C/svg%3E"); --ej-t: "Guardar ejercicio"; }
@@ -243,6 +259,7 @@
   #ej-toolbar > div > button[onclick="ejDelete()"]:disabled { opacity: .4; }
   /* nombre al pasar el ratón */
   #ej-toolbar > .ej-section-header:hover::after,
+  #ej-toolbar > .ej-anim-btn:hover::after,
   #ej-toolbar > div:not(.ej-section-body) > button[onclick]:not([title]):hover::after {
     content: var(--ej-t); position: absolute; left: 52px; top: 50%; transform: translateY(-50%);
     background: #0f172a; color: #fff; border: 1px solid #334155; padding: 6px 10px; border-radius: 8px;
@@ -262,6 +279,73 @@
     z-index: 6; box-shadow: 0 10px 30px rgba(0,0,0,.35);
   }
   #ej-pizarra-wrap:has(#ej-toolbar > .ej-section-body) #ej-canvas-area { margin-left: 308px; }
+}
+/* Sin pregunta inicial "estático o animado" */
+#ej-modo-overlay { display: none !important; }
+#ej-toolbar > div[style^="background:#7c3aed"] { display: none; }
+.ej-anim-btn { width: 100%; padding: 9px; border-radius: 8px; border: 1px solid #6d28d9; background: #2e1065; color: #ddd6fe; font-size: 12px; font-weight: 600; cursor: pointer; }
+.ej-anim-btn.on { background: #7c3aed; color: #fff; border-color: #a855f7; }
+/* Barra de jugadores en la fila de Pizarra / Ficha / Banco */
+#ej-jugbar { display: flex; align-items: center; gap: 6px; margin: 0 0 4px 14px; padding-left: 14px; border-left: 1px solid #374151; }
+.ej-module:has(#ej-tab-pizarra[style*="display: none"]) #ej-jugbar { display: none; }
+.ej-jb-seg { display: flex; background: #0b1220; border: 1px solid #2f405c; border-radius: 8px; padding: 2px; }
+.ej-jb-seg button { padding: 5px 10px; border: none; border-radius: 6px; background: transparent; color: #94a3b8; font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.ej-jb-seg button.on.my { background: #1d4ed8; color: #fff; }
+.ej-jb-seg button.on.riv { background: #b91c1c; color: #fff; }
+.ej-jb-btn, .ej-jb-sel { height: 30px; padding: 0 10px; border-radius: 7px; border: 1px solid #2f405c; background: #1c2638; color: #e2e8f0; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.ej-jb-btn.on { background: #22c55e; border-color: #16a34a; color: #052e14; }
+.ej-jb-sel { padding: 0 6px; }
+.ej-jb-dots { display: flex; align-items: center; gap: 5px; padding: 0 4px 0 8px; border-left: 1px solid #374151; }
+.ej-jb-dot { box-shadow: 0 0 0 1px #64748b; width: 20px; height: 20px; padding: 0; border-radius: 50%; border: 2px solid; cursor: pointer; flex: none; }
+.ej-jb-dot.on { outline: 2px solid #22c55e; outline-offset: 2px; }
+.ej-jb-a { width: 30px; padding: 0; font-size: 14px; font-weight: 800; }
+.ej-jb-dat { width: 104px; }
+#ej-jug-modal { position: fixed; inset: 0; z-index: 99990; background: rgba(2,6,23,.72); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.ej-jm-caja { width: 100%; max-width: 780px; max-height: 88vh; display: flex; flex-direction: column; background: #0f172a; border: 1px solid #334155; border-radius: 14px; box-shadow: 0 20px 60px rgba(0,0,0,.6); overflow: hidden; }
+.ej-jm-cab { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid #1e293b; color: #e2e8f0; font-size: 15px; }
+.ej-jm-cab strong { flex: 1; }
+.ej-jm-otro, .ej-jm-cancel { background: transparent; border: 1px solid #475569; color: #cbd5e1; border-radius: 8px; padding: 6px 12px; font-size: 12px; cursor: pointer; }
+.ej-jm-x { background: none; border: none; color: #94a3b8; font-size: 18px; cursor: pointer; padding: 2px 6px; }
+.ej-jm-cuerpo { overflow-y: auto; padding: 6px 16px 14px; }
+.ej-jm-grupo { display: flex; align-items: center; justify-content: space-between; margin: 12px 0 6px; color: #94a3b8; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
+.ej-jm-grupo button { background: none; border: none; color: #60a5fa; font-size: 11px; font-weight: 600; cursor: pointer; padding: 2px 0; }
+.ej-jm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+.ej-jm-card { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 8px 4px; background: #1e293b; border: 2px solid transparent; border-radius: 10px; color: #e2e8f0; cursor: pointer; min-width: 0; font-family: inherit; }
+.ej-jm-card.on { border-color: #22c55e; background: #14532d; }
+.ej-jm-card.en { opacity: .45; cursor: default; }
+.ej-jm-card b { font-size: 12px; font-weight: 600; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ej-jm-card i { font-size: 10px; font-style: normal; color: #94a3b8; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ej-jm-av { width: 46px; height: 46px; border-radius: 50%; border: 2px solid; background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 700; color: #fff; }
+.ej-jm-pie { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-top: 1px solid #1e293b; }
+.ej-jm-pie span { flex: 1; color: #64748b; font-size: 11px; }
+.ej-jm-ok { background: #22c55e; border: none; color: #052e14; border-radius: 8px; padding: 9px 16px; font-size: 13px; font-weight: 700; cursor: pointer; }
+.ej-jm-ok:disabled { background: #334155; color: #94a3b8; cursor: default; }
+.ej-jb-est { display: flex; background: #0b1220; border: 1px solid #2f405c; border-radius: 8px; padding: 2px; gap: 1px; }
+.ej-jb-est button { width: 27px; height: 24px; padding: 0; border: none; border-radius: 6px; background: transparent; color: #94a3b8; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.ej-jb-est button.on { background: #334155; color: #fff; }
+.ej-jb-a.on { background: #1d4ed8; border-color: #3b82f6; color: #fff; }
+@media (max-width: 900px) { #ej-jugbar { display: none; } }
+@media (max-width: 1500px) {
+  #ej-jugbar { margin-left: 6px; padding-left: 8px; gap: 5px; }
+  .ej-jb-txt { display: none; }
+  .ej-jb-seg button { padding: 5px 7px; }
+  .ej-jb-btn, .ej-jb-sel { padding: 0 7px; }
+  .ej-jb-sel { width: 86px; }
+  .ej-jb-dat { width: 90px; }
+  .ej-jb-dots { gap: 4px; padding: 0 2px 0 6px; }
+  .ej-jb-dot { width: 18px; height: 18px; }
+  .ej-nav .ej-nav-btn { padding-left: 10px; padding-right: 10px; }
+}
+@media (max-width: 1500px) { #ej-pizarra-topbar > div:first-child { display: none !important; } }
+@media (max-width: 1100px) { .ej-jb-dots { display: none; } }
+@media (max-width: 1280px) {
+  #ej-pizarra-topbar button[onclick] { font-size: 0 !important; padding: 5px 9px !important; }
+  #ej-pizarra-topbar button[onclick]::before { font-size: 14px; }
+  #ej-pizarra-topbar button[onclick="ejProyPanel()"]::before { content: "📁"; }
+  #ej-pizarra-topbar button[onclick="ejPresentar()"]::before { content: "📽"; }
+  #ej-pizarra-topbar button[onclick="ejNuevaPizarra()"]::before { content: "✕"; color: #cbd5e1; }
+  #ej-pizarra-topbar > div:first-child { display: none !important; }
+  #ej-pizarra-topbar button { padding-left: 9px !important; padding-right: 9px !important; }
 }
 /* El campo no es texto seleccionable: sin esto, arrastrar para dibujar inicia una seleccion de texto y el navegador corta el trazo */
 #ej-canvas-area, #ej-canvas-area svg { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }

@@ -475,7 +475,7 @@ function ejRenderSVG() {
 
     // Jugadores (encima de todo)
     for (const p of ejP.players) {
-        const isGk = p.number == 1;
+        const isGk = p.number == 1 && p.team !== 'tarea';
         const gkColor = ejEsRival(p) ? ejP.rivalGkColor : ejP.myGkColor;
         const effectiveColor = isGk ? gkColor : p.color;
         const tc = EJ_TEAM_COLORS[effectiveColor] || EJ_TEAM_COLORS.blue;
@@ -487,7 +487,7 @@ function ejRenderSVG() {
         const textColor = ['yellow','white','atletico','juventus'].includes(p.color) ? '#1e293b' : '#ffffff';
         const fillAttr = tc.striped ? `url(#stp-${p.id})` : tc.fill;
 
-        if (p.soloTexto) {
+        if (p.soloTexto && !p.anon) {
             const _stName = ejEscXml(p.name || '');
             const _stFs = 12 * scale;
             const _stW = Math.max(30, _stName.length * _stFs * 0.62);
@@ -499,21 +499,21 @@ function ejRenderSVG() {
         </g>`;
             continue;
         }
-        var _hasPhoto = !!p.photo;
+        var _est = p.estilo || 'foto', _anon = !!p.anon, _hasPhoto = !!p.photo && _est === 'foto' && !_anon, _verNum = p.showNumber && p.number && !_anon, _verNom = p.showName && p.name && !_anon;
         html += `<g data-id="${p.id}" data-type="player" transform="translate(${p.x},${p.y})" style="cursor:move">
             <ellipse cx="${r*0.18}" cy="${r*0.62}" rx="${r*0.92}" ry="${r*0.42}" fill="rgba(0,0,0,0.30)" style="pointer-events:none"/>
             ${p.hasVest ? `<circle r="${r+4}" fill="none" stroke="${vc.fill}" stroke-width="4" stroke-dasharray="8 4"/>` : ''}`;
-        if (_hasPhoto) {
+        if (_est === 'camiseta') { html += ejCamisetaSVG(r, fillAttr, sel ? '#22c55e' : tc.stroke, sel, _verNum ? p.number : '', textColor, fs); } else if (_hasPhoto) {
             html += `<circle r="${r}" fill="#0f172a"/>
             <image href="${ejFotoCache[p.photo] || p.photo}" x="${-r}" y="${-r}" width="${r*2}" height="${r*2}" preserveAspectRatio="xMidYMid slice" clip-path="url(#pclip-${p.id})" style="pointer-events:none"/>
             <circle r="${r}" fill="none" stroke="${sel?'#22c55e':tc.stroke}" stroke-width="${sel?3:2.5}"/>
-            ${p.showNumber && p.number ? `<circle cx="${r*0.72}" cy="${r*0.72}" r="${r*0.56}" fill="${tc.fill}" stroke="#fff" stroke-width="1.2"/><text x="${r*0.72}" y="${r*0.72}" text-anchor="middle" dominant-baseline="central" fill="${textColor}" font-size="${fs*0.82}" font-weight="700" font-family="system-ui">${p.number}</text>` : ''}`;
+            ${_verNum ? `<circle cx="${r*0.72}" cy="${r*0.72}" r="${r*0.56}" fill="${tc.fill}" stroke="#fff" stroke-width="1.2"/><text x="${r*0.72}" y="${r*0.72}" text-anchor="middle" dominant-baseline="central" fill="${textColor}" font-size="${fs*0.82}" font-weight="700" font-family="system-ui">${p.number}</text>` : ''}`;
         } else {
             html += `<circle r="${r}" fill="${fillAttr}" stroke="${sel?'#22c55e':tc.stroke}" stroke-width="${sel?3:2}"/>
             <ellipse cx="0" cy="${-r*0.32}" rx="${r*0.62}" ry="${r*0.40}" fill="rgba(255,255,255,0.16)" style="pointer-events:none"/>
-            ${p.showNumber && p.number ? `<text text-anchor="middle" dominant-baseline="central" fill="${textColor}" font-size="${fs}" font-weight="700" font-family="system-ui">${p.number}</text>` : ''}`;
+            ${_verNum ? `<text text-anchor="middle" dominant-baseline="central" fill="${textColor}" font-size="${fs}" font-weight="700" font-family="system-ui">${p.number}</text>` : ''}`;
         }
-        html += `${p.showName && p.name ? `<text text-anchor="middle" y="${r+11}" fill="#ffffff" font-size="9" font-weight="600" font-family="system-ui" style="text-shadow:0 1px 2px rgba(0,0,0,.8)">${ejEscXml(p.name)}</text>` : ''}
+        html += `${_verNom ? `<text text-anchor="middle" y="${r+11}" fill="#ffffff" font-size="9" font-weight="600" font-family="system-ui" style="text-shadow:0 1px 2px rgba(0,0,0,.8)">${ejEscXml(p.name)}</text>` : ''}
         </g>`;
     }
 // Fantasmas del frame anterior - no mostrar durante exportación
@@ -765,20 +765,20 @@ if (ejP.activeTool === 'connect') { if (!isBackground && el) { var _cid = parseI
                 photo: (ejP._plantillaLabel === 'nofoto' || ejP._plantillaLabel === 'solotexto') ? null : (p.photo || null),
                 showNumber: ejP._plantillaLabel !== 'name' && ejP._plantillaLabel !== 'solotexto',
                 showName: ejP._plantillaLabel === 'name' || ejP._plantillaLabel === 'both' || ejP._plantillaLabel === 'nofoto' || ejP._plantillaLabel === 'solotexto', soloTexto: ejP._plantillaLabel === 'solotexto',
-                hasVest: false, vestColor: ejP.vestColor
+                hasVest: false, vestColor: ejP.vestColor, estilo: ejP.fichaEstilo || 'foto', anon: !!ejP.fichaAnon
             });
             ejP._plantillaMode = false;
             ejP._plantillaSelIdx = undefined;
             ejP.activeTool = 'select';
         } else {
-            const color = ejP._addingRival ? ejP.rivalColor : ejP.myColor;
+            const color = ejP._tareaColor || (ejP._addingRival ? ejP.rivalColor : ejP.myColor);
             const counts = ejP.playerCounts;
             counts[color] = (counts[color] || 0) + 1;
             ejP.players.push({
-                id, x: pos.x, y: pos.y, color, team: ejP._addingRival ? 'rival' : 'my',
+                id, x: pos.x, y: pos.y, color, team: ejP._tareaColor ? 'tarea' : (ejP._addingRival ? 'rival' : 'my'),
                 scale, number: ejP.showNumbers ? counts[color] : '',
                 showNumber: ejP.showNumbers,
-                hasVest: ejP.hasVest, vestColor: ejP.vestColor
+                hasVest: ejP.hasVest, vestColor: ejP.vestColor, estilo: ejP.fichaEstilo || 'foto', anon: !!ejP.fichaAnon
             });
             // Mantener activo "Añadir jugador" para colocar varios seguidos
         }
@@ -2004,7 +2004,7 @@ function ejApplyFormation(key, isRival) {
     const ts = Date.now();
     if (!isRival) {
         // Reemplazar mi equipo
-        ejP.players = ejP.players.filter(p => ejEsRival(p)); // mantener solo rivales
+        ejP.players = ejP.players.filter(p => ejEsRival(p) || p.team === 'tarea'); // mantener rivales y fichas de tarea
         ejP.playerCounts[color] = 0;
     }
     const offset = ejP.nextId;
@@ -2014,7 +2014,7 @@ function ejApplyFormation(key, isRival) {
         y: pos.y * ejP.svgH,
         color, team: isRival ? 'rival' : 'my',
         scale,
-        number: i + 1,
+        number: i + 1, estilo: ejP.fichaEstilo || 'foto', anon: !!ejP.fichaAnon,
         showNumber: ejP.showNumbers,
         hasVest: ejP.hasVest,
         vestColor: ejP.vestColor
@@ -2631,7 +2631,7 @@ function ejEtiquetarEquipos() {
 }
 function ejJugadoresDelEquipo(rival) {
     ejEtiquetarEquipos();
-    return ejP.players.filter(function(p) { return (p.team === 'rival') === !!rival; });
+    return ejP.players.filter(function(p) { return p.team !== 'tarea' && (p.team === 'rival') === !!rival; });
 }
 function ejSetMyColor(c) {
     ejSaveHistory();
@@ -5515,3 +5515,316 @@ function ejProyPlegar() {
     b.style.display = plegado ? '' : 'none';
     if (btn) { btn.textContent = plegado ? '—' : '▢'; btn.title = plegado ? 'Plegar' : 'Desplegar'; }
 }
+// =====================================================================
+// REDISEÑO PIZARRA · Entregas 3 y 4
+// Barra de jugadores arriba (equipos, colores de tarea, estilo de ficha, anónimo
+// y ventana de plantilla),
+// animación a demanda, sin pregunta inicial y fondo del color del campo.
+// Todo va en este bloque: para deshacerlo basta con borrarlo.
+// =====================================================================
+function ejAnimConmutar() {
+    if (ejP.animMode && ejP.frames.length > 1) {
+        ejConfirm('¿Quitar la animación? Se perderán los fotogramas.', function () { ejToggleAnimMode(); });
+    } else {
+        ejToggleAnimMode();
+    }
+}
+function ejJugEquipo(rival) { ejP._addingRival = !!rival; ejP._tareaColor = null; ejP._jugModalPend = false; ejRenderToolbar(); }
+function ejJugAnadir() {
+    var rival = !!ejP._addingRival;
+    var activo = ejP.activeTool === 'player' && !ejP._plantillaMode && !ejP._tareaColor;
+    ejP._tareaColor = null;
+    ejSetTool(activo ? 'select' : 'player');
+    ejP._plantillaMode = false;
+    ejP._addingRival = rival;
+    ejRenderToolbar();
+}
+// Fichas de tarea: jugadores sin nombre de un color suelto (tercer equipo, comodines, petos)
+function ejJugTarea(color) {
+    var rival = !!ejP._addingRival;
+    var activo = ejP.activeTool === 'player' && ejP._tareaColor === color;
+    ejSetTool(activo ? 'select' : 'player');
+    ejP._plantillaMode = false;
+    ejP._addingRival = rival;
+    ejP._tareaColor = activo ? null : color;
+    ejRenderToolbar();
+}
+// Estilo de ficha (foto, círculo, camiseta) y botón "A" (fichas anónimas).
+// Se guarda en cada jugador (estilo, anon), así viaja con el ejercicio y con deshacer.
+function ejFichaSync() {
+    if (!ejP.players.length) return;
+    var ref = ejP.players.find(function (p) { return p.estilo; });
+    ejP.fichaEstilo = ref ? ref.estilo : 'foto';
+    ejP.fichaAnon = ref ? !!ref.anon : false;
+}
+function ejFichaEstilo(est) {
+    ejSaveHistory();
+    ejP.fichaEstilo = est;
+    ejP.players.forEach(function (p) { p.estilo = est; p.anon = !!ejP.fichaAnon; });
+    ejRenderSVG();
+    ejRenderToolbar();
+}
+function ejFichaAnonimo() {
+    ejSaveHistory();
+    ejP.fichaAnon = !ejP.fichaAnon;
+    ejP.players.forEach(function (p) { p.anon = ejP.fichaAnon; p.estilo = ejP.fichaEstilo || 'foto'; });
+    ejRenderSVG();
+    ejRenderToolbar();
+}
+function ejCamisetaSVG(r, fill, stroke, sel, numero, colorTexto, fs) {
+    var k = r * 1.25;
+    var pts = [[-0.42,-0.95],[-1.08,-0.58],[-0.86,-0.02],[-0.6,-0.2],[-0.6,0.98],[0.6,0.98],[0.6,-0.2],[0.86,-0.02],[1.08,-0.58],[0.42,-0.95]];
+    var d = 'M' + pts.map(function (q) { return (q[0] * k).toFixed(1) + ',' + (q[1] * k).toFixed(1); }).join(' L') + ' Q0,' + (-0.5 * k).toFixed(1) + ' ' + (-0.42 * k).toFixed(1) + ',' + (-0.95 * k).toFixed(1) + ' Z';
+    return '<path d="' + d + '" fill="' + fill + '" stroke="' + stroke + '" stroke-width="' + (sel ? 3 : 2) + '" stroke-linejoin="round"/>'
+        + (numero !== '' && numero !== undefined && numero !== null ? '<text y="' + (0.22 * k).toFixed(1) + '" text-anchor="middle" dominant-baseline="central" fill="' + colorTexto + '" font-size="' + fs + '" font-weight="700" font-family="system-ui" style="pointer-events:none">' + numero + '</text>' : '');
+}
+function ejJugFormacion(sel) {
+    if (sel.value) ejApplyFormation(sel.value, !!ejP._addingRival);
+    sel.value = '';
+}
+// ---- Ventana de jugadores: la plantilla por líneas, se marcan varios y entran de golpe ----
+var EJ_JUG_GRUPOS = [['POR', 'Porteros', 0.06], ['DEF', 'Defensas', 0.20], ['MED', 'Centrocampistas', 0.36], ['DEL', 'Delanteros', 0.47], ['OTR', 'Sin posición', 0.28]];
+function ejJugGrupo(pos) {
+    var t = String(pos || '').toLowerCase();
+    if (!t) return 'OTR';
+    if (t.indexOf('porter') >= 0 || t === 'por') return 'POR';
+    if (t.indexOf('medio') === 0 || t.indexOf('mc') === 0 || t.indexOf('mediapunta') >= 0 || t.indexOf('interior') >= 0 || t.indexOf('pivote') >= 0) return 'MED';
+    if (t.indexOf('central') >= 0 || t.indexOf('lateral') >= 0 || t.indexOf('defensa') >= 0 || t.indexOf('lt ') === 0 || t.indexOf('carrilero') >= 0) return 'DEF';
+    if (t.indexOf('delanter') >= 0 || t.indexOf('extremo') >= 0 || t.indexOf('ext ') === 0 || t.indexOf('punta') >= 0) return 'DEL';
+    return 'OTR';
+}
+function ejJugLado(pos) {
+    var t = String(pos || '').toLowerCase();
+    if (t.indexOf('izq') >= 0 || t.indexOf('izdo') >= 0) return 0;
+    if (t.indexOf('der') >= 0 || t.indexOf('dcho') >= 0) return 2;
+    return 1;
+}
+function ejJugEnCampo(j, rival) {
+    return ejP.players.some(function (p) { return p.name && p.name === j.name && ejEsRival(p) === rival && p.team !== 'tarea'; });
+}
+async function ejJugPlantilla() {
+    var rival = !!ejP._addingRival;
+    if (ejP._plantilla && ejP._plantilla.length && !!ejP._plantillaEsRival === rival) { ejJugModalAbrir(); return; }
+    ejP._jugModalPend = true;
+    if (rival) { ejCargarPlantillaRival(); return; }
+    await ejCargarPlantilla();
+    if (ejP._jugModalPend) { ejP._jugModalPend = false; ejToast('Tu plantilla está vacía. Añade jugadores en Mi Club.', 'warning'); }
+}
+function ejJugModalCerrar() {
+    var m = document.getElementById('ej-jug-modal');
+    if (m) m.remove();
+}
+function ejJugModalAbrir() {
+    ejP._jugSel = {};
+    ejJugModalCerrar();
+    var m = document.createElement('div');
+    m.id = 'ej-jug-modal';
+    m.onclick = function (e) { if (e.target === m) ejJugModalCerrar(); };
+    document.body.appendChild(m);
+    ejJugModalPintar();
+}
+function ejJugModalPintar() {
+    var m = document.getElementById('ej-jug-modal');
+    if (!m) return;
+    var rival = !!ejP._plantillaEsRival;
+    var lista = ejP._plantilla || [];
+    var sel = ejP._jugSel || {};
+    var nSel = Object.keys(sel).length;
+    var cuerpo = '';
+    EJ_JUG_GRUPOS.forEach(function (g) {
+        var idx = [];
+        lista.forEach(function (j, i) { if (ejJugGrupo(j.position) === g[0]) idx.push(i); });
+        if (!idx.length) return;
+        var libres = idx.filter(function (i) { return !ejJugEnCampo(lista[i], rival); });
+        var todos = libres.length && libres.every(function (i) { return sel[i]; });
+        cuerpo += '<div class="ej-jm-grupo"><span>' + g[1] + ' · ' + idx.length + '</span>'
+            + (libres.length ? '<button type="button" onclick="ejJugModalGrupo(\'' + g[0] + '\')">' + (todos ? 'Quitar todos' : 'Marcar todos') + '</button>' : '') + '</div><div class="ej-jm-grid">';
+        idx.forEach(function (i) {
+            var j = lista[i];
+            var enCampo = ejJugEnCampo(j, rival);
+            var esGk = g[0] === 'POR';
+            var col = EJ_TEAM_COLORS[rival ? (esGk ? ejP.rivalGkColor : ejP.rivalColor) : (esGk ? ejP.myGkColor : ejP.myColor)] || EJ_TEAM_COLORS.blue;
+            var num = (j.number === null || j.number === undefined) ? '' : j.number;
+            var avatar = j.photo
+                ? '<div class="ej-jm-av" style="background-image:url(\'' + String(j.photo).replace(/'/g, '%27') + '\');border-color:' + col.stroke + '"></div>'
+                : '<div class="ej-jm-av" style="background:' + col.fill + ';border-color:' + col.stroke + '">' + num + '</div>';
+            cuerpo += '<button type="button" class="ej-jm-card' + (sel[i] ? ' on' : '') + (enCampo ? ' en' : '') + '"' + (enCampo ? ' disabled' : ' onclick="ejJugModalToggle(' + i + ')"') + '>'
+                + avatar + '<b>' + ejEscXml(j.name || '?') + '</b><i>' + (enCampo ? 'En el campo' : (num !== '' ? num + ' · ' : '') + ejEscXml(j.position || '')) + '</i></button>';
+        });
+        cuerpo += '</div>';
+    });
+    m.innerHTML = '<div class="ej-jm-caja">'
+        + '<div class="ej-jm-cab"><strong>' + (rival ? 'Jugadores del rival' : 'Mis jugadores') + '</strong>'
+        + (rival ? '<button type="button" class="ej-jm-otro" onclick="ejJugModalCerrar();ejP._jugModalPend=true;ejCargarPlantillaRival()">Cambiar de equipo</button>' : '')
+        + '<button type="button" class="ej-jm-x" onclick="ejJugModalCerrar()" title="Cerrar">✕</button></div>'
+        + '<div class="ej-jm-cuerpo">' + cuerpo + '</div>'
+        + '<div class="ej-jm-pie"><span>Cada jugador entra colocado en su línea; luego lo mueves donde quieras.</span>'
+        + '<button type="button" class="ej-jm-cancel" onclick="ejJugModalCerrar()">Cancelar</button>'
+        + '<button type="button" class="ej-jm-ok"' + (nSel ? '' : ' disabled') + ' onclick="ejJugModalAnadir()">' + (nSel ? 'Añadir ' + nSel + (nSel === 1 ? ' jugador' : ' jugadores') : 'Marca jugadores') + '</button></div></div>';
+}
+function ejJugModalToggle(i) {
+    var cuerpo = document.querySelector('#ej-jug-modal .ej-jm-cuerpo');
+    var sc = cuerpo ? cuerpo.scrollTop : 0;
+    if (ejP._jugSel[i]) delete ejP._jugSel[i]; else ejP._jugSel[i] = true;
+    ejJugModalPintar();
+    cuerpo = document.querySelector('#ej-jug-modal .ej-jm-cuerpo');
+    if (cuerpo) cuerpo.scrollTop = sc;
+}
+function ejJugModalGrupo(g) {
+    var rival = !!ejP._plantillaEsRival;
+    var libres = [];
+    (ejP._plantilla || []).forEach(function (j, i) { if (ejJugGrupo(j.position) === g && !ejJugEnCampo(j, rival)) libres.push(i); });
+    var todos = libres.every(function (i) { return ejP._jugSel[i]; });
+    libres.forEach(function (i) { if (todos) delete ejP._jugSel[i]; else ejP._jugSel[i] = true; });
+    var cuerpo = document.querySelector('#ej-jug-modal .ej-jm-cuerpo');
+    var sc = cuerpo ? cuerpo.scrollTop : 0;
+    ejJugModalPintar();
+    cuerpo = document.querySelector('#ej-jug-modal .ej-jm-cuerpo');
+    if (cuerpo) cuerpo.scrollTop = sc;
+}
+function ejJugModalAnadir() {
+    var rival = !!ejP._plantillaEsRival;
+    var lista = ejP._plantilla || [];
+    var marcados = Object.keys(ejP._jugSel || {}).map(Number);
+    if (!marcados.length) return;
+    ejSaveHistory();
+    var lab = ejP._plantillaLabel || 'both';
+    if (lab === 'nofoto') lab = 'both';
+    var scale = ejP.selectedSize === 'small' ? 0.6 : ejP.selectedSize === 'large' ? 1.4 : 1.0;
+    EJ_JUG_GRUPOS.forEach(function (g) {
+        var grupo = marcados.filter(function (i) { return ejJugGrupo(lista[i].position) === g[0]; });
+        grupo.sort(function (a, b) { return (ejJugLado(lista[a].position) - ejJugLado(lista[b].position)) || ((lista[a].number || 0) - (lista[b].number || 0)); });
+        if (rival) grupo.reverse();
+        grupo.forEach(function (i, k) {
+            var j = lista[i];
+            var x = (rival ? 1 - g[2] : g[2]) * ejP.svgW;
+            var y = 40 + (k + 0.5) / grupo.length * (ejP.svgH - 80);
+            var libre = function () { return !ejP.players.some(function (p) { return Math.abs(p.x - x) < 16 && Math.abs(p.y - y) < 16; }); };
+            for (var n = 0; n < 12 && !libre(); n++) x += rival ? -26 : 26;
+            var esGk = g[0] === 'POR';
+            ejP.players.push({
+                id: ejP.nextId++, x: x, y: y,
+                color: rival ? (esGk ? ejP.rivalGkColor : ejP.rivalColor) : (esGk ? ejP.myGkColor : ejP.myColor),
+                team: rival ? 'rival' : 'my', scale: scale,
+                number: (j.number === null || j.number === undefined) ? '' : j.number, name: j.name, photo: j.photo || null,
+                showNumber: lab !== 'name' && lab !== 'solotexto', showName: lab !== 'num', soloTexto: lab === 'solotexto',
+                hasVest: false, vestColor: ejP.vestColor,
+                estilo: ejP.fichaEstilo || 'foto', anon: !!ejP.fichaAnon
+            });
+        });
+    });
+    ejP.selectedId = null;
+    if (ejP.animMode) ejFrameSaveCurrent();
+    ejJugModalCerrar();
+    ejRenderSVG();
+    ejRenderToolbar();
+    ejToast(marcados.length + (marcados.length === 1 ? ' jugador añadido' : ' jugadores añadidos'), 'success');
+}
+// Qué datos se ven en las fichas con nombre (dorsal, nombre, los dos o solo el nombre escrito)
+function ejJugDatos(v) {
+    ejP._plantillaLabel = v;
+    var conNombre = ejP.players.filter(function (p) { return p.name; });
+    if (conNombre.length) {
+        ejSaveHistory();
+        conNombre.forEach(function (p) {
+            p.showNumber = v !== 'name' && v !== 'solotexto';
+            p.showName = v !== 'num';
+            p.soloTexto = v === 'solotexto';
+        });
+        if (ejP.animMode) ejFrameSaveCurrent();
+    }
+    ejRenderSVG();
+    ejRenderToolbar();
+}
+// El panel de jugadores se queda con lo que no está en la barra de arriba: apariencia y jugador seleccionado
+function ejJugLimpiarPanel(tb) {
+    var cab = tb.querySelector('.ej-section-header.ej-sec-players');
+    var body = cab ? cab.nextElementSibling : null;
+    if (!body || !body.classList.contains('ej-section-body')) return;
+    var quitar = [];
+    Array.prototype.forEach.call(body.children, function (h) {
+        if (h.matches('button.ej-btn-tool, button[onclick^="ejCargarPlantilla"]')) quitar.push(h);
+        else if (h.tagName === 'DIV' && h.querySelector(':scope > button[onclick^="ejP._addingRival="], :scope > .ej-formations, [onclick^="ejSetPlantillaLabel"], [onclick^="ejColocarJugadorPlantilla"]')) quitar.push(h);
+    });
+    quitar.forEach(function (h) { h.remove(); });
+}
+function ejRenderJugBar() {
+    var nav = document.querySelector('.ej-nav');
+    if (!nav) return;
+    var bar = document.getElementById('ej-jugbar');
+    if (!bar) {
+        bar = document.createElement('div');
+        bar.id = 'ej-jugbar';
+        nav.appendChild(bar);
+    }
+    var rival = !!ejP._addingRival;
+    var tarea = ejP.activeTool === 'player' ? (ejP._tareaColor || null) : null;
+    var anadiendo = ejP.activeTool === 'player' && !ejP._plantillaMode && !tarea;
+    ejFichaSync();
+    var estilo = ejP.fichaEstilo || 'foto';
+    var IC = { foto: '<circle cx="12" cy="9" r="3.2"/><path d="M5.5 19c.8-3.4 3.4-5 6.5-5s5.7 1.6 6.5 5"/>', circulo: '<circle cx="12" cy="12" r="7.5"/>', camiseta: '<path d="M9 4 4 6.5l1.5 4L8 9.5V20h8V9.5l2.5 1 1.5-4L15 4c-.8 1.4-5.2 1.4-6 0z"/>' };
+    var NOM = { foto: 'Fichas con foto', circulo: 'Fichas en círculo con dorsal', camiseta: 'Fichas en camiseta con dorsal' };
+    var estilos = ['foto', 'circulo', 'camiseta'].map(function (e) {
+        return '<button type="button" class="' + (estilo === e ? 'on' : '') + '" onclick="ejFichaEstilo(\'' + e + '\')" title="' + NOM[e] + '"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + IC[e] + '</svg></button>';
+    }).join('');
+    var puntos = Object.keys(EJ_TEAM_COLORS).filter(function (k) {
+        return !EJ_TEAM_COLORS[k].striped && k !== ejP.myColor && k !== ejP.rivalColor;
+    }).map(function (k) {
+        var c = EJ_TEAM_COLORS[k];
+        return '<button type="button" class="ej-jb-dot' + (tarea === k ? ' on' : '') + '" style="background:' + c.fill + ';border-color:' + c.stroke + '" onclick="ejJugTarea(\'' + k + '\')" title="Fichas de color ' + c.name.toLowerCase() + ': cada clic en el campo coloca una. Pulsa otra vez para soltar"></button>';
+    }).join('');
+    var lab = ejP._plantillaLabel || 'both';
+    if (lab === 'nofoto') lab = 'both';
+    var datos = [['num', 'Dorsal'], ['name', 'Nombre'], ['both', 'Dorsal y nombre'], ['solotexto', 'Solo texto']].map(function (o) { return '<option value="' + o[0] + '"' + (lab === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('');
+    var formaciones = Object.keys(EJ_FORMATIONS).map(function (k) { return '<option value="' + k + '">' + k + '</option>'; }).join('');
+    bar.innerHTML =
+        '<div class="ej-jb-seg">'
+        + '<button type="button" class="' + (!rival ? 'on my' : '') + '" onclick="ejJugEquipo(false)">Mi equipo</button>'
+        + '<button type="button" class="' + (rival ? 'on riv' : '') + '" onclick="ejJugEquipo(true)">Rival</button>'
+        + '</div>'
+        + '<button type="button" class="ej-jb-btn' + (anadiendo ? ' on' : '') + '" onclick="ejJugAnadir()" title="Cada clic en el campo coloca un jugador. Pulsa otra vez para soltar">+<span class="ej-jb-txt"> Jugador</span></button>'
+        + '<select class="ej-jb-sel ej-jb-x" onchange="ejJugFormacion(this)" title="Colocar el equipo en una formación"><option value="">Formación</option>' + formaciones + '</select>'
+        + '<button type="button" class="ej-jb-btn ej-jb-x" onclick="ejJugPlantilla()" title="Abrir la plantilla, marcar varios jugadores y añadirlos de golpe">Plantilla</button>'
+        + '<div class="ej-jb-dots">' + puntos + '</div>'
+        + '<select class="ej-jb-sel ej-jb-dat" onchange="ejJugDatos(this.value)" title="Qué se ve en las fichas de los jugadores con nombre">' + datos + '</select>'
+        + '<div class="ej-jb-est">' + estilos + '</div>'
+        + '<button type="button" class="ej-jb-btn ej-jb-a' + (!ejP.fichaAnon ? ' on' : '') + '" onclick="ejFichaAnonimo()" title="' + (ejP.fichaAnon ? 'Fichas anónimas. Pulsa para ver fotos, dorsales y nombres' : 'Pulsa para dejar las fichas anónimas: sin foto, dorsal ni nombre') + '">A</button>';
+}
+(function () {
+    var renderToolbarOriginal = ejRenderToolbar;
+    ejRenderToolbar = function () {
+        // Sin pregunta inicial: si la pizarra espera a que se elija modo, se abre en estático
+        var ov = document.getElementById('ej-modo-overlay');
+        if (ov && ov.style.display !== 'none') { ejElegirModo('estatico'); return; }
+        if (ejP.activeTool !== 'player') ejP._tareaColor = null;
+        if (ejP._apariencia === undefined) ejP._apariencia = true;
+        renderToolbarOriginal();
+        var tb = document.getElementById('ej-toolbar');
+        if (tb) ejJugLimpiarPanel(tb);
+        if (tb && !tb.querySelector('.ej-anim-btn')) {
+            var b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'ej-anim-btn' + (ejP.animMode ? ' on' : '');
+            b.setAttribute('onclick', 'ejAnimConmutar()');
+            b.textContent = ejP.animMode ? '🎬 Quitar animación' : '🎬 Animar';
+            var acciones = tb.querySelector('button[onclick="ejExportPNG()"]');
+            if (acciones && acciones.parentNode && acciones.parentNode.parentNode === tb) tb.insertBefore(b, acciones.parentNode);
+            else tb.appendChild(b);
+        }
+        ejRenderJugBar();
+        if (ejP._jugModalPend && ejP._plantilla && ejP._plantilla.length && !!ejP._plantillaEsRival === !!ejP._addingRival) { ejP._jugModalPend = false; ejJugModalAbrir(); }
+    };
+    var showTabOriginal = ejShowTab;
+    ejShowTab = function (tab, btn) {
+        showTabOriginal(tab, btn);
+        if (tab === 'pizarra') ejRenderToolbar();
+    };
+    var renderSVGOriginal = ejRenderSVG;
+    ejRenderSVG = function () {
+        renderSVGOriginal();
+        // El área de trabajo toma el color del campo: así no quedan franjas oscuras a los lados
+        if (ejP._presentOn) return;
+        var area = document.getElementById('ej-canvas-area');
+        if (area) area.style.background = (ejP.fieldColor === 'grid') ? '#fbfcfe' : (ejP.fieldColor || '');
+    };
+})();
