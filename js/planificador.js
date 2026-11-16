@@ -2533,8 +2533,8 @@ function ejSvgToPng(svgString) {
         var blob = new Blob([svgString], {type: 'image/svg+xml'});
         var url = URL.createObjectURL(blob);
         img.onload = function() {
-            ctx.drawImage(img, 0, 0, 800, 500);
-            resolve(canvas.toDataURL('image/png'));
+            ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, 800, 500); ctx.drawImage(img, 0, 0, 800, 500);
+            resolve(canvas.toDataURL('image/jpeg', 0.88)); // JPEG: la imagen de la tarea pesa unas 6 veces menos que en PNG
             URL.revokeObjectURL(url);
         };
         img.onerror = function() { resolve(''); URL.revokeObjectURL(url); };
