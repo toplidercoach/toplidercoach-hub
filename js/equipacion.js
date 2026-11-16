@@ -26,7 +26,7 @@ var EQ_DISENOS = [
     ['damero', 'Damero'],
     ['mangas', 'Mangas de otro color']
 ];
-var EQ_COLORES = ['#ffffff', '#111827', '#1d4ed8', '#0ea5e9', '#16a34a', '#facc15', '#f97316', '#dc2626', '#7c3aed', '#7f1d1d'];
+var EQ_KIT_COLORES = ['#ffffff', '#111827', '#1d4ed8', '#0ea5e9', '#16a34a', '#facc15', '#f97316', '#dc2626', '#7c3aed', '#7f1d1d'];
 var EQ_ROLES = [
     ['portero', 'Portero'],
     ['comodin', 'Comodín'],
@@ -144,7 +144,7 @@ function eqEstilos() {
         '.eq-rol i{width:28px;height:28px;border-radius:50%;border:2px solid #9ca3af;display:block}',
         '.eq-caja{background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:14px}',
         '.eq-link{background:none;border:1px solid #d1d5db;border-radius:8px;padding:6px 12px;font-size:12px;color:#374151;cursor:pointer;margin-top:12px}',
-        '.eq-pie{display:flex;align-items:center;justify-content:flex-end;gap:14px}',
+        '.eq-kit-pie{display:flex;align-items:center;justify-content:flex-end;gap:14px}',
         '.eq-aviso{font-size:13px;color:#b45309;font-weight:600}',
         '.eq-campo{border-radius:12px;overflow:hidden}',
         '@media (max-width:900px){.eq-kits{grid-template-columns:repeat(2,1fr)}.eq-editor,.eq-tarea{grid-template-columns:1fr}.eq-previa{flex-direction:row;justify-content:center}}'
@@ -207,9 +207,9 @@ function eqPintar() {
     h += '<p class="eq-t">Diseño <span>· ' + EQ_DISENOS.length + ' estilos</span></p><div class="eq-disenos">' + EQ_DISENOS.map(function (d) {
         return '<button type="button" class="eq-dis' + (kit.d === d[0] ? ' on' : '') + '" onclick="eqDiseno(\'' + d[0] + '\')">' + eqCamisetaSVG({ d: d[0], c1: kit.c1, c2: kit.c2, p: kit.p }, 44) + d[1] + '</button>';
     }).join('') + '</div>';
-    h += '<p class="eq-t">Color principal</p>' + eqMuestras(EQ_COLORES, kit.c1, 'eqColorC1');
-    h += '<p class="eq-t">Color secundario</p>' + eqMuestras(EQ_COLORES, kit.c2, 'eqColorC2');
-    h += '<p class="eq-t">Pantalón</p>' + eqMuestras(EQ_COLORES, kit.p, 'eqColorP');
+    h += '<p class="eq-t">Color principal</p>' + eqMuestras(EQ_KIT_COLORES, kit.c1, 'eqColorC1');
+    h += '<p class="eq-t">Color secundario</p>' + eqMuestras(EQ_KIT_COLORES, kit.c2, 'eqColorC2');
+    h += '<p class="eq-t">Pantalón</p>' + eqMuestras(EQ_KIT_COLORES, kit.p, 'eqColorP');
     h += '</div></div></div></div>';
 
     // --- Colores de tarea ---
@@ -222,7 +222,7 @@ function eqPintar() {
     h += '</div><div>' + eqCampoPrevia() + '</div></div></div></div>';
 
     // --- Guardar ---
-    h += '<div class="eq-pie">' + (st.sucio ? '<span class="eq-aviso">Hay cambios sin guardar</span>' : '') + '<button class="btn-primary" onclick="eqGuardar()">Guardar equipación</button></div>';
+    h += '<div class="eq-kit-pie">' + (st.sucio ? '<span class="eq-aviso">Hay cambios sin guardar</span>' : '') + '<button class="btn-primary" onclick="eqKitGuardar()">Guardar equipación</button></div>';
     h += '</div>';
     cont.innerHTML = h;
 }
@@ -237,7 +237,7 @@ function eqColorP(c) { eqEstado.cfg.kits[eqEstado.kit].p = c; eqCambiar(); }
 function eqColorRol(c) { eqEstado.cfg.tarea[eqEstado.rol] = c; eqCambiar(); }
 function eqRestablecerTarea() { eqEstado.cfg.tarea = eqDefecto().tarea; eqCambiar(); }
 
-async function eqGuardar() {
+async function eqKitGuardar() {
     if (!clubId) { showToast('No se ha podido identificar el club', 'error'); return; }
     // Se conserva lo que la pizarra ya tenga guardado (fondo, escudo, fichas) y se cambian solo kits y tarea
     var actual = (clubData && clubData.pizarra_config) || {};
