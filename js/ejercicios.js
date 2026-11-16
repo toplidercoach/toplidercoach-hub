@@ -1421,7 +1421,7 @@ async function ejProyEnviarBanco() {
         name: ejProyActual.nombre,
         description: (desc && desc.trim()) ? desc.trim() : null,
         board_data: it.board_data || null,
-        thumbnail_svg: it.thumbnail_svg || null,
+        thumbnail_svg: await ejMiniaturaCompacta(it.thumbnail_svg || null),
         visibility: 'private',
         approval_status: 'approved',
         source: 'custom'
@@ -3322,6 +3322,57 @@ function ejComprimirThumbSVG(svgStr) {
         .replace(/<image[^>]*data-bg="1"[^>]*href="data:image\/svg\+xml;base64,[^"]*"[^>]*\/>/g, campo)
         .replace(/<image[^>]*data-bg="1"[^>]*href="data:image\/png;base64,[^"]*"[^>]*\/?>(<\/image>)?/g, '');
 }
+// ---- Miniatura compacta ----
+// El dibujo se guarda como una foto comprimida metida en un SVG mínimo, en vez de como el dibujo
+// vectorial entero (que arrastra dentro cada cono, balón, foto y escudo y pesa cerca de 1 MB).
+// Sigue siendo un SVG, así que se ve igual en todos los sitios que ya pintaban miniaturas.
+var EJ_MINI_W = 960, EJ_MINI_H = 600, EJ_MINI_MARCA = 'data-tlc-mini="1"';
+function ejMiniaturaEsCompacta(t) {
+    return typeof t === 'string' && t.length < 400000 && t.slice(0, 200).indexOf(EJ_MINI_MARCA) >= 0;
+}
+async function ejMiniaturaCompacta(origen) {
+    if (!origen || typeof origen !== 'string') return origen || null;
+    var t = origen.trim();
+    if (ejMiniaturaEsCompacta(t)) return t;      // ya lo está: no se vuelve a comprimir
+    var temporal = null;
+    try {
+        var W = EJ_MINI_W, H = EJ_MINI_H, esFoto = t.indexOf('data:') === 0, src = t;
+        if (!esFoto) {
+            // Solo se retoca la etiqueta inicial (medidas fijas, sin estilos) y se pinta desde un archivo
+            // temporal en memoria: así aguanta también miniaturas antiguas de muchos MB
+            var ini = t.match(/<svg\b[^>]*>/);
+            if (!ini) return origen;
+            var etiqueta = ini[0].replace(/\s(width|height|style)="[^"]*"/g, '').replace(/^<svg/, '<svg width="' + W + '" height="' + H + '"');
+            temporal = URL.createObjectURL(new Blob([t.slice(0, ini.index), etiqueta, t.slice(ini.index + ini[0].length)], { type: 'image/svg+xml' }));
+            src = temporal;
+        }
+        var img = new Image();
+        img.src = src;
+        await img.decode();
+        var lienzo = document.createElement('canvas');
+        lienzo.width = W; lienzo.height = H;
+        var ctx = lienzo.getContext('2d');
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(0, 0, W, H);
+        if (esFoto) {
+            // Una imagen subida entra entera, centrada, sin deformarse
+            var iw = img.naturalWidth || W, ih = img.naturalHeight || H, esc = Math.min(W / iw, H / ih);
+            var dw = Math.round(iw * esc), dh = Math.round(ih * esc);
+            ctx.drawImage(img, Math.round((W - dw) / 2), Math.round((H - dh) / 2), dw, dh);
+        } else {
+            ctx.drawImage(img, 0, 0, W, H);
+        }
+        var datos = lienzo.toDataURL('image/webp', 0.82);
+        if (datos.indexOf('data:image/webp') !== 0) datos = lienzo.toDataURL('image/jpeg', 0.85);
+        return '<svg xmlns="http://www.w3.org/2000/svg" ' + EJ_MINI_MARCA + ' viewBox="0 0 ' + W + ' ' + H + '" width="100%" height="100%">'
+            + '<image href="' + datos + '" x="0" y="0" width="' + W + '" height="' + H + '"/></svg>';
+    } catch (e) {
+        console.warn('ejMiniaturaCompacta: se guarda sin comprimir:', e && e.message);
+        return origen;
+    } finally {
+        if (temporal) URL.revokeObjectURL(temporal);
+    }
+}
 function ejPrepararThumbParaPDF() {
     const svgSource = window.ejThumbnailPendiente || (() => {
         const el = document.getElementById('ej-svg');
@@ -3594,7 +3645,7 @@ let thumbnailSvg = window.ejThumbnailPendiente || null;
             animFrames: ejP.animMode ? ejP.frames : [],
             animMode: ejP.animMode
         } : null,
-        thumbnail_svg: (thumbnailSvg ? ejComprimirThumbSVG(thumbnailSvg) : null) || window._ejPdfThumbData,
+        thumbnail_svg: await ejMiniaturaCompacta((thumbnailSvg ? ejComprimirThumbSVG(thumbnailSvg) : null) || window._ejPdfThumbData),
         
         source: 'custom'
     };
@@ -3814,6 +3865,7 @@ async function ejImportarJSON(input) {
                 if (!fila.source) fila.source = 'import';
                 return fila;
             });
+            for (var m = 0; m < filas.length; m++) { if (filas[m].thumbnail_svg) filas[m].thumbnail_svg = await ejMiniaturaCompacta(filas[m].thumbnail_svg); }
             var res = await supabaseClient.from('custom_exercises').insert(filas);
             if (res.error) { fallos += filas.length; console.warn('Lote fallido', i, res.error.message); }
             else ok += filas.length;
@@ -4911,7 +4963,7 @@ function ejColocarJugadorPlantilla(idx) {
                 animFrames: ejP.frames,
                 animMode: ejP.animMode
             },
-            thumbnail_svg: thumbnailSvg ? ejComprimirThumbSVG(thumbnailSvg) : null
+            thumbnail_svg: thumbnailSvg ? await ejMiniaturaCompacta(ejComprimirThumbSVG(thumbnailSvg)) : null
         };
         var res = await supabaseClient.from('custom_exercises').update(updateData).eq('id', ejEditandoId).select();
         if (res.error) throw res.error;
