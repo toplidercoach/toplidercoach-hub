@@ -351,7 +351,7 @@ function ejRenderSVG() {
         const h = (eqType ? eqType.h : 40) * (eq.scale || 1);
         const sel = eq.id === ejP.selectedId;
         const img = EJ_EQUIPMENT_IMAGES[eq.eqType];
-        html += `<g data-id="${eq.id}" data-type="equipment" style="cursor:move" transform="rotate(${eq.rotation||0},${eq.x},${eq.y})">
+        html += `<g data-id="${eq.id}" data-type="equipment" style="cursor:move" transform="rotate(${(eq.rotation||0) + ejGiroDe(eq.id)},${eq.x},${eq.y})">
            ${eq.color ? `<filter id="eqtint-${eq.id}" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="0.2126 0.7152 0.0722 0 0 0.2126 0.7152 0.0722 0 0 0.2126 0.7152 0.0722 0 0 0 0 0 1 0" result="g"/><feComponentTransfer in="g" result="gb"><feFuncR type="linear" slope="0.55" intercept="0.5"/><feFuncG type="linear" slope="0.55" intercept="0.5"/><feFuncB type="linear" slope="0.55" intercept="0.5"/></feComponentTransfer><feFlood flood-color="${eq.color}" result="c"/><feBlend in="c" in2="gb" mode="multiply" result="t"/><feComposite in="t" in2="SourceGraphic" operator="in"/></filter>` : ''}
             <image href="${img}" x="${eq.x - w/2}" y="${eq.y - h/2}" width="${w}" height="${h}" preserveAspectRatio="xMidYMid meet"${eq.color ? ` filter="url(#eqtint-${eq.id})"` : ''}/>
             ${sel ? `<rect x="${eq.x - w/2 - 3}" y="${eq.y - h/2 - 3}" width="${w+6}" height="${h+6}" fill="none" stroke="#22c55e" stroke-width="1.5" stroke-dasharray="4 2" rx="3"/>` : ''}
@@ -441,7 +441,7 @@ function ejRenderSVG() {
             html += `<line x1="${t.x1}" y1="${t.y1}" x2="${t.x2}" y2="${t.y2}" stroke="${ejP.lineColor}" stroke-width="${sw}" stroke-dasharray="${dash}" opacity="0.7"/>`;
         } else if (t.type === 'rect') {
             var prevFill = ejP.shapeFill ? ejHexToRgba(ejP.lineColor, ejP.shapeFillOpacity) : 'none';
-            html += `<rect x="${t.x}" y="${t.y}" width="${t.w}" height="${t.h}" fill="${prevFill}" stroke="${ejP.lineColor}" stroke-width="${sw}" stroke-dasharray="${dash}" opacity="0.7"/>`;
+            html += `<rect x="${Math.min(t.x, t.x + t.w)}" y="${Math.min(t.y, t.y + t.h)}" width="${Math.abs(t.w)}" height="${Math.abs(t.h)}" fill="${prevFill}" stroke="${ejP.lineColor}" stroke-width="${sw}" stroke-dasharray="${dash}" opacity="0.7"/>`;
             html += ejEtiquetaZonaSVG(t);
         } else if (t.type === 'ellipse') {
             var prevFill = ejP.shapeFill ? ejHexToRgba(ejP.lineColor, ejP.shapeFillOpacity) : 'none';
@@ -837,7 +837,9 @@ return;
 
  // Herramientas de dibujo
     const drawTools = ['arrow','line','rect','ellipse','curved','pencil','dribble'];
-    if (drawTools.includes(ejP.activeTool) && ejP.animMode) {
+    // En animación, un trazo que empieza sobre una ficha o un balón puede ser la orden de moverlo
+    // o un simple dibujo: lo decide el selector del panel de Dibujo. Rectángulos y círculos siempre son dibujo.
+    if (drawTools.includes(ejP.activeTool) && ejP.animMode && ejP.animTrazoMueve !== false && ejP.activeTool !== 'rect' && ejP.activeTool !== 'ellipse') {
         const SNAP_PLAYER = 30;
         const SNAP_BALL = 22;
         const SNAP_EQUIP = 26;
@@ -881,7 +883,8 @@ if (snapElem) {
             return;
         }
     }
-    if (drawTools.includes(ejP.activeTool) && isBackground) {
+    // Con una herramienta de dibujo activa se dibuja desde donde se pulse, también encima de una ficha o del material
+    if (drawTools.includes(ejP.activeTool)) {
         ejP.isDrawing = true;
         ejP.drawStart = pos;
         if (ejP.activeTool === 'pencil') {
@@ -1075,7 +1078,10 @@ function ejPunteroSoltar(e) {
 
         if (ejP.activeTool === 'pencil' && t && t.points && t.points.length > 2) {
             newLine = { id, type: 'freehand', points: [...t.points], color, strokeWidth: sw, dashed };
-        } else if (ejP.activeTool === 'rect' && t && t.w > 5 && t.h > 5) {
+        } else if (ejP.activeTool === 'rect' && t && Math.abs(t.w) > 5 && Math.abs(t.h) > 5) {
+            // El rectángulo vale en cualquier dirección en que se arrastre
+            if (t.w < 0) { t.x += t.w; t.w = -t.w; }
+            if (t.h < 0) { t.y += t.h; t.h = -t.h; }
             var shapeFillVal = ejP.shapeFill ? (ejP.shapeFillType === 'hatched' ? 'hatched' : ejHexToRgba(color, ejP.shapeFillOpacity)) : 'none';
             newLine = { id, type: 'rect', x: t.x, y: t.y, w: t.w, h: t.h, color, fill: shapeFillVal, fillType: ejP.shapeFill ? ejP.shapeFillType : null, fillOpacity: ejP.shapeFillOpacity, strokeWidth: sw, dashed };
         } else if (ejP.activeTool === 'ellipse' && t && t.rx > 5 && t.ry > 5) {
@@ -1091,7 +1097,7 @@ function ejPunteroSoltar(e) {
                 newLine = { id, type: 'dribble', x1: t.x1, y1: t.y1, x2: t.x2, y2: t.y2,
                     color, strokeWidth: sw, dashed, hasArrow: true };
             }
-        } else {
+        } else if (ejP.activeTool !== 'rect' && ejP.activeTool !== 'ellipse') {
             const dx = pos.x - ejP.drawStart.x, dy = pos.y - ejP.drawStart.y;
             if (Math.sqrt(dx*dx+dy*dy) > 5) {
                 newLine = { id, type: 'line', x1: ejP.drawStart.x, y1: ejP.drawStart.y,
@@ -2411,6 +2417,14 @@ ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin
     ${sectionHeader('draw','✏️','Dibujo')}
     ${drawOpen ? `
     <div class="ej-section-body">
+        ${ejP.animMode ? `<div class="ej-trazo-modo" style="margin-bottom:8px">
+            <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Al trazar desde una ficha o el balón</div>
+            <div style="display:flex;gap:4px;background:#0b1220;padding:3px;border-radius:8px;border:1px solid #2f405c">
+                <button type="button" onclick="ejAnimTrazoModo(true)" title="El trazo es la orden de moverse: la ficha o el balón irá hasta donde acabe" style="flex:1;border:none;border-radius:6px;padding:6px 4px;font-size:11px;font-weight:700;cursor:pointer;${ejP.animTrazoMueve !== false ? 'background:#facc15;color:#1e293b' : 'background:none;color:#94a3b8'}">🏃 Lo mueve</button>
+                <button type="button" onclick="ejAnimTrazoModo(false)" title="El trazo es solo un dibujo: se queda pintado y la ficha no se mueve" style="flex:1;border:none;border-radius:6px;padding:6px 4px;font-size:11px;font-weight:700;cursor:pointer;${ejP.animTrazoMueve === false ? 'background:#3b82f6;color:#fff' : 'background:none;color:#94a3b8'}">✏️ Solo dibuja</button>
+            </div>
+            <div style="font-size:10px;color:#94a3b8;margin-top:4px;line-height:1.3">${ejP.animTrazoMueve !== false ? 'La flecha amarilla marca el recorrido hasta el siguiente fotograma.' : 'La flecha se queda dibujada desde este fotograma. Nada se mueve.'}</div>
+        </div>` : ''}
         <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px">Herramientas</div>
         <div class="ej-equipment-grid">
             ${[
@@ -4358,6 +4372,7 @@ function ejFramePlay(fromFrame) {
     }
     ejP.isPlaying = true;
     ejP._animDom = null;
+    ejP._giros = null;
     ejP._animFrame = ejP.currentFrame;
     ejP._animProgress = 0;
     ejP._globalProgress = ejP.currentFrame; // progreso global continuo
@@ -4369,6 +4384,7 @@ function ejFramePlay(fromFrame) {
 function ejFrameStop() {
     ejP.isPlaying = false;
     ejP._animDom = null;
+    ejP._giros = null;
     ejP._globalProgress = 0;
     if (ejP._animId) {
         cancelAnimationFrame(ejP._animId);
@@ -4510,6 +4526,7 @@ function ejFrameAnimate(now) {
         ejInterpolateElem(fA.equipment[i].id, fA, fB, frac, seg, 'equipment');
     }
 
+    ejAnimGiros();
     // Solo se redibuja la pizarra al cambiar de tramo; dentro del tramo se mueven las fichas ya dibujadas
     if (!ejAnimMover(seg)) {
         ejRenderSVG();
@@ -4532,7 +4549,7 @@ function ejAnimPreparar(seg) {
     });
     ejP.equipment.forEach(function (q) {
         const g = svg.querySelector('g[data-type="equipment"][data-id="' + q.id + '"]');
-        if (g) d.mat.push({ q: q, g: g, x0: q.x, y0: q.y, x: q.x, y: q.y, base: g.getAttribute('transform') || '' });
+        if (g) d.mat.push({ q: q, g: g, x0: q.x, y0: q.y, x: q.x, y: q.y, giro0: ejGiroDe(q.id), giro: ejGiroDe(q.id), base: g.getAttribute('transform') || '' });
     });
     ejP.connections.forEach(function (c) {
         const g = svg.querySelector('g[data-type="connection"][data-id="' + c.id + '"]');
@@ -4548,6 +4565,27 @@ function ejAnimPreparar(seg) {
     d.centinela = svg.firstElementChild;
     ejP._animDom = d;
 }
+// El balón gira mientras se mueve: cuanto más recorre, más gira, y en el sentido en que avanza.
+// El giro solo existe durante la reproducción o al crear el vídeo; no se guarda en el ejercicio.
+var EJ_GIRO_GRADOS_POR_PX = 4.5, EJ_GIRO_MAX_PASO = 40;
+function ejGiroDe(id) {
+    var g = ejP._giros && ejP._giros[id];
+    return g ? g.deg : 0;
+}
+function ejAnimGiros() {
+    if (!ejP._giros) ejP._giros = {};
+    for (var i = 0; i < ejP.equipment.length; i++) {
+        var q = ejP.equipment[i];
+        if (q.eqType !== 'ball') continue;
+        var g = ejP._giros[q.id];
+        if (!g) { ejP._giros[q.id] = { x: q.x, y: q.y, deg: 0 }; continue; }
+        var dx = q.x - g.x, dy = q.y - g.y, d = Math.sqrt(dx * dx + dy * dy);
+        if (d < 0.01) continue;
+        var sentido = Math.abs(dx) >= Math.abs(dy) ? (dx >= 0 ? 1 : -1) : (dy >= 0 ? 1 : -1);
+        g.deg = Math.round(((g.deg + sentido * Math.min(d * EJ_GIRO_GRADOS_POR_PX, EJ_GIRO_MAX_PASO)) % 360) * 10) / 10;
+        g.x = q.x; g.y = q.y;
+    }
+}
 function ejAnimMover(seg) {
     const d = ejP._animDom;
     // Si ha cambiado el tramo o alguien ha redibujado la pizarra, hay que volver a prepararla
@@ -4560,7 +4598,11 @@ function ejAnimMover(seg) {
     }
     for (i = 0; i < d.mat.length; i++) {
         o = d.mat[i];
-        if (o.q.x !== o.x || o.q.y !== o.y) { o.x = o.q.x; o.y = o.q.y; o.g.setAttribute('transform', 'translate(' + (o.x - o.x0) + ',' + (o.y - o.y0) + ') ' + o.base); }
+        var giro = ejGiroDe(o.q.id);
+        if (o.q.x !== o.x || o.q.y !== o.y || giro !== o.giro) {
+            o.x = o.q.x; o.y = o.q.y; o.giro = giro;
+            o.g.setAttribute('transform', 'translate(' + (o.x - o.x0) + ',' + (o.y - o.y0) + ') ' + (giro !== o.giro0 ? 'rotate(' + (giro - o.giro0) + ',' + o.x0 + ',' + o.y0 + ') ' : '') + o.base);
+        }
     }
     for (i = 0; i < d.uni.length; i++) {
         o = d.uni[i];
@@ -4826,7 +4868,56 @@ function ejColocarJugadorPlantilla(idx) {
         if (msgEl) msgEl.innerHTML = '<span style="color:#ef4444">❌ Error: ' + err.message + '</span>';
     }
 }
+// Vídeo de la ficha: se crea en el navegador igual que el de "Descargar vídeo" y se sube ya hecho.
+// Si el navegador no puede crearlo o el servidor no lo admite, se usa el método anterior (grabación en directo).
 async function ejExportarAnimacionMP4() {
+    if (!ejP.animMode || ejP.frames.length < 2) { ejToast('Activa el modo animación y crea al menos 2 frames.', 'warning'); return; }
+    if (!ejEditandoId) { ejToast('Guarda el ejercicio primero desde la Ficha antes de exportar vídeo.', 'warning'); return; }
+    if (ejP._videoHaciendo) return;
+    var aviso = function (html) { var m = document.getElementById('ej-anim-msg'); if (m) m.innerHTML = html; };
+    var url = null;
+    ejP._exportingVideo = true; ejRenderTimeline();
+    try {
+        ejP._videoHaciendo = true; ejP._videoCancelar = false;
+        var blob = await ejVideoCrear(EJ_VIDEO_FICHA, function (pc) { aviso('<span style="color:#f97316;font-weight:600">⏳ Creando el vídeo… ' + pc + ' %</span>'); });
+        ejP._videoHaciendo = false;
+        aviso('<span style="color:#3b82f6;font-weight:600">📤 Subiendo el vídeo…</span>');
+        url = await ejVideoSubir(blob, ejEditandoId);
+    } catch (e) {
+        ejP._videoHaciendo = false;
+        console.warn('Vídeo nuevo no disponible, se usa la grabación en directo:', e && e.message);
+    }
+    if (!url) { ejP._exportingVideo = false; return ejExportarAnimacionGrabada(); }
+    await supabaseClient.from('custom_exercises').update({ animation_url: url }).eq('id', ejEditandoId);
+    var idx = ejBancoCache.findIndex(function (x) { return x.id === ejEditandoId; });
+    if (idx >= 0) ejBancoCache[idx].animation_url = url;
+    ejP._exportingVideo = false; ejP._lastVideoUrl = url; ejP._videoDesactualizado = false;
+    ejRenderTimeline();
+    aviso('✅ Vídeo MP4 guardado — <a href="' + url + '" target="_blank" style="color:#93c5fd;text-decoration:underline">Ver vídeo ▶</a>');
+}
+// Sube un vídeo al servidor (primero el de vídeo, y si falla el de la web) y devuelve su dirección, o null
+async function ejVideoSubir(blob, id) {
+    var base64 = await new Promise(function (ok, mal) {
+        var rd = new FileReader();
+        rd.onload = function () { ok(rd.result.split(',')[1]); };
+        rd.onerror = function () { mal(new Error('No se ha podido leer el vídeo')); };
+        rd.readAsDataURL(blob);
+    });
+    var cuerpo = JSON.stringify({ video: base64, id: String(id) });
+    var cab = { 'Content-Type': 'application/json', 'Authorization': 'Bearer toplider_thumb_2026' };
+    var res;
+    try {
+        res = await fetch('https://gpu.toplidercoach.com/upload-video', { method: 'POST', headers: cab, body: cuerpo });
+        if (!res.ok) throw new Error('GPU HTTP ' + res.status);
+    } catch (e) {
+        res = await fetch('https://toplidercoach.com/wp-content/uploads/ejercicios/upload-video.php', { method: 'POST', headers: cab, body: cuerpo });
+    }
+    var data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'El servidor no ha admitido el vídeo');
+    return data.url;
+}
+// Método anterior, de reserva: graba la animación en directo y el servidor la convierte a MP4
+async function ejExportarAnimacionGrabada() {
     if (!ejP.animMode || ejP.frames.length < 2) {
         ejToast('Activa el modo animación y crea al menos 2 frames.', 'warning');
         return;
@@ -5570,6 +5661,10 @@ function ejProyPlegar() {
 // ventanas de formación y plantilla, opciones junto al objeto, fondos de campo,
 // configuración por club y equipación.
 // =====================================================================
+function ejAnimTrazoModo(mueve) {
+    ejP.animTrazoMueve = !!mueve;
+    ejRenderToolbar();
+}
 function ejAnimConmutar() {
     if (ejP.animMode && ejP.frames.length > 1) {
         ejConfirm('¿Quitar la animación? Se perderán los fotogramas.', function () { ejToggleAnimMode(); });
@@ -6548,6 +6643,8 @@ var EJ_VIDEO_FORMATOS = {
     horizontal: { w: 1920, h: 1080, n: 'Horizontal', d: '1920 × 1080 · para proyectar o mandar por WhatsApp' },
     vertical:   { w: 1080, h: 1920, n: 'Vertical', d: '1080 × 1920 · para historias y reels' }
 };
+// El vídeo de la ficha lleva la proporción exacta del campo, sin franjas
+var EJ_VIDEO_FICHA = { w: 1600, h: 1000, n: 'Ficha' };
 var EJ_VIDEO_FPS = 30;
 function ejVideoLib() {
     if (window.TLCVideo) return Promise.resolve(window.TLCVideo);
@@ -6576,7 +6673,7 @@ function ejVideoCerrar() {
     if (ejP._videoUrlLocal) { URL.revokeObjectURL(ejP._videoUrlLocal); ejP._videoUrlLocal = null; }
 }
 function ejVideoAbrir() {
-    if (ejP._videoHaciendo) return;
+    if (ejP._videoHaciendo || ejP._exportingVideo) return;
     if (!ejP.animMode || ejP.frames.length < 2) { ejToast('Para sacar un vídeo hacen falta al menos 2 fotogramas.', 'warning'); return; }
     var tarjetas = Object.keys(EJ_VIDEO_FORMATOS).map(function (k) {
         var f = EJ_VIDEO_FORMATOS[k], vert = f.h > f.w;
@@ -6601,6 +6698,7 @@ function ejAnimPosicionar(t) {
     for (i = 0; i < fA.players.length; i++) ejInterpolateElem(fA.players[i].id, fA, fB, frac, seg, 'player');
     for (i = 0; i < fA.equipment.length; i++) ejInterpolateElem(fA.equipment[i].id, fA, fB, frac, seg, 'equipment');
     ejP.currentFrame = seg;
+    ejAnimGiros();
 }
 function ejVideoNombre() {
     var lbl = document.getElementById('ej-pizarra-nombre-label');
@@ -6609,16 +6707,9 @@ function ejVideoNombre() {
     return (n || 'animacion') + '.mp4';
 }
 function ejVideoCancelar() { ejP._videoCancelar = true; }
-async function ejVideoExportar(formato) {
-    var f = EJ_VIDEO_FORMATOS[formato];
-    if (!f || ejP._videoHaciendo) return;
-    if (!ejP.animMode || ejP.frames.length < 2) { ejVideoCerrar(); return; }
-    ejP._videoHaciendo = true; ejP._videoCancelar = false;
-    ejVideoCaja('<b style="font-size:16px">Creando el vídeo…</b>'
-        + '<div style="height:10px;background:#0b1220;border:1px solid #2f405c;border-radius:6px;margin-top:14px;overflow:hidden"><div id="ej-video-barra" style="height:100%;width:0%;background:#22c55e;transition:width .15s linear"></div></div>'
-        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px"><span id="ej-video-txt" style="font-size:12px;color:#94a3b8">Preparando…</span>'
-        + '<button type="button" onclick="ejVideoCancelar()" style="background:#0b1220;border:1px solid #2f405c;color:#e2e8f0;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:13px">Cancelar</button></div>');
-    var estado = null, salida = null, blob = null, fallo = null;
+// Crea el MP4 y lo devuelve (o null si se cancela). Deja la pizarra como estaba.
+async function ejVideoCrear(f, alAvanzar) {
+    var estado = null, salida = null, blob = null;
     try {
         var M = await ejVideoLib();
         if (typeof VideoEncoder === 'undefined' || !(await M.canEncodeVideo('avc', { width: f.w, height: f.h }))) {
@@ -6628,7 +6719,7 @@ async function ejVideoExportar(formato) {
         ejFrameSaveCurrent();
         await ejPrecargarFotosJugadores();
         estado = { frame: ejP.currentFrame, sel: ejP.selectedId, tipo: ejP.selectedType, multi: ejP.multiSel, exp: ejP._exporting };
-        ejP.selectedId = null; ejP.multiSel = []; ejP._exporting = true; ejP._animDom = null;
+        ejP.selectedId = null; ejP.multiSel = []; ejP._exporting = true; ejP._animDom = null; ejP._giros = null;
 
         var svg = document.getElementById('ej-svg');
         var lienzo = document.createElement('canvas');
@@ -6659,33 +6750,49 @@ async function ejVideoExportar(formato) {
         var segs = ejP.frames.length - 1;
         var nIni = Math.round(0.5 * EJ_VIDEO_FPS), nFin = Math.round(0.8 * EJ_VIDEO_FPS);
         var nMov = Math.max(2, Math.round(segs * (ejP.playSpeed * 1.2 / 1000) * EJ_VIDEO_FPS));
-        var total = nIni + nMov + nFin, barra = document.getElementById('ej-video-barra'), txt = document.getElementById('ej-video-txt');
+        var total = nIni + nMov + nFin;
         for (var i = 0; i < total; i++) {
             if (ejP._videoCancelar) break;
             var quieto = (i > 0 && i < nIni) || i > nIni + nMov;      // misma imagen que la anterior: no hace falta repintar
             if (!quieto) { ejAnimPosicionar(i < nIni ? 0 : Math.min(1, (i - nIni) / nMov)); await pintar(); }
             await fuente.add(i / EJ_VIDEO_FPS, 1 / EJ_VIDEO_FPS);
-            if (i % 3 === 0 || i === total - 1) {
-                var pc = Math.round((i + 1) / total * 100);
-                if (barra) barra.style.width = pc + '%';
-                if (txt) txt.textContent = pc + ' %';
-            }
+            if (alAvanzar && (i % 3 === 0 || i === total - 1)) alAvanzar(Math.round((i + 1) / total * 100));
         }
         if (ejP._videoCancelar) { await salida.cancel(); }
         else { await salida.finalize(); blob = new Blob([salida.target.buffer], { type: 'video/mp4' }); }
     } catch (e) {
-        console.error('ejVideoExportar:', e);
-        fallo = e;
         try { if (salida && salida.state !== 'finalized' && salida.state !== 'canceled') await salida.cancel(); } catch (e2) {}
+        throw e;
+    } finally {
+        // La pizarra vuelve a como estaba
+        ejP._giros = null;
+        if (estado) {
+            ejP._exporting = estado.exp || false;
+            ejP.currentFrame = Math.min(estado.frame, ejP.frames.length - 1);
+            ejFrameRestore(ejP.frames[ejP.currentFrame]);
+            ejP.selectedId = estado.sel; ejP.selectedType = estado.tipo; ejP.multiSel = estado.multi || [];
+            ejRenderSVG(); ejRenderTimeline();
+        }
     }
-    // La pizarra vuelve a como estaba
-    if (estado) {
-        ejP._exporting = estado.exp || false;
-        ejP.currentFrame = Math.min(estado.frame, ejP.frames.length - 1);
-        ejFrameRestore(ejP.frames[ejP.currentFrame]);
-        ejP.selectedId = estado.sel; ejP.selectedType = estado.tipo; ejP.multiSel = estado.multi || [];
-        ejRenderSVG(); ejRenderTimeline();
-    }
+    return blob;
+}
+async function ejVideoExportar(formato) {
+    var f = EJ_VIDEO_FORMATOS[formato];
+    if (!f || ejP._videoHaciendo || ejP._exportingVideo) return;
+    if (!ejP.animMode || ejP.frames.length < 2) { ejVideoCerrar(); return; }
+    ejP._videoHaciendo = true; ejP._videoCancelar = false;
+    ejVideoCaja('<b style="font-size:16px">Creando el vídeo…</b>'
+        + '<div style="height:10px;background:#0b1220;border:1px solid #2f405c;border-radius:6px;margin-top:14px;overflow:hidden"><div id="ej-video-barra" style="height:100%;width:0%;background:#22c55e;transition:width .15s linear"></div></div>'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px"><span id="ej-video-txt" style="font-size:12px;color:#94a3b8">Preparando…</span>'
+        + '<button type="button" onclick="ejVideoCancelar()" style="background:#0b1220;border:1px solid #2f405c;color:#e2e8f0;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:13px">Cancelar</button></div>');
+    var blob = null, fallo = null;
+    try {
+        blob = await ejVideoCrear(f, function (pc) {
+            var barra = document.getElementById('ej-video-barra'), txt = document.getElementById('ej-video-txt');
+            if (barra) barra.style.width = pc + '%';
+            if (txt) txt.textContent = pc + ' %';
+        });
+    } catch (e) { console.error('ejVideoExportar:', e); fallo = e; }
     ejP._videoHaciendo = false;
     if (fallo) {
         ejVideoCaja('<b style="font-size:16px">No se ha podido crear el vídeo</b><div style="font-size:13px;color:#fca5a5;margin-top:8px">' + ejEscXml(fallo.message || String(fallo)) + '</div>'
