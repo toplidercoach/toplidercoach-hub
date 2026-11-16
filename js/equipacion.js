@@ -241,6 +241,10 @@ async function eqGuardar() {
     if (!clubId) { showToast('No se ha podido identificar el club', 'error'); return; }
     // Se conserva lo que la pizarra ya tenga guardado (fondo, escudo, fichas) y se cambian solo kits y tarea
     var actual = (clubData && clubData.pizarra_config) || {};
+    try {
+        var leido = await supabaseClient.from('clubs').select('pizarra_config').eq('id', clubId).maybeSingle();
+        if (leido && !leido.error && leido.data && leido.data.pizarra_config) actual = leido.data.pizarra_config;
+    } catch (e) { /* si no se puede leer, se usa lo que hay en memoria */ }
     var nuevo = Object.assign({}, actual, { kits: eqEstado.cfg.kits, tarea: eqEstado.cfg.tarea });
     var r = await supabaseClient.from('clubs').update({ pizarra_config: nuevo }).eq('id', clubId);
     if (r && r.error) { console.error('pizarra_config:', r.error); showToast('No se ha podido guardar la equipación: ' + r.error.message, 'error'); return; }
