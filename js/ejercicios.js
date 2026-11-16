@@ -2293,8 +2293,8 @@ function ejRenderToolbar() {
    
    
     <div style="display:flex;gap:6px;margin-bottom:6px">
-        <button onclick="ejUndo()" title="Deshacer (Ctrl+Z)" style="flex:1;padding:7px;background:#1e293b;border:1px solid #334155;color:#e2e8f0;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">↩ Deshacer</button>
-        <button onclick="ejRedo()" title="Rehacer (Ctrl+Y)" style="flex:1;padding:7px;background:#1e293b;border:1px solid #334155;color:#94a3b8;border-radius:6px;cursor:pointer;font-size:12px">↪ Rehacer</button>
+        <button onclick="ejUndo()" title="Deshacer (Ctrl+Z)" style="flex:1;padding:7px;background:#1e293b;border:1px solid #334155;color:#e2e8f0;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600"><i class="ej-ico ej-ico-deshacer"></i> Deshacer</button>
+        <button onclick="ejRedo()" title="Rehacer (Ctrl+Y)" style="flex:1;padding:7px;background:#1e293b;border:1px solid #334155;color:#94a3b8;border-radius:6px;cursor:pointer;font-size:12px"><i class="ej-ico ej-ico-rehacer"></i> Rehacer</button>
     </div>
  ${(ejP.multiSel && ejP.multiSel.length > 0) ? `
     <div style="margin-bottom:8px;padding:8px;background:#0f172a;border:1px solid #22c55e;border-radius:8px">
@@ -2306,20 +2306,20 @@ function ejRenderToolbar() {
     </div>` : ''}
   <!-- PANEL MODO ANIMACION -->
 ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin-bottom:6px;width:100%;padding:8px;border-radius:6px;text-align:center;color:#fff;font-size:12px;font-weight:600">
-        🎬 Modo Animación ON
+        <i class="ej-ico ej-ico-animar"></i> Modo Animación ON
     </div>` : ''}
 
     <!-- SECCIÓN JUGADORES -->
     ${sectionHeader('players','⚽','Jugadores')}
     ${playersOpen ? `
     <div class="ej-section-body">
-        <div class="ej-section-header ej-sec-apariencia${ejP._apariencia?' open':''}" onclick="ejP._apariencia=!ejP._apariencia;ejRenderToolbar()" style="margin-top:2px">🎨 Apariencia</div>
+        <div class="ej-section-header ej-sec-apariencia${ejP._apariencia?' open':''}" onclick="ejP._apariencia=!ejP._apariencia;ejRenderToolbar()" style="margin-top:2px"><i class="ej-ico ej-ico-paleta"></i> Apariencia</div>
         ${ejP._apariencia ? `
         <div class="ej-section-body">
             ${!ejP._addingRival && ejEqCfg() ? `<div class="ej-eq-nota">Tu equipo se dibuja con la equipación del club.<button type="button" onclick="ejIrEquipacion()">Cambiar en Mi Club</button></div>` : `
             <label style="font-size:11px;color:#9ca3af">Color ${ejP._addingRival?'rival':'mi equipo'}:</label>
             ${colorSwatches(ejP._addingRival?ejP.rivalColor:ejP.myColor, true, true, ejP._addingRival?'ejSetRivalColor':'ejSetMyColor')}
-            <label style="font-size:11px;color:#9ca3af;margin-top:4px;display:block">🧤 Portero (nº1):</label>
+            <label style="font-size:11px;color:#9ca3af;margin-top:4px;display:block">Portero (nº1):</label>
             ${colorSwatches(ejP._addingRival?ejP.rivalGkColor:ejP.myGkColor, true, false, ejP._addingRival?'ejSetRivalGkColor':'ejSetMyGkColor')}`}
             <div class="ej-size-row" style="margin-top:6px">
                 <span>Tamaño:</span>
@@ -2359,13 +2359,13 @@ ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin
         <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px">Tipo de campo</div>
         <div class="ej-field-btns">
             ${['full','half','halfDown','blank','artificial'].map(f=>`<button class="ej-btn-sm${ejP.fieldType===f?' active':''}" onclick="ejSetField('${f}')">${f==='full'?'Completo':f==='half'?'Medio ↑':f==='halfDown'?'Medio ↓':f==='blank'?'Libre':'Artificial'}</button>`).join('')}
-            <button class="ej-btn-sm${ejP.showCarriles?' active':''}" onclick="ejToggleCarriles()" title="5 carriles del juego posicional">🛣️ Carriles</button>
-            <button class="ej-btn-sm${ejP.showZonas?' active':''}" onclick="ejToggleZonas()" title="3 tercios del campo">▦ Zonas</button>
+            <button class="ej-btn-sm${ejP.showCarriles?' active':''}" onclick="ejToggleCarriles()" title="5 carriles del juego posicional"><i class="ej-ico ej-ico-carriles"></i> Carriles</button>
+            <button class="ej-btn-sm${ejP.showZonas?' active':''}" onclick="ejToggleZonas()" title="3 tercios del campo"><i class="ej-ico ej-ico-zonas"></i> Zonas</button>
         </div>
         <div class="ej-field-btns" style="margin-top:6px">
-            <button class="ej-btn-sm${ejP.showRejilla?' active':''}" onclick="ejToggleRejilla()" title="Rejilla de metros del campo Artificial (105x65, marcas cada 5 m)">📏 Rejilla</button>
+            <button class="ej-btn-sm${ejP.showRejilla?' active':''}" onclick="ejToggleRejilla()" title="Rejilla de metros del campo Artificial (105x65, marcas cada 5 m)"><i class="ej-ico ej-ico-rejilla"></i> Rejilla</button>
         </div>
-        <div style="font-size:11px;color:#9ca3af;margin:10px 0 4px">🎥 Cámara</div>
+        <div style="font-size:11px;color:#9ca3af;margin:10px 0 4px"><i class="ej-ico ej-ico-camara"></i> Cámara</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px">
             <button class="ej-btn-sm${!ejP.camAngle?' active':''}" onclick="ejSetCamara(0)">Cenital</button>
             <button class="ej-btn-sm${ejP.camAngle===35?' active':''}" onclick="ejSetCamara(35)">TV</button>
@@ -2373,15 +2373,15 @@ ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin
         </div>
         <input type="range" min="0" max="60" value="${ejP.camAngle||0}" oninput="ejSetCamara(parseInt(this.value))" style="width:100%;accent-color:#22c55e"/>
         ${ejP.camAngle?`<div style="font-size:10px;color:#f59e0b;margin-top:2px">Vista ${ejP.camAngle}° — puedes editar también en esta vista</div>`:''}
-        <div style="font-size:11px;color:#9ca3af;margin:10px 0 4px">🔍 Zoom <span id="ej-zoom-pct">${Math.round((ejP.zoom||1)*100)}%</span></div>
+        <div style="font-size:11px;color:#9ca3af;margin:10px 0 4px"><i class="ej-ico ej-ico-zoom"></i> Zoom <span id="ej-zoom-pct">${Math.round((ejP.zoom||1)*100)}%</span></div>
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
             <button class="ej-btn-sm" onclick="ejZoomCambiar(-0.25)">−</button>
             <button class="ej-btn-sm" onclick="ejZoomReset()">100%</button>
             <button class="ej-btn-sm" onclick="ejZoomCambiar(0.25)">+</button>
-            <button class="ej-btn-sm" onclick="ejPan(0,-1)">▲</button>
-            <button class="ej-btn-sm" onclick="ejPan(0,1)">▼</button>
-            <button class="ej-btn-sm" onclick="ejPan(-1,0)">◀</button>
-            <button class="ej-btn-sm" onclick="ejPan(1,0)">▶</button>
+            <button class="ej-btn-sm" onclick="ejPan(0,-1)"><i class="ej-ico ej-ico-arriba"></i></button>
+            <button class="ej-btn-sm" onclick="ejPan(0,1)"><i class="ej-ico ej-ico-abajo"></i></button>
+            <button class="ej-btn-sm" onclick="ejPan(-1,0)"><i class="ej-ico ej-ico-izq"></i></button>
+            <button class="ej-btn-sm" onclick="ejPan(1,0)"><i class="ej-ico ej-ico-der"></i></button>
         </div>
         <div style="font-size:10px;color:#64748b;margin-top:2px">Consejo: Ctrl + rueda del ratón para hacer zoom donde apunta el cursor</div>
         <div style="display:none">
@@ -2396,7 +2396,7 @@ ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin
         <div style="margin-top:8px;padding-top:8px;border-top:1px solid #334155">
             <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#9ca3af;margin-bottom:6px">
                 <input type="checkbox" ${ejP.showEII?'checked':''} onchange="ejP.showEII=this.checked;ejRenderSVG()">
-                <span style="color:${ejP.showEII?'#22c55e':'#9ca3af'};font-weight:${ejP.showEII?'600':'400'}">📐 Análisis de zona (EII)</span>
+                <span style="color:${ejP.showEII?'#22c55e':'#9ca3af'};font-weight:${ejP.showEII?'600':'400'}"><i class="ej-ico ej-ico-analisis"></i> Análisis de zona (EII)</span>
             </label>
             <div style="font-size:10px;color:#64748b;margin-bottom:4px">Introduce las medidas totales de tu campo (m)</div>
             <div style="display:flex;gap:4px;align-items:center">
@@ -2420,24 +2420,24 @@ ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin
         ${ejP.animMode ? `<div class="ej-trazo-modo" style="margin-bottom:8px">
             <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Al trazar desde una ficha o el balón</div>
             <div style="display:flex;gap:4px;background:#0b1220;padding:3px;border-radius:8px;border:1px solid #2f405c">
-                <button type="button" onclick="ejAnimTrazoModo(true)" title="El trazo es la orden de moverse: la ficha o el balón irá hasta donde acabe" style="flex:1;border:none;border-radius:6px;padding:6px 4px;font-size:11px;font-weight:700;cursor:pointer;${ejP.animTrazoMueve !== false ? 'background:#facc15;color:#1e293b' : 'background:none;color:#94a3b8'}">🏃 Lo mueve</button>
-                <button type="button" onclick="ejAnimTrazoModo(false)" title="El trazo es solo un dibujo: se queda pintado y la ficha no se mueve" style="flex:1;border:none;border-radius:6px;padding:6px 4px;font-size:11px;font-weight:700;cursor:pointer;${ejP.animTrazoMueve === false ? 'background:#3b82f6;color:#fff' : 'background:none;color:#94a3b8'}">✏️ Solo dibuja</button>
+                <button type="button" onclick="ejAnimTrazoModo(true)" title="El trazo es la orden de moverse: la ficha o el balón irá hasta donde acabe" style="flex:1;border:none;border-radius:6px;padding:6px 4px;font-size:11px;font-weight:700;cursor:pointer;${ejP.animTrazoMueve !== false ? 'background:#facc15;color:#1e293b' : 'background:none;color:#94a3b8'}"><i class="ej-ico ej-ico-mover"></i> Lo mueve</button>
+                <button type="button" onclick="ejAnimTrazoModo(false)" title="El trazo es solo un dibujo: se queda pintado y la ficha no se mueve" style="flex:1;border:none;border-radius:6px;padding:6px 4px;font-size:11px;font-weight:700;cursor:pointer;${ejP.animTrazoMueve === false ? 'background:#3b82f6;color:#fff' : 'background:none;color:#94a3b8'}"><i class="ej-ico ej-ico-lapiz"></i> Solo dibuja</button>
             </div>
             <div style="font-size:10px;color:#94a3b8;margin-top:4px;line-height:1.3">${ejP.animTrazoMueve !== false ? 'La flecha amarilla marca el recorrido hasta el siguiente fotograma.' : 'La flecha se queda dibujada desde este fotograma. Nada se mueve.'}</div>
         </div>` : ''}
         <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px">Herramientas</div>
         <div class="ej-equipment-grid">
             ${[
-                {k:'pencil',  ico:'✏️', lbl:'Lápiz'},
-                {k:'arrow',   ico:'➡️', lbl:'Flecha'},
-                {k:'curved',  ico:'↗️', lbl:'Curva'},
-                {k:'dribble', ico:'〰️', lbl:'Conducción'},
-                {k:'line',    ico:'➖', lbl:'Línea'},
-                {k:'rect',    ico:'⬜', lbl:'Rect.'},
-                {k:'ellipse', ico:'⭕', lbl:'Círculo'},
-                {k:'text',    ico:'T',  lbl:'Texto'},
-                {k:'connect', ico:'🔗', lbl:'Conectar'}
-            ].map(item=>`<button class="ej-btn-equipment${t===item.k?' active':''}" onclick="ejSetTool(ejP.activeTool==='${item.k}'?'select':'${item.k}')" title="${item.lbl}"><span style="font-size:18px;line-height:1">${item.ico}</span><span>${item.lbl}</span></button>`).join('')}
+                {k:'pencil',  ico:'lapiz', lbl:'Lápiz'},
+                {k:'arrow',   ico:'flecha', lbl:'Flecha'},
+                {k:'curved',  ico:'curva', lbl:'Curva'},
+                {k:'dribble', ico:'conduccion', lbl:'Conducción'},
+                {k:'line',    ico:'linea', lbl:'Línea'},
+                {k:'rect',    ico:'rect', lbl:'Rect.'},
+                {k:'ellipse', ico:'circulo', lbl:'Círculo'},
+                {k:'text',    ico:'texto',  lbl:'Texto'},
+                {k:'connect', ico:'conectar', lbl:'Conectar'}
+            ].map(item=>`<button class="ej-btn-equipment${t===item.k?' active':''}" onclick="ejSetTool(ejP.activeTool==='${item.k}'?'select':'${item.k}')" title="${item.lbl}"><i class="ej-ico ej-ico-${item.ico}" style="font-size:19px"></i><span>${item.lbl}</span></button>`).join('')}
         </div>
         <div class="ej-draw-opts" style="margin-top:8px">
             <span>Grosor: <input type="range" min="1" max="10" value="${ejP.lineWidth}" oninput="ejP.lineWidth=+this.value" style="width:80px;vertical-align:middle;accent-color:#22c55e"></span>
@@ -2446,7 +2446,7 @@ ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin
         <div class="ej-draw-opts" style="margin-top:6px;padding-top:6px;border-top:1px solid #1e293b">
             <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#9ca3af">
                 <input type="checkbox" ${ejP.shapeFill?'checked':''} onchange="ejP.shapeFill=this.checked;ejRenderToolbar()">
-                <span style="color:${ejP.shapeFill?'#22c55e':'#9ca3af'};font-weight:${ejP.shapeFill?'600':'400'}">🎨 Relleno zona</span>
+                <span style="color:${ejP.shapeFill?'#22c55e':'#9ca3af'};font-weight:${ejP.shapeFill?'600':'400'}"><i class="ej-ico ej-ico-paleta"></i> Relleno zona</span>
             </label>
             ${ejP.shapeFill ? `<div style="display:flex;align-items:center;gap:4px;margin-top:4px"><span style="font-size:10px;color:#64748b">Tipo:</span><button onclick="ejP.shapeFillType='solid';ejRenderToolbar()" style="padding:2px 8px;font-size:10px;border-radius:4px;border:1px solid ${ejP.shapeFillType==='solid'?'#22c55e':'#334155'};background:${ejP.shapeFillType==='solid'?'#0f4c2a':'transparent'};color:${ejP.shapeFillType==='solid'?'#22c55e':'#64748b'};cursor:pointer">Sólido</button><button onclick="ejP.shapeFillType='hatched';ejRenderToolbar()" style="padding:2px 8px;font-size:10px;border-radius:4px;border:1px solid ${ejP.shapeFillType==='hatched'?'#f97316':'#334155'};background:${ejP.shapeFillType==='hatched'?'#78350f':'transparent'};color:${ejP.shapeFillType==='hatched'?'#f97316':'#64748b'};cursor:pointer">Rallado</button></div>` : ''}
             ${ejP.shapeFill ? '<div style="display:flex;align-items:center;gap:6px;margin-top:4px"><span style="font-size:10px;color:#64748b">Opacidad:</span><input type="range" min="10" max="70" value="'+Math.round(ejP.shapeFillOpacity*100)+'" oninput="ejP.shapeFillOpacity=this.value/100;ejRenderToolbar()" style="width:80px;accent-color:#22c55e"><span style="font-size:10px;color:#94a3b8;min-width:28px">'+Math.round(ejP.shapeFillOpacity*100)+'%</span></div>' : ''}
@@ -2457,8 +2457,8 @@ ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin
         </div>
         ${selText ? `
         <div style="margin-top:8px;padding-top:8px;border-top:1px solid #334155;background:#0b1220;border:1px solid #2f405c;border-radius:8px;padding:8px">
-            <div style="font-size:11px;color:#9ca3af;margin-bottom:6px">📝 Texto seleccionado</div>
-            <button onclick="ejEditarTexto()" style="width:100%;padding:7px;margin-bottom:8px;background:#1e3a5f;border:1px solid #2563eb;color:#93c5fd;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">✏️ Editar texto</button>
+            <div style="font-size:11px;color:#9ca3af;margin-bottom:6px">Texto seleccionado</div>
+            <button onclick="ejEditarTexto()" style="width:100%;padding:7px;margin-bottom:8px;background:#1e3a5f;border:1px solid #2563eb;color:#93c5fd;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600"><i class="ej-ico ej-ico-lapiz"></i> Editar texto</button>
             <label style="font-size:11px;color:#9ca3af;display:block;margin-bottom:3px">Tipo de letra:</label>
             <select onchange="ejChangeTextFont(this.value)" style="width:100%;padding:5px 6px;margin-bottom:8px;background:#0f172a;border:1px solid #334155;color:#fff;border-radius:6px;font-size:12px;cursor:pointer">
                 ${[['system-ui, sans-serif','Moderna'],['Georgia, serif','Clásica'],["'Arial Black', Impact, sans-serif",'Titular'],["'Trebuchet MS', sans-serif",'Redondeada'],["'Courier New', monospace",'Máquina']].map(function(o){ var cur=(selText.font||'system-ui, sans-serif')===o[0]; return '<option value="'+o[0]+'"'+(cur?' selected':'')+' style="font-family:'+o[0]+'">'+o[1]+'</option>'; }).join('')}
@@ -2475,8 +2475,8 @@ ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin
             </div>
         </div>` : ''}
         <div class="ej-actions-row" style="margin-top:8px;padding-top:8px;border-top:1px solid #334155">
-            <button class="ej-act-btn undo" onclick="ejUndo()" title="Deshacer (Ctrl+Z)">↩ Deshacer</button>
-            <button class="ej-act-btn redo" onclick="ejRedo()" title="Rehacer (Ctrl+Y)">↪ Rehacer</button>
+            <button class="ej-act-btn undo" onclick="ejUndo()" title="Deshacer (Ctrl+Z)"><i class="ej-ico ej-ico-deshacer"></i> Deshacer</button>
+            <button class="ej-act-btn redo" onclick="ejRedo()" title="Rehacer (Ctrl+Y)"><i class="ej-ico ej-ico-rehacer"></i> Rehacer</button>
         </div>
     </div>` : ''}
     <!-- SECCIÓN MATERIAL -->
@@ -2524,12 +2524,12 @@ ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin
 
 
     <!-- BOTONES PRINCIPALES -->
-    <button type="button" class="ej-anim-btn${ejP.animMode ? ' on' : ''}" onclick="ejAnimConmutar()">${ejP.animMode ? '🎬 Quitar animación' : '🎬 Animar'}</button>
+    <button type="button" class="ej-anim-btn${ejP.animMode ? ' on' : ''}" onclick="ejAnimConmutar()">${ejP.animMode ? '<i class="ej-ico ej-ico-animar"></i> Quitar animación' : '<i class="ej-ico ej-ico-animar"></i> Animar'}</button>
     <div style="margin-top:10px;display:flex;flex-direction:column;gap:6px">
-        ${ejP.animMode && ejEditandoId ? '' : '<button class="ej-act-btn purple full" onclick="ejCapturarParaFicha()" style="width:100%;padding:10px;background:#7c3aed;border:none;color:#fff;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600">📋 Guardar ejercicio</button>'}
-        <button class="ej-act-btn green full" onclick="ejExportPNG()" style="width:100%;padding:8px;background:#0f172a;border:1px solid #334155;color:#94a3b8;border-radius:8px;cursor:pointer;font-size:12px">📥 Exportar PNG</button>
-        <button class="ej-act-btn full" onclick="ejMontajeAbrir()" style="width:100%;padding:8px;background:#7c2d12;border:1px solid #9a3412;color:#fdba74;border-radius:8px;cursor:pointer;font-size:12px;margin-top:6px">🏟️ Guardar montaje de sesion</button>
-        <button class="ej-act-btn red full" onclick="ejDelete()" ${!sel?'disabled':''} style="width:100%;padding:8px;background:#7f1d1d;border:1px solid #dc2626;color:#fca5a5;border-radius:8px;cursor:pointer;font-size:12px">🗑 Eliminar seleccionado</button>
+        ${ejP.animMode && ejEditandoId ? '' : '<button class="ej-act-btn purple full" onclick="ejCapturarParaFicha()" style="width:100%;padding:10px;background:#7c3aed;border:none;color:#fff;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600"><i class="ej-ico ej-ico-guardar"></i> Guardar ejercicio</button>'}
+        <button class="ej-act-btn green full" onclick="ejExportPNG()" style="width:100%;padding:8px;background:#0f172a;border:1px solid #334155;color:#94a3b8;border-radius:8px;cursor:pointer;font-size:12px"><i class="ej-ico ej-ico-descargar"></i> Exportar PNG</button>
+        <button class="ej-act-btn full" onclick="ejMontajeAbrir()" style="width:100%;padding:8px;background:#7c2d12;border:1px solid #9a3412;color:#fdba74;border-radius:8px;cursor:pointer;font-size:12px;margin-top:6px"><i class="ej-ico ej-ico-montaje"></i> Guardar montaje de sesion</button>
+        <button class="ej-act-btn red full" onclick="ejDelete()" ${!sel?'disabled':''} style="width:100%;padding:8px;background:#7f1d1d;border:1px solid #dc2626;color:#fca5a5;border-radius:8px;cursor:pointer;font-size:12px"><i class="ej-ico ej-ico-papelera"></i> Eliminar seleccionado</button>
     </div>
     `;
     ejBarrasSync();
@@ -2684,10 +2684,10 @@ root.innerHTML = `
         <div style="display:flex;flex-direction:column;gap:6px;min-width:0">
         <div id="ej-pizarra-topbar" style="display:flex;align-items:center;justify-content:space-between;background:#1e3a5f;border:1px solid #2563eb;border-radius:8px;padding:8px 14px;margin-bottom:8px;gap:10px">
             <div style="display:flex;align-items:center;gap:8px;min-width:0">
-                <span style="font-size:14px">📋</span>
+                <span style="font-size:14px;color:#93c5fd"><i class="ej-ico ej-ico-ficha"></i></span>
                 <span id="ej-pizarra-nombre-label" style="color:#93c5fd;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Pizarra libre</span>
             </div>
-            <div style="display:flex;gap:8px;flex-shrink:0"><button onclick="ejProyPanel()" style="background:#7c3aed;border:none;color:#fff;padding:5px 14px;border-radius:6px;cursor:pointer;font-size:12px;white-space:nowrap;font-weight:600">📁 Proyectos</button><button onclick="ejPresentar()" style="background:#16a34a;border:none;color:#fff;padding:5px 14px;border-radius:6px;cursor:pointer;font-size:12px;white-space:nowrap;font-weight:600">📽️ Presentar</button><button onclick="ejNuevaPizarra()" style="background:#0f172a;border:1px solid #475569;color:#94a3b8;padding:5px 14px;border-radius:6px;cursor:pointer;font-size:12px;white-space:nowrap">✕ Nueva pizarra</button></div>
+            <div style="display:flex;gap:8px;flex-shrink:0"><button onclick="ejProyPanel()" class="ej-tb-btn" title="Proyectos"><i class="ej-ico ej-ico-carpeta"></i><span class="ej-txt">Proyectos</span></button><button onclick="ejPresentar()" class="ej-tb-btn pri" title="Presentar a pantalla completa"><i class="ej-ico ej-ico-presentar"></i><span class="ej-txt">Presentar</span></button><button onclick="ejNuevaPizarra()" class="ej-tb-btn" title="Nueva pizarra"><i class="ej-ico ej-ico-nueva"></i><span class="ej-txt">Nueva pizarra</span></button></div>
 </div>
         <div id="ej-toolbar"></div>
         </div>
@@ -4373,6 +4373,8 @@ function ejFramePlay(fromFrame) {
     ejP.isPlaying = true;
     ejP._animDom = null;
     ejP._giros = null;
+    ejP._sonidoSeg = -1;
+    if (ejSonidoActivo()) ejSonidoPreparar();
     ejP._animFrame = ejP.currentFrame;
     ejP._animProgress = 0;
     ejP._globalProgress = ejP.currentFrame; // progreso global continuo
@@ -4527,6 +4529,7 @@ function ejFrameAnimate(now) {
     }
 
     ejAnimGiros();
+    if (ejP._sonidoSeg !== seg) { ejP._sonidoSeg = seg; if (ejSonidoActivo() && ejAnimGolpeEn(seg)) ejSonidoGolpeAhora(); }
     // Solo se redibuja la pizarra al cambiar de tramo; dentro del tramo se mueven las fichas ya dibujadas
     if (!ejAnimMover(seg)) {
         ejRenderSVG();
@@ -4564,6 +4567,82 @@ function ejAnimPreparar(seg) {
     });
     d.centinela = svg.firstElementChild;
     ejP._animDom = d;
+}
+// ---- Sonido del golpeo ----
+// Suena un golpe seco cuando el balón arranca un desplazamiento largo (pase, tiro, despeje).
+// Las conducciones cortas no suenan, y un pase partido en dos fotogramas seguidos en la misma dirección suena una vez.
+var EJ_GOLPE_MIN_PX = 60, EJ_GOLPE_MISMO_RUMBO = 25;
+function ejSonidoActivo() {
+    if (ejP.animSonido === undefined) {
+        var v = null;
+        try { v = localStorage.getItem('tlc_pizarra_sonido'); } catch (e) {}
+        ejP.animSonido = v !== '0';
+    }
+    return ejP.animSonido;
+}
+function ejSonidoConmutar() {
+    ejP.animSonido = !ejSonidoActivo();
+    try { localStorage.setItem('tlc_pizarra_sonido', ejP.animSonido ? '1' : '0'); } catch (e) {}
+    if (ejP.animSonido) { ejSonidoPreparar(); ejSonidoGolpeAhora(); }
+    ejRenderTimeline();
+}
+// ¿Algún balón arranca un golpeo en el tramo que va del fotograma seg al seg+1?
+function ejAnimGolpeEn(seg) {
+    var fA = ejP.frames[seg], fB = ejP.frames[seg + 1], f0 = ejP.frames[seg - 1];
+    if (!fA || !fB) return false;
+    for (var i = 0; i < ejP.equipment.length; i++) {
+        var q = ejP.equipment[i];
+        if (q.eqType !== 'ball') continue;
+        var a = fA.equipment.find(function (x) { return x.id === q.id; }), b = fB.equipment.find(function (x) { return x.id === q.id; });
+        if (!a || !b) continue;
+        var dx = b.x - a.x, dy = b.y - a.y;
+        if (Math.sqrt(dx * dx + dy * dy) < EJ_GOLPE_MIN_PX) continue;
+        var z = f0 && f0.equipment.find(function (x) { return x.id === q.id; });
+        if (z) {
+            var px = a.x - z.x, py = a.y - z.y;
+            if (Math.sqrt(px * px + py * py) >= EJ_GOLPE_MIN_PX) {
+                // Ya venía en movimiento: solo es otro golpeo si cambia de rumbo
+                var dif = Math.abs(Math.atan2(dy, dx) - Math.atan2(py, px)) * 180 / Math.PI;
+                if (dif > 180) dif = 360 - dif;
+                if (dif < EJ_GOLPE_MISMO_RUMBO) continue;
+            }
+        }
+        return true;
+    }
+    return false;
+}
+// El golpe: un tono grave que cae rápido más un chasquido corto. Sirve para el altavoz y para el vídeo.
+function ejSonidoGolpe(ctx, cuando) {
+    var osc = ctx.createOscillator(), g = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(190, cuando);
+    osc.frequency.exponentialRampToValueAtTime(52, cuando + 0.09);
+    g.gain.setValueAtTime(0.0001, cuando);
+    g.gain.exponentialRampToValueAtTime(0.9, cuando + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, cuando + 0.16);
+    osc.connect(g); g.connect(ctx.destination);
+    osc.start(cuando); osc.stop(cuando + 0.18);
+    var n = Math.floor(ctx.sampleRate * 0.03), buf = ctx.createBuffer(1, n, ctx.sampleRate), d = buf.getChannelData(0);
+    for (var i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+    var ruido = ctx.createBufferSource(), filtro = ctx.createBiquadFilter(), gr = ctx.createGain();
+    ruido.buffer = buf; filtro.type = 'bandpass'; filtro.frequency.value = 1400; filtro.Q.value = 0.8;
+    gr.gain.setValueAtTime(0.35, cuando); gr.gain.exponentialRampToValueAtTime(0.0001, cuando + 0.03);
+    ruido.connect(filtro); filtro.connect(gr); gr.connect(ctx.destination);
+    ruido.start(cuando);
+}
+function ejSonidoPreparar() {
+    try {
+        var AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return null;
+        if (!ejP._audioCtx) ejP._audioCtx = new AC();
+        if (ejP._audioCtx.state === 'suspended') ejP._audioCtx.resume();
+        return ejP._audioCtx;
+    } catch (e) { return null; }
+}
+function ejSonidoGolpeAhora() {
+    var ctx = ejSonidoPreparar();
+    if (!ctx) return;
+    try { ejSonidoGolpe(ctx, ctx.currentTime + 0.01); } catch (e) {}
 }
 // El balón gira mientras se mueve: cuanto más recorre, más gira, y en el sentido en que avanza.
 // El giro solo existe durante la reproducción o al crear el vídeo; no se guarda en el ejercicio.
@@ -4634,50 +4713,39 @@ function ejRenderTimeline() {
 
     let dots = '';
     for (let i = 0; i < total; i++) {
-        const active = i === cur;
-        dots += `<div onclick="ejFrameGo(${i})" style="
-            width:${active?'28px':'20px'};height:${active?'28px':'20px'};
-            border-radius:50%;
-            background:${active?'#3b82f6':'#334155'};
-            border:2px solid ${active?'#93c5fd':'#475569'};
-            cursor:pointer;
-            display:flex;align-items:center;justify-content:center;
-            font-size:${active?'11px':'9px'};color:${active?'#fff':'#9ca3af'};
-            font-weight:${active?'700':'400'};
-            transition:all .15s ease;
-            flex-shrink:0;
-        " title="Frame ${i+1}">${i+1}</div>`;
+        dots += `<button type="button" class="ej-tl-punto${i === cur ? ' on' : ''}" onclick="ejFrameGo(${i})" title="Fotograma ${i+1}">${i+1}</button>`;
     }
+    const vel = ejP.playSpeed >= 1500 ? 0 : (ejP.playSpeed >= 800 ? 1 : 2);
 
     bar.innerHTML = `
-    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-        <div style="display:flex;align-items:center;gap:4px">
+    <div class="ej-tl">
+        <div class="ej-tl-g">
             ${ejP.isPlaying
-                ? '<button onclick="ejFrameStop()" style="background:#ef4444;border:none;color:#fff;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">⏹ Stop</button>'
-                : '<button onclick="ejFramePlay()" style="background:#22c55e;border:none;color:#fff;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600" ' + (total<2?'disabled':'') + '>▶ Play</button>'
+                ? '<button class="ej-tl-btn pri parar" onclick="ejFrameStop()"><i class="ej-ico ej-ico-stop"></i><span>Parar</span></button>'
+                : '<button class="ej-tl-btn pri" onclick="ejFramePlay()" ' + (total<2?'disabled':'') + '><i class="ej-ico ej-ico-play"></i><span>Play</span></button>'
             }
-            <button onclick="ejFramePrev()" style="background:#1e3a5f;border:1px solid #2563eb;color:#93c5fd;padding:5px 8px;border-radius:6px;cursor:pointer;font-size:12px" ${cur<=0?'disabled':''}>◀</button>
-            <button onclick="ejFrameNext()" style="background:#1e3a5f;border:1px solid #2563eb;color:#93c5fd;padding:5px 8px;border-radius:6px;cursor:pointer;font-size:12px" ${cur>=total-1?'disabled':''}>▶</button>
+            <button class="ej-tl-btn ico" onclick="ejFramePrev()" title="Fotograma anterior" ${cur<=0?'disabled':''}><i class="ej-ico ej-ico-izq"></i></button>
+            <button class="ej-tl-btn ico" onclick="ejFrameNext()" title="Fotograma siguiente" ${cur>=total-1?'disabled':''}><i class="ej-ico ej-ico-der"></i></button>
         </div>
-        <div style="display:flex;align-items:center;gap:6px;flex:1;overflow-x:auto;padding:4px 0">
+        <div class="ej-tl-puntos">
             ${dots}
         </div>
-        <div style="display:flex;align-items:center;gap:4px">
-<button onclick="ejFrameAdd()" style="background:#7c3aed;border:none;color:#fff;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600">+ Frame</button>
-            <button onclick="ejFrameDeleteLast()" style="background:#7f1d1d;border:1px solid #dc2626;color:#fca5a5;padding:5px 8px;border-radius:6px;cursor:pointer;font-size:11px" ${total<=1?'disabled':''}>🗑 Frame</button>
-            <button onclick="ejFrameUndoTraj()" style="background:#1e3a5f;border:1px solid #2563eb;color:#93c5fd;padding:5px 8px;border-radius:6px;cursor:pointer;font-size:11px" title="Deshacer última trayectoria del frame">↩ Trayo</button>
+        <div class="ej-tl-g">
+            <button class="ej-tl-btn" onclick="ejFrameAdd()" title="Añadir un fotograma con la posición actual"><i class="ej-ico ej-ico-mas"></i><span>Fotograma</span></button>
+            <button class="ej-tl-btn peligro" onclick="ejFrameDeleteLast()" title="Borrar el último fotograma" ${total<=1?'disabled':''}><i class="ej-ico ej-ico-papelera"></i><span>Fotograma</span></button>
+            <button class="ej-tl-btn" onclick="ejFrameUndoTraj()" title="Deshacer la última trayectoria de este fotograma"><i class="ej-ico ej-ico-deshacer"></i><span>Trayectoria</span></button>
         </div>
-        <div style="display:flex;align-items:center;gap:4px">
-            <span style="color:#64748b;font-size:10px">Vel:</span>
-            <button onclick="ejFrameSetSpeed(1500)" style="background:${ejP.playSpeed>=1500?'#1e3a5f':'#0f172a'};border:1px solid #334155;color:#9ca3af;padding:3px 6px;border-radius:4px;cursor:pointer;font-size:10px">0.5x</button>
-            <button onclick="ejFrameSetSpeed(800)" style="background:${ejP.playSpeed>=800&&ejP.playSpeed<1500?'#1e3a5f':'#0f172a'};border:1px solid #334155;color:#9ca3af;padding:3px 6px;border-radius:4px;cursor:pointer;font-size:10px">1x</button>
-            <button onclick="ejFrameSetSpeed(400)" style="background:${ejP.playSpeed<800?'#1e3a5f':'#0f172a'};border:1px solid #334155;color:#9ca3af;padding:3px 6px;border-radius:4px;cursor:pointer;font-size:10px">2x</button>
+        <div class="ej-tl-g ej-tl-vel" title="Velocidad de reproducción">
+            <button class="ej-tl-btn mini${vel===0?' on':''}" onclick="ejFrameSetSpeed(1500)">0.5x</button>
+            <button class="ej-tl-btn mini${vel===1?' on':''}" onclick="ejFrameSetSpeed(800)">1x</button>
+            <button class="ej-tl-btn mini${vel===2?' on':''}" onclick="ejFrameSetSpeed(400)">2x</button>
+            <button class="ej-tl-btn mini${ejSonidoActivo()?' on':''}" onclick="ejSonidoConmutar()" title="${ejSonidoActivo() ? 'Sonido del golpeo activado. Pulsa para quitarlo.' : 'Sin sonido. Pulsa para que suene el golpeo del balón.'}">${ejSonidoActivo() ? '<i class="ej-ico ej-ico-sonido"></i>' : '<i class="ej-ico ej-ico-mudo"></i>'}</button>
         </div>
-        <span style="color:#64748b;font-size:11px;white-space:nowrap">Frame ${cur+1}/${total}</span>
-        <button onclick="ejVideoAbrir()" title="Descargar la animación como vídeo MP4" style="background:#f97316;border:none;color:#fff;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600" ${total<2?'disabled':''}>⬇ Vídeo</button>
-        ${ejEditandoId ? `<button onclick="ejGuardarYExportar()" style="background:#22c55e;border:none;color:#fff;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600">${ejP._exportingVideo ? '⏳ Generando...' : '💾 Guardar cambios'}</button>` : ''}
+        <span class="ej-tl-cuenta">${cur+1} / ${total}</span>
+        <button class="ej-tl-btn acento" onclick="ejVideoAbrir()" title="Descargar la animación como vídeo MP4" ${total<2?'disabled':''}><i class="ej-ico ej-ico-descargar"></i><span>Vídeo</span></button>
+        ${ejEditandoId ? `<button class="ej-tl-btn pri" onclick="ejGuardarYExportar()" title="Guardar los cambios del ejercicio y su vídeo">${ejP._exportingVideo ? '<i class="ej-ico ej-ico-espera"></i><span>Generando…</span>' : '<i class="ej-ico ej-ico-guardar"></i><span>Guardar</span>'}</button>` : ''}
     </div>
-    <div id="ej-anim-msg" style="font-size:11px;color:#9ca3af;margin-top:4px;text-align:center">${ejP._exportingVideo ? '⏳ Generando vídeo... (no toques nada)' : ejP._lastVideoUrl ? '<span style="color:#22c55e">✅ Vídeo MP4 guardado</span> — <a href="'+ejP._lastVideoUrl+'" target="_blank" style="color:#93c5fd;text-decoration:underline">Ver vídeo ▶</a> · <a href="https://toplidercoach.com/wp-content/uploads/ejercicios/download-video.php?url='+encodeURIComponent(ejP._lastVideoUrl)+'" target="_blank" style="color:#f97316;text-decoration:underline">📥 Descargar</a>' : ''}</div>`;
+    <div id="ej-anim-msg" style="font-size:11px;color:#9ca3af;margin-top:4px;text-align:center">${ejP._exportingVideo ? '<i class="ej-ico ej-ico-espera"></i> Generando vídeo… no toques nada' : ejP._lastVideoUrl ? '<span style="color:#22c55e"><i class="ej-ico ej-ico-ok"></i> Vídeo MP4 guardado</span> — <a href="'+ejP._lastVideoUrl+'" target="_blank" style="color:#93c5fd;text-decoration:underline">Ver vídeo</a> · <a href="https://toplidercoach.com/wp-content/uploads/ejercicios/download-video.php?url='+encodeURIComponent(ejP._lastVideoUrl)+'" target="_blank" style="color:#93c5fd;text-decoration:underline">Descargar</a>' : ''}</div>`;
 }
 async function ejCargarPlantilla() {
     try {
@@ -4879,9 +4947,9 @@ async function ejExportarAnimacionMP4() {
     ejP._exportingVideo = true; ejRenderTimeline();
     try {
         ejP._videoHaciendo = true; ejP._videoCancelar = false;
-        var blob = await ejVideoCrear(EJ_VIDEO_FICHA, function (pc) { aviso('<span style="color:#f97316;font-weight:600">⏳ Creando el vídeo… ' + pc + ' %</span>'); });
+        var blob = await ejVideoCrear(EJ_VIDEO_FICHA, function (pc) { aviso('<span style="color:#f97316;font-weight:600"><i class="ej-ico ej-ico-espera"></i> Creando el vídeo… ' + pc + ' %</span>'); });
         ejP._videoHaciendo = false;
-        aviso('<span style="color:#3b82f6;font-weight:600">📤 Subiendo el vídeo…</span>');
+        aviso('<span style="color:#3b82f6;font-weight:600"><i class="ej-ico ej-ico-espera"></i> Subiendo el vídeo…</span>');
         url = await ejVideoSubir(blob, ejEditandoId);
     } catch (e) {
         ejP._videoHaciendo = false;
@@ -4893,7 +4961,7 @@ async function ejExportarAnimacionMP4() {
     if (idx >= 0) ejBancoCache[idx].animation_url = url;
     ejP._exportingVideo = false; ejP._lastVideoUrl = url; ejP._videoDesactualizado = false;
     ejRenderTimeline();
-    aviso('✅ Vídeo MP4 guardado — <a href="' + url + '" target="_blank" style="color:#93c5fd;text-decoration:underline">Ver vídeo ▶</a>');
+    aviso('<span style="color:#22c55e"><i class="ej-ico ej-ico-ok"></i> Vídeo MP4 guardado</span> — <a href="' + url + '" target="_blank" style="color:#93c5fd;text-decoration:underline">Ver vídeo</a>');
 }
 // Sube un vídeo al servidor (primero el de vídeo, y si falla el de la web) y devuelve su dirección, o null
 async function ejVideoSubir(blob, id) {
@@ -5084,7 +5152,7 @@ async function ejExportarAnimacionGrabada() {
             await supabaseClient.from('custom_exercises').update({ animation_url: data.url }).eq('id', ejEditandoId);
             const idx = ejBancoCache.findIndex(x => x.id === ejEditandoId);
             if (idx >= 0) ejBancoCache[idx].animation_url = data.url;
-            ejP._exportingVideo = false; ejP._lastVideoUrl = data.url; ejRenderTimeline(); const msgFinal = document.getElementById('ej-anim-msg'); if (msgFinal) msgFinal.innerHTML = '✅ Vídeo MP4 guardado — <a href="' + data.url + '" target="_blank" style="color:#93c5fd;text-decoration:underline">Ver vídeo ▶</a>';
+            ejP._exportingVideo = false; ejP._lastVideoUrl = data.url; ejRenderTimeline(); const msgFinal = document.getElementById('ej-anim-msg'); if (msgFinal) msgFinal.innerHTML = '✅ Vídeo MP4 guardado — <a href="' + data.url + '" target="_blank" style="color:#93c5fd;text-decoration:underline">Ver vídeo</a>';
             ejP._videoDesactualizado = false;
         } else {
             ejP._exportingVideo = false; ejRenderTimeline(); const msgErr = document.getElementById('ej-anim-msg'); if (msgErr) msgErr.textContent = '❌ Error: ' + (data.error || 'desconocido');
@@ -5166,10 +5234,10 @@ function ejInit() {
     <div class="ej-module">
         <!-- Sub-navegación interna -->
         <div class="ej-nav">
-            <button class="ej-nav-btn ej-hub-btn" title="Mostrar u ocultar el menú del HUB" onclick="document.body.classList.toggle('tlc-hub-abierto')">☰</button>
-            <button class="ej-nav-btn active" onclick="ejShowTab('pizarra',this)">🎯 Pizarra</button>
-            <button class="ej-nav-btn" onclick="ejShowTab('ficha',this)">📋 Ficha</button>
-            <button class="ej-nav-btn" onclick="ejShowTab('banco',this)">🗂 Banco</button>
+            <button class="ej-nav-btn ej-hub-btn" title="Mostrar u ocultar el menú del HUB" onclick="document.body.classList.toggle('tlc-hub-abierto')"><i class="ej-ico ej-ico-menu"></i></button>
+            <button class="ej-nav-btn active" onclick="ejShowTab('pizarra',this)" title="Pizarra"><i class="ej-ico ej-ico-pizarra"></i><span class="ej-txt">Pizarra</span></button>
+            <button class="ej-nav-btn" onclick="ejShowTab('ficha',this)" title="Ficha"><i class="ej-ico ej-ico-ficha"></i><span class="ej-txt">Ficha</span></button>
+            <button class="ej-nav-btn" onclick="ejShowTab('banco',this)" title="Banco"><i class="ej-ico ej-ico-banco"></i><span class="ej-txt">Banco</span></button>
         </div>
         <div id="ej-tab-pizarra" class="ej-tab active">
             <div id="ej-pizarra-container"></div>
@@ -5777,7 +5845,7 @@ function ejFormPintar() {
         return '<button type="button" class="ej-fm-card" onclick="ejFormElegir(\'' + clave + '\')"><svg viewBox="0 0 160 100">' + campo + puntos + '</svg><b>' + clave + '</b></button>';
     }).join('');
     m.innerHTML = '<div class="ej-jm-caja ej-fm-caja">'
-        + '<div class="ej-jm-cab"><strong>' + (rival ? 'Formación del rival' : 'Formación de mi equipo') + '</strong><button type="button" class="ej-jm-x" onclick="ejFormCerrar()" title="Cerrar">✕</button></div>'
+        + '<div class="ej-jm-cab"><strong>' + (rival ? 'Formación del rival' : 'Formación de mi equipo') + '</strong><button type="button" class="ej-jm-x" onclick="ejFormCerrar()" title="Cerrar"><i class="ej-ico ej-ico-nueva"></i></button></div>'
         + '<div class="ej-fm-tabs">' + EJ_FORM_GRUPOS.map(function (g) { return '<button type="button" class="' + (g[0] === grupo[0] ? 'on' : '') + '" onclick="ejFormGrupo(\'' + g[0] + '\')">' + g[1] + '</button>'; }).join('') + '</div>'
         + '<div class="ej-jm-cuerpo"><div class="ej-fm-grid">' + tarjetas + '</div></div>'
         + '<div class="ej-jm-pie"><span>Al elegir una, sustituye a los jugadores ' + (rival ? 'del rival' : 'de tu equipo') + ' que haya en el campo. Las fichas de tarea no se tocan.</span>'
@@ -5870,7 +5938,7 @@ function ejJugModalPintar() {
     m.innerHTML = '<div class="ej-jm-caja">'
         + '<div class="ej-jm-cab"><strong>' + (rival ? 'Jugadores del rival' : 'Mis jugadores') + '</strong>'
         + (rival ? '<button type="button" class="ej-jm-otro" onclick="ejJugModalCerrar();ejP._jugModalPend=true;ejCargarPlantillaRival()">Cambiar de equipo</button>' : '')
-        + '<button type="button" class="ej-jm-x" onclick="ejJugModalCerrar()" title="Cerrar">✕</button></div>'
+        + '<button type="button" class="ej-jm-x" onclick="ejJugModalCerrar()" title="Cerrar"><i class="ej-ico ej-ico-nueva"></i></button></div>'
         + '<div class="ej-jm-cuerpo">' + cuerpo + '</div>'
         + '<div class="ej-jm-pie"><span>Cada jugador entra colocado en su línea; luego lo mueves donde quieras.</span>'
         + '<button type="button" class="ej-jm-cancel" onclick="ejJugModalCerrar()">Cancelar</button>'
@@ -6499,7 +6567,7 @@ function ejCfgPintar() {
     var eqc = ejEqCfg();
     var propio = !!ejFondoDef().color;
     var h = '<div class="ej-cfg-caja">'
-        + '<div class="ej-jm-cab"><strong>Configuración de la pizarra</strong><button type="button" class="ej-jm-x" onclick="ejCfgCerrar()" title="Cerrar">✕</button></div>'
+        + '<div class="ej-jm-cab"><strong>Configuración de la pizarra</strong><button type="button" class="ej-jm-x" onclick="ejCfgCerrar()" title="Cerrar"><i class="ej-ico ej-ico-nueva"></i></button></div>'
         + '<div class="ej-cfg-cuerpo">'
         + '<h4>Campo</h4><div class="ej-cfg-l">Fondo</div>' + ejFondoMiniaturas('ejCfgHacer(\'ejSetFondo\',\'$k\')')
         + '<div class="ej-cfg-l">Color del césped' + (propio ? ' <em>(este fondo trae el suyo)</em>' : '') + '</div><div class="ej-cfg-cols redondo' + (propio ? ' off' : '') + '">'
@@ -6682,7 +6750,7 @@ function ejVideoAbrir() {
             + '<span><b style="display:block;font-size:14px">' + f.n + '</b><span style="font-size:12px;color:#94a3b8">' + f.d + '</span></span></button>';
     }).join('');
     ejVideoCaja('<div style="display:flex;align-items:center;justify-content:space-between"><b style="font-size:16px">Descargar vídeo</b>'
-        + '<button type="button" onclick="ejVideoCerrar()" style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;line-height:1">✕</button></div>'
+        + '<button type="button" onclick="ejVideoCerrar()" style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;line-height:1"><i class="ej-ico ej-ico-nueva"></i></button></div>'
         + '<div style="font-size:12px;color:#94a3b8;margin-top:4px">' + ejP.frames.length + ' fotogramas. No hace falta guardar el ejercicio.</div>' + tarjetas);
 }
 // Coloca fichas y material en un punto de la animación: t va de 0 (primer fotograma) a 1 (último).
@@ -6744,6 +6812,12 @@ async function ejVideoCrear(f, alAvanzar) {
         salida = new M.Output({ format: new M.Mp4OutputFormat(), target: new M.BufferTarget() });
         var fuente = new M.CanvasSource(lienzo, { codec: 'avc', bitrate: 8e6 });
         salida.addVideoTrack(fuente, { frameRate: EJ_VIDEO_FPS });
+        // Pista de sonido, si está activado y el navegador sabe codificarla (AAC, que suena en todas partes; si no, Opus)
+        var fuenteAudio = null, golpes = [], segSonido = -1;
+        if (ejSonidoActivo() && M.canEncodeAudio && typeof OfflineAudioContext !== 'undefined') {
+            var codecAudio = (await M.canEncodeAudio('aac')) ? 'aac' : ((await M.canEncodeAudio('opus')) ? 'opus' : null);
+            if (codecAudio) { fuenteAudio = new M.AudioBufferSource({ codec: codecAudio, bitrate: 128e3 }); salida.addAudioTrack(fuenteAudio); }
+        }
         await salida.start();
 
         // Medio segundo quieto al principio, el movimiento, y casi un segundo quieto al final
@@ -6755,8 +6829,17 @@ async function ejVideoCrear(f, alAvanzar) {
             if (ejP._videoCancelar) break;
             var quieto = (i > 0 && i < nIni) || i > nIni + nMov;      // misma imagen que la anterior: no hace falta repintar
             if (!quieto) { ejAnimPosicionar(i < nIni ? 0 : Math.min(1, (i - nIni) / nMov)); await pintar(); }
+            if (fuenteAudio && i >= nIni && i <= nIni + nMov && ejP.currentFrame !== segSonido) {
+                segSonido = ejP.currentFrame;
+                if (ejAnimGolpeEn(segSonido)) golpes.push(i / EJ_VIDEO_FPS);
+            }
             await fuente.add(i / EJ_VIDEO_FPS, 1 / EJ_VIDEO_FPS);
             if (alAvanzar && (i % 3 === 0 || i === total - 1)) alAvanzar(Math.round((i + 1) / total * 100));
+        }
+        if (fuenteAudio && !ejP._videoCancelar) {
+            var off = new OfflineAudioContext(2, Math.ceil(total / EJ_VIDEO_FPS * 48000), 48000);
+            golpes.forEach(function (t) { ejSonidoGolpe(off, t); });
+            await fuenteAudio.add(await off.startRendering());
         }
         if (ejP._videoCancelar) { await salida.cancel(); }
         else { await salida.finalize(); blob = new Blob([salida.target.buffer], { type: 'video/mp4' }); }
@@ -6802,10 +6885,10 @@ async function ejVideoExportar(formato) {
     if (!blob) { ejVideoCerrar(); ejToast('Vídeo cancelado.', 'info'); return; }
     var nombre = ejVideoNombre();
     ejVideoCaja('<div style="display:flex;align-items:center;justify-content:space-between"><b style="font-size:16px">Vídeo listo</b>'
-        + '<button type="button" onclick="ejVideoCerrar()" style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;line-height:1">✕</button></div>'
+        + '<button type="button" onclick="ejVideoCerrar()" style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;line-height:1"><i class="ej-ico ej-ico-nueva"></i></button></div>'
         + '<video id="ej-video-previa" controls autoplay loop muted playsinline style="display:block;width:100%;max-height:56vh;background:#000;border-radius:8px;margin-top:10px"></video>'
         + '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px"><span style="font-size:12px;color:#94a3b8">' + f.n + ' · ' + (blob.size / 1048576).toFixed(1) + ' MB</span>'
-        + '<a id="ej-video-bajar" download="' + nombre + '" style="background:#22c55e;color:#04210f;font-weight:700;border-radius:8px;padding:8px 18px;text-decoration:none;font-size:14px">⬇ Descargar</a></div>');
+        + '<a id="ej-video-bajar" download="' + nombre + '" style="background:#22c55e;color:#04210f;font-weight:700;border-radius:8px;padding:8px 18px;text-decoration:none;font-size:14px"><i class="ej-ico ej-ico-descargar"></i> Descargar</a></div>');
     ejP._videoUrlLocal = URL.createObjectURL(blob);
     document.getElementById('ej-video-previa').src = ejP._videoUrlLocal;
     var a = document.getElementById('ej-video-bajar');
