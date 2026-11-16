@@ -8,6 +8,9 @@
 //   picos de carga (+30% sobre su media) y filas de media por posicion.
 // - v4: exportacion del informe a PDF (jsPDF + autoTable, sin emojis) y a CSV
 //   compatible con Excel es-ES (separador ';', decimales con coma, BOM).
+// - v5: columnas segun la marca del GPS. Las sesiones importadas de SoccerLab muestran sus
+//   propias columnas (HI>25,2, ACC/DEC>2, P.Load, pulso, TRIMP) en tabla, graficas, PDF y CSV.
+//   El resto de sesiones se ve exactamente igual que antes.
 // No modifica cm-prepfisica.js. Cargar DESPUES de cm-prepfisica.js.
 
 var cmPfSes2 = {
@@ -393,7 +396,50 @@ var CMPFSES2_COLS_EJ = [
     { k: 'dec',    lbl: 'DEC>3',    dec: 0 },
     { k: 'dec40',  lbl: 'DEC>4',    dec: 0 }
 ];
+// Columnas de la sesion cuando los datos vienen de SoccerLab (extra_metrics.gps_brand = 'soccerlab'):
+// primero lo que mira el cuerpo tecnico (TD, Vmax, alta intensidad, acc/dec totales) y despues lo que
+// esa marca trae de mas. Las marcadas con opc:true se ocultan si ningun jugador tiene dato (p. ej. sin banda de pulso).
+var CMPFSES2_COLS_SOCCERLAB = [
+    { k: 'min',    lbl: 'Min',       dec: 0 },
+    { k: 'td',     lbl: 'TD(m)',     dec: 0 },
+    { k: 'mmin',   lbl: 'm/min',     dec: 1 },
+    { k: 'vmax',   lbl: 'Vmax',      dec: 1 },
+    { k: 'pvmax',  lbl: '%VmaxInd',  dec: 0 },
+    { k: 'spr',    lbl: 'HI>25,2',   dec: 0 },
+    { k: 'acc',    lbl: 'ACC>2',     dec: 0 },
+    { k: 'dec',    lbl: 'DEC>2',     dec: 0 },
+    { k: 'hsr',    lbl: 'HSR>19,8',  dec: 0 },
+    { k: 'nspr',   lbl: 'N.Spr',     dec: 0 },
+    { k: 'pl',     lbl: 'P.Load',    dec: 1, opc: true },
+    { k: 'fcmed',  lbl: 'FC med',    dec: 0, opc: true },
+    { k: 'fcmax',  lbl: 'FC max',    dec: 0, opc: true },
+    { k: 'trimp',  lbl: 'TRIMP',     dec: 0, opc: true },
+    { k: 'rpe',    lbl: 'RPE',       dec: 0 },
+    { k: 'srpe',   lbl: 'sRPE(UA)',  dec: 0 },
+    { k: 'srpekm', lbl: 'UA/km',     dec: 1 }
+];
 var CMPFSES2_COLS = CMPFSES2_COLS_SES;   // columnas activas (se cambian en cmPfSes2Render)
+
+// Marca de GPS de las filas mostradas: la mas repetida ('dispositivo' si no viene indicada)
+function cmPfSes2Marca(filas) {
+    var cuenta = {}, mejor = 'dispositivo', max = 0;
+    filas.forEach(function (f) {
+        var m = f.marca || 'dispositivo';
+        cuenta[m] = (cuenta[m] || 0) + 1;
+        if (cuenta[m] > max) { max = cuenta[m]; mejor = m; }
+    });
+    return mejor;
+}
+
+// Columnas que tocan segun segmento y marca; las opcionales sin ningun dato no se muestran
+function cmPfSes2ColsActivas(esEj, filas) {
+    if (esEj) return CMPFSES2_COLS_EJ;
+    if (cmPfSes2Marca(filas) !== 'soccerlab') return CMPFSES2_COLS_SES;
+    return CMPFSES2_COLS_SOCCERLAB.filter(function (c) {
+        if (!c.opc) return true;
+        return filas.some(function (f) { return f[c.k] !== null && f[c.k] !== undefined && !isNaN(f[c.k]); });
+    });
+}
 
 function cmPfSes2Filas() {
     var filas = [];
@@ -434,6 +480,10 @@ function cmPfSes2Filas() {
             hsr21: exNum(ex.hid21_m),
             acc25: exNum(ex.acc_25), acc40: exNum(ex.acc_40),
             dec25: exNum(ex.dec_25), dec40: exNum(ex.dec_40),
+            marca: ex.gps_brand || 'dispositivo',
+            pl: exNum(d.player_load),
+            fcmed: exNum(d.hr_avg), fcmax: exNum(d.hr_max),
+            trimp: exNum(ex.hr_trimp),
             ref: d.activity_ref || null,
             z: [d.z1_distance_m, d.z2_distance_m, d.z3_distance_m, d.z4_distance_m, d.z5_distance_m]
                 .map(function (v) { return v !== null && v !== undefined ? parseFloat(v) : 0; })
@@ -531,8 +581,10 @@ function cmPfSes2Render() {
     cmPfSes2Cerrar();
     var ses = cmPfSes2.ses;
     var esEj = cmPfSes2.segmento !== 'TOTAL';
-    CMPFSES2_COLS = esEj ? CMPFSES2_COLS_EJ : CMPFSES2_COLS_SES;
     var filas = cmPfSes2Filas();
+    CMPFSES2_COLS = cmPfSes2ColsActivas(esEj, filas);
+    if (cmPfSes2.sortCol !== 'nombre' && !CMPFSES2_COLS.some(function (c) { return c.k === cmPfSes2.sortCol; })) { cmPfSes2.sortCol = 'td'; cmPfSes2.sortDir = -1; }
+    if (!CMPFSES2_COLS.some(function (c) { return c.k === cmPfSes2.metrica; })) cmPfSes2.metrica = 'td';
 
     var col = cmPfSes2.sortCol, dir = cmPfSes2.sortDir;
     filas.sort(function (a, b) {
@@ -814,7 +866,7 @@ function cmPfSes2HtmlTabla(filas, stats) {
 
     return '<div style="overflow-x:auto"><table class="cmpfses2-tabla"><thead>' + thead + '</thead><tbody>' + tbody + resumen + filasPos + '</tbody></table></div>' +
         (!conIE ? '<div class="cmpfses2-leyenda">Vista de ejercicio: datos solo de esta tarea. Verde/rojo: por encima/debajo de la media del grupo (&plusmn;0,75 desv.tip.) &middot; HSR&gt;19 / &gt;21 / &gt;24: metros por encima de esa velocidad (km/h) &middot; ACC y DEC: numero de acciones por encima de 2,5 / 3 / 4 m/s&sup2; &middot; El RPE no se muestra aqui porque es de la sesion completa &middot; ' + filas.length + ' jugadores</div>' :
-        '<div class="cmpfses2-leyenda">Verde/rojo: por encima/debajo de la media del grupo (&plusmn;0,75 desv.tip.) &middot; %VmaxInd: velocidad del dia respecto a la maxima historica del jugador en sesiones anteriores (amarillo &ge;95%; "-" si aun no hay historial previo) &middot; Clic en una cabecera para ordenar &middot; sRPE = RPE &times; min (Foster) &middot; UA/km = coste percibido por km recorrido:  alto = corri&oacute; poco para lo que le cost&oacute; &middot; I/E: &#9888; posible fatiga, &#9889; va sobrado, &#10003; concuerdan (contra la media del propio jugador en 28 d&iacute;as; atenuado = provisional, comparado con el grupo)' + notaHist + ' &middot; ' + filas.length + ' jugadores en segmento ' + cmPfSes2.segmento + '</div>');
+        '<div class="cmpfses2-leyenda">' + (cmPfSes2Marca(filas) === 'soccerlab' ? 'GPS SoccerLab &middot; HI&gt;25,2: metros a mas de 25,2 km/h (alta intensidad) &middot; HSR&gt;19,8: metros a mas de 19,8 km/h &middot; ACC&gt;2 / DEC&gt;2: numero total de aceleraciones y deceleraciones por encima de 2 m/s&sup2; &middot; Min: tiempo activo &middot; P.Load: Player Load 3D &middot; TRIMP: carga interna por pulso &middot; ' : '') + 'Verde/rojo: por encima/debajo de la media del grupo (&plusmn;0,75 desv.tip.) &middot; %VmaxInd: velocidad del dia respecto a la maxima historica del jugador en sesiones anteriores (amarillo &ge;95%; "-" si aun no hay historial previo) &middot; Clic en una cabecera para ordenar &middot; sRPE = RPE &times; min (Foster) &middot; UA/km = coste percibido por km recorrido:  alto = corri&oacute; poco para lo que le cost&oacute; &middot; I/E: &#9888; posible fatiga, &#9889; va sobrado, &#10003; concuerdan (contra la media del propio jugador en 28 d&iacute;as; atenuado = provisional, comparado con el grupo)' + notaHist + ' &middot; ' + filas.length + ' jugadores en segmento ' + cmPfSes2.segmento + '</div>');
 }
 
 // ---------- Vista GRAFICAS ----------
