@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Prueba gratuita de 7 días · Modo Club · TopLiderCoach</title>
+<title>Prueba del Modo Club · TopLiderCoach</title>
 <link rel="icon" href="https://toplidercoach.com/wp-content/uploads/2025/11/diseno-sin-titulo-11.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -117,22 +117,38 @@
 </header>
 
 <main>
-  <section class="vista activa" id="v-form">
+  <!-- Vista publica: la prueba se solicita por WhatsApp -->
+  <section class="vista activa" id="v-wa">
+    <div class="mensaje">
+      <h1>La prueba del Modo Club se solicita por WhatsApp</h1>
+      <p>Escríbenos, cuéntanos qué club sois y os activamos 7 días del Modo Club completo con vuestro propio club: todos los despachos, todos los equipos y todo el cuerpo técnico.</p>
+      <p>Si antes quieres verlo con datos de ejemplo, entra en la demo con tu cargo.</p>
+      <div class="acciones">
+        <a class="btn" href="https://wa.me/34611126983?text=Hola%2C%20quiero%20solicitar%20la%20prueba%20de%207%20d%C3%ADas%20del%20Modo%20Club.%0A%0AClub%3A%20%0ANombre%20y%20cargo%3A%20%0AN%C3%BAmero%20de%20equipos%3A%20%0AEmail%3A%20" target="_blank" rel="noopener">Solicitar prueba por WhatsApp</a>
+        <a class="btn ghost" href="index.html">Entrar en la demo</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Formulario interno (prueba.html#interno): solo funciona con la clave -->
+  <section class="vista" id="v-form">
     <div class="intro">
-      <span class="kicker">7 días · sin tarjeta</span>
-      <h1>Prueba el Modo Club con tu propio club</h1>
-      <p>Todos los despachos, todos tus equipos y todo tu cuerpo técnico, sin límites, durante 7 días. Lo que cargues se queda si decides contratar.</p>
+      <span class="kicker">Uso interno</span>
+      <h1>Activar una prueba de club</h1>
+      <p>Rellena los datos del club al que habéis aprobado la prueba. Le llegará a su email el enlace para activarla.</p>
     </div>
     <div class="caja">
+      <label for="f-clave">Clave interna</label>
+      <input type="password" id="f-clave" maxlength="200" autocomplete="current-password" style="padding:13px 14px">
       <label for="f-club">Nombre del club</label>
       <input type="text" id="f-club" maxlength="120" autocomplete="organization" placeholder="Ej.: CD La Bañeza">
       <div class="dos">
         <div>
-          <label for="f-nombre">Tu nombre y apellidos</label>
+          <label for="f-nombre">Nombre y apellidos del contacto</label>
           <input type="text" id="f-nombre" maxlength="120" autocomplete="name">
         </div>
         <div>
-          <label for="f-cargo">Tu cargo en el club</label>
+          <label for="f-cargo">Su cargo en el club</label>
           <select id="f-cargo">
             <option value="">Elige una opción</option>
             <option>Presidente o directivo</option>
@@ -148,7 +164,7 @@
         <div>
           <label for="f-email">Email</label>
           <input type="email" id="f-email" maxlength="160" autocomplete="email" inputmode="email">
-          <p class="ayuda-campo">Te enviaremos aquí el enlace para activar la prueba.</p>
+          <p class="ayuda-campo">Aquí recibirá el enlace para activar la prueba.</p>
         </div>
         <div>
           <label for="f-telefono">Teléfono móvil</label>
@@ -156,30 +172,29 @@
           <p class="ayuda-campo">Fuera de España, con prefijo (+351…).</p>
         </div>
       </div>
-      <label for="f-equipos">¿Cuántos equipos tiene tu club?</label>
+      <label for="f-equipos">¿Cuántos equipos tiene el club?</label>
       <input type="number" id="f-equipos" min="1" max="200" inputmode="numeric" style="max-width:160px">
       <div class="trampa" aria-hidden="true"><label for="f-web">No rellenes este campo</label><input type="text" id="f-web" tabindex="-1" autocomplete="off"></div>
 
-      <label class="acepto"><input type="checkbox" id="f-acepta"><span>Acepto las condiciones de la prueba y la <a href="https://toplidercoach.com/politica-de-privacidad/" target="_blank" rel="noopener">política de privacidad</a>. La prueba dura 7 días. Al terminar, guardamos los datos de tu club 30 días por si decides contratar; pasado ese plazo se borran de forma definitiva.</span></label>
+      <label class="acepto"><input type="checkbox" id="f-acepta"><span>El club ha aceptado las condiciones de la prueba y la <a href="https://toplidercoach.com/politica-de-privacidad/" target="_blank" rel="noopener">política de privacidad</a>: la prueba dura 7 días y, al terminar, sus datos se guardan 30 días por si contrata; pasado ese plazo se borran de forma definitiva.</span></label>
 
       <p class="aviso" id="f-aviso" role="alert"></p>
-      <button type="button" class="btn ancho" id="f-enviar">Enviarme el enlace de activación</button>
+      <button type="button" class="btn ancho" id="f-enviar">Enviar el enlace de activación al club</button>
     </div>
     <ul class="puntos">
-      <li>Los 7 días empiezan cuando activas la prueba desde tu correo, no ahora.</li>
-      <li>No pedimos tarjeta. Al terminar no se cobra nada: el acceso se cierra solo.</li>
-      <li>Una prueba por club. Si necesitas más tiempo, escríbenos por WhatsApp.</li>
+      <li>Los 7 días empiezan cuando el club activa la prueba desde su correo, no ahora.</li>
+      <li>Al terminar no se cobra nada: el acceso se cierra solo.</li>
+      <li>Una prueba por email y por teléfono.</li>
     </ul>
   </section>
 
   <section class="vista" id="v-enviado">
     <div class="mensaje">
-      <h1>Revisa tu correo</h1>
-      <p>Hemos enviado un enlace de activación a <b id="e-email" style="color:#fff"></b>. Ábrelo y pulsa <b style="color:#fff">Activar mi prueba</b>.</p>
-      <p>Suele llegar en menos de un minuto. Si no lo ves, mira en la carpeta de spam o correo no deseado. El remitente es administracion@toplidercoach.com.</p>
+      <h1>Enlace enviado</h1>
+      <p>Hemos enviado el enlace de activación a <b id="e-email" style="color:#fff"></b>. El club tiene que abrirlo y pulsar <b style="color:#fff">Activar mi prueba</b>.</p>
+      <p>Suele llegar en menos de un minuto. Si no lo ve, que mire en la carpeta de spam o correo no deseado. El remitente es administracion@toplidercoach.com.</p>
       <div class="acciones">
         <button type="button" class="btn ghost" id="e-volver">He escrito mal el email</button>
-        <a class="btn ghost" href="https://wa.me/34611126983" target="_blank" rel="noopener">No me llega: WhatsApp</a>
       </div>
     </div>
   </section>
@@ -189,7 +204,7 @@
 (function () {
   'use strict';
   var API = 'https://cqteodxyvavyroxeshoz.supabase.co/functions/v1/prueba-club';
-  var CAMPOS = { club: 'f-club', nombre: 'f-nombre', email: 'f-email', telefono: 'f-telefono', acepta: 'f-acepta' };
+  var CAMPOS = { clave: 'f-clave', club: 'f-club', nombre: 'f-nombre', email: 'f-email', telefono: 'f-telefono', acepta: 'f-acepta' };
   var btn = document.getElementById('f-enviar'), aviso = document.getElementById('f-aviso');
   function val(id) { return document.getElementById(id).value.trim(); }
   function ver(id) { document.querySelectorAll('.vista').forEach(function (v) { v.classList.toggle('activa', v.id === id); }); window.scrollTo(0, 0); }
@@ -202,13 +217,14 @@
 
   async function enviar() {
     aviso.textContent = ''; marcar(null);
-    var d = { action: 'solicitar', club: val('f-club'), nombre: val('f-nombre'), cargo: val('f-cargo'), email: val('f-email'),
+    var d = { action: 'solicitar', clave: document.getElementById('f-clave').value, club: val('f-club'), nombre: val('f-nombre'), cargo: val('f-cargo'), email: val('f-email'),
               telefono: val('f-telefono'), equipos: val('f-equipos'), acepta: document.getElementById('f-acepta').checked, web: val('f-web') };
-    if (d.club.length < 3) return fallo('Escribe el nombre de tu club.', 'club');
-    if (d.nombre.length < 5 || d.nombre.indexOf(' ') < 0) return fallo('Escribe tu nombre y apellidos.', 'nombre');
+    if (!d.clave) return fallo('Escribe la clave interna.', 'clave');
+    if (d.club.length < 3) return fallo('Escribe el nombre del club.', 'club');
+    if (d.nombre.length < 5 || d.nombre.indexOf(' ') < 0) return fallo('Escribe el nombre y apellidos del contacto.', 'nombre');
     if (!/^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/.test(d.email)) return fallo('Ese email no parece correcto.', 'email');
-    if (d.telefono.replace(/\D/g, '').length < 9) return fallo('Escribe tu teléfono móvil.', 'telefono');
-    if (!d.acepta) return fallo('Tienes que aceptar las condiciones de la prueba.', 'acepta');
+    if (d.telefono.replace(/\D/g, '').length < 9) return fallo('Escribe el teléfono móvil del contacto.', 'telefono');
+    if (!d.acepta) return fallo('Marca que el club ha aceptado las condiciones de la prueba.', 'acepta');
     btn.disabled = true; btn.textContent = 'Enviando…';
     try {
       var r = await fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(d) });
@@ -216,9 +232,11 @@
       if (j.ok) { document.getElementById('e-email').textContent = d.email; ver('v-enviado'); }
       else fallo(j.motivo || 'No hemos podido enviar la solicitud.', j.campo);
     } catch (e) { fallo('No hay conexión. Vuelve a intentarlo.'); }
-    btn.disabled = false; btn.textContent = 'Enviarme el enlace de activación';
+    btn.disabled = false; btn.textContent = 'Enviar el enlace de activación al club';
   }
   btn.addEventListener('click', enviar);
+  // El formulario solo se muestra entrando por prueba.html#interno
+  if (location.hash === '#interno') ver('v-form');
   document.getElementById('e-volver').addEventListener('click', function () { ver('v-form'); document.getElementById('f-email').focus(); });
 })();
 </script>
