@@ -9,8 +9,12 @@
 // - v4: exportacion del informe a PDF (jsPDF + autoTable, sin emojis) y a CSV
 //   compatible con Excel es-ES (separador ';', decimales con coma, BOM).
 // - v5: columnas segun la marca del GPS. Las sesiones importadas de SoccerLab muestran sus
-//   propias columnas (HI>25,2, ACC/DEC>2, P.Load, pulso, TRIMP) en tabla, graficas, PDF y CSV.
+//   propias columnas (HI>25, ACC/DEC>2, P.Load, pulso, TRIMP) en tabla, graficas, PDF y CSV.
 //   El resto de sesiones se ve exactamente igual que antes.
+// - v6: porteros con otro GPS (UBIKO). Sus datos se meten a mano desde el boton "+ Porteros" con los
+//   mismos campos que da la plataforma de UBIKO, se muestran en una tabla aparte y no entran en las
+//   medias ni en los colores de los jugadores de campo. La ventana de sesion de la ficha del jugador
+//   (pestana GPS) usa las etiquetas de su marca y ensena lo que esa marca trae de mas.
 // No modifica cm-prepfisica.js. Cargar DESPUES de cm-prepfisica.js.
 
 var cmPfSes2 = {
@@ -405,10 +409,10 @@ var CMPFSES2_COLS_SOCCERLAB = [
     { k: 'mmin',   lbl: 'm/min',     dec: 1 },
     { k: 'vmax',   lbl: 'Vmax',      dec: 1 },
     { k: 'pvmax',  lbl: '%VmaxInd',  dec: 0 },
-    { k: 'spr',    lbl: 'HI>25,2',   dec: 0 },
+    { k: 'spr',    lbl: 'HI>25',   dec: 0 },
     { k: 'acc',    lbl: 'ACC>2',     dec: 0 },
     { k: 'dec',    lbl: 'DEC>2',     dec: 0 },
-    { k: 'hsr',    lbl: 'HSR>19,8',  dec: 0 },
+    { k: 'hsr',    lbl: 'HSR>20,1',  dec: 0 },
     { k: 'nspr',   lbl: 'N.Spr',     dec: 0 },
     { k: 'pl',     lbl: 'P.Load',    dec: 1, opc: true },
     { k: 'fcmed',  lbl: 'FC med',    dec: 0, opc: true },
@@ -417,6 +421,20 @@ var CMPFSES2_COLS_SOCCERLAB = [
     { k: 'rpe',    lbl: 'RPE',       dec: 0 },
     { k: 'srpe',   lbl: 'sRPE(UA)',  dec: 0 },
     { k: 'srpekm', lbl: 'UA/km',     dec: 1 }
+];
+// Columnas de los porteros con GPS UBIKO (extra_metrics.gps_brand = 'ubiko'): las de su plataforma
+var CMPFSES2_COLS_UBIKO = [
+    { k: 'min',    lbl: 'Min',      dec: 0 },
+    { k: 'td',     lbl: 'TD(m)',    dec: 0 },
+    { k: 'mmin',   lbl: 'm/min',    dec: 1 },
+    { k: 'vmax',   lbl: 'Vmax',     dec: 1 },
+    { k: 'hsr',    lbl: 'HSR(m)',   dec: 0, opc: true },
+    { k: 'spr',    lbl: 'Spr(m)',   dec: 0, opc: true },
+    { k: 'nspr',   lbl: 'N.Spr',    dec: 0, opc: true },
+    { k: 'acc',    lbl: 'ACC exp',  dec: 0, opc: true },
+    { k: 'dec',    lbl: 'DEC exp',  dec: 0, opc: true },
+    { k: 'fcmed',  lbl: 'FC med',   dec: 0, opc: true },
+    { k: 'fcmax',  lbl: 'FC max',   dec: 0, opc: true }
 ];
 var CMPFSES2_COLS = CMPFSES2_COLS_SES;   // columnas activas (se cambian en cmPfSes2Render)
 
@@ -434,14 +452,15 @@ function cmPfSes2Marca(filas) {
 // Columnas que tocan segun segmento y marca; las opcionales sin ningun dato no se muestran
 function cmPfSes2ColsActivas(esEj, filas) {
     if (esEj) return CMPFSES2_COLS_EJ;
-    if (cmPfSes2Marca(filas) !== 'soccerlab') return CMPFSES2_COLS_SES;
-    return CMPFSES2_COLS_SOCCERLAB.filter(function (c) {
+    var marca = cmPfSes2Marca(filas);
+    if (marca !== 'soccerlab' && marca !== 'ubiko') return CMPFSES2_COLS_SES;
+    return (marca === 'ubiko' ? CMPFSES2_COLS_UBIKO : CMPFSES2_COLS_SOCCERLAB).filter(function (c) {
         if (!c.opc) return true;
         return filas.some(function (f) { return f[c.k] !== null && f[c.k] !== undefined && !isNaN(f[c.k]); });
     });
 }
 
-function cmPfSes2Filas() {
+function cmPfSes2FilasTodas() {
     var filas = [];
     cmPfSes2.allData.forEach(function (d) {
         if (d.segment_name !== cmPfSes2.segmento) return;
@@ -490,6 +509,25 @@ function cmPfSes2Filas() {
         });
     });
     return filas;
+}
+
+// Los porteros con GPS UBIKO van en tabla aparte: no entran en medias, colores ni avisos del resto.
+// Si en la sesion solo hay datos de UBIKO, se muestran como tabla principal.
+function cmPfSes2Partir() {
+    var todas = cmPfSes2FilasTodas();
+    var porteros = todas.filter(function (f) { return f.marca === 'ubiko'; });
+    var campo = todas.filter(function (f) { return f.marca !== 'ubiko'; });
+    if (!campo.length || cmPfSes2.segmento !== 'TOTAL') return { filas: todas, porteros: [] };
+    return { filas: campo, porteros: porteros };
+}
+function cmPfSes2Filas() { return cmPfSes2Partir().filas; }
+function cmPfSes2FilasPorteros() { return cmPfSes2Partir().porteros; }
+
+function cmPfSes2ColsPorteros(porteros) {
+    return CMPFSES2_COLS_UBIKO.filter(function (c) {
+        if (!c.opc) return true;
+        return porteros.some(function (f) { return f[c.k] !== null && f[c.k] !== undefined && !isNaN(f[c.k]); });
+    });
 }
 
 function cmPfSes2Stats(filas, campo) {
@@ -622,9 +660,12 @@ function cmPfSes2Render() {
     var tit = ses.title || (ses.opponent ? 'vs ' + ses.opponent : 'Sesion');
     var fechaFmt = typeof cmPfFormatFecha === 'function' ? cmPfFormatFecha(ses.session_date) : ses.session_date;
 
+    var porteros = cmPfSes2FilasPorteros();
     var cuerpo = cmPfSes2.vista === 'tabla'
-        ? cmPfSes2HtmlTabla(filas, stats)
+        ? cmPfSes2HtmlTabla(filas, stats) + cmPfSes2HtmlPorteros(porteros)
         : cmPfSes2HtmlGraficas(filas);
+    // El alta manual de porteros se ofrece a los clubs que trabajan con un GPS de otra marca
+    var conPorteros = !esEj && (porteros.length > 0 || cmPfSes2Marca(filas) !== 'dispositivo');
 
     var ov = document.createElement('div');
     ov.id = 'cmpfses2-overlay';
@@ -684,6 +725,7 @@ function cmPfSes2Render() {
             '<button class="cmpfses2-vbtn' + (cmPfSes2.vista === 'graficas' ? ' act' : '') + '" onclick="cmPfSes2CambiarVista(\'graficas\')">Graficas</button>' +
             (cmPfSes2.vista === 'tabla' && !esEj ? '<button class="cmpfses2-hbtn' + (cmPfSes2.vsHist ? ' act' : '') + '" onclick="cmPfSes2ToggleHist()" title="Mostrar bajo cada valor la diferencia con la media del jugador en las ultimas 4 semanas (mismo tipo de sesion)">vs 4 sem: ' + (cmPfSes2.vsHist ? 'ON' : 'OFF') + '</button>' : '') +
             '<div style="display:flex;gap:6px;margin-left:auto">' +
+                (conPorteros ? '<button class="cmpfses2-vbtn" onclick="cmPfSes2PorterosAbrir()" title="Meter o corregir a mano los datos de los porteros que llevan el GPS UBIKO">+ Porteros</button>' : '') +
                 '<button class="cmpfses2-vbtn" onclick="cmPfSes2SincronizarMinutos(cmPfSes2.ses.id,false)" title="Copiar los minutos del GPS de cada jugador a su ficha de asistencia (duracion real)">Sync min.</button>' +
                 '<button class="cmpfses2-vbtn" onclick="cmPfSes2ExportPdf()">PDF</button>' +
                 '<button class="cmpfses2-vbtn" onclick="cmPfSes2ExportCsv()">CSV</button>' +
@@ -866,8 +908,299 @@ function cmPfSes2HtmlTabla(filas, stats) {
 
     return '<div style="overflow-x:auto"><table class="cmpfses2-tabla"><thead>' + thead + '</thead><tbody>' + tbody + resumen + filasPos + '</tbody></table></div>' +
         (!conIE ? '<div class="cmpfses2-leyenda">Vista de ejercicio: datos solo de esta tarea. Verde/rojo: por encima/debajo de la media del grupo (&plusmn;0,75 desv.tip.) &middot; HSR&gt;19 / &gt;21 / &gt;24: metros por encima de esa velocidad (km/h) &middot; ACC y DEC: numero de acciones por encima de 2,5 / 3 / 4 m/s&sup2; &middot; El RPE no se muestra aqui porque es de la sesion completa &middot; ' + filas.length + ' jugadores</div>' :
-        '<div class="cmpfses2-leyenda">' + (cmPfSes2Marca(filas) === 'soccerlab' ? 'GPS SoccerLab &middot; HI&gt;25,2: metros a mas de 25,2 km/h (alta intensidad) &middot; HSR&gt;19,8: metros a mas de 19,8 km/h &middot; ACC&gt;2 / DEC&gt;2: numero total de aceleraciones y deceleraciones por encima de 2 m/s&sup2; &middot; Min: tiempo activo &middot; P.Load: Player Load 3D &middot; TRIMP: carga interna por pulso &middot; ' : '') + 'Verde/rojo: por encima/debajo de la media del grupo (&plusmn;0,75 desv.tip.) &middot; %VmaxInd: velocidad del dia respecto a la maxima historica del jugador en sesiones anteriores (amarillo &ge;95%; "-" si aun no hay historial previo) &middot; Clic en una cabecera para ordenar &middot; sRPE = RPE &times; min (Foster) &middot; UA/km = coste percibido por km recorrido:  alto = corri&oacute; poco para lo que le cost&oacute; &middot; I/E: &#9888; posible fatiga, &#9889; va sobrado, &#10003; concuerdan (contra la media del propio jugador en 28 d&iacute;as; atenuado = provisional, comparado con el grupo)' + notaHist + ' &middot; ' + filas.length + ' jugadores en segmento ' + cmPfSes2.segmento + '</div>');
+        '<div class="cmpfses2-leyenda">' + (cmPfSes2Marca(filas) === 'soccerlab' ? 'GPS SoccerLab &middot; HI&gt;25: metros a mas de 25 km/h (alta intensidad) &middot; HSR&gt;20,1: metros a mas de 20,1 km/h &middot; ACC&gt;2 / DEC&gt;2: numero total de aceleraciones y deceleraciones por encima de 2 m/s&sup2; &middot; Min: tiempo activo &middot; P.Load: Player Load 3D &middot; TRIMP: carga interna por pulso &middot; ' : '') + 'Verde/rojo: por encima/debajo de la media del grupo (&plusmn;0,75 desv.tip.) &middot; %VmaxInd: velocidad del dia respecto a la maxima historica del jugador en sesiones anteriores (amarillo &ge;95%; "-" si aun no hay historial previo) &middot; Clic en una cabecera para ordenar &middot; sRPE = RPE &times; min (Foster) &middot; UA/km = coste percibido por km recorrido:  alto = corri&oacute; poco para lo que le cost&oacute; &middot; I/E: &#9888; posible fatiga, &#9889; va sobrado, &#10003; concuerdan (contra la media del propio jugador en 28 d&iacute;as; atenuado = provisional, comparado con el grupo)' + notaHist + ' &middot; ' + filas.length + ' jugadores en segmento ' + cmPfSes2.segmento + '</div>');
 }
+
+// ---------- Porteros con GPS UBIKO: tabla aparte ----------
+function cmPfSes2HtmlPorteros(porteros) {
+    if (!porteros || !porteros.length) return '';
+    var cols = cmPfSes2ColsPorteros(porteros);
+    var h = '<div class="cmpfses2-gbox"><h4>Porteros &middot; GPS UBIKO (' + porteros.length + ')</h4>' +
+        '<div style="overflow-x:auto"><table class="cmpfses2-tabla"><thead><tr><th>Jugador</th><th>Pos</th>';
+    cols.forEach(function (c) { h += '<th style="text-align:right">' + c.lbl + '</th>'; });
+    h += '</tr></thead><tbody>';
+    porteros.forEach(function (f) {
+        h += '<tr><td style="font-weight:600">' + f.nombre + '</td><td style="color:#94a3b8;font-size:11px">' + f.pos + '</td>';
+        cols.forEach(function (c) {
+            var v = f[c.k];
+            if (v === null || v === undefined || isNaN(v)) h += '<td style="color:#475569">-</td>';
+            else h += '<td>' + (c.dec === 0 ? Math.round(v) : (Math.round(v * 10) / 10)) + '</td>';
+        });
+        h += '</tr>';
+    });
+    h += '</tbody></table></div>' +
+        '<div class="cmpfses2-leyenda">Los porteros llevan otro GPS (UBIKO): sus datos no entran en las medias, los colores ni los avisos de la tabla de jugadores de campo. HSR, Spr y ACC/DEC exp son los que calcula la plataforma de UBIKO. Para corregirlos, boton "+ Porteros".</div></div>';
+    return h;
+}
+
+// ---------- Porteros con GPS UBIKO: alta manual ----------
+// Campos y unidades iguales a los de la tabla "Resumen de la sesion" de UBIKO (distancias en km).
+var CMPFSES2_POR_CAMPOS = [
+    { k: 'min',  lbl: 'Tiempo (min)',        ph: '84:05' },
+    { k: 'td',   lbl: 'Distancia total (km)', ph: '3,95' },
+    { k: 'vmax', lbl: 'Velocidad max (km/h)', ph: '21,42' },
+    { k: 'hsr',  lbl: 'HSR (km)',            ph: '0,01' },
+    { k: 'spr',  lbl: 'Sprint (km)',         ph: '0,00' },
+    { k: 'nspr', lbl: '# sprints',           ph: '0' },
+    { k: 'acc',  lbl: '# Acc exp',           ph: '88' },
+    { k: 'dec',  lbl: '# Des exp',           ph: '90' },
+    { k: 'fcmax', lbl: 'HR max',             ph: '203' },
+    { k: 'fcmed', lbl: 'HR media',           ph: '130' }
+];
+var cmPfSes2Por = { jugadores: [] };
+
+// "3,95" -> 3.95 ; '' -> null
+function cmPfSes2NumEs(v) {
+    if (v === null || v === undefined) return null;
+    var t = String(v).trim().replace(/\s/g, '').replace(',', '.');
+    if (t === '') return null;
+    var n = parseFloat(t);
+    return isNaN(n) ? null : n;
+}
+// "84:05" -> 84.08 min ; "1:24:05" -> 84.08 ; "84" o "84,5" -> minutos
+function cmPfSes2Tiempo(v) {
+    if (v === null || v === undefined) return null;
+    var t = String(v).trim();
+    if (t === '') return null;
+    if (t.indexOf(':') === -1) return cmPfSes2NumEs(t);
+    var p = t.split(':').map(function (x) { return parseFloat(x); });
+    if (p.some(function (x) { return isNaN(x); })) return null;
+    if (p.length === 3) return p[0] * 60 + p[1] + p[2] / 60;
+    return p[0] + p[1] / 60;
+}
+
+// Fila para cm_pf_gps_player_data a partir de lo tecleado (null si no hay distancia ni tiempo)
+function cmPfSes2PorteroFila(pid, val) {
+    var km = function (k) { var n = cmPfSes2NumEs(val[k]); return n === null ? null : Math.round(n * 1000); };
+    var ent = function (k) { var n = cmPfSes2NumEs(val[k]); return n === null ? null : Math.round(n); };
+    var min = cmPfSes2Tiempo(val.min);
+    var td = km('td');
+    if (td === null && min === null) return null;
+    var vmax = cmPfSes2NumEs(val.vmax);
+    return {
+        club_id: clubId, session_id: cmPfSes2.ses.id, player_id: pid, segment_name: 'TOTAL', archived: false, archived_at: null,
+        total_distance_m: td,
+        hsr_distance_m: km('hsr'),
+        sprint_distance_m: km('spr'),
+        max_speed_kmh: vmax === null ? null : Math.round(vmax * 100) / 100,
+        sprint_count: ent('nspr'),
+        accel_count: ent('acc'),
+        decel_count: ent('dec'),
+        player_load: null,
+        hr_avg: ent('fcmed'),
+        hr_max: ent('fcmax'),
+        duration_min: min === null ? null : Math.round(min),
+        extra_metrics: {
+            distance_per_min: (td !== null && min) ? Math.round(td / min * 10) / 10 : null,
+            gps_brand: 'ubiko',
+            entrada: 'manual'
+        },
+        notes: null
+    };
+}
+
+function cmPfSes2PorterosCerrar() {
+    var ov = document.getElementById('cmpfses2-por-overlay');
+    if (ov) ov.remove();
+}
+
+async function cmPfSes2PorterosAbrir() {
+    cmPfSes2PorterosCerrar();
+    try {
+        var r = await supabaseClient.from('club_players').select('id, name, positions_main')
+            .eq('club_id', clubId).eq('active', true).order('name');
+        var todos = r.data || [];
+        var esPortero = function (p) {
+            return (p.positions_main || []).some(function (x) { return String(x).toLowerCase().indexOf('portero') !== -1; });
+        };
+        var lista = todos.filter(esPortero);
+        // Tambien quien ya tenga datos UBIKO en esta sesion, aunque su ficha no diga "portero"
+        var yaUbiko = {};
+        cmPfSes2.allData.forEach(function (d) {
+            if (d.segment_name === 'TOTAL' && d.extra_metrics && d.extra_metrics.gps_brand === 'ubiko') yaUbiko[d.player_id] = d;
+        });
+        todos.forEach(function (p) { if (yaUbiko[p.id] && lista.indexOf(p) === -1) lista.push(p); });
+        if (!lista.length) { showToast('No hay ningun jugador con posicion "portero" en la plantilla', 'warning'); return; }
+        cmPfSes2Por.jugadores = lista;
+
+        var actual = function (d, k) {
+            if (!d) return '';
+            var es = function (n, dec) { return n === null || n === undefined ? '' : String(Math.round(parseFloat(n) * Math.pow(10, dec)) / Math.pow(10, dec)).replace('.', ','); };
+            if (k === 'min') return es(d.duration_min, 0);
+            if (k === 'td') return d.total_distance_m === null ? '' : es(d.total_distance_m / 1000, 2);
+            if (k === 'hsr') return d.hsr_distance_m === null ? '' : es(d.hsr_distance_m / 1000, 2);
+            if (k === 'spr') return d.sprint_distance_m === null ? '' : es(d.sprint_distance_m / 1000, 2);
+            if (k === 'vmax') return es(d.max_speed_kmh, 2);
+            if (k === 'nspr') return es(d.sprint_count, 0);
+            if (k === 'acc') return es(d.accel_count, 0);
+            if (k === 'dec') return es(d.decel_count, 0);
+            if (k === 'fcmax') return es(d.hr_max, 0);
+            if (k === 'fcmed') return es(d.hr_avg, 0);
+            return '';
+        };
+
+        var inp = 'width:100%;padding:6px 8px;background:#0f172a;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-size:13px;box-sizing:border-box';
+        var h = '<div style="background:#0f172a;border:1px solid #fbbf24;border-radius:14px;max-width:760px;width:100%;padding:20px;color:#e2e8f0;max-height:90vh;overflow-y:auto">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center"><h3 style="margin:0;font-size:16px">Porteros &middot; GPS UBIKO</h3>' +
+            '<button style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer" onclick="cmPfSes2PorterosCerrar()">x</button></div>' +
+            '<p style="color:#94a3b8;font-size:12px;margin:6px 0 14px">Copia los datos de la tabla "Resumen de la sesion" de UBIKO tal como salen alli (distancias en km, con coma). Deja en blanco al portero que no haya entrenado. Si un portero ya tenia datos, aparecen para corregirlos.</p>';
+        lista.forEach(function (p, i) {
+            var d = yaUbiko[p.id] || null;
+            h += '<div style="background:#1e293b;border-radius:10px;padding:12px;margin-bottom:10px">' +
+                '<div style="font-weight:700;margin-bottom:8px">' + p.name + (d ? ' <span style="color:#5eead4;font-size:11px;font-weight:500">(con datos)</span>' : '') + '</div>' +
+                '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px">';
+            CMPFSES2_POR_CAMPOS.forEach(function (c) {
+                h += '<div><label style="display:block;font-size:10px;color:#94a3b8;margin-bottom:3px">' + c.lbl + '</label>' +
+                    '<input type="text" inputmode="decimal" id="cmpfses2-por-' + i + '-' + c.k + '" placeholder="' + c.ph + '" value="' + actual(d, c.k) + '" style="' + inp + '"></div>';
+            });
+            h += '</div></div>';
+        });
+        h += '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:6px">' +
+            '<button class="cmpfses2-vbtn" onclick="cmPfSes2PorterosCerrar()">Cancelar</button>' +
+            '<button class="cmpfses2-vbtn act" id="cmpfses2-por-guardar" onclick="cmPfSes2PorterosGuardar()">Guardar porteros</button></div></div>';
+
+        var ov = document.createElement('div');
+        ov.id = 'cmpfses2-por-overlay';
+        ov.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.75);z-index:9600;display:flex;justify-content:center;align-items:flex-start;padding:25px;overflow-y:auto';
+        ov.onclick = function (e) { if (e.target === ov) cmPfSes2PorterosCerrar(); };
+        ov.innerHTML = h;
+        document.body.appendChild(ov);
+    } catch (e) { showToast('Error: ' + (e.message || e), 'error'); }
+}
+
+async function cmPfSes2PorterosGuardar() {
+    var rows = [], aviso = null;
+    cmPfSes2Por.jugadores.forEach(function (p, i) {
+        var val = {};
+        CMPFSES2_POR_CAMPOS.forEach(function (c) {
+            var el = document.getElementById('cmpfses2-por-' + i + '-' + c.k);
+            val[c.k] = el ? el.value : '';
+        });
+        var fila = cmPfSes2PorteroFila(p.id, val);
+        if (!fila) return;
+        // Avisos de unidades: la distancia va en km, no en metros
+        if (fila.total_distance_m !== null && fila.total_distance_m > 30000) aviso = p.name + ': la distancia va en km (por ejemplo 3,95), no en metros';
+        if (fila.max_speed_kmh !== null && fila.max_speed_kmh > 45) aviso = p.name + ': revisa la velocidad maxima';
+        rows.push(fila);
+    });
+    if (aviso) { showToast(aviso, 'error'); return; }
+    if (!rows.length) { showToast('No has metido datos de ningun portero'); return; }
+
+    var btn = document.getElementById('cmpfses2-por-guardar');
+    if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
+    try {
+        var res = await supabaseClient.from('cm_pf_gps_player_data').upsert(rows, { onConflict: 'session_id,player_id,segment_name' });
+        if (res.error) throw res.error;
+        showToast(rows.length + (rows.length === 1 ? ' portero guardado' : ' porteros guardados'));
+        var sid = cmPfSes2.ses.id;
+        cmPfSes2PorterosCerrar();
+        if (typeof cmPfVerSesionCompleta === 'function') cmPfVerSesionCompleta(sid);
+        if (typeof cmPfCargarSesiones === 'function') cmPfCargarSesiones();
+    } catch (e) {
+        showToast('Error guardando: ' + (e.message || e), 'error');
+        if (btn) { btn.disabled = false; btn.textContent = 'Guardar porteros'; }
+    }
+}
+
+// ---------- Ficha del jugador (pestana GPS): ventana de una sesion segun la marca del GPS ----------
+// Solo cambia para datos de otra marca (SoccerLab, UBIKO). Los del dispositivo propio abren la ventana de siempre.
+function cmPfSes2EtiquetasMarca(marca) {
+    if (marca === 'soccerlab') return { hsr: 'HSR>20,1', spr: 'HI>25', acc: 'ACC>2', dec: 'DEC>2', nombre: 'SoccerLab' };
+    if (marca === 'ubiko') return { hsr: 'HSR', spr: 'Sprint', acc: 'ACC exp', dec: 'DEC exp', nombre: 'UBIKO' };
+    return { hsr: 'HSR', spr: 'Sprint', acc: 'AccHI', dec: 'DecHI', nombre: '' };
+}
+
+function cmPfSes2MetricasJugador(s) {
+    var ex = s.extra_metrics || {};
+    var et = cmPfSes2EtiquetasMarca(ex.gps_brand);
+    var lista = [
+        { l: 'Min', v: s.duration_min, u: "'" },
+        { l: 'TD', v: s.total_distance_m, u: 'm' },
+        { l: 'm/min', v: ex.distance_per_min, u: '' },
+        { l: 'Vmax', v: s.max_speed_kmh, u: 'km/h' },
+        { l: et.spr, v: s.sprint_distance_m, u: 'm' },
+        { l: et.hsr, v: s.hsr_distance_m, u: 'm' },
+        { l: 'N.Sprint', v: s.sprint_count, u: '' },
+        { l: et.acc, v: s.accel_count, u: '' },
+        { l: et.dec, v: s.decel_count, u: '' },
+        { l: 'P.Load', v: s.player_load, u: '' },
+        { l: 'FC med', v: s.hr_avg, u: '' },
+        { l: 'FC max', v: s.hr_max, u: '' },
+        { l: 'TRIMP', v: ex.hr_trimp, u: '' },
+        { l: 'HMLD', v: ex.hmld_m, u: 'm' },
+        { l: 'P.Met', v: ex.avg_metabolic_power, u: 'W/kg' },
+        { l: 'Spr. repetidos', v: ex.repeated_sprints, u: '' },
+        { l: 'Acc altas', v: ex.acc_high, u: '' },
+        { l: 'Dec altas', v: ex.dec_high, u: '' },
+        { l: 'Cambios dir.', v: ex.cod, u: '' },
+        { l: 'Impactos', v: ex.impacts_total, u: '' }
+    ];
+    return lista.filter(function (m) { return m.v !== null && m.v !== undefined && m.v !== ''; });
+}
+
+async function cmPfSes2VerSesionJugador(sessionId, original) {
+    try {
+        var sg = await supabaseClient.from('cm_pf_gps_player_data').select('*')
+            .eq('session_id', sessionId).eq('player_id', cmPfJugadorActual.id).eq('archived', false).order('segment_name');
+        var segs = sg.data || [];
+        var otraMarca = segs.some(function (s) { return s.extra_metrics && s.extra_metrics.gps_brand; });
+        if (!otraMarca) { original(sessionId); return; }
+
+        var sr = await supabaseClient.from('cm_pf_gps_sessions').select('*').eq('id', sessionId).single();
+        var ses = sr.data;
+        if (!ses) return;
+        var tipo = ses.session_type === 'match' ? 'Partido' : 'Entreno';
+        var tit = ses.title || (ses.opponent ? 'vs ' + ses.opponent : 'Sesion');
+        var zn = (cmPfGpsConfig && cmPfGpsConfig.zone_names) || ['Z1', 'Z2', 'Z3', 'Z4', 'Z5'];
+        var colors = ['#3b82f6', '#22c55e', '#eab308', '#f97316', '#ef4444'];
+        var marca = '';
+        segs.forEach(function (s) { if (!marca && s.extra_metrics && s.extra_metrics.gps_brand) marca = cmPfSes2EtiquetasMarca(s.extra_metrics.gps_brand).nombre; });
+
+        var html = '<div style="background:#0f172a;border:1px solid #fbbf24;border-radius:12px;padding:24px;max-width:600px;width:100%;max-height:80vh;overflow-y:auto"><div style="display:flex;justify-content:space-between;margin-bottom:6px"><h4 style="margin:0;color:#e2e8f0">' + cmPfFormatFecha(ses.session_date) + ' &middot; ' + tipo + ' &middot; ' + tit + '</h4><button style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer" onclick="this.closest(\'div[style*=fixed]\').remove()">&times;</button></div>';
+        if (marca) html += '<div style="color:#93c5fd;font-size:11px;margin-bottom:12px">GPS ' + marca + '</div>';
+        if (segs.length > 1) {
+            html += '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:16px">';
+            segs.forEach(function (s, i) { html += '<button class="cmpf-seg-btn' + (i === 0 ? ' active' : '') + '" onclick="cmPfSelSeg(this,' + i + ')" data-idx="' + i + '">' + s.segment_name + '</button>'; });
+            html += '</div>';
+        }
+        segs.forEach(function (s, i) {
+            html += '<div class="cmpf-seg-detail" style="' + (i > 0 ? 'display:none' : '') + '"><div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">';
+            cmPfSes2MetricasJugador(s).forEach(function (m) { html += '<span class="cmpf-metric-mini">' + m.l + ': <span>' + m.v + m.u + '</span></span>'; });
+            html += '</div>';
+            var zz = [s.z1_distance_m || 0, s.z2_distance_m || 0, s.z3_distance_m || 0, s.z4_distance_m || 0, s.z5_distance_m || 0].map(function (z) { return parseFloat(z) || 0; });
+            var zt = zz.reduce(function (a, b) { return a + b; }, 0);
+            if (zt > 0) {
+                html += '<div style="margin-top:8px"><div style="color:#94a3b8;font-size:11px;margin-bottom:4px">Zonas de velocidad</div><div class="cmpf-zone-bar">';
+                zz.forEach(function (z, j) { var pct = Math.round(z / zt * 100); if (pct > 0) html += '<div style="width:' + pct + '%;background:' + colors[j] + '">' + pct + '%</div>'; });
+                html += '</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">';
+                zz.forEach(function (z, j) { if (z > 0) html += '<span style="font-size:10px;color:' + colors[j] + '">' + zn[j] + ': ' + Math.round(z) + 'm</span>'; });
+                html += '</div></div>';
+            }
+            if (s.notes) html += '<div style="color:#64748b;font-size:12px;margin-top:8px">' + s.notes + '</div>';
+            html += '</div>';
+        });
+        html += '</div>';
+        var ov = document.createElement('div');
+        ov.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.6);z-index:9500;display:flex;justify-content:center;align-items:center;padding:20px';
+        ov.onclick = function (e) { if (e.target === ov) document.body.removeChild(ov); };
+        ov.innerHTML = html;
+        document.body.appendChild(ov);
+    } catch (e) { showToast('Error cargando sesion'); }
+}
+
+(function () {
+    var intentos = 0;
+    var t = setInterval(function () {
+        intentos++;
+        if (typeof cmPfVerSesionGps === 'function' || intentos > 600) {
+            clearInterval(t);
+            if (typeof cmPfVerSesionGps === 'function') {
+                var original = cmPfVerSesionGps;
+                cmPfVerSesionGps = function (sessionId) { return cmPfSes2VerSesionJugador(sessionId, original); };
+            }
+        }
+    }, 300);
+})();
 
 // ---------- Vista GRAFICAS ----------
 function cmPfSes2HtmlGraficas(filas) {
@@ -1064,6 +1397,19 @@ function cmPfSes2ExportCsv() {
         lineas.push(l.join(';'));
     });
 
+    var porteros = cmPfSes2FilasPorteros();
+    if (porteros.length) {
+        var colsP = cmPfSes2ColsPorteros(porteros);
+        lineas.push('');
+        lineas.push('Porteros (GPS UBIKO)');
+        lineas.push(['Jugador', 'Posicion'].concat(colsP.map(function (c) { return c.lbl; })).join(';'));
+        porteros.forEach(function (f) {
+            var l = ['"' + f.nombre.replace(/"/g, '""') + '"', '"' + (f.pos || '') + '"'];
+            colsP.forEach(function (c) { l.push(num(f[c.k], c.dec)); });
+            lineas.push(l.join(';'));
+        });
+    }
+
     // BOM para que Excel abra el CSV con la codificacion correcta
     var blob = new Blob(['\uFEFF' + lineas.join('\r\n')], { type: 'text/csv;charset=utf-8' });
     var a = document.createElement('a');
@@ -1191,6 +1537,24 @@ function cmPfSes2ExportPdf() {
         theme: 'grid'
     });
 
+    // Porteros con GPS UBIKO: tabla aparte
+    var porteros = cmPfSes2FilasPorteros();
+    if (porteros.length) {
+        var colsP = cmPfSes2ColsPorteros(porteros);
+        doc.autoTable({
+            startY: doc.lastAutoTable.finalY + 6,
+            head: [['Porteros (GPS UBIKO)', 'Pos'].concat(colsP.map(function (c) { return c.lbl; }))],
+            body: porteros.map(function (f) {
+                return [f.nombre, f.pos || ''].concat(colsP.map(function (c) { return fmt(f[c.k], c.dec); }));
+            }),
+            styles: { fontSize: 7, cellPadding: 1.5, halign: 'right' },
+            columnStyles: { 0: { halign: 'left', fontStyle: 'bold' }, 1: { halign: 'left' } },
+            headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontSize: 6.5, halign: 'right' },
+            theme: 'grid',
+            tableWidth: 'wrap'
+        });
+    }
+
     // Pie
     var yFin = doc.lastAutoTable.finalY + 6;
     doc.setFontSize(7);
@@ -1203,4 +1567,4 @@ function cmPfSes2ExportPdf() {
     if (typeof showToast === 'function') showToast('PDF descargado');
 }
 
-console.log('[PrepFisica] cm-prepfisica-sesion.js v4 cargado (tabla + graficas + historico + PDF/CSV)');
+console.log('[PrepFisica] cm-prepfisica-sesion.js v6 cargado (tabla + graficas + historico + PDF/CSV + marcas de GPS + porteros)');

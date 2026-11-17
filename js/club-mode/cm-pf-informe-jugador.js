@@ -156,6 +156,13 @@
     function construir(j, D) {
         var M = { j: j, cp: D.cp, cfg: D.cfg, perfil: D.perfiles[j.id] || null };
         M.posGrupo = grupoPos(D.cp.position_detail || (D.cp.positions_main && D.cp.positions_main[0]) || j.position);
+        // Etiquetas segun la marca de GPS de las sesiones de este jugador (la mas repetida)
+        var marcas = {}, marca = '';
+        (D.gps || []).forEach(function (d) { if (d.player_id !== j.id) return; var b = (d.extra_metrics && d.extra_metrics.gps_brand) || 'dispositivo'; marcas[b] = (marcas[b] || 0) + 1; });
+        Object.keys(marcas).forEach(function (b) { if (!marca || marcas[b] > marcas[marca]) marca = b; });
+        var LBL = { soccerlab: ['HSR >20,1', 'Alta int. >25', 'Acel + Desacel >2'], ubiko: ['HSR', 'Sprint', 'Acel + Desacel exp.'] }[marca] || ['HSR >19', 'Sprint >24', 'Acel + Desacel'];
+        MET[1].lbl = LBL[0]; MET[2].lbl = LBL[1]; MET[3].lbl = LBL[2];
+        M.marca = marca;
         // Fechas de partido (HUB + sesiones GPS de partido)
         var fm = {};
         D.matches.forEach(function (m) { if (m.match_date) fm[m.match_date] = m.opponent || 'Partido'; });
@@ -476,7 +483,7 @@
             h += '<tr' + (s.tipo === 'match' ? ' class="par"' : '') + '><td>' + fecha(s.f, true) + '</td><td style="text-align:left;max-width:170px;overflow:hidden;text-overflow:ellipsis">' + esc(s.tipo === 'match' ? 'vs ' + s.rival : s.titulo) + '</td><td>' + (s.md || '—') + '</td><td>' + fmt(s.min, 0) + '</td><td>' + fmt(s.td, 0) + '</td><td>' + fmt(s.mmin, 1) + '</td><td>' + fmt(s.hsr, 0) + '</td><td>' + fmt(s.sprint, 0) + '</td><td>' + fmt(s.nsprint, 0) + '</td><td>' + fmt(num(s.d.accel_count), 0) + '</td><td>' + fmt(num(s.d.decel_count), 0) + '</td><td>' + fmt(s.vmax, 1) + '</td><td>' + (M.ref.td ? fmt(s.td / M.ref.td * 100, 0) + '%' : '—') + '</td></tr>';
         });
         h += '</tbody></table></div>';
-        h += '<div class="nota" style="margin-top:10px">Informe generado el ' + new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) + '. Umbrales del club: HSR > ' + ((M.cfg && M.cfg.hsr_threshold_kmh) || 19) + ' km/h, sprint > ' + ((M.cfg && M.cfg.sprint_threshold_kmh) || 24) + ' km/h. Las varias sesiones GPS de un mismo día se suman.</div>';
+        h += '<div class="nota" style="margin-top:10px">Informe generado el ' + new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) + '. ' + (M.marca === 'soccerlab' ? 'GPS SoccerLab: HSR > 20,1 km/h, alta intensidad > 25 km/h, aceleraciones y deceleraciones > 2 m/s²' : (M.marca === 'ubiko' ? 'GPS UBIKO: HSR, sprint y aceleraciones explosivas según los calcula su plataforma' : 'Umbrales del club: HSR > ' + ((M.cfg && M.cfg.hsr_threshold_kmh) || 19) + ' km/h, sprint > ' + ((M.cfg && M.cfg.sprint_threshold_kmh) || 24) + ' km/h')) + '. Las varias sesiones GPS de un mismo día se suman.</div>';
         h += '</div>';
         S.cont.innerHTML = h;
         pintarCharts(M, F, wF, pF, conZ, zn);

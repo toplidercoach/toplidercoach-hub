@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Convertir miniaturas · TopLiderCoach</title>
+<!--
+  HERRAMIENTA DE MANTENIMIENTO (solo para el administrador). NO SE SUBE A PRODUCCIÓN.
+  Recorre los ejercicios del banco y cambia la miniatura antigua (dibujo vectorial, ~1 MB)
+  por la miniatura compacta (foto comprimida, ~20-40 kB). Solo toca la columna thumbnail_svg.
+  Usa la misma función que la pizarra (ejMiniaturaCompacta, en js/ejercicios.js).
+-->
+<style>
+  body { margin: 0; background: #0b1220; color: #e2e8f0; font-family: system-ui, sans-serif; }
+  .caja { max-width: 980px; margin: 0 auto; padding: 24px 18px 60px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  p.sub { color: #94a3b8; margin: 0 0 18px; font-size: 14px; }
+  .panel { background: #111a2b; border: 1px solid #2f405c; border-radius: 12px; padding: 16px 18px; margin-bottom: 14px; }
+  label.op { display: block; padding: 8px 10px; border: 1px solid #2f405c; border-radius: 8px; margin-top: 8px; cursor: pointer; font-size: 14px; }
+  label.op small { display: block; color: #94a3b8; margin-left: 22px; }
+  button { font: inherit; border: none; border-radius: 8px; padding: 10px 20px; cursor: pointer; font-weight: 700; }
+  #btn-ir { background: #22c55e; color: #04210f; }
+  #btn-parar { background: #7f1d1d; color: #fecaca; display: none; }
+  button:disabled { opacity: .45; cursor: default; }
+  .barra { height: 12px; background: #0b1220; border: 1px solid #2f405c; border-radius: 7px; overflow: hidden; margin: 12px 0 8px; }
+  .barra div { height: 100%; width: 0; background: #22c55e; transition: width .2s linear; }
+  .datos { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px; }
+  .datos div { background: #0b1220; border: 1px solid #2f405c; border-radius: 8px; padding: 8px 10px; font-size: 12px; color: #94a3b8; }
+  .datos b { display: block; font-size: 18px; color: #e2e8f0; }
+  #aviso { font-size: 14px; margin-top: 10px; min-height: 20px; }
+  .mal { color: #fca5a5; } .bien { color: #86efac; }
+  #pares { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .par { background: #0b1220; border: 1px solid #2f405c; border-radius: 8px; padding: 8px; font-size: 12px; }
+  .par .im { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px; }
+  .par img { width: 100%; aspect-ratio: 8/5; object-fit: contain; background: #0f4c2a; border-radius: 6px; display: block; }
+  .par span { color: #94a3b8; }
+  #fallos { font-size: 12px; color: #fca5a5; white-space: pre-wrap; max-height: 220px; overflow: auto; margin: 0; }
+</style>
+</head>
+<body>
+<div class="caja">
+  <h1>Convertir miniaturas del banco</h1>
+  <p class="sub">Cambia las miniaturas pesadas (dibujos de más de 150 kB) por la compacta. No toca el dibujo, la ficha ni el vídeo. Se puede parar y continuar otro día.</p>
+
+  <div class="panel" id="panel-op">
+    <b>¿Qué quieres convertir?</b>
+    <label class="op"><input type="radio" name="alc" value="prueba" checked> Prueba: 10 miniaturas pesadas
+      <small>Diez repartidas de la más ligera a la más pesada, para mirar el resultado antes de lanzarlo con todas.</small></label>
+    <label class="op"><input type="radio" name="alc" value="todos"> Todas las miniaturas pesadas
+      <small>Los dibujos de más de 150 kB, de todos los usuarios. Deja esta pestaña abierta y visible.</small></label>
+    <div style="margin-top:14px;display:flex;gap:10px;align-items:center">
+      <button id="btn-ir" disabled>Empezar</button>
+      <button id="btn-parar">Parar</button>
+      <span id="estado" style="font-size:13px;color:#94a3b8">Preparando…</span>
+    </div>
+    <div class="barra"><div id="barra"></div></div>
+    <div class="datos">
+      <div><b id="d-rev">0</b>revisados</div>
+      <div><b id="d-conv">0</b>convertidos</div>
+      <div><b id="d-ya">0</b>ya estaban bien</div>
+      <div><b id="d-aho">0 MB</b>ahorrado</div>
+    </div>
+    <div id="aviso"></div>
+  </div>
+
+  <div class="panel" id="panel-pares" style="display:none">
+    <b>Últimos convertidos</b> <span style="font-size:12px;color:#94a3b8">— a la izquierda como estaba, a la derecha como queda</span>
+    <div id="pares" style="margin-top:10px"></div>
+  </div>
+
+  <div class="panel" id="panel-fallos" style="display:none">
+    <b>No convertidos</b> <span style="font-size:12px;color:#94a3b8">— se quedan como estaban; pásale esta lista a Claude</span>
+    <pre id="fallos"></pre>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  // La pizarra se registra como módulo del HUB al cargarse; aquí no hay HUB, así que no hace nada
+  function registrarModulo() {}
+</script>
+<script src="js/ejercicios.js"></script>
+<script>
+(function () {
+  var ADMIN = '1433';                 // solo el administrador puede usar esta página
+  var PAUSA_MS = 400;                 // descanso entre ejercicios, para no cargar la base de datos
+  var MAX_BYTES = 200 * 1024 * 1024;  // una miniatura mayor que esto no se intenta convertir aquí
+  var MAX_VISTA = 8 * 1024 * 1024;    // por encima de esto no se enseña el "antes", para no llenar la memoria
+  var $ = function (id) { return document.getElementById(id); };
+  var cli = null, parar = false, enMarcha = false;
+  var n = { rev: 0, conv: 0, ya: 0, antes: 0, despues: 0, fallos: 0 };
+
+  function aviso(txt, clase) { $('aviso').className = clase || ''; $('aviso').textContent = txt || ''; }
+  function mb(b) { return (b / 1048576).toFixed(b > 1048576 * 100 ? 0 : 1) + ' MB'; }
+  function pinta(total) {
+    $('d-rev').textContent = n.rev; $('d-conv').textContent = n.conv; $('d-ya').textContent = n.ya;
+    $('d-aho').textContent = mb(Math.max(0, n.antes - n.despues));
+    if (total) $('barra').style.width = Math.min(100, n.rev / total * 100).toFixed(1) + '%';
+  }
+  function fallo(e, motivo) {
+    n.fallos++;
+    $('panel-fallos').style.display = '';
+    if ($('fallos').textContent.indexOf(e.id + ' | ') >= 0) return;      // ya está en la lista
+    $('fallos').textContent += e.id + ' | ' + (e.name || '') + ' | ' + motivo + '\n';
+  }
+  function src(t) {
+    t = t.trim();
+    return t.indexOf('data:') === 0 ? t : URL.createObjectURL(new Blob([t], { type: 'image/svg+xml' }));
+  }
+  function par(e, antes, despues) {
+    $('panel-pares').style.display = '';
+    var d = document.createElement('div');
+    d.className = 'par';
+    var nombre = document.createElement('b'); nombre.textContent = e.name || '(sin nombre)';
+    var peso = document.createElement('span'); peso.textContent = ' · ' + (antes.length > 1048576 ? mb(antes.length) : Math.round(antes.length / 1024) + ' kB') + ' → ' + Math.round(despues.length / 1024) + ' kB';
+    var im = document.createElement('div'); im.className = 'im';
+    if (antes.length > MAX_VISTA) { var sin = document.createElement('div'); sin.style.cssText = 'display:flex;align-items:center;justify-content:center;text-align:center;color:#94a3b8;background:#111a2b;border-radius:6px;padding:6px'; sin.textContent = 'La de antes pesa demasiado para enseñarla aquí'; im.appendChild(sin); }
+    else { var ia = new Image(); ia.src = src(antes); im.appendChild(ia); }
+    var id2 = new Image(); id2.src = src(despues); im.appendChild(id2);
+    d.appendChild(nombre); d.appendChild(peso); d.appendChild(im);
+    var caja = $('pares');
+    caja.insertBefore(d, caja.firstChild);
+    while (caja.children.length > 12) {
+      caja.lastChild.querySelectorAll('img').forEach(function (i) { if (i.src.indexOf('blob:') === 0) URL.revokeObjectURL(i.src); });
+      caja.removeChild(caja.lastChild);
+    }
+  }
+  function espera(ms) { return new Promise(function (ok) { setTimeout(ok, ms); }); }
+
+  async function preparar() {
+    var u = {};
+    try { u = JSON.parse(localStorage.getItem('hub_user') || '{}'); } catch (e) {}
+    var miId = String(u.wp_user_id || u.id || '');
+    if (miId !== ADMIN) { $('estado').textContent = ''; aviso('Entra primero en el HUB con tu usuario en este mismo navegador y vuelve a abrir esta página.', 'mal'); return; }
+    if (typeof ejMiniaturaCompacta !== 'function' || typeof ejMiniaturaEsCompacta !== 'function') {
+      $('estado').textContent = ''; aviso('El archivo js/ejercicios.js no es el de las miniaturas comprimidas. Ponlo primero.', 'mal'); return;
+    }
+    // La dirección y la clave pública de la base de datos se leen de js/core.js, para no tenerlas escritas en dos sitios
+    var core = await (await fetch('js/core.js')).text();
+    var url = (core.match(/SUPABASE_URL\s*=\s*'([^']+)'/) || [])[1], clave = (core.match(/SUPABASE_KEY\s*=\s*'([^']+)'/) || [])[1];
+    if (!url || !clave || !window.supabase) { $('estado').textContent = ''; aviso('No se ha podido preparar la conexión con la base de datos.', 'mal'); return; }
+    cli = window.supabase.createClient(url, clave);
+    $('estado').textContent = 'Listo.';
+    $('btn-ir').disabled = false;
+  }
+
+  // La lista de miniaturas pesadas la da la base de datos (función tlc_miniaturas_pesadas), de menor a mayor.
+  // Las ya convertidas dejan de salir, así que al volver a empezar se sigue con las que faltan.
+  async function listar() {
+    var r = await cli.rpc('tlc_miniaturas_pesadas');
+    if (r.error) throw new Error('no se ha podido leer la lista (' + r.error.message + '). ¿Has ejecutado el SQL de la función?');
+    return r.data || [];
+  }
+
+  async function empezar() {
+    if (enMarcha) return;
+    var alcance = document.querySelector('input[name="alc"]:checked').value;
+    enMarcha = true; parar = false;
+    n = { rev: 0, conv: 0, ya: 0, antes: 0, despues: 0, fallos: 0 };
+    $('btn-ir').disabled = true; $('btn-parar').style.display = 'inline-block';
+    document.querySelectorAll('input[name="alc"]').forEach(function (i) { i.disabled = true; });
+    aviso('');
+    try {
+      $('estado').textContent = 'Leyendo la lista de ejercicios…';
+      var lista = await listar();
+      var pendientes = lista.length;
+      if (alcance === 'prueba' && lista.length > 10) {
+        // diez repartidas por peso, la última es la más pesada de todas
+        var rep10 = []; for (var q = 0; q < 10; q++) rep10.push(lista[Math.round(q * (lista.length - 1) / 9)]);
+        lista = rep10;
+      }
+      var total = lista.length;
+      $('estado').textContent = pendientes + ' miniaturas pesadas pendientes' + (alcance === 'prueba' ? '; se prueban ' + total + '.' : '.');
+      for (var k = 0; k < lista.length; k++) {
+        if (parar) break;
+        var e = lista[k];
+        try {
+          var r = await cli.from('custom_exercises').select('thumbnail_svg').eq('id', e.id).single();
+          if (r.error) throw new Error('lectura: ' + r.error.message);
+          var t = r.data && r.data.thumbnail_svg;
+          if (!t || ejMiniaturaEsCompacta(String(t).trim())) { n.ya++; }
+          else if (t.length > MAX_BYTES) { fallo(e, 'demasiado grande (' + mb(t.length) + ')'); }
+          else {
+            var m = await ejMiniaturaCompacta(t);
+            if (!ejMiniaturaEsCompacta(m)) { fallo(e, 'no se ha podido pintar (' + Math.round(t.length / 1024) + ' kB)'); }
+            else if (m.length >= t.length) { n.ya++; }      // ya era ligera: se deja como está
+            else {
+              var g = await cli.from('custom_exercises').update({ thumbnail_svg: m }).eq('id', e.id);
+              if (g.error) throw new Error('guardado: ' + g.error.message);
+              n.conv++; n.antes += t.length; n.despues += m.length;
+              par(e, t, m);
+            }
+          }
+        } catch (err) { fallo(e, err.message || String(err)); }
+        n.rev++;
+        pinta(total);
+        await espera(PAUSA_MS);
+      }
+      var fin = !parar && k >= lista.length;
+      if (alcance === 'prueba') { $('barra').style.width = '100%'; aviso('Prueba terminada: ' + n.conv + ' convertidos. Míralos aquí debajo y en el Banco antes de seguir.', 'bien'); }
+      else if (fin) { $('barra').style.width = '100%'; aviso('Terminado. Convertidos ' + n.conv + ', ahorrado ' + mb(n.antes - n.despues) + (n.fallos ? '. Sin convertir: ' + n.fallos + '.' : '.'), 'bien'); }
+      else aviso('Parado. Al volver a pulsar Empezar sigue con las que faltan.', '');
+    } catch (err) {
+      aviso('Se ha interrumpido: ' + (err.message || err) + '. Puedes volver a pulsar Empezar; sigue con las que faltan.', 'mal');
+    }
+    enMarcha = false;
+    $('btn-ir').disabled = false; $('btn-parar').style.display = 'none';
+    document.querySelectorAll('input[name="alc"]').forEach(function (i) { i.disabled = false; });
+  }
+
+  $('btn-ir').onclick = empezar;
+  $('btn-parar').onclick = function () { parar = true; $('estado').textContent = 'Parando…'; };
+  window.addEventListener('beforeunload', function (ev) { if (enMarcha) { ev.preventDefault(); ev.returnValue = ''; } });
+  preparar().catch(function (e) { aviso('Error al preparar: ' + (e.message || e), 'mal'); });
+})();
+</script>
+</body>
+</html>

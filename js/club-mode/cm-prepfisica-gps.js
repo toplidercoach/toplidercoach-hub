@@ -1,10 +1,13 @@
-// ========== CM-PREPFISICA-GPS.JS - Importador CSV de dispositivos GPS (v2, multimarca) ==========
+// ========== CM-PREPFISICA-GPS.JS - Importador CSV de dispositivos GPS (v3, multimarca) ==========
 // Importa el CSV que exporta la plataforma del GPS con todos los jugadores de una sesion.
 // Reconoce la marca sola, por las columnas del archivo:
 //   - 'dispositivo' : formato del dispositivo TopLiderCoach (separador ';', campos entrecomillados,
 //                     columnas "Player No.", "Player Name", "Time Played", "Distance (m)"...).
 //   - 'soccerlab'   : exportacion de SoccerLab (separador ',', linea entera entre comillas,
 //                     columnas name, time_active, totaldistance, walkdistance...).
+//   - 'ubiko'       : exportacion de UBIKO (separador ';', decimales con coma, distancias en km,
+//                     columnas session, task, date, position, dorsal, player...). Es el GPS de los
+//                     porteros: se anade a la sesion del mismo dia que ya exista.
 // Empareja jugadores por: 1) emparejamiento recordado de otras importaciones, 2) dorsal,
 // 3) nombre exacto, 4) nombre contenido, 5) nombre parecido (se marca "Revisar").
 // Guarda en las tablas existentes cm_pf_gps_sessions + cm_pf_gps_player_data (segmento TOTAL).
@@ -12,13 +15,14 @@
 // No modifica cm-prepfisica.js: inyecta su boton envolviendo cmPfRenderPanel.
 
 var cmPfDev = {
-    formato: null,      // 'dispositivo' | 'soccerlab'
+    formato: null,      // 'dispositivo' | 'soccerlab' | 'ubiko'
     filas: [],          // filas normalizadas del CSV
     fechaCsv: null,     // YYYY-MM-DD detectada
     tituloCsv: '',      // sugerido desde el nombre del archivo
     jugadores: [],      // [{id, name, dorsal}]
     asignacion: {},     // indice de fila -> player_id | '' (no importar)
-    metodo: {}          // indice de fila -> 'alias' | 'dorsal' | 'nombre' | 'aprox' | ''
+    metodo: {},         // indice de fila -> 'alias' | 'dorsal' | 'nombre' | 'aprox' | ''
+    sesionesDia: []     // sesiones GPS ya existentes en la fecha elegida (para anadir los porteros)
 };
 
 var CMPF_DEV_FORMATOS = {
@@ -30,7 +34,12 @@ var CMPF_DEV_FORMATOS = {
     soccerlab: {
         etiqueta: 'SoccerLab',
         source: 'soccerlab_csv',
-        nota: 'Zonas: andar 0-7,2 / trote 7,2-14,4 / carrera 14,4-19,8 / sprint 19,8-25,2 / sprint alto +25,2 km/h. HSR = distancia a mas de 19,8 &middot; Sprint = distancia a mas de 25,2 (high intensity). Acc y Dec = totales (&gt;2 m/s&sup2;). Minutos = tiempo activo. Pulso, TRIMP, cambios de direccion, impactos y el resto se guardan en metricas extra. Los jugadores con menos de 1 minuto activo no se importan.'
+        nota: 'Zonas: andar 0-7,2 / trote 7,2-14,4 / carrera 14,4-20,1 / sprint 20,1-25 / sprint alto +25 km/h. HSR = distancia a mas de 20,1 &middot; Sprint = distancia a mas de 25 (high intensity). Acc y Dec = totales (&gt;2 m/s&sup2;). Minutos = tiempo activo. Pulso, TRIMP, cambios de direccion, impactos y el resto se guardan en metricas extra. Los jugadores con menos de 1 minuto activo no se importan.'
+    },
+    ubiko: {
+        etiqueta: 'UBIKO (porteros)',
+        source: 'ubiko_csv',
+        nota: 'Se importa la fila "Total" de cada jugador (las distancias de UBIKO vienen en km y se guardan en metros). HSR y Sprint = los que calcula UBIKO. Acc y Dec = explosivas; las medias, el pulso por zonas y el resto se guardan en metricas extra. En el informe de la sesion estos jugadores salen en la tabla "Porteros", aparte de los de campo.'
     }
 };
 
@@ -128,6 +137,8 @@ function cmPfDevDecodificar(buffer) {
 function cmPfDevDetectar(cabecera) {
     var disp = cmPfDevParseLinea(cabecera);
     if (disp.indexOf('Player No.') !== -1 && disp.indexOf('Player Name') !== -1) return 'dispositivo';
+    var ub = cabecera.replace(/"/g, '').toLowerCase().split(';').map(function (c) { return c.trim(); });
+    if (ub.indexOf('player') !== -1 && ub.indexOf('task') !== -1 && ub.indexOf('total_distance') !== -1 && ub.indexOf('num_acc_expl') !== -1) return 'ubiko';
     var sl = cabecera.replace(/"/g, '').toLowerCase().split(',').map(function (c) { return c.trim(); });
     if (sl.indexOf('name') !== -1 && sl.indexOf('totaldistance') !== -1 && sl.indexOf('time_active') !== -1) return 'soccerlab';
     return null;
@@ -207,7 +218,7 @@ function cmPfDevParsearDispositivo(lineas) {
 
 // ---------- Parseo: SoccerLab ----------
 // walk + jog + run + sprint = distancia total (comprobado con archivos reales).
-// 'hisprintdistance' (>25,2 km/h) esta DENTRO de 'sprintdistance' (>19,8) y 'speedzone_6_distance'
+// 'hisprintdistance' (>25 km/h) esta DENTRO de 'sprintdistance' (>20,1) y 'speedzone_6_distance'
 // dentro de 'hisprintdistance': no se suman como zonas aparte para no contar metros dos veces.
 function cmPfDevParsearSoccerlab(lineas) {
     var partir = function (l) { return l.replace(/"/g, '').split(',').map(function (c) { return c.trim(); }); };
@@ -223,8 +234,8 @@ function cmPfDevParsearSoccerlab(lineas) {
 
         var td = g('totaldistance');
         var minutos = g('time_active');
-        var sprint = g('sprintdistance');      // > 19,8 km/h (incluye el sprint alto)
-        var hisprint = g('hisprintdistance');  // > 25,2 km/h
+        var sprint = g('sprintdistance');      // > 20,1 km/h (incluye el sprint alto)
+        var hisprint = g('hisprintdistance');  // > 25 km/h
         var z4 = (sprint !== null && hisprint !== null) ? Math.max(0, sprint - hisprint) : sprint;
         var inactivo = (minutos === null || minutos < 1);
 
@@ -278,6 +289,105 @@ function cmPfDevParsearSoccerlab(lineas) {
     return { filas: filas, fecha: null };
 }
 
+// ---------- Parseo: UBIKO ----------
+// Una fila por jugador y tarea ("Periodo 1", "Total"...), mas una fila resumen sin jugador que se ignora.
+// Se importa la fila "Total" de cada jugador (o la unica que tenga). Distancias en km -> metros.
+// La fecha viene como mes/dia/ano ("11/12/2026" = 12 de noviembre): se comprueba con el dia de la
+// semana si la sesion se llama LUNES, MARTES... y, si no cuadra ninguna lectura, se usa mes/dia.
+function cmPfDevFechaUbiko(txt, nombreSesion) {
+    var m = (txt || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (!m) return null;
+    var a = parseInt(m[1]), b = parseInt(m[2]), y = parseInt(m[3]);
+    var iso = function (mes, dia) { return y + '-' + ('0' + mes).slice(-2) + '-' + ('0' + dia).slice(-2); };
+    var valida = function (mes, dia) { return mes >= 1 && mes <= 12 && dia >= 1 && dia <= 31; };
+    var mesDia = valida(a, b) ? iso(a, b) : null;     // 11/12 -> 12 de noviembre
+    var diaMes = valida(b, a) ? iso(b, a) : null;     // 11/12 -> 11 de diciembre
+    if (!mesDia) return diaMes;
+    if (!diaMes || mesDia === diaMes) return mesDia;
+    var dias = ['DOMINGO', 'LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO'];
+    var ns = cmPfDevNorm(nombreSesion);
+    var diaDe = function (f) { return dias[new Date(f + 'T12:00:00').getDay()]; };
+    var casaMD = ns.indexOf(diaDe(mesDia)) !== -1, casaDM = ns.indexOf(diaDe(diaMes)) !== -1;
+    if (casaDM && !casaMD) return diaMes;
+    return mesDia;
+}
+
+function cmPfDevParsearUbiko(lineas) {
+    var partir = function (l) { return l.replace(/"/g, '').split(';').map(function (c) { return c.trim(); }); };
+    var cab = partir(lineas[0]).map(function (c) { return c.toLowerCase(); });
+    var idx = {};
+    cab.forEach(function (c, i) { idx[c] = i; });
+
+    // Agrupar por jugador y quedarse con la fila "Total" (o la primera si no hay Total)
+    var porJugador = {}, orden = [], sesion = '', fechaTxt = '';
+    for (var li = 1; li < lineas.length; li++) {
+        var v = partir(lineas[li]);
+        var nombre = v[idx['player']];
+        if (!nombre) continue;                       // fila resumen del grupo
+        if (!sesion) sesion = v[idx['session']] || '';
+        if (!fechaTxt) fechaTxt = v[idx['date']] || '';
+        var clave = (v[idx['dorsal']] || '') + '|' + nombre;
+        var esTotal = String(v[idx['task']] || '').toLowerCase() === 'total';
+        if (!porJugador[clave]) { porJugador[clave] = v; orden.push(clave); }
+        else if (esTotal) porJugador[clave] = v;
+    }
+
+    var filas = [];
+    orden.forEach(function (clave) {
+        var v = porJugador[clave];
+        var g = function (k) { return idx[k] === undefined ? null : cmPfDevNum(v[idx[k]]); };
+        var km = function (k) { var n = g(k); return n === null ? null : Math.round(n * 1000); };
+        var minutos = g('time');
+        var td = km('total_distance');
+        var pl = g('player_load');
+        var inactivo = (minutos === null || minutos < 1);
+        var mmin = g('minute_distance');
+        if (mmin === null && td !== null && minutos && !inactivo) mmin = td / minutos;
+
+        filas.push({
+            dorsal_csv: v[idx['dorsal']] || '',
+            dorsal_debil: true,                      // el dorsal de UBIKO puede no ser el de la plantilla: manda el nombre
+            nombre_csv: v[idx['player']],
+            minutos: minutos,
+            duracion_sesion: minutos,
+            inactivo: inactivo,
+            total_distance_m: td,
+            hsr_distance_m: km('hsr'),
+            sprint_distance_m: km('distance_vrange6'),
+            sprint_count: g('sprints'),
+            max_speed_kmh: cmPfDevRed(g('max_speed'), 2),
+            accel_count: g('num_acc_expl'),
+            decel_count: g('num_dec_expl'),
+            player_load: (pl !== null && pl > 0) ? cmPfDevRed(pl, 1) : null,
+            hr_avg: g('hr_avg'), hr_max: g('hr_max'),
+            z1_distance_m: km('distance_vrange1'),
+            z2_distance_m: km('distance_vrange2'),
+            z3_distance_m: km('distance_vrange3'),
+            z4_distance_m: km('distance_vrange4'),
+            z5_distance_m: km('distance_vrange5'),
+            distance_per_min: inactivo ? null : cmPfDevRed(mmin, 1),
+            extra: {
+                avg_speed_kmh: cmPfDevRed(g('average_speed'), 2),
+                z6_distance_m: km('distance_vrange6'),
+                acc_med: g('num_acc'),
+                dec_med: g('num_dec'),
+                max_acc: cmPfDevRed(g('max_acc'), 2),
+                max_dec: cmPfDevRed(g('max_dec'), 2),
+                num_hsr: g('num_hsr'),
+                hmld_m: km('hmld'),
+                hr_z1_pct: cmPfDevRed(g('hr_percent_z1'), 1),
+                hr_z2_pct: cmPfDevRed(g('hr_percent_z2'), 1),
+                hr_z3_pct: cmPfDevRed(g('hr_percent_z3'), 1),
+                hr_z4_pct: cmPfDevRed(g('hr_percent_z4'), 1),
+                active_time_min: cmPfDevRed(g('active_time'), 1),
+                effective_time_min: cmPfDevRed(g('effective_time'), 1),
+                posicion_gps: v[idx['position']] || null
+            }
+        });
+    });
+    return { filas: filas, fecha: cmPfDevFechaUbiko(fechaTxt, sesion), titulo: sesion };
+}
+
 // Fecha y titulo desde el nombre del archivo de SoccerLab: "SOCCERLAB_20261109T171925.937794MONSCALPE.csv"
 function cmPfDevNombreSoccerlab(nombre) {
     var base = (nombre || '').replace(/\.csv$/i, '');
@@ -294,13 +404,16 @@ function cmPfDevParsear(texto, nombreArchivo) {
     if (lineas.length < 2) throw new Error('El CSV no tiene datos');
 
     var formato = cmPfDevDetectar(lineas[0]);
-    if (!formato) throw new Error('Formato no reconocido. Marcas admitidas: dispositivo TopLiderCoach y SoccerLab.');
+    if (!formato) throw new Error('Formato no reconocido. Marcas admitidas: dispositivo TopLiderCoach, SoccerLab y UBIKO.');
 
     var res, fecha, titulo;
     if (formato === 'soccerlab') {
         res = cmPfDevParsearSoccerlab(lineas);
         var n = cmPfDevNombreSoccerlab(nombreArchivo);
         fecha = n.fecha; titulo = n.titulo;
+    } else if (formato === 'ubiko') {
+        res = cmPfDevParsearUbiko(lineas);
+        fecha = res.fecha; titulo = res.titulo;
     } else {
         res = cmPfDevParsearDispositivo(lineas);
         fecha = res.fecha;
@@ -351,8 +464,8 @@ function cmPfDevEmparejar(filas, jugadores, alias) {
         // 1) Emparejamiento recordado
         if (nc && alias[nc] && porId[alias[nc]]) { pid = alias[nc]; met = 'alias'; }
 
-        // 2) Dorsal exacto
-        if (!pid) {
+        // 2) Dorsal exacto (si el dorsal del archivo es fiable)
+        if (!pid && !f.dorsal_debil) {
             var d = parseInt(f.dorsal_csv);
             if (!isNaN(d)) {
                 var porDorsal = jugadores.filter(function (j) { return j.dorsal === d; });
@@ -385,6 +498,15 @@ function cmPfDevEmparejar(filas, jugadores, alias) {
                 else if (n === mejor && n > 0) candidatos.push(j);
             });
             if (mejor > 0 && candidatos.length === 1) { pid = candidatos[0].id; met = 'aprox'; }
+        }
+
+        // 6) Dorsal poco fiable (UBIKO): solo si el nombre no ha servido, y se marca para revisar
+        if (!pid && f.dorsal_debil) {
+            var d2 = parseInt(f.dorsal_csv);
+            if (!isNaN(d2)) {
+                var porDorsal2 = jugadores.filter(function (j) { return j.dorsal === d2; });
+                if (porDorsal2.length === 1) { pid = porDorsal2[0].id; met = 'aprox'; }
+            }
         }
 
         // Sin actividad: no se importa por defecto (el usuario puede asignarlo a mano)
@@ -435,7 +557,7 @@ function cmPfDevAbrir() {
             '<h3>Importar sesion del dispositivo GPS</h3>' +
             '<button style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer" onclick="cmPfDevCerrar()">x</button>' +
         '</div>' +
-        '<p style="color:#94a3b8;font-size:13px;margin:6px 0 14px">Sube el CSV que exporta la plataforma de tu GPS (todos los jugadores de la sesion en un archivo). La marca se reconoce sola: dispositivo TopLiderCoach y SoccerLab.</p>' +
+        '<p style="color:#94a3b8;font-size:13px;margin:6px 0 14px">Sube el CSV que exporta la plataforma de tu GPS (todos los jugadores de la sesion en un archivo). La marca se reconoce sola: dispositivo TopLiderCoach, SoccerLab y UBIKO (porteros).</p>' +
         '<input type="file" id="cmpfdev-file" accept=".csv" style="color:#e2e8f0;font-size:13px" onchange="cmPfDevLeerArchivo(this)">' +
         '<div id="cmpfdev-contenido" style="margin-top:16px"></div>' +
     '</div>';
@@ -449,6 +571,7 @@ function cmPfDevCerrar() {
     cmPfDev.filas = [];
     cmPfDev.asignacion = {};
     cmPfDev.metodo = {};
+    cmPfDev.sesionesDia = [];
 }
 
 // ---------- Leer y parsear el archivo ----------
@@ -534,6 +657,12 @@ function cmPfDevRenderPreview() {
     '</div>' +
     '<div class="cmpf-form-group" style="max-width:280px"><label>Equipo</label><select id="cmpfdev-equipo">' + equiposOpts + '</select></div>';
 
+    // UBIKO es el GPS de los porteros: lo normal es anadirlos a la sesion de ese dia que ya tiene a los de campo
+    if (cmPfDev.formato === 'ubiko') {
+        h += '<div class="cmpf-form-group" style="max-width:520px"><label>Anadir a la sesion</label><select id="cmpfdev-sesion"><option value="">Cargando sesiones de ese dia...</option></select>' +
+            '<div style="color:#64748b;font-size:11px;margin-top:4px">Si eliges una sesion existente, los porteros se suman a ella y el titulo, tipo y rival de arriba no se usan.</div></div>';
+    }
+
     // Tabla de jugadores
     h += '<table class="cmpfdev-tabla"><thead><tr>' +
         '<th>CSV</th><th>Jugador del club</th><th>Min</th><th>Dist</th><th>m/min</th><th>Vmax</th><th>Calidad</th>' +
@@ -577,6 +706,39 @@ function cmPfDevRenderPreview() {
     '</div>';
 
     cont.innerHTML = h;
+
+    if (cmPfDev.formato === 'ubiko') {
+        var fe = document.getElementById('cmpfdev-fecha');
+        if (fe) fe.onchange = cmPfDevCargarSesionesDia;
+        cmPfDevCargarSesionesDia();
+    }
+}
+
+// Sesiones GPS que ya existen en la fecha elegida (para sumar los porteros a la de los jugadores de campo)
+async function cmPfDevCargarSesionesDia() {
+    var sel = document.getElementById('cmpfdev-sesion');
+    if (!sel) return;
+    var fecha = (document.getElementById('cmpfdev-fecha') || {}).value;
+    cmPfDev.sesionesDia = [];
+    if (fecha) {
+        try {
+            var r = await supabaseClient.from('cm_pf_gps_sessions').select('id, session_type, title, opponent, source')
+                .eq('club_id', clubId).eq('session_date', fecha).or('archived.is.null,archived.eq.false').order('created_at');
+            cmPfDev.sesionesDia = r.data || [];
+        } catch (e) { cmPfDev.sesionesDia = []; }
+    }
+    sel = document.getElementById('cmpfdev-sesion');
+    if (!sel) return;
+    var o = '';
+    cmPfDev.sesionesDia.forEach(function (s) {
+        var nombre = (s.session_type === 'match' ? 'Partido' : 'Entreno') + ' - ' + (s.title || (s.opponent ? 'vs ' + s.opponent : 'sin titulo'));
+        o += '<option value="' + s.id + '">' + nombre.replace(/</g, '&lt;') + '</option>';
+    });
+    o += '<option value="">' + (cmPfDev.sesionesDia.length ? 'Crear una sesion nueva' : 'No hay sesion ese dia: se creara una nueva') + '</option>';
+    sel.innerHTML = o;
+    // Por defecto, la que no sea de UBIKO (la de los jugadores de campo); si no, la primera
+    var pref = cmPfDev.sesionesDia.filter(function (s) { return s.source !== 'ubiko_csv'; })[0] || cmPfDev.sesionesDia[0];
+    sel.value = pref ? pref.id : '';
 }
 
 // ---------- Fila de la tabla cm_pf_gps_player_data a partir de una fila normalizada ----------
@@ -656,10 +818,16 @@ async function cmPfDevGuardar() {
     try {
         // Reutilizar sesion existente (misma fecha+tipo+titulo) o crearla
         // (una sesion eliminada/archivada no se reutiliza: se crea una nueva limpia)
-        var q = supabaseClient.from('cm_pf_gps_sessions').select('id')
-            .eq('club_id', clubId).eq('session_date', fecha).eq('session_type', tipo);
-        q = titulo ? q.eq('title', titulo) : q.is('title', null);
-        var sr = await q.or('archived.is.null,archived.eq.false').limit(1).maybeSingle();
+        var sesionElegida = (document.getElementById('cmpfdev-sesion') || {}).value || '';
+        var sr = { data: null };
+        if (sesionElegida) {
+            sr = { data: { id: sesionElegida } };
+        } else {
+            var q = supabaseClient.from('cm_pf_gps_sessions').select('id')
+                .eq('club_id', clubId).eq('session_date', fecha).eq('session_type', tipo);
+            q = titulo ? q.eq('title', titulo) : q.is('title', null);
+            sr = await q.or('archived.is.null,archived.eq.false').limit(1).maybeSingle();
+        }
         var sid;
         var durMax = 0;
         cmPfDev.filas.forEach(function (f) {
@@ -714,4 +882,4 @@ async function cmPfDevGuardar() {
     }
 }
 
-console.log('[PrepFisica] cm-prepfisica-gps.js cargado (importador CSV multimarca: dispositivo + SoccerLab)');
+console.log('[PrepFisica] cm-prepfisica-gps.js v3 cargado (importador CSV multimarca: dispositivo + SoccerLab + UBIKO)');
