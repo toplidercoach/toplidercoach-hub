@@ -731,7 +731,7 @@ async function dibujarJugadorCardCompacta(doc, jugador, x, y, ancho, alto, color
             
             const tempId = document.getElementById('stats-temporada').value || seasonId;
             const { data: temp } = await supabaseClient.from('seasons').select('name').eq('id', tempId).single();
-            const { data: partidos } = await supabaseClient.from('matches').select('*').eq('season_id', tempId).not('result', 'is', null);
+            const selCompPdf = document.getElementById('stats-competicion'); const compSel = selCompPdf ? selCompPdf.value : ''; const { data: partidosTodos } = await supabaseClient.from('matches').select('*').eq('season_id', tempId).not('result', 'is', null); const partidos = (partidosTodos || []).filter(p => !compSel || p.competition === compSel);
             
             const victorias = partidos?.filter(p => p.result === 'win').length || 0;
             const empates = partidos?.filter(p => p.result === 'draw').length || 0;
@@ -739,7 +739,7 @@ async function dibujarJugadorCardCompacta(doc, jugador, x, y, ancho, alto, color
             const gF = partidos?.reduce((sum, p) => sum + (p.team_goals || 0), 0) || 0;
             const gC = partidos?.reduce((sum, p) => sum + (p.opponent_goals || 0), 0) || 0;
             
-            const { data: stats } = await supabaseClient.from('match_player_stats').select('*, players(name, position), matches!inner(season_id)').eq('matches.season_id', tempId);
+            const { data: statsTodos } = await supabaseClient.from('match_player_stats').select('*, players(name, position), matches!inner(season_id, competition)').eq('matches.season_id', tempId); const stats = (statsTodos || []).filter(s => !compSel || (s.matches && s.matches.competition === compSel));
             
             const jugadorStats = {};
             (stats || []).forEach(s => {
@@ -761,7 +761,7 @@ async function dibujarJugadorCardCompacta(doc, jugador, x, y, ancho, alto, color
             doc.setFont('helvetica', 'bold');
             doc.text('ESTADISTICAS DE TEMPORADA', 105, 20, { align: 'center' });
             doc.setFontSize(14);
-            doc.text(`${clubData?.name || 'Mi Club'} - ${temp?.name || 'Temporada'}`, 105, 35, { align: 'center' });
+            doc.text(`${clubData?.name || 'Mi Club'} - ${temp?.name || 'Temporada'}${compSel ? ' - ' + compSel : ''}`, 105, 35, { align: 'center' });
             
             doc.setTextColor(30);
             doc.setFontSize(11);
@@ -804,7 +804,7 @@ async function dibujarJugadorCardCompacta(doc, jugador, x, y, ancho, alto, color
             doc.setTextColor(150);
             doc.text('Generado con HUB TopLiderCoach', 105, 285, { align: 'center' });
             
-            doc.save(`estadisticas_${temp?.name || 'temporada'}.pdf`);
+            doc.save(`estadisticas_${temp?.name || 'temporada'}${compSel ? '_' + compSel : ''}.pdf`);
         }
         
 
