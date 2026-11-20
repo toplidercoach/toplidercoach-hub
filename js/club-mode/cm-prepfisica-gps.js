@@ -1,4 +1,4 @@
-// ========== CM-PREPFISICA-GPS.JS - Importador CSV de dispositivos GPS (v3, multimarca) ==========
+// ========== CM-PREPFISICA-GPS.JS - Importador de dispositivos GPS (v4, multimarca) ==========
 // Importa el CSV que exporta la plataforma del GPS con todos los jugadores de una sesion.
 // Reconoce la marca sola, por las columnas del archivo:
 //   - 'dispositivo' : formato del dispositivo TopLiderCoach (separador ';', campos entrecomillados,
@@ -8,6 +8,12 @@
 //   - 'ubiko'       : exportacion de UBIKO (separador ';', decimales con coma, distancias en km,
 //                     columnas session, task, date, position, dorsal, player...). Es el GPS de los
 //                     porteros: se anade a la sesion del mismo dia que ya exista.
+//   - 'soccerlab_xlsx' : Excel de sesion de SoccerLab ("Events progress": una hoja por sesion con la
+//                     fecha en el nombre, metricas en filas y jugadores en columnas). Es el archivo
+//                     que da la sesion correcta; se lee con SheetJS, que se carga solo al usarlo.
+// v4: minutos de SoccerLab = duracion de la sesion (como calcula SoccerLab sus m/min), no el tiempo
+//     activo; minutos editables en la vista previa (en partidos hay que poner los jugados); avisos
+//     antes de importar (velocidades imposibles, sesiones mezcladas, datos ya importados).
 // Empareja jugadores por: 1) emparejamiento recordado de otras importaciones, 2) dorsal,
 // 3) nombre exacto, 4) nombre contenido, 5) nombre parecido (se marca "Revisar").
 // Guarda en las tablas existentes cm_pf_gps_sessions + cm_pf_gps_player_data (segmento TOTAL).
@@ -15,7 +21,12 @@
 // No modifica cm-prepfisica.js: inyecta su boton envolviendo cmPfRenderPanel.
 
 var cmPfDev = {
-    formato: null,      // 'dispositivo' | 'soccerlab' | 'ubiko'
+    formato: null,      // 'dispositivo' | 'soccerlab' | 'soccerlab_xlsx' | 'ubiko'
+    archivo: '',        // nombre del archivo subido
+    eventos: [],        // sesiones que trae un Excel de SoccerLab: [{nombre, fecha, titulo, filas}]
+    eventoIdx: 0,
+    avisos: [],         // avisos del archivo (se confirman antes de importar)
+    duplicado: null,    // sesion del club que ya tiene estos mismos datos
     filas: [],          // filas normalizadas del CSV
     fechaCsv: null,     // YYYY-MM-DD detectada
     tituloCsv: '',      // sugerido desde el nombre del archivo
@@ -34,7 +45,13 @@ var CMPF_DEV_FORMATOS = {
     soccerlab: {
         etiqueta: 'SoccerLab',
         source: 'soccerlab_csv',
-        nota: 'Zonas: andar 0-7,2 / trote 7,2-14,4 / carrera 14,4-20,1 / sprint 20,1-25 / sprint alto +25 km/h. HSR = distancia a mas de 20,1 &middot; Sprint = distancia a mas de 25 (high intensity). Acc y Dec = totales (&gt;2 m/s&sup2;). Minutos = tiempo activo. Pulso, TRIMP, cambios de direccion, impactos y el resto se guardan en metricas extra. Los jugadores con menos de 1 minuto activo no se importan.'
+        nota: 'Zonas: andar 0-7,2 / trote 7,2-14,4 / carrera 14,4-20,1 / sprint 20,1-25 / sprint alto +25 km/h. HSR = distancia a mas de 20,1 &middot; Sprint = distancia a mas de 25 (high intensity). Acc y Dec = totales (&gt;2 m/s&sup2;). Minutos = duracion de la sesion, como calcula SoccerLab sus m/min (en partidos se propone el tiempo en movimiento: cambialo por los minutos jugados). Pulso, TRIMP, cambios de direccion, impactos y el resto se guardan en metricas extra. Los jugadores con menos de 1 minuto activo no se importan.'
+    },
+    soccerlab_xlsx: {
+        etiqueta: 'SoccerLab (Excel de sesion)',
+        source: 'soccerlab_xlsx',
+        marca: 'soccerlab',
+        nota: 'Excel "Events progress" de SoccerLab. Zonas: andar / trote / carrera / sprint 20,1-25 / sprint alto +25 km/h. HSR = distancia a mas de 20,1 &middot; Sprint = distancia a mas de 25 (high intensity). Acc y Dec = totales (&gt;2 m/s&sup2;). Minutos = duracion de la sesion (en partidos se propone el tiempo en movimiento: cambialo por los minutos jugados). Este Excel no trae pulso, Player Load ni numero de sprints. Los jugadores sin tiempo activo no se importan.'
     },
     ubiko: {
         etiqueta: 'UBIKO (porteros)',
@@ -233,17 +250,20 @@ function cmPfDevParsearSoccerlab(lineas) {
         var g = function (k) { return idx[k] === undefined ? null : cmPfDevNum(v[idx[k]]); };
 
         var td = g('totaldistance');
-        var minutos = g('time_active');
+        var activo = g('time_active');         // tiempo en movimiento
+        var dur = g('duration');               // duracion de la sesion (con ella calcula SoccerLab los m/min)
+        var minutos = dur || activo;
         var sprint = g('sprintdistance');      // > 20,1 km/h (incluye el sprint alto)
         var hisprint = g('hisprintdistance');  // > 25 km/h
         var z4 = (sprint !== null && hisprint !== null) ? Math.max(0, sprint - hisprint) : sprint;
-        var inactivo = (minutos === null || minutos < 1);
+        var inactivo = (activo === null || activo < 1);
 
         filas.push({
             dorsal_csv: '',
             nombre_csv: v[idx['name']],
             minutos: minutos,
-            duracion_sesion: g('duration'),
+            min_sesion: dur, min_activo: activo,
+            duracion_sesion: dur,
             inactivo: inactivo,
             total_distance_m: td,
             hsr_distance_m: sprint,
@@ -282,11 +302,123 @@ function cmPfDevParsearSoccerlab(lineas) {
                 hr_anaerobic_min: cmPfDevRed(g('hrzoneanaerobic'), 1),
                 hr_trimp: cmPfDevRed(g('hrtrimp'), 1),
                 hr_quality: cmPfDevRed(g('hr_quality'), 0),
-                session_duration_min: cmPfDevRed(g('duration'), 1)
+                active_time_min: cmPfDevRed(activo, 1),
+                session_duration_min: cmPfDevRed(dur, 1)
             }
         });
     }
     return { filas: filas, fecha: null };
+}
+
+// ---------- Parseo: Excel de sesion de SoccerLab ("Events progress") ----------
+// Cada hoja es una sesion. Una fila de cabecera con "TEAM AVERAGE" y, a su derecha, un jugador por
+// columna ("Alex Grachev (22927)"). Debajo, una metrica por fila: nombre, unidad y valores. Las filas
+// con unidad "/min" son las relativas (bloque INTENSITY); el resto, los totales (bloque TOTAL WORK).
+function cmPfDevParsearSoccerlabHoja(rows) {
+    var cabIdx = -1, colEq = -1, r, c;
+    for (r = 0; r < rows.length && cabIdx === -1; r++) {
+        var fila0 = rows[r] || [];
+        for (c = 0; c < fila0.length; c++) {
+            if (String(fila0[c] === null || fila0[c] === undefined ? '' : fila0[c]).trim().toUpperCase() === 'TEAM AVERAGE') { cabIdx = r; colEq = c; break; }
+        }
+    }
+    if (cabIdx === -1 || colEq < 2) throw new Error('La hoja no tiene el formato de sesion de SoccerLab');
+    var cab = rows[cabIdx];
+    var jugadores = [];
+    for (c = colEq + 1; c < cab.length; c++) {
+        var nom = String(cab[c] === null || cab[c] === undefined ? '' : cab[c]).replace(/\s*\(\d+\)\s*$/, '').trim();
+        if (nom) jugadores.push({ col: c, nombre: nom });
+    }
+    var tot = {}, rel = {};
+    for (r = cabIdx + 1; r < rows.length; r++) {
+        var fila = rows[r] || [];
+        var met = String(fila[colEq - 2] === null || fila[colEq - 2] === undefined ? '' : fila[colEq - 2]).trim().toLowerCase();
+        if (!met) continue;
+        var uni = String(fila[colEq - 1] === null || fila[colEq - 1] === undefined ? '' : fila[colEq - 1]).trim().toLowerCase();
+        var mapa = uni.indexOf('/min') !== -1 ? rel : tot;
+        if (!mapa[met]) mapa[met] = fila;
+    }
+    if (!tot['totaldistance']) throw new Error('La hoja no trae la distancia total');
+
+    var filas = [];
+    jugadores.forEach(function (j) {
+        var g = function (k) { return tot[k] ? cmPfDevNum(tot[k][j.col]) : null; };
+        var td = g('totaldistance');
+        var dur = g('duration');
+        var activo = g('time_active');
+        var sprint = g('sprintdistance');      // > 20,1 km/h (incluye el sprint alto)
+        var hisprint = g('hisprintdistance');  // > 25 km/h
+        var z4 = (sprint !== null && hisprint !== null) ? Math.max(0, sprint - hisprint) : sprint;
+        var inactivo = activo !== null ? activo < 1 : (td === null || td < 50);
+        var minutos = dur || activo;
+        filas.push({
+            dorsal_csv: '',
+            nombre_csv: j.nombre,
+            minutos: minutos,
+            min_sesion: dur, min_activo: activo,
+            duracion_sesion: dur,
+            inactivo: inactivo,
+            total_distance_m: td,
+            hsr_distance_m: sprint,
+            sprint_distance_m: hisprint,
+            sprint_count: null,
+            max_speed_kmh: cmPfDevRed(g('maxspeed'), 2),
+            accel_count: g('total_accelerations'),
+            decel_count: g('total_decelerations'),
+            player_load: null,
+            hr_avg: null, hr_max: null,
+            z1_distance_m: cmPfDevRed(g('walkdistance'), 1),
+            z2_distance_m: cmPfDevRed(g('jogdistance'), 1),
+            z3_distance_m: cmPfDevRed(g('rundistance'), 1),
+            z4_distance_m: cmPfDevRed(z4, 1),
+            z5_distance_m: cmPfDevRed(hisprint, 1),
+            distance_per_min: (td !== null && minutos && !inactivo) ? Math.round(td / minutos * 10) / 10 : null,
+            extra: {
+                active_time_min: cmPfDevRed(activo, 1),
+                session_duration_min: cmPfDevRed(dur, 1)
+            }
+        });
+    });
+    return filas;
+}
+
+// hojas: [{nombre, rows}] -> sesiones del archivo: [{nombre, fecha, titulo, filas}]
+function cmPfDevParsearSoccerlabExcel(hojas, nombreArchivo) {
+    var eventos = [];
+    hojas.forEach(function (h) {
+        var m = String(h.nombre || '').match(/^(\d{4})-(\d{2})-(\d{2})\s*(.*)$/);
+        if (!m) return;                              // "Sum of all events" y otras hojas resumen
+        var filas;
+        try { filas = cmPfDevParsearSoccerlabHoja(h.rows); } catch (e) { return; }
+        if (filas.length) eventos.push({ nombre: h.nombre, fecha: m[1] + '-' + m[2] + '-' + m[3], titulo: (m[4] || '').trim(), filas: filas });
+    });
+    if (!eventos.length) {
+        // Ninguna hoja lleva la fecha en el nombre: se usa la primera que se pueda leer y la fecha del archivo
+        var mf = String(nombreArchivo || '').match(/(\d{4})(\d{2})(\d{2})T\d{6}/);
+        for (var i = 0; i < hojas.length && !eventos.length; i++) {
+            try {
+                var f2 = cmPfDevParsearSoccerlabHoja(hojas[i].rows);
+                if (f2.length) eventos.push({ nombre: hojas[i].nombre, fecha: mf ? mf[1] + '-' + mf[2] + '-' + mf[3] : null, titulo: '', filas: f2 });
+            } catch (e) { /* siguiente hoja */ }
+        }
+    }
+    if (!eventos.length) throw new Error('No se reconoce el Excel. Se admite el Excel de sesion de SoccerLab ("Events progress").');
+    return eventos;
+}
+
+// Lector de Excel (SheetJS): se descarga la primera vez que se sube un .xlsx
+var cmPfDevXlsxProm = null;
+function cmPfDevCargarXlsx() {
+    if (typeof XLSX !== 'undefined') return Promise.resolve();
+    if (cmPfDevXlsxProm) return cmPfDevXlsxProm;
+    cmPfDevXlsxProm = new Promise(function (ok, ko) {
+        var s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+        s.onload = function () { ok(); };
+        s.onerror = function () { cmPfDevXlsxProm = null; ko(new Error('No se ha podido cargar el lector de Excel. Comprueba la conexion y vuelve a intentarlo.')); };
+        document.head.appendChild(s);
+    });
+    return cmPfDevXlsxProm;
 }
 
 // ---------- Parseo: UBIKO ----------
@@ -404,7 +536,7 @@ function cmPfDevParsear(texto, nombreArchivo) {
     if (lineas.length < 2) throw new Error('El CSV no tiene datos');
 
     var formato = cmPfDevDetectar(lineas[0]);
-    if (!formato) throw new Error('Formato no reconocido. Marcas admitidas: dispositivo TopLiderCoach, SoccerLab y UBIKO.');
+    if (!formato) throw new Error('Formato no reconocido. Marcas admitidas: dispositivo TopLiderCoach, SoccerLab (CSV o Excel de sesion) y UBIKO.');
 
     var res, fecha, titulo;
     if (formato === 'soccerlab') {
@@ -557,8 +689,8 @@ function cmPfDevAbrir() {
             '<h3>Importar sesion del dispositivo GPS</h3>' +
             '<button style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer" onclick="cmPfDevCerrar()">x</button>' +
         '</div>' +
-        '<p style="color:#94a3b8;font-size:13px;margin:6px 0 14px">Sube el CSV que exporta la plataforma de tu GPS (todos los jugadores de la sesion en un archivo). La marca se reconoce sola: dispositivo TopLiderCoach, SoccerLab y UBIKO (porteros).</p>' +
-        '<input type="file" id="cmpfdev-file" accept=".csv" style="color:#e2e8f0;font-size:13px" onchange="cmPfDevLeerArchivo(this)">' +
+        '<p style="color:#94a3b8;font-size:13px;margin:6px 0 14px">Sube el archivo que exporta la plataforma de tu GPS (todos los jugadores de la sesion en un archivo). La marca se reconoce sola: dispositivo TopLiderCoach, SoccerLab (CSV o el Excel de sesion "Events progress") y UBIKO (porteros).</p>' +
+        '<input type="file" id="cmpfdev-file" accept=".csv,.xlsx" style="color:#e2e8f0;font-size:13px" onchange="cmPfDevLeerArchivo(this)">' +
         '<div id="cmpfdev-contenido" style="margin-top:16px"></div>' +
     '</div>';
     document.body.appendChild(ov);
@@ -572,6 +704,11 @@ function cmPfDevCerrar() {
     cmPfDev.asignacion = {};
     cmPfDev.metodo = {};
     cmPfDev.sesionesDia = [];
+    cmPfDev.archivo = '';
+    cmPfDev.eventos = [];
+    cmPfDev.eventoIdx = 0;
+    cmPfDev.avisos = [];
+    cmPfDev.duplicado = null;
 }
 
 // ---------- Leer y parsear el archivo ----------
@@ -579,9 +716,31 @@ function cmPfDevLeerArchivo(input) {
     var file = input.files && input.files[0];
     if (!file) return;
 
+    var esExcel = /\.xlsx$/i.test(file.name);
+    var fallo = function (err) { showToast((err && err.message) ? err.message : 'Error leyendo el archivo', 'error'); };
     var reader = new FileReader();
     reader.onload = function (e) {
         try {
+            cmPfDev.archivo = file.name;
+            cmPfDev.eventos = [];
+            cmPfDev.eventoIdx = 0;
+            if (esExcel) {
+                var cont = document.getElementById('cmpfdev-contenido');
+                if (cont) cont.innerHTML = '<p style="color:#94a3b8;font-size:13px">Leyendo el Excel...</p>';
+                cmPfDevCargarXlsx().then(function () {
+                    var wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+                    var hojas = wb.SheetNames.map(function (n) {
+                        return { nombre: n, rows: XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, defval: null }) };
+                    });
+                    cmPfDev.eventos = cmPfDevParsearSoccerlabExcel(hojas, file.name);
+                    cmPfDevUsarEvento(0);
+                }).catch(function (err) {
+                    var c2 = document.getElementById('cmpfdev-contenido');
+                    if (c2) c2.innerHTML = '';
+                    fallo(err);
+                });
+                return;
+            }
             var texto = cmPfDevDecodificar(e.target.result);
             var res = cmPfDevParsear(texto, file.name);
             cmPfDev.formato = res.formato;
@@ -589,11 +748,129 @@ function cmPfDevLeerArchivo(input) {
             cmPfDev.fechaCsv = res.fecha;
             cmPfDev.tituloCsv = res.titulo || '';
             cmPfDevCargarJugadoresYRender();
-        } catch (err) {
-            showToast((err && err.message) ? err.message : 'Error leyendo CSV', 'error');
-        }
+        } catch (err) { fallo(err); }
     };
     reader.readAsArrayBuffer(file);
+}
+
+// Sesion elegida dentro de un Excel de SoccerLab (una hoja por sesion)
+function cmPfDevUsarEvento(i) {
+    var ev = cmPfDev.eventos[i];
+    if (!ev) return;
+    cmPfDev.eventoIdx = i;
+    cmPfDev.formato = 'soccerlab_xlsx';
+    cmPfDev.filas = ev.filas;
+    cmPfDev.fechaCsv = ev.fecha;
+    cmPfDev.tituloCsv = ev.titulo || '';
+    cmPfDevCargarJugadoresYRender();
+}
+
+// ---------- Minutos: editables en la vista previa ----------
+function cmPfDevEsSoccerlab() { return cmPfDev.formato === 'soccerlab' || cmPfDev.formato === 'soccerlab_xlsx'; }
+
+function cmPfDevRecalc(f) {
+    f.distance_per_min = (f.total_distance_m !== null && f.minutos && !f.inactivo) ? Math.round(f.total_distance_m / f.minutos * 10) / 10 : null;
+}
+
+function cmPfDevPintarMin(i) {
+    var f = cmPfDev.filas[i];
+    var inp = document.getElementById('cmpfdev-min-' + i);
+    if (inp && document.activeElement !== inp) inp.value = (f.minutos !== null && f.minutos !== undefined) ? Math.round(f.minutos) : '';
+    var c = document.getElementById('cmpfdev-mm-' + i);
+    if (c) c.textContent = (f.distance_per_min !== null && f.distance_per_min !== undefined) ? f.distance_per_min : '-';
+}
+
+function cmPfDevMin(i, valor) {
+    var f = cmPfDev.filas[i];
+    if (!f) return;
+    var n = cmPfDevNum(valor);
+    f.minutos = (n !== null && n > 0) ? n : null;
+    f.min_editado = true;
+    cmPfDevRecalc(f);
+    cmPfDevPintarMin(i);
+}
+
+// SoccerLab no exporta los minutos jugados: en entrenos se usa la duracion de la sesion y en partidos
+// se propone el tiempo en movimiento, que hay que corregir con los minutos reales de cada jugador.
+function cmPfDevTipoCambiado() {
+    var tipo = (document.getElementById('cmpfdev-tipo') || {}).value || 'training';
+    var nota = document.getElementById('cmpfdev-aviso-partido');
+    if (nota) nota.style.display = (tipo === 'match' && cmPfDevEsSoccerlab()) ? 'block' : 'none';
+    if (!cmPfDevEsSoccerlab()) return;
+    cmPfDev.filas.forEach(function (f, i) {
+        if (f.min_editado) return;
+        var m = tipo === 'match' ? (f.min_activo || f.min_sesion) : (f.min_sesion || f.min_activo);
+        f.minutos = m || null;
+        cmPfDevRecalc(f);
+        cmPfDevPintarMin(i);
+    });
+}
+
+// ---------- Avisos del archivo ----------
+function cmPfDevAvisosArchivo() {
+    var av = [];
+    var act = cmPfDev.filas.filter(function (f) { return !f.inactivo; });
+    var rapidos = act.filter(function (f) { return f.max_speed_kmh !== null && f.max_speed_kmh > 40; }).length;
+    if (rapidos) av.push(rapidos + (rapidos === 1 ? ' jugador con' : ' jugadores con') + ' velocidad maxima por encima de 40 km/h. No es un dato real: el archivo puede traer varias sesiones mezcladas o un fallo del GPS.');
+    var durs = act.map(function (f) { return f.duracion_sesion; }).filter(function (d) { return d; });
+    if (durs.length) {
+        var mx = Math.max.apply(null, durs), mn = Math.min.apply(null, durs);
+        if (mx > 150) av.push('La sesion dura ' + Math.round(mx) + ' minutos. Comprueba que el archivo es de una sola sesion y no de varias sumadas.');
+        else if (mn > 0 && mx > mn * 1.8) av.push('Los jugadores tienen duraciones muy distintas (de ' + Math.round(mn) + ' a ' + Math.round(mx) + ' minutos). Comprueba que el archivo es de una sola sesion.');
+    }
+    return av;
+}
+
+function cmPfDevPintarAvisos() {
+    var av = cmPfDevAvisosArchivo();
+    var d = cmPfDev.duplicado;
+    if (d) {
+        var fd = typeof cmPfFormatFecha === 'function' ? cmPfFormatFecha(d.session_date) : d.session_date;
+        av.push('Estos mismos datos ya estan importados en la sesion del ' + fd + ' (' + String(d.title || (d.opponent ? 'vs ' + d.opponent : 'sin titulo')).replace(/</g, '&lt;') + '). Si es el mismo archivo, no lo importes otra vez.');
+    }
+    cmPfDev.avisos = av;
+    var caja = document.getElementById('cmpfdev-avisos');
+    if (!caja) return;
+    caja.innerHTML = av.length
+        ? '<div style="background:#450a0a;border:1px solid #b91c1c;color:#fecaca;border-radius:8px;padding:10px 12px;font-size:12px;margin-bottom:12px"><b>Revisa este archivo antes de importar</b><ul style="margin:6px 0 0 18px;padding:0">' +
+            av.map(function (a) { return '<li style="margin-bottom:3px">' + a + '</li>'; }).join('') + '</ul></div>'
+        : '';
+}
+
+// Sesion del club que ya tiene estos mismos datos (misma distancia en los mismos jugadores)
+function cmPfDevSesionRepetida(pares, datos) {
+    var cuenta = {};
+    (datos || []).forEach(function (d) {
+        var td = Math.round(parseFloat(d.total_distance_m));
+        if (pares.some(function (p) { return p.pid === d.player_id && p.td === td; })) cuenta[d.session_id] = (cuenta[d.session_id] || 0) + 1;
+    });
+    var minimo = Math.max(3, Math.ceil(pares.length * 0.6));
+    var mejor = null;
+    Object.keys(cuenta).forEach(function (sid) {
+        if (cuenta[sid] >= minimo && (mejor === null || cuenta[sid] > cuenta[mejor])) mejor = sid;
+    });
+    return mejor;
+}
+
+async function cmPfDevBuscarDuplicado() {
+    cmPfDev.duplicado = null;
+    try {
+        var pares = [];
+        cmPfDev.filas.forEach(function (f, i) {
+            var p = cmPfDev.asignacion[i];
+            if (p && f.total_distance_m !== null && f.total_distance_m > 100) pares.push({ pid: p, td: Math.round(f.total_distance_m) });
+        });
+        if (pares.length < 3) return;
+        var r = await supabaseClient.from('cm_pf_gps_player_data').select('session_id, player_id, total_distance_m')
+            .eq('club_id', clubId).eq('segment_name', 'TOTAL').eq('archived', false)
+            .in('player_id', pares.map(function (p) { return p.pid; }))
+            .in('total_distance_m', pares.map(function (p) { return p.td; }));
+        var sid = cmPfDevSesionRepetida(pares, r.data);
+        if (!sid) return;
+        var s = await supabaseClient.from('cm_pf_gps_sessions').select('id, session_date, title, opponent, archived').eq('id', sid).maybeSingle();
+        if (s.data && !s.data.archived) cmPfDev.duplicado = s.data;
+    } catch (e) { /* sin comprobacion de duplicados: el importador funciona igual */ }
+    cmPfDevPintarAvisos();
 }
 
 // ---------- Emparejar jugadores y renderizar vista previa ----------
@@ -617,8 +894,10 @@ async function cmPfDevCargarJugadoresYRender() {
         var em = cmPfDevEmparejar(cmPfDev.filas, cmPfDev.jugadores, cmPfDevAlias());
         cmPfDev.asignacion = em.asignacion;
         cmPfDev.metodo = em.metodo;
+        cmPfDev.duplicado = null;
 
         cmPfDevRenderPreview();
+        cmPfDevBuscarDuplicado();
     } catch (e) {
         if (cont) cont.innerHTML = '<p style="color:#fca5a5;font-size:13px">Error: ' + (e.message || e) + '</p>';
     }
@@ -649,8 +928,18 @@ function cmPfDevRenderPreview() {
     var h = '<div class="cmpfdev-marca">Formato detectado: ' + fmt.etiqueta + ' &middot; ' + cmPfDev.filas.length + ' jugadores' +
         (nInactivos ? ' (' + nInactivos + ' sin actividad)' : '') + '</div>';
 
+    // Excel con varias sesiones: se importa una cada vez
+    if (cmPfDev.formato === 'soccerlab_xlsx' && cmPfDev.eventos.length > 1) {
+        h += '<div class="cmpf-form-group" style="max-width:420px"><label>Sesion del archivo (' + cmPfDev.eventos.length + ')</label><select onchange="cmPfDevUsarEvento(parseInt(this.value))">';
+        cmPfDev.eventos.forEach(function (ev, i) {
+            h += '<option value="' + i + '"' + (i === cmPfDev.eventoIdx ? ' selected' : '') + '>' + String(ev.nombre).replace(/</g, '&lt;') + '</option>';
+        });
+        h += '</select><div style="color:#64748b;font-size:11px;margin-top:4px">El archivo trae varias sesiones. Importa una, y vuelve a subirlo para la siguiente.</div></div>';
+    }
+    h += '<div id="cmpfdev-avisos"></div>';
+
     h += '<div class="cmpf-form-row-4" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">' +
-        '<div class="cmpf-form-group"><label>Tipo</label><select id="cmpfdev-tipo"><option value="training">Entreno</option><option value="match">Partido</option></select></div>' +
+        '<div class="cmpf-form-group"><label>Tipo</label><select id="cmpfdev-tipo" onchange="cmPfDevTipoCambiado()"><option value="training">Entreno</option><option value="match">Partido</option></select></div>' +
         '<div class="cmpf-form-group"><label>Fecha</label><input type="date" id="cmpfdev-fecha" value="' + (cmPfDev.fechaCsv || '') + '"></div>' +
         '<div class="cmpf-form-group"><label>Titulo</label><input type="text" id="cmpfdev-titulo" value="' + cmPfDev.tituloCsv.replace(/"/g, '&quot;') + '"></div>' +
         '<div class="cmpf-form-group"><label>Rival</label><input type="text" id="cmpfdev-rival"></div>' +
@@ -663,9 +952,11 @@ function cmPfDevRenderPreview() {
             '<div style="color:#64748b;font-size:11px;margin-top:4px">Si eliges una sesion existente, los porteros se suman a ella y el titulo, tipo y rival de arriba no se usan.</div></div>';
     }
 
+    h += '<div id="cmpfdev-aviso-partido" style="display:none;background:#451a03;border:1px solid #b45309;color:#fcd34d;border-radius:8px;padding:10px 12px;font-size:12px;margin:4px 0 8px"><b>Partido:</b> SoccerLab no exporta los minutos jugados. La columna Min propone el tiempo en movimiento, que se queda corto. Escribe los minutos reales de cada jugador (los del acta) antes de importar: con ellos se calculan los m/min y el perfil de partido a 90\'.</div>';
+
     // Tabla de jugadores
     h += '<table class="cmpfdev-tabla"><thead><tr>' +
-        '<th>CSV</th><th>Jugador del club</th><th>Min</th><th>Dist</th><th>m/min</th><th>Vmax</th><th>Calidad</th>' +
+        '<th>Archivo</th><th>Jugador del club</th><th>Min</th><th>Dist</th><th>m/min</th><th>Vmax</th><th>Calidad</th>' +
         '</tr></thead><tbody>';
 
     cmPfDev.filas.forEach(function (f, i) {
@@ -689,9 +980,9 @@ function cmPfDevRenderPreview() {
         h += '<tr' + (f.inactivo ? ' style="opacity:.55"' : '') + '>' +
             '<td>' + (f.dorsal_csv ? f.dorsal_csv + ' - ' : '') + f.nombre_csv + '</td>' +
             '<td><select onchange="cmPfDevAsignar(' + i + ',this.value)">' + opts + '</select></td>' +
-            '<td>' + (f.minutos !== null ? Math.round(f.minutos) + "'" : '-') + '</td>' +
+            '<td><input type="number" min="0" step="1" id="cmpfdev-min-' + i + '" value="' + (f.minutos !== null && f.minutos !== undefined ? Math.round(f.minutos) : '') + '" onchange="cmPfDevMin(' + i + ',this.value)" title="Minutos del jugador en la sesion. Puedes corregirlos." style="width:58px;background:#1e293b;border:1px solid #334155;color:#e2e8f0;padding:4px 6px;border-radius:5px;font-size:12px"></td>' +
             '<td>' + (f.total_distance_m !== null ? Math.round(f.total_distance_m) + ' m' : '-') + '</td>' +
-            '<td>' + (f.distance_per_min !== null ? f.distance_per_min : '-') + '</td>' +
+            '<td id="cmpfdev-mm-' + i + '">' + (f.distance_per_min !== null && f.distance_per_min !== undefined ? f.distance_per_min : '-') + '</td>' +
             '<td>' + (f.max_speed_kmh !== null ? f.max_speed_kmh : '-') + '</td>' +
             '<td>' + calidad + '</td>' +
         '</tr>';
@@ -706,6 +997,8 @@ function cmPfDevRenderPreview() {
     '</div>';
 
     cont.innerHTML = h;
+    cmPfDevPintarAvisos();
+    cmPfDevTipoCambiado();
 
     if (cmPfDev.formato === 'ubiko') {
         var fe = document.getElementById('cmpfdev-fecha');
@@ -746,7 +1039,8 @@ function cmPfDevFilaBD(f, pid, sid) {
     var ent = function (v) { return (v !== null && v !== undefined) ? Math.round(v) : null; };
     var extra = { distance_per_min: f.distance_per_min };
     Object.keys(f.extra || {}).forEach(function (k) { extra[k] = f.extra[k]; });
-    if (cmPfDev.formato && cmPfDev.formato !== 'dispositivo') extra.gps_brand = cmPfDev.formato;
+    var marca = (CMPF_DEV_FORMATOS[cmPfDev.formato] || {}).marca || cmPfDev.formato;
+    if (marca && marca !== 'dispositivo') extra.gps_brand = marca;
     return {
         club_id: clubId, session_id: sid, player_id: pid, segment_name: 'TOTAL', archived: false, archived_at: null,
         total_distance_m: ent(f.total_distance_m),
@@ -810,7 +1104,18 @@ async function cmPfDevGuardar() {
         if (visto[p]) repetido = f.nombre_csv;
         visto[p] = true;
     });
-    if (repetido) { showToast('Hay un jugador del club asignado a dos filas del CSV (' + repetido + ')', 'error'); return; }
+    if (repetido) { showToast('Hay un jugador del club asignado a dos filas del archivo (' + repetido + ')', 'error'); return; }
+
+    // Avisos del archivo: hay que confirmarlos
+    if (cmPfDev.avisos && cmPfDev.avisos.length) {
+        var txtAv = cmPfDev.avisos.map(function (a) { return '- ' + a.replace(/&lt;/g, '<'); }).join('\n\n');
+        if (!confirm('Este archivo tiene avisos:\n\n' + txtAv + '\n\n¿Importarlo de todas formas?')) return;
+    }
+    // Partido de SoccerLab sin tocar los minutos: se avisa, porque el perfil de partido depende de ellos
+    if (tipo === 'match' && cmPfDevEsSoccerlab()) {
+        var tocados = cmPfDev.filas.some(function (f, i) { return cmPfDev.asignacion[i] && f.min_editado; });
+        if (!tocados && !confirm('No has cambiado los minutos de ningun jugador.\n\nSoccerLab no exporta los minutos jugados: lo que hay ahora es el tiempo en movimiento, que se queda corto.\n\n¿Importar el partido asi?')) return;
+    }
 
     var btn = document.getElementById('cmpfdev-btn-guardar');
     if (btn) { btn.disabled = true; btn.textContent = 'Importando...'; }
@@ -840,7 +1145,8 @@ async function cmPfDevGuardar() {
             var ins = await supabaseClient.from('cm_pf_gps_sessions').insert({
                 club_id: clubId, session_date: fecha, session_type: tipo,
                 title: titulo || null, opponent: rival || null, team_id: tid,
-                duration_min: durMax ? Math.round(durMax) : null, source: fmt.source
+                duration_min: durMax ? Math.round(durMax) : null, source: fmt.source,
+                import_file_name: cmPfDev.archivo || null
             }).select('id').single();
             if (ins.error) throw ins.error;
             sid = ins.data.id;
@@ -882,4 +1188,4 @@ async function cmPfDevGuardar() {
     }
 }
 
-console.log('[PrepFisica] cm-prepfisica-gps.js v3 cargado (importador CSV multimarca: dispositivo + SoccerLab + UBIKO)');
+console.log('[PrepFisica] cm-prepfisica-gps.js v4 cargado (importador multimarca: dispositivo + SoccerLab CSV/Excel + UBIKO, minutos editables y avisos)');

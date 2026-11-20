@@ -15,6 +15,8 @@
 //   mismos campos que da la plataforma de UBIKO, se muestran en una tabla aparte y no entran en las
 //   medias ni en los colores de los jugadores de campo. La ventana de sesion de la ficha del jugador
 //   (pestana GPS) usa las etiquetas de su marca y ensena lo que esa marca trae de mas.
+// - v7: SoccerLab: "Min" es la duracion de la sesion (antes, tiempo activo) y el numero de sprints se
+//   oculta si el archivo no lo trae (el Excel de sesion de SoccerLab no lo incluye).
 // No modifica cm-prepfisica.js. Cargar DESPUES de cm-prepfisica.js.
 
 var cmPfSes2 = {
@@ -413,7 +415,7 @@ var CMPFSES2_COLS_SOCCERLAB = [
     { k: 'acc',    lbl: 'ACC>2',     dec: 0 },
     { k: 'dec',    lbl: 'DEC>2',     dec: 0 },
     { k: 'hsr',    lbl: 'HSR>20,1',  dec: 0 },
-    { k: 'nspr',   lbl: 'N.Spr',     dec: 0 },
+    { k: 'nspr',   lbl: 'N.Spr',     dec: 0, opc: true },
     { k: 'pl',     lbl: 'P.Load',    dec: 1, opc: true },
     { k: 'fcmed',  lbl: 'FC med',    dec: 0, opc: true },
     { k: 'fcmax',  lbl: 'FC max',    dec: 0, opc: true },
@@ -908,7 +910,7 @@ function cmPfSes2HtmlTabla(filas, stats) {
 
     return '<div style="overflow-x:auto"><table class="cmpfses2-tabla"><thead>' + thead + '</thead><tbody>' + tbody + resumen + filasPos + '</tbody></table></div>' +
         (!conIE ? '<div class="cmpfses2-leyenda">Vista de ejercicio: datos solo de esta tarea. Verde/rojo: por encima/debajo de la media del grupo (&plusmn;0,75 desv.tip.) &middot; HSR&gt;19 / &gt;21 / &gt;24: metros por encima de esa velocidad (km/h) &middot; ACC y DEC: numero de acciones por encima de 2,5 / 3 / 4 m/s&sup2; &middot; El RPE no se muestra aqui porque es de la sesion completa &middot; ' + filas.length + ' jugadores</div>' :
-        '<div class="cmpfses2-leyenda">' + (cmPfSes2Marca(filas) === 'soccerlab' ? 'GPS SoccerLab &middot; HI&gt;25: metros a mas de 25 km/h (alta intensidad) &middot; HSR&gt;20,1: metros a mas de 20,1 km/h &middot; ACC&gt;2 / DEC&gt;2: numero total de aceleraciones y deceleraciones por encima de 2 m/s&sup2; &middot; Min: tiempo activo &middot; P.Load: Player Load 3D &middot; TRIMP: carga interna por pulso &middot; ' : '') + 'Verde/rojo: por encima/debajo de la media del grupo (&plusmn;0,75 desv.tip.) &middot; %VmaxInd: velocidad del dia respecto a la maxima historica del jugador en sesiones anteriores (amarillo &ge;95%; "-" si aun no hay historial previo) &middot; Clic en una cabecera para ordenar &middot; sRPE = RPE &times; min (Foster) &middot; UA/km = coste percibido por km recorrido:  alto = corri&oacute; poco para lo que le cost&oacute; &middot; I/E: &#9888; posible fatiga, &#9889; va sobrado, &#10003; concuerdan (contra la media del propio jugador en 28 d&iacute;as; atenuado = provisional, comparado con el grupo)' + notaHist + ' &middot; ' + filas.length + ' jugadores en segmento ' + cmPfSes2.segmento + '</div>');
+        '<div class="cmpfses2-leyenda">' + (cmPfSes2Marca(filas) === 'soccerlab' ? 'GPS SoccerLab &middot; HI&gt;25: metros a mas de 25 km/h (alta intensidad) &middot; HSR&gt;20,1: metros a mas de 20,1 km/h &middot; ACC&gt;2 / DEC&gt;2: numero total de aceleraciones y deceleraciones por encima de 2 m/s&sup2; &middot; Min: duracion de la sesion (en partidos, minutos jugados) &middot; P.Load: Player Load 3D &middot; TRIMP: carga interna por pulso &middot; ' : '') + 'Verde/rojo: por encima/debajo de la media del grupo (&plusmn;0,75 desv.tip.) &middot; %VmaxInd: velocidad del dia respecto a la maxima historica del jugador en sesiones anteriores (amarillo &ge;95%; "-" si aun no hay historial previo) &middot; Clic en una cabecera para ordenar &middot; sRPE = RPE &times; min (Foster) &middot; UA/km = coste percibido por km recorrido:  alto = corri&oacute; poco para lo que le cost&oacute; &middot; I/E: &#9888; posible fatiga, &#9889; va sobrado, &#10003; concuerdan (contra la media del propio jugador en 28 d&iacute;as; atenuado = provisional, comparado con el grupo)' + notaHist + ' &middot; ' + filas.length + ' jugadores en segmento ' + cmPfSes2.segmento + '</div>');
 }
 
 // ---------- Porteros con GPS UBIKO: tabla aparte ----------
@@ -1567,4 +1569,4 @@ function cmPfSes2ExportPdf() {
     if (typeof showToast === 'function') showToast('PDF descargado');
 }
 
-console.log('[PrepFisica] cm-prepfisica-sesion.js v6 cargado (tabla + graficas + historico + PDF/CSV + marcas de GPS + porteros)');
+console.log('[PrepFisica] cm-prepfisica-sesion.js v7 cargado (tabla + graficas + historico + PDF/CSV + marcas de GPS + porteros)');
