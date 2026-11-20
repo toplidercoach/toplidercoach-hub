@@ -39,7 +39,11 @@ function asisFiltrarCelebradas(sesiones) {
         .wreg-extremos { display:flex; justify-content:space-between; font-size:10px; color:#9ca3af; margin-top:2px; }
         .wreg-grupo { background:#f9fafb; border-radius:8px; padding:10px 12px; margin-bottom:10px; }
         .wreg-grupo label { font-size:12px; color:#374151; display:block; margin-bottom:5px; }
-        .wreg-grupo select { width:100%; padding:6px 8px; border:1px solid #d1d5db; border-radius:6px; }
+        .wreg-chips { display:flex; flex-wrap:wrap; gap:6px; }
+        .wreg-chip { padding:5px 11px; font-size:12px; font-family:inherit; background:#fff; border:1px solid #d1d5db; border-radius:999px; color:#374151; cursor:pointer; }
+        .wreg-chip:hover { border-color:#9ca3af; }
+        .wreg-chip.on { background:#1e293b; border-color:#1e293b; color:#fff; font-weight:600; }
+        .wreg-grupo .w-grupo-otro { width:100%; margin-top:8px; padding:6px 8px; border:1px solid #d1d5db; border-radius:6px; font-size:13px; }
         .wreg-indices { display:flex; gap:20px; border-top:1px solid #e5e7eb; padding-top:10px; font-size:13px; color:#6b7280; }
         .wreg-indices strong { font-size:15px; }
     `;
@@ -400,10 +404,14 @@ async function abrirModalAsistenciaSesion(sesionId, esPartido) {
             const grupoMuscular = asist.grupo_muscular || '';
             const mostrarGrupo = (muscular !== '' && Number(muscular) >= 4);
 
-            let opcionesGrupo = '<option value="">Grupo afectado...</option>';
+            // Zonas afectadas: se guardan como texto ("Isquiotibiales, Aductor, Otro: abdominal")
+            const gSel = wGrupoLeer(grupoMuscular, GRUPOS);
+            let chipsGrupo = '';
             GRUPOS.forEach(g => {
-                opcionesGrupo += `<option value="${g}" ${grupoMuscular === g ? 'selected' : ''}>${g}</option>`;
+                const on = gSel.marcados.indexOf(g) >= 0;
+                chipsGrupo += `<button type="button" class="wreg-chip${on ? ' on' : ''}" data-g="${g}" aria-pressed="${on}" onclick="wGrupoChip(this)">${g}</button>`;
             });
+            const otroOn = gSel.marcados.indexOf('Otro') >= 0;
 
             html += `
                 <div class="wreg-card" data-player-id="${j.player_id}" data-sin-datos="${(asist.sueno != null || asist.rpe != null) ? '0' : '1'}" data-reg-por="${asist.registrado_por || ''}" data-reg-en="${asist.registrado_en || ''}" data-rpe-en="${asist.rpe_registrado_en || ''}">
@@ -456,8 +464,10 @@ async function abrirModalAsistenciaSesion(sesionId, esPartido) {
                         </div>
                     </div>
                     <div class="wreg-grupo" style="display:${mostrarGrupo ? 'block' : 'none'};">
-                        <label>🩹 ¿Qué grupo muscular?</label>
-                        <select class="w-grupo">${opcionesGrupo}</select>
+                        <label>¿Qué zonas? Se pueden marcar varias</label>
+                        <div class="wreg-chips">${chipsGrupo}</div>
+                        <input type="text" class="w-grupo-otro" maxlength="40" placeholder="¿Cuál? Ej: abdominal, hombro..." value="${wGrupoEsc(gSel.otro)}" style="display:${otroOn ? 'block' : 'none'};" oninput="wGrupoSync(this)">
+                        <input type="hidden" class="w-grupo" value="${wGrupoEsc(wGrupoTexto(gSel.marcados, gSel.otro, GRUPOS))}">
                     </div>
                     <div class="wreg-indices">
                         <span>Bienestar: <strong class="w-ib">-</strong></span>
@@ -698,7 +708,7 @@ function wListaRender() {
         const asistTxt = f.asistio ? '<span style="color:#10b981;font-weight:700">✓</span>'
             : '<span style="color:#dc2626;font-weight:700">✗</span>' + (f.motivo ? '<div style="font-size:10px;color:#9ca3af">' + f.motivo + '</div>' : '');
         const badge = f.sinDatos ? ' <span style="background:#f3f4f6;color:#9ca3af;border-radius:999px;padding:1px 8px;font-size:10px;font-weight:700">Sin datos</span>' : '';
-        const grupoTxt = (f.muscular != null && f.muscular >= 4 && f.grupo) ? '<div style="font-size:10px;color:#ea580c;font-weight:600">' + f.grupo + '</div>' : '';
+        const grupoTxt = (f.muscular != null && f.muscular >= 4 && f.grupo) ? '<div style="font-size:10px;color:#ea580c;font-weight:600">' + wGrupoEsc(f.grupo) + '</div>' : '';
         const rpeHoraTxt = (f.rpe != null && f.rpeEnvio != null) ? '<div style="font-size:10px;color:#7c3aed;font-weight:600">' + horaEnvio(f.rpeEnvio) + '</div>' : '';
         return '<tr onclick="wListaIrAFicha(\'' + f.id + '\')" style="border-top:1px solid #f3f4f6;cursor:pointer;' + (gris ? 'opacity:0.55;background:#fafafa' : '') + '">' +
             '<td style="padding:7px 6px;text-align:center">' + asistTxt + '</td>' +
@@ -794,6 +804,53 @@ function wActualizar(input, campo) {
     const span = card.querySelector(`.wreg-val[data-for="${campo}"]`);
     if (span) span.textContent = input.value;
     wCalcularIndices(card);
+}
+
+// ---- Zonas afectadas (varias a la vez; "Otro" admite texto) ----
+function wGrupoEsc(t) {
+    return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+// Texto guardado -> { marcados: [...], otro: 'texto libre' }
+function wGrupoLeer(texto, grupos) {
+    const r = { marcados: [], otro: '' };
+    String(texto || '').split(',').map(x => x.trim()).filter(Boolean).forEach(p => {
+        if (p !== 'Otro' && grupos.indexOf(p) >= 0) { if (r.marcados.indexOf(p) < 0) r.marcados.push(p); return; }
+        if (r.marcados.indexOf('Otro') < 0) r.marcados.push('Otro');
+        const libre = (p === 'Otro') ? '' : p.replace(/^Otro\s*:\s*/i, '');
+        if (libre) r.otro = r.otro ? (r.otro + ' ' + libre) : libre;
+    });
+    return r;
+}
+// { marcados, otro } -> texto a guardar, en el orden de la lista
+function wGrupoTexto(marcados, otro, grupos) {
+    const partes = [];
+    grupos.forEach(g => {
+        if (marcados.indexOf(g) < 0) return;
+        if (g !== 'Otro') { partes.push(g); return; }
+        const libre = String(otro || '').replace(/[,;]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 40);
+        partes.push(libre ? ('Otro: ' + libre) : 'Otro');
+    });
+    return partes.join(', ');
+}
+// Recalcula el valor oculto (.w-grupo) de una ficha a partir de sus chips
+function wGrupoSync(el) {
+    const caja = el.closest('.wreg-grupo');
+    if (!caja) return;
+    const chips = Array.prototype.slice.call(caja.querySelectorAll('.wreg-chip'));
+    const grupos = chips.map(c => c.dataset.g);
+    const marcados = chips.filter(c => c.classList.contains('on')).map(c => c.dataset.g);
+    caja.querySelector('.w-grupo').value = wGrupoTexto(marcados, caja.querySelector('.w-grupo-otro').value, grupos);
+}
+function wGrupoChip(btn) {
+    const on = !btn.classList.contains('on');
+    btn.classList.toggle('on', on);
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    if (btn.dataset.g === 'Otro') {
+        const t = btn.closest('.wreg-grupo').querySelector('.w-grupo-otro');
+        t.style.display = on ? 'block' : 'none';
+        if (on) t.focus();
+    }
+    wGrupoSync(btn);
 }
 
 function wActualizarMuscular(input) {
@@ -1285,4 +1342,4 @@ function wActualizarRpe(input) {
     const card = input.closest('.wreg-card');
     const span = card.querySelector('.wreg-val[data-for="rpe"]');
     if (span) span.textContent = input.value;
-}
+}

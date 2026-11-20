@@ -30,7 +30,11 @@
   .num-field { width:100%; padding:12px; font-size:16px; background:#0f172a; border:1px solid #475569; border-radius:10px; color:#fff; }
   .grupo-box { background:#0f172a; border-radius:12px; padding:14px; margin-bottom:22px; display:none; }
   .grupo-box label { display:block; font-size:14px; color:#cbd5e1; margin-bottom:8px; }
-  .grupo-box select { width:100%; padding:12px; font-size:16px; background:#1e293b; border:1px solid #475569; border-radius:10px; color:#fff; }
+  .grupo-box .chips { display:flex; flex-wrap:wrap; gap:8px; }
+  .grupo-box .chip { padding:10px 14px; font-size:15px; background:#1e293b; border:1px solid #475569; border-radius:999px; color:#cbd5e1; cursor:pointer; font-family:inherit; }
+  .grupo-box .chip.on { background:#f59e0b; border-color:#f59e0b; color:#0f172a; font-weight:700; }
+  .grupo-box .otro-txt { display:none; width:100%; margin-top:10px; padding:12px; font-size:16px; background:#1e293b; border:1px solid #475569; border-radius:10px; color:#fff; }
+  .grupo-box .ayuda { font-size:12px; color:#64748b; margin-top:8px; }
   .guia-btn { background:transparent; border:1px solid #475569; color:#94a3b8; border-radius:8px; padding:6px 12px; font-size:13px; cursor:pointer; }
   .btn-enviar { width:100%; padding:16px; font-size:17px; font-weight:700; background:#10b981; color:#fff; border:none; border-radius:12px; cursor:pointer; margin-top:8px; }
   .btn-enviar:disabled { background:#475569; cursor:not-allowed; }
@@ -180,8 +184,8 @@ function formatoHora(d) {
 
 function mostrarFormulario(jugador, sesion) {
     const horaTxt = sesion.session_time ? ' · ' + sesion.session_time.slice(0,5) + 'h' : '';
-    let opcionesGrupo = '<option value="">Selecciona el grupo...</option>';
-    GRUPOS.forEach(g => { opcionesGrupo += `<option value="${g}">${g}</option>`; });
+    let chipsGrupo = '';
+    GRUPOS.forEach(g => { chipsGrupo += `<button type="button" class="chip" data-g="${g}" aria-pressed="false" onclick="marcarGrupo(this)">${g}</button>`; });
 
     pintar(`
         <div class="card">
@@ -210,8 +214,9 @@ function mostrarFormulario(jugador, sesion) {
                 <div class="extremos"><span>0 · Sin daño</span><span>Lesión · 10</span></div>
             </div>
             <div class="grupo-box" id="grupo-box">
-                <label>🩹 ¿Qué grupo muscular?</label>
-                <select id="s-grupo">${opcionesGrupo}</select>
+                <label>🩹 ¿Qué zonas? Puedes marcar varias</label>
+                <div class="chips" id="chips-grupo">${chipsGrupo}</div>
+                <input type="text" class="otro-txt" id="t-otro" maxlength="40" placeholder="¿Cuál? Ej: abdominal, hombro..." autocomplete="off">
             </div>
             <div class="item">
                 <div class="item-label">⏱️ Horas de sueño</div>
@@ -240,6 +245,30 @@ function cambioMusc(val) {
     document.getElementById('grupo-box').style.display = (Number(val) >= 4) ? 'block' : 'none';
 }
 
+// Zonas con molestia: se pueden marcar varias. "Otro" abre un campo para escribir cual.
+function marcarGrupo(btn) {
+    const on = !btn.classList.contains('on');
+    btn.classList.toggle('on', on);
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    if (btn.dataset.g === 'Otro') {
+        const t = document.getElementById('t-otro');
+        t.style.display = on ? 'block' : 'none';
+        if (on) t.focus();
+    }
+}
+// Devuelve { texto, falta }: texto = 'Isquiotibiales, Aductor, Otro: abdominal' (lo que se guarda)
+function gruposElegidos() {
+    const partes = [];
+    let falta = '';
+    document.querySelectorAll('#chips-grupo .chip.on').forEach(b => {
+        if (b.dataset.g !== 'Otro') { partes.push(b.dataset.g); return; }
+        const cual = document.getElementById('t-otro').value.replace(/[,;]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 40);
+        if (!cual) falta = 'otro'; else partes.push('Otro: ' + cual);
+    });
+    if (!falta && !partes.length) falta = 'ninguno';
+    return { texto: partes.join(', '), falta: falta };
+}
+
 let enviando = false;
 async function enviar(jugadorId, sesionId) {
     if (enviando) return;
@@ -247,8 +276,14 @@ async function enviar(jugadorId, sesionId) {
     const horas = parseFloat(document.getElementById('n-horas').value);
     const peso = parseFloat(document.getElementById('n-peso').value);
 
-    if (muscVal >= 4 && !document.getElementById('s-grupo').value) {
-        alert('Por favor, indica qué grupo muscular tienes afectado.');
+    const grupos = gruposElegidos();
+    if (muscVal >= 4 && grupos.falta === 'ninguno') {
+        alert('Por favor, marca qué zona o zonas tienes afectadas.');
+        return;
+    }
+    if (muscVal >= 4 && grupos.falta === 'otro') {
+        alert('Has marcado "Otro": escribe cuál es la zona.');
+        document.getElementById('t-otro').focus();
         return;
     }
     enviando = true;
@@ -261,7 +296,7 @@ async function enviar(jugadorId, sesionId) {
         fatiga: parseInt(document.getElementById('r-fatiga').value),
         estres: parseInt(document.getElementById('r-estres').value),
         estado_muscular: muscVal,
-        grupo_muscular: muscVal >= 4 ? document.getElementById('s-grupo').value : null,
+        grupo_muscular: muscVal >= 4 ? grupos.texto : null,
         horas_sueno: isNaN(horas) ? null : horas,
         registrado_por: 'jugador'
     };
