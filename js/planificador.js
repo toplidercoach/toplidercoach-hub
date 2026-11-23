@@ -722,6 +722,60 @@ registrarSubTab('planificador', 'calendario', cargarCalendarioUnificado);
             }
         }
         
+        // ---- Tarjetas de tarea de la sesion: imagen, series y minutos ----
+        // Cada tarea guarda nSeries y minSerie; "duracion" sigue siendo el total (series x minutos),
+        // que es lo que leen los PDF, la carga GPS y la periodizacion.
+        function planEsc(t) { return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+        function planTareaPartes(ej) {
+            const total = Math.max(0, Math.round(parseFloat(ej.duracion) || 0));
+            const s = parseInt(ej.nSeries) || 1, m = parseInt(ej.minSerie) || 0;
+            if (s > 1 && m > 0 && s * m === total) return { series: s, min: m, total: total };
+            return { series: 1, min: total, total: total };
+        }
+        // Texto del tiempo de una tarea: "2 x 5 min" si tiene series, "10 min" si no
+        function planTareaTiempo(ej) {
+            const p = planTareaPartes(ej);
+            return p.series > 1 ? (p.series + ' x ' + p.min + ' min') : (p.total + ' min');
+        }
+        function planTareaAjustar(seccion, idx, campo, delta) {
+            const ej = sesion[seccion] && sesion[seccion][idx];
+            if (!ej) return;
+            const p = planTareaPartes(ej);
+            let series = p.series, min = p.min;
+            if (campo === 'series') series = Math.min(20, Math.max(1, series + delta));
+            else min = Math.min(180, Math.max(1, min + delta));
+            ej.nSeries = series; ej.minSerie = min; ej.duracion = series * min;
+            renderizarSesion();
+        }
+        function planTareaTarjeta(ej, seccion, idx, total) {
+            const libre = ej.tipo === 'libre', p = planTareaPartes(ej);
+            const a = "'" + seccion + "', " + idx;
+            const paso = (campo, d, txt, tit, quieto) => '<button type="button" class="tarea-paso" title="' + tit + '"' + (quieto ? ' disabled' : '') + ' onclick="event.stopPropagation(); planTareaAjustar(' + a + ", '" + campo + "', " + d + ')">' + txt + '</button>';
+            const meta = [];
+            if (!libre && ej.jugadores) meta.push(planEsc(ej.jugadores) + ' jugadores');
+            if (!libre && ej.espacio) meta.push(planEsc(ej.espacio));
+            if (libre && ej.notas) meta.push('<i>' + planEsc(ej.notas.length > 90 ? ej.notas.slice(0, 90) + '…' : ej.notas) + '</i>');
+            const nEq = (ej.equipos && ej.equipos.series) ? ej.equipos.series.length : 0;
+            return '<div class="tarea-card' + (libre ? ' libre' : '') + '">'
+                + (libre ? '<div class="tarea-img vacia">Bloque libre</div>'
+                         : '<div class="tarea-img' + (ej.imagen ? '' : ' vacia') + '" onclick="seleccionarEjercicio(\'' + ej.id + '\')" title="Ver el ejercicio">' + (ej.imagen ? '<img src="' + planEsc(ej.imagen) + '" alt="" loading="lazy">' : 'Sin imagen') + '</div>')
+                + '<div class="tarea-cuerpo">'
+                + '<div class="tarea-titulo" title="' + planEsc(ej.titulo) + '">' + planEsc(ej.titulo) + '</div>'
+                + '<div class="tarea-meta"><span>' + (meta.join(' · ') || '&nbsp;') + '</span>'
+                + '<button type="button" class="tarea-orden" title="Subir"' + (idx === 0 ? ' disabled' : '') + ' onclick="event.stopPropagation(); moverEjercicio(' + a + ', -1)">▲</button>'
+                + '<button type="button" class="tarea-orden" title="Bajar"' + (idx === total - 1 ? ' disabled' : '') + ' onclick="event.stopPropagation(); moverEjercicio(' + a + ', 1)">▼</button></div>'
+                + '<div class="tarea-tiempos">'
+                + '<div class="tarea-tiempo"><span>Series</span><div>' + paso('series', -1, '−', 'Una serie menos', p.series <= 1) + '<b>' + p.series + '</b>' + paso('series', 1, '+', 'Una serie más', p.series >= 20) + '</div></div>'
+                + '<div class="tarea-tiempo"><span>Minutos</span><div>' + paso('min', -1, '−', 'Un minuto menos', p.min <= 1) + '<b>' + p.min + '</b>' + paso('min', 1, '+', 'Un minuto más', p.min >= 180) + '</div></div>'
+                + '<div class="tarea-total" title="Tiempo total de la tarea">' + p.total + ' min</div>'
+                + '</div>'
+                + '<div class="tarea-acciones">'
+                + '<button type="button" title="Cambiar el título solo en esta sesión" onclick="event.stopPropagation(); editarTituloSesion(' + a + ')">Editar</button>'
+                + '<button type="button" class="eq" title="Montar equipos" onclick="event.stopPropagation(); eqAbrirModal(' + a + ')">Equipos' + (nEq ? ' ' + nEq : '') + '</button>'
+                + '<button type="button" class="quitar" title="Quitar de la sesión" onclick="event.stopPropagation(); quitarEjercicio(' + a + ')">Quitar</button>'
+                + '</div></div></div>';
+        }
+
         function renderizarSesion() {
             let duracionTotal = 0;
             
@@ -739,19 +793,7 @@ registrarSubTab('planificador', 'calendario', cargarCalendarioUnificado);
                     lista.innerHTML = '<p style="text-align:center;color:#9ca3af;padding:20px;font-size:13px;">Arrastra ejercicios aqui</p>';
               } else {
                     const totalEnSeccion = sesion[seccion].length;
-                    lista.innerHTML = sesion[seccion].map((ej, idx) => `
-                        <div class="ejercicio-en-sesion" ${ej.tipo === 'libre' ? 'style="border-left:4px solid #8b5cf6;"' : `onclick="seleccionarEjercicio('${ej.id}')" style="cursor: pointer;"`}>
-                            <div>
-                                <div class="nombre">${ej.tipo === 'libre' ? '📋 ' : ''}${ej.titulo}</div>
-                                <div class="duracion">${ej.duracion} min${ej.tipo === 'libre' && ej.notas ? ' · <span style="font-style:italic;color:#8b5cf6;">' + (ej.notas.length > 60 ? ej.notas.slice(0, 60) + '…' : ej.notas) + '</span>' : ''}</div>
-                            </div>
-                            <button onclick="event.stopPropagation(); moverEjercicio('${seccion}', ${idx}, -1)" title="Subir" ${idx === 0 ? 'disabled' : ''} style="background:#e5e7eb; border:none; border-radius:4px; padding:4px 8px; cursor:${idx === 0 ? 'not-allowed' : 'pointer'}; opacity:${idx === 0 ? '0.3' : '1'}; font-size:11px; color:#374151; margin-right:2px;">▲</button>
-                            <button onclick="event.stopPropagation(); moverEjercicio('${seccion}', ${idx}, 1)" title="Bajar" ${idx === totalEnSeccion - 1 ? 'disabled' : ''} style="background:#e5e7eb; border:none; border-radius:4px; padding:4px 8px; cursor:${idx === totalEnSeccion - 1 ? 'not-allowed' : 'pointer'}; opacity:${idx === totalEnSeccion - 1 ? '0.3' : '1'}; font-size:11px; color:#374151; margin-right:4px;">▼</button>
-                            <button onclick="event.stopPropagation(); editarTituloSesion('${seccion}', ${idx})" title="Editar titulo solo en esta sesion" style="background:#fef3c7;color:#b45309;border:1px solid #fcd34d;border-radius:6px;margin-right:2px;">✏️</button>
-                            <button onclick="event.stopPropagation(); eqAbrirModal('${seccion}', ${idx})" title="Montar equipos" style="background:#ede9fe;color:#7c3aed;border:1px solid #c4b5fd;border-radius:6px;margin-right:4px;">👥${ej.equipos && ej.equipos.series ? ' ' + ej.equipos.series.length : ''}</button>
-                            <button onclick="event.stopPropagation(); quitarEjercicio('${seccion}', ${idx})">Quitar</button>
-                        </div>
-                    `).join('');
+                    lista.innerHTML = '<div class="tareas-grid">' + sesion[seccion].map((ej, idx) => planTareaTarjeta(ej, seccion, idx, totalEnSeccion)).join('') + '</div>';
                 }
             });
             
@@ -1447,7 +1489,7 @@ if (s.players && s.players.length > 0) {
                             doc.setFont('helvetica', 'bold');
                             doc.text(`${i + 1}. ${ej.titulo}`, 12, y + 5);
                             doc.setFont('helvetica', 'normal');
-                            doc.text(`${ej.duracion} min`, 195, y + 5, { align: 'right' });
+                            doc.text(planTareaTiempo(ej), 195, y + 5, { align: 'right' });
                             y += 10;
                             if (notasLineas.length) {
                                 doc.setFontSize(8);
@@ -1485,7 +1527,7 @@ if (s.players && s.players.length > 0) {
                         doc.text(conTitulos ? `${i + 1}. ${ej.titulo}` : `Ejercicio ${i + 1}`, 12, y + 5);
                         doc.setFont('helvetica', 'normal');
                         doc.setTextColor(100, 100, 100);
-                        doc.text(`${ej.duracion} min`, 195, y + 5, { align: 'right' });
+                        doc.text(planTareaTiempo(ej), 195, y + 5, { align: 'right' });
                         y += 9;
                         
                         const contenidoY = y;
@@ -3113,6 +3155,7 @@ async function abrirModoVestuario(id) {
                     titulo: ej.titulo || ('Ejercicio ' + n),
                     imagen: ej.imagen || null,
                     duracion: ej.duracion || null,
+                    tiempo: ej.duracion ? planTareaTiempo(ej) : null,
                     texto: (ej.tipo === 'libre') ? (ej.notas || '') : (ej.objetivo || ej.notas || '')
                 });
             });
@@ -3170,7 +3213,7 @@ function mvRender() {
                 '</div>' +
                 '<div style="flex:1;display:flex;flex-direction:column;justify-content:center;min-width:0">' +
                     '<h2 style="font-size:4.6vh;margin:0 0 2vh;line-height:1.15">' + sl.titulo + '</h2>' +
-                    (sl.duracion ? '<div style="font-size:2.6vh;color:#fbbf24;font-weight:800;margin-bottom:2vh">&#9201; ' + sl.duracion + ' min</div>' : '') +
+                    (sl.duracion ? '<div style="font-size:2.6vh;color:#fbbf24;font-weight:800;margin-bottom:2vh">&#9201; ' + (sl.tiempo || (sl.duracion + ' min')) + '</div>' : '') +
                     (sl.texto ? '<div style="font-size:2.7vh;line-height:1.5;color:#cbd5e1;overflow-y:auto;max-height:46vh">' + sl.texto + '</div>' : '') +
                 '</div>' +
             '</div>';
@@ -3529,7 +3572,7 @@ async function exportarSesionPDFResumida(id) {
         const mostrar = lineas.slice(0, maxL); if (lineas.length > maxL) mostrar[maxL - 1] = recortar(mostrar[maxL - 1] + '…', tw);
         if (!eqS.length) { doc.text(mostrar, tx, ty + 6, { lineHeightFactor: 1.12 }); } else { const nomDe = id => { const j = (s.players || []).find(p => String(p.id) === String(id)); return j ? ((j.shirt_number ? j.shirt_number + '.' : '') + limpiar(j.name)) : '?'; }; const pal = [[24, 95, 165], [163, 45, 45], [15, 110, 86], [133, 79, 11], [124, 58, 237], [157, 23, 77]]; const fsE = cols === 3 ? 6.2 : 6.8, lhE = cols === 3 ? 2.75 : 3.0, maxE = Math.max(1, Math.floor((textH - 4) / lhE)); let ly = ty + 6, usadas = 0, corte = false; eqS.forEach((sr, si) => { const pre = eqS.length > 1 ? 'S' + (si + 1) + ' ' : ''; const filas = (sr.equipos || []).map((e, i) => { const pt = (e.peto && typeof EQ_PETOS !== 'undefined' && EQ_PETOS[e.peto]) ? EQ_PETOS[e.peto] : null; return { tit: pre + e.nombre + (pt ? ' (' + pt.nombre.toLowerCase() + ')' : ''), jug: e.jugadores || [], col: pt ? pt.rgb : pal[i % pal.length], bl: e.peto === 'blanco' }; }); if ((sr.comodines || []).length) filas.push({ tit: pre + 'Comodines', jug: sr.comodines, col: [107, 114, 128], bl: false }); filas.filter(f => f.jug.length).forEach(f => { if (corte) return; doc.setFontSize(fsE); doc.setFont('helvetica', 'bold'); const tit = f.tit + ':'; const wT = doc.getTextWidth(tit) + 1.5; doc.setFont('helvetica', 'normal'); let ls = doc.splitTextToSize(f.jug.map(nomDe).join(', '), tw - 4 - wT); if (usadas + ls.length > maxE) { ls = ls.slice(0, Math.max(0, maxE - usadas)); if (!ls.length) { corte = true; return; } ls[ls.length - 1] = recortar(ls[ls.length - 1] + '…', tw - 4 - wT); corte = true; } doc.setFillColor(f.col[0], f.col[1], f.col[2]); doc.setDrawColor(150, 150, 150); doc.circle(tx + 1.2, ly - 0.9, 1.1, f.bl ? 'FD' : 'F'); doc.setFont('helvetica', 'bold'); doc.setTextColor(...NAVY); doc.text(tit, tx + 3.2, ly); doc.setFont('helvetica', 'normal'); doc.text(ls, tx + 3.2 + wT, ly, { lineHeightFactor: lhE / (fsE * 0.3528) }); ly += ls.length * lhE; usadas += ls.length; }); }); }
         const fy = y + h - strip;
-        const datos = [['Tiempo', (t.duracion || 0) + "'"], ['Jugadores', t.jugadores || '—'], ['Espacio', t.espacio || '—'], ['Tema', t.tema || '—']];
+        const datos = [['Tiempo', planTareaPartes(t).series > 1 ? (planTareaPartes(t).series + ' x ' + planTareaPartes(t).min + "'") : ((t.duracion || 0) + "'")], ['Jugadores', t.jugadores || '—'], ['Espacio', t.espacio || '—'], ['Tema', t.tema || '—']];
         const cw = w / datos.length; datos.forEach((d, i) => celda(x + i * cw, fy, cw, strip, d[0], d[1], SOFT));
     }
 

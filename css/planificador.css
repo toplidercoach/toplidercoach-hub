@@ -1053,3 +1053,31 @@
                 font-size: 20px;
             }
         }
+
+/* ---- Tarjetas de tarea de la sesión (imagen, series y minutos) ---- */
+.tareas-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(196px, 1fr)); gap: 10px; margin-bottom: 8px; }
+.tarea-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; min-width: 0; }
+.tarea-card.libre { border-left: 4px solid #8b5cf6; }
+.tarea-img { width: 100%; aspect-ratio: 8 / 5; max-height: 170px; background: #f1f5f9; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.tarea-img img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.tarea-img.vacia { color: #94a3b8; font-size: 12px; }
+.tarea-card.libre .tarea-img { aspect-ratio: auto; height: 34px; cursor: default; background: #f5f3ff; color: #7c3aed; font-weight: 600; }
+.tarea-cuerpo { padding: 8px 8px 9px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.tarea-titulo { font-weight: 600; font-size: 14px; color: #111827; line-height: 1.25; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.tarea-meta { font-size: 12px; color: #6b7280; display: flex; align-items: center; gap: 3px; min-width: 0; }
+.tarea-meta > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tarea-orden { background: #f1f5f9; border: 1px solid #e2e8f0; color: #334155; border-radius: 6px; padding: 2px 6px; font-size: 10px; cursor: pointer; }
+.tarea-orden:disabled { opacity: .35; cursor: not-allowed; }
+.tarea-tiempos { display: flex; align-items: flex-end; gap: 6px; }
+.tarea-tiempo > span { display: block; font-size: 10px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: .03em; margin-bottom: 2px; }
+.tarea-tiempo > div { display: flex; align-items: center; }
+.tarea-tiempo b { min-width: 20px; text-align: center; font-size: 14px; color: #111827; }
+.tarea-paso { width: 23px; height: 24px; border-radius: 7px; border: 1px solid #cbd5e1; background: #fff; color: #334155; font-size: 15px; line-height: 1; cursor: pointer; padding: 0; }
+.tarea-paso:hover:not(:disabled) { background: #ede9fe; border-color: #a78bfa; }
+.tarea-paso:disabled { opacity: .35; cursor: not-allowed; }
+.tarea-total { margin-left: auto; font-size: 13px; font-weight: 700; color: #7c3aed; white-space: nowrap; padding-bottom: 4px; }
+.tarea-acciones { display: flex; gap: 3px; flex-wrap: wrap; }
+.tarea-acciones button { background: #f1f5f9; border: 1px solid #e2e8f0; color: #334155; border-radius: 6px; padding: 4px 6px; font-size: 11px; cursor: pointer; white-space: nowrap; }
+.tarea-acciones button:disabled { opacity: .35; cursor: not-allowed; }
+.tarea-acciones button.eq { background: #ede9fe; border-color: #c4b5fd; color: #7c3aed; }
+.tarea-acciones button.quitar { background: #fee2e2; border-color: #fecaca; color: #dc2626; margin-left: auto; }
