@@ -776,28 +776,56 @@ async function dibujarJugadorCardCompacta(doc, jugador, x, y, ancho, alto, color
             // Titular / suplente / convocado sin jugar
             const jugoEn = {};
             (stats || []).forEach(s => { if (s.minutes_played > 0) jugoEn[s.match_id + '|' + s.player_id] = true; });
-            Object.values(jugadorStats).forEach(j => { j.tit = 0; j.sup = 0; j.conv = 0; });
+            Object.values(jugadorStats).forEach(j => { j.tit = 0; j.sup = 0; j.conv = 0; j.comp = 0; j.nc = 0; });
+            // Minutos que duro cada partido = los del jugador que mas jugo (90, 80, 70... segun la categoria)
+            const duracion = {};
+            (stats || []).forEach(s => { const m = s.minutes_played || 0; if (m > (duracion[s.match_id] || 0)) duracion[s.match_id] = m; });
+            const enLista = {};
             (partidos || []).forEach(p => {
                 const tit = new Set((p.titulares || []).map(t => t.player_id).filter(Boolean));
                 const conv = (p.convocados || []).map(c => c.player_id).filter(Boolean);
                 new Set([...conv, ...tit]).forEach(pid => {
                     if (!jugadorStats[pid]) {
                         const info = (p.convocados || []).find(c => c.player_id === pid) || (p.titulares || []).find(t => t.player_id === pid) || {};
-                        jugadorStats[pid] = { name: info.name || 'Jugador', pos: info.position || '', pj: 0, min: 0, goles: 0, asist: 0, ta: 0, tr: 0, tit: 0, sup: 0, conv: 0 };
+                        jugadorStats[pid] = { name: info.name || 'Jugador', pos: info.position || '', pj: 0, min: 0, goles: 0, asist: 0, ta: 0, tr: 0, tit: 0, sup: 0, conv: 0, comp: 0, nc: 0 };
                     }
+                    enLista[p.id + '|' + pid] = true;
                     if (tit.has(pid)) jugadorStats[pid].tit++; else if (jugoEn[p.id + '|' + pid]) jugadorStats[pid].sup++; else jugadorStats[pid].conv++;
                 });
             });
+            // Partidos completos (jugo todos los minutos) y no convocados (ni en la lista ni jugo)
+            const idsPartidos = new Set((partidos || []).map(p => p.id));
+            (stats || []).forEach(s => {
+                const m = s.minutes_played || 0;
+                if (m > 0 && idsPartidos.has(s.match_id) && m >= duracion[s.match_id] && jugadorStats[s.player_id]) jugadorStats[s.player_id].comp++;
+            });
+            Object.keys(jugadorStats).forEach(pid => {
+                let n = 0;
+                (partidos || []).forEach(p => { if (!enLista[p.id + '|' + pid] && !jugoEn[p.id + '|' + pid]) n++; });
+                jugadorStats[pid].nc = n;
+            });
             const ordenados = Object.values(jugadorStats).sort((a, b) => b.goles - a.goles);
-            const tableData = ordenados.map(j => [j.name, j.pos, j.pj, j.tit || 0, j.sup || 0, j.conv || 0, j.min, j.goles, j.asist, j.ta, j.tr]);
+            const tableData = ordenados.map(j => [j.name, j.pos, j.pj, j.tit || 0, j.sup || 0, j.comp || 0, j.conv || 0, j.nc || 0, j.min, j.goles, j.asist, j.ta, j.tr]);
             
+            // Columnas estrechas para que quepa todo en el ancho del folio
+            const colNum = { halign: 'center', cellWidth: 10.5 };
+            const colsEstilo = { 0: { cellWidth: 36 }, 1: { cellWidth: 'auto' } };
+            for (let c = 2; c <= 12; c++) colsEstilo[c] = colNum;
             doc.autoTable({
                 startY: y,
-                head: [['Jugador', 'Pos', 'PJ', 'Tit', 'Sup', 'Conv', 'Min', 'Goles', 'Asist', 'TA', 'TR']],
+                head: [['Jugador', 'Pos', 'PJ', 'Tit', 'Sup', 'Compl', 'Conv\ns/j', 'No\nconv', 'Min', 'Goles', 'Asist', 'TA', 'TR']],
                 body: tableData,
                 theme: 'striped',
-                headStyles: { fillColor: [5, 150, 105] },
-                styles: { fontSize: 9 }
+                margin: { left: 12, right: 12 },
+                headStyles: { fillColor: [5, 150, 105], fontSize: 7, halign: 'center', valign: 'middle', cellPadding: 1.2, overflow: 'linebreak' },
+                styles: { fontSize: 8, cellPadding: 1.4, overflow: 'ellipsize' },
+                columnStyles: colsEstilo,
+                didParseCell: function (d) { if (d.section === 'head' && d.column.index < 2) d.cell.styles.halign = 'left'; },
+                didDrawPage: function () {
+                    doc.setFontSize(7);
+                    doc.setTextColor(120);
+                    doc.text('Compl = partidos completos (jugo todos los minutos)  |  Conv s/j = convocado sin jugar  |  No conv = no convocado', 12, 279);
+                }
             });
             
             doc.setFontSize(8);

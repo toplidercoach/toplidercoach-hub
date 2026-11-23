@@ -1323,25 +1323,70 @@ function renderizarConvocatoria() {
 
             window.statsJugCache = Object.values(jugadorStats);
             if (!window.statsOrden) window.statsOrden = { col: 'goles', dir: 'desc' };
+            statsPrepararTabla(tablaBody);
             statsActivarOrdenCabeceras(tablaBody);
             const ordenados = statsOrdenar(window.statsJugCache);
             
             if (ordenados.length === 0) {
-                tablaBody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#9ca3af;">No hay estadisticas</td></tr>';
+                tablaBody.innerHTML = '<tr><td colspan="' + STATS_COLS.length + '" style="text-align:center;color:#9ca3af;">No hay estadisticas</td></tr>';
             } else {
                tablaBody.innerHTML = ordenados.map(statsFilaHtml).join('');
             }
         }
 
         // ---- Orden de la tabla de jugadores ----
-        const STATS_COLS = ['nombre', 'pj', 'tit', 'sup', 'conv', 'min', 'goles', 'asist', 'ta', 'tr'];
+        // Columnas de la tabla: [clave, cabecera, explicacion que sale al pasar el raton]
+        const STATS_DEF = [
+            ['nombre', 'Jugador', ''],
+            ['pj', 'PJ', 'Partidos jugados'],
+            ['tit', 'Tit.', 'Titular'],
+            ['sup', 'Sup.', 'Suplente: jugó saliendo del banquillo'],
+            ['comp', 'Compl.', 'Partidos completos: jugó todos los minutos del partido'],
+            ['conv', 'Conv. s/j', 'Convocado sin jugar'],
+            ['nc', 'No conv.', 'No convocado'],
+            ['min', 'Min', 'Minutos jugados'],
+            ['goles', 'Goles', ''],
+            ['asist', 'Asist.', 'Asistencias'],
+            ['ta', 'TA', 'Tarjetas amarillas'],
+            ['tr', 'TR', 'Tarjetas rojas']
+        ];
+        const STATS_COLS = STATS_DEF.map(d => d[0]);
+
+        // Pone las cabeceras de STATS_DEF y el estilo compacto (columnas estrechas, todo en una pantalla)
+        function statsPrepararTabla(tablaBody) {
+            const tabla = tablaBody && tablaBody.closest('table');
+            if (!tabla) return;
+            tabla.classList.add('stats-compacta');
+            const fila = tabla.querySelector('thead tr');
+            if (fila && fila.children.length !== STATS_DEF.length) {
+                fila.innerHTML = STATS_DEF.map(d => `<th data-ayuda="${d[2]}">${d[1]}</th>`).join('');
+            }
+            if (!document.getElementById('stats-compacta-css')) {
+                const st = document.createElement('style');
+                st.id = 'stats-compacta-css';
+                st.textContent =
+                    '.stats-compacta th,.stats-compacta td{padding:6px 6px;text-align:center;white-space:nowrap}' +
+                    '.stats-compacta th{font-size:12px}' +
+                    '.stats-compacta th:not(:first-child){width:62px}' +
+                    '.stats-compacta th:first-child,.stats-compacta td:first-child{text-align:left;padding-left:12px}' +
+                    '.stats-compacta .jugador-mini-foto{width:30px;height:30px;font-size:12px;flex:none}' +
+                    '.stats-compacta .jugador-cell{gap:8px}' +
+                    '.stats-compacta .stats-pos{font-size:11px;color:#6b7280}' +
+                    '.stats-compacta .stats-cero{color:#cbd5e1}';
+                document.head.appendChild(st);
+            }
+        }
 
         // Reparte, por jugador, los partidos en titular / suplente (jugo desde el banquillo) / convocado sin jugar.
         // Usa matches.titulares y matches.convocados (guardan player_id) y los minutos de match_player_stats.
         function statsCalcularParticipacion(jugadorStats, partidos, stats) {
             const jugoEn = {};
             (stats || []).forEach(s => { if (s.minutes_played > 0) jugoEn[s.match_id + '|' + s.player_id] = true; });
-            Object.values(jugadorStats).forEach(j => { j.tit = 0; j.sup = 0; j.conv = 0; });
+            Object.values(jugadorStats).forEach(j => { j.tit = 0; j.sup = 0; j.conv = 0; j.comp = 0; j.nc = 0; });
+            // Minutos que duro cada partido = los del jugador que mas jugo (90, 80, 70... segun la categoria)
+            const duracion = {};
+            (stats || []).forEach(s => { const m = s.minutes_played || 0; if (m > (duracion[s.match_id] || 0)) duracion[s.match_id] = m; });
+            const enLista = {};   // partido|jugador -> estuvo convocado (o fue titular)
             (partidos || []).forEach(p => {
                 const tit = new Set((p.titulares || []).map(t => t.player_id).filter(Boolean));
                 const conv = (p.convocados || []).map(c => c.player_id).filter(Boolean);
@@ -1349,12 +1394,25 @@ function renderizarConvocatoria() {
                 todos.forEach(pid => {
                     if (!jugadorStats[pid]) {
                         const info = (p.convocados || []).find(c => c.player_id === pid) || (p.titulares || []).find(t => t.player_id === pid) || {};
-                        jugadorStats[pid] = { player: { id: pid, name: info.name || 'Jugador', position: info.position || '' }, pj: 0, min: 0, goles: 0, asist: 0, ta: 0, tr: 0, tit: 0, sup: 0, conv: 0 };
+                        jugadorStats[pid] = { player: { id: pid, name: info.name || 'Jugador', position: info.position || '' }, pj: 0, min: 0, goles: 0, asist: 0, ta: 0, tr: 0, tit: 0, sup: 0, conv: 0, comp: 0, nc: 0 };
                     }
+                    enLista[p.id + '|' + pid] = true;
                     if (tit.has(pid)) jugadorStats[pid].tit++;
                     else if (jugoEn[p.id + '|' + pid]) jugadorStats[pid].sup++;
                     else jugadorStats[pid].conv++;
                 });
+            });
+            // Partidos completos: jugo todos los minutos de ese partido
+            const idsPartidos = new Set((partidos || []).map(p => p.id));
+            (stats || []).forEach(s => {
+                const m = s.minutes_played || 0;
+                if (m > 0 && idsPartidos.has(s.match_id) && m >= duracion[s.match_id] && jugadorStats[s.player_id]) jugadorStats[s.player_id].comp++;
+            });
+            // No convocado: partidos jugados por el equipo en los que ni estuvo en la lista ni jugo
+            Object.keys(jugadorStats).forEach(pid => {
+                let n = 0;
+                (partidos || []).forEach(p => { if (!enLista[p.id + '|' + pid] && !jugoEn[p.id + '|' + pid]) n++; });
+                jugadorStats[pid].nc = n;
             });
         }
 
@@ -1370,14 +1428,16 @@ function renderizarConvocatoria() {
                     </div>
                     <div>
                         <strong>${j.player?.name || 'Sin nombre'}</strong>
-                        <div style="font-size:12px;color:#6b7280;">${j.player?.position || ''}</div>
+                        <div class="stats-pos" style="font-size:12px;color:#6b7280;">${j.player?.position || ''}</div>
                     </div>
                 </div>
             </td>
             <td>${j.pj}</td>
             <td>${j.tit || 0}</td>
             <td>${j.sup || 0}</td>
+            <td>${j.comp || 0}</td>
             <td style="color:#9ca3af">${j.conv || 0}</td>
+            <td${j.nc ? '' : ' class="stats-cero"'}>${j.nc || 0}</td>
             <td>${j.min}</td>
             <td><strong>${j.goles}</strong></td>
             <td>${j.asist}</td>
@@ -1406,7 +1466,7 @@ function renderizarConvocatoria() {
                 const o = window.statsOrden;
                 th.textContent = th.dataset.ordenBase + (o && o.col === col ? (o.dir === 'asc' ? ' ▲' : ' ▼') : '');
                 th.style.cursor = 'pointer';
-                th.title = 'Ordenar';
+                th.title = (th.dataset.ayuda ? th.dataset.ayuda + ' · ' : '') + 'clic para ordenar';
                 th.onclick = function() {
                     if (window.statsOrden && window.statsOrden.col === col) {
                         window.statsOrden.dir = window.statsOrden.dir === 'desc' ? 'asc' : 'desc';
