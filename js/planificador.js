@@ -723,6 +723,51 @@ registrarSubTab('planificador', 'calendario', cargarCalendarioUnificado);
             }
         }
         
+        // ---- Barra fija de la sesión: duración, reparto por bloques, carga prevista y guardar ----
+        // Se queda pegada abajo mientras se monta la sesión. Los botones (guardar, PDF, asistencia...) son los
+        // mismos de la cabecera, cambiados de sitio: no hay dos sitios para guardar.
+        var PLAN_BARRA_BLOQUES = [['previo', 'Previo', '#8b5cf6'], ['calentamiento', 'Calentamiento', '#f97316'], ['principal', 'Principal', '#3b82f6'], ['enfriamiento', 'Final', '#10b981'], ['postcampo', 'Post-campo', '#64748b']];
+        function planBarraMontar() {
+            let b = document.getElementById('plan-barra');
+            if (b) return b;
+            const vista = document.getElementById('planificador-crear');
+            if (!vista) return null;
+            b = document.createElement('div');
+            b.id = 'plan-barra';
+            b.innerHTML = '<div class="pb-total"><span>Duración</span><b id="pb-min">0 min</b></div><div class="pb-reparto"><div class="pb-franja" id="pb-franja"></div><div class="pb-leyenda" id="pb-leyenda"></div></div><div class="pb-carga" id="pb-carga"></div><div class="pb-acciones" id="pb-acciones"></div>';
+            vista.appendChild(b);
+            const botones = vista.querySelector('.section-header > div');
+            if (botones) { while (botones.firstChild) b.querySelector('#pb-acciones').appendChild(botones.firstChild); botones.remove(); }
+            return b;
+        }
+        function planBarraRender() {
+            const b = planBarraMontar();
+            if (!b || typeof sesion === 'undefined' || !sesion) return;
+            const mins = PLAN_BARRA_BLOQUES.map(x => (Array.isArray(sesion[x[0]]) ? sesion[x[0]] : []).reduce((a, e) => a + (e.duracion || 0), 0));
+            const total = mins.reduce((a, m) => a + m, 0);
+            const port = (Array.isArray(sesion.porteros) ? sesion.porteros : []).reduce((a, e) => a + (e.duracion || 0), 0);
+            document.getElementById('pb-min').textContent = total + ' min';
+            document.getElementById('pb-franja').innerHTML = total
+                ? PLAN_BARRA_BLOQUES.map((x, i) => mins[i] ? '<i style="flex:' + mins[i] + ';background:' + x[2] + '" title="' + x[1] + ': ' + mins[i] + ' min"></i>' : '').join('')
+                : '';
+            document.getElementById('pb-leyenda').innerHTML = total
+                ? PLAN_BARRA_BLOQUES.map((x, i) => mins[i] ? '<span><i style="background:' + x[2] + '"></i>' + x[1] + ' <b>' + mins[i] + '</b></span>' : '').join('') + (port ? '<span title="Los porteros trabajan aparte: no suman en la duración"><i style="background:#0e7490"></i>Porteros <b>' + port + '</b></span>' : '')
+                : '<span>Añade tareas para ver el reparto de la sesión</span>';
+            let carga = '';
+            if (typeof planGpsResumen === 'function') {
+                try {
+                    carga = planGpsResumen().map(c => '<button type="button" class="pb-chip" onclick="planBarraIrCarga()" title="' + planEsc(c.ayuda) + '"><span>' + planEsc(c.lbl) + '</span><b><i style="background:' + c.color + '"></i>' + planEsc(c.valor) + '</b><small>' + planEsc(c.nota) + '</small></button>').join('');
+                } catch (e) { console.warn('[planBarra] carga:', e); }
+            }
+            document.getElementById('pb-carga').innerHTML = carga;
+        }
+        function planBarraIrCarga() {
+            const caja = document.getElementById('plan-gps-objetivo');
+            if (!caja) return;
+            if (typeof planGps !== 'undefined' && planGps && !planGps.abierto && typeof planGpsToggle === 'function') planGpsToggle();
+            caja.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
         // ---- Biblioteca en ventana grande ----
         // La biblioteca y el detalle ya no son columnas: se abren en una ventana desde "+ Añadir tarea" de cada bloque,
         // y lo que se añade va directo a ese bloque. La ventana sigue abierta para añadir varias tareas seguidas.
@@ -869,6 +914,7 @@ registrarSubTab('planificador', 'calendario', cargarCalendarioUnificado);
             });
             
             document.getElementById('duracion-total').textContent = `${duracionTotal} min`;
+            planBarraRender();
         }
         let bloqueLibreSeccion = null;
         function abrirModalBloqueLibre(seccion) {

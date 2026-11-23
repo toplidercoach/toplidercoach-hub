@@ -449,8 +449,36 @@ function planGpsRender() {
     var claveActual = (fecha && typeof clubId !== 'undefined' && clubId) ? clubId + '|' + fecha : '';
     var auto = (planGps.autoClave === claveActual) ? planGps.auto : null;
     caja.innerHTML = planGpsHtml(ses, planGps.mapa, planGps.obj, planGps.abierto, planGps.detalle, auto);
+    if (typeof planBarraRender === 'function') { try { planBarraRender(); } catch (e) { console.warn('[PlanGps] barra:', e); } }
     if (!planGps.mapa || planGps.mapaClub !== (typeof clubId !== 'undefined' ? clubId : null)) planGpsCargarMapa(false);
     planGpsPedirObjetivo();
+}
+// Resumen para la barra fija de la sesion: distancia y alta velocidad previstas frente al objetivo del dia.
+// Devuelve [] si todavia no hay datos GPS de ninguna tarea de la sesion.
+function planGpsResumen() {
+    var ses = (typeof sesion !== 'undefined') ? sesion : null;
+    if (!ses || !planGps.mapa) return [];
+    var c = planGpsCalcular(ses, planGps.mapa);
+    if (!c.nCon) return [];
+    var fecha = planGpsFechaSesion();
+    var clave = (fecha && typeof clubId !== 'undefined' && clubId) ? clubId + '|' + fecha : '';
+    var auto = (planGps.autoClave === clave) ? planGps.auto : null;
+    var sinDatos = c.nSin ? ' Sin datos GPS de ' + c.nSin + (c.nSin === 1 ? ' tarea' : ' tareas') + ' (' + Math.round(c.minSin) + ' min): no cuentan.' : '';
+    return [['td', 'Distancia prevista'], ['hsr19', 'Alta velocidad']].map(function (d) {
+        var m = PLANGPS_MET.filter(function (x) { return x.k === d[0]; })[0];
+        var est = Math.round(c.tot[d[0]]);
+        var manual = parseFloat(planGps.obj[d[0]]);
+        var r = (!isNaN(manual) && manual > 0) ? [manual * 0.9, manual * 1.1] : ((auto && auto.rangos && m.kObj && auto.rangos[m.kObj]) ? auto.rangos[m.kObj] : null);
+        var color = '#94a3b8', nota = 'sin objetivo';
+        if (r) {
+            var lo = Math.round(r[0]), hi = Math.round(r[1]);
+            if (est < lo) { color = '#f59e0b'; nota = 'faltan ' + planGpsFmt(lo - est, 0) + ' m'; }
+            else if (est > hi) { color = '#ef4444'; nota = 'sobran ' + planGpsFmt(est - hi, 0) + ' m'; }
+            else { color = '#22c55e'; nota = 'en el objetivo'; }
+        }
+        return { lbl: d[1], valor: planGpsFmt(est, 0) + ' m', nota: nota, color: color,
+                 ayuda: 'Media por jugador, con el ritmo GPS medido de estas tareas.' + (r ? ' Objetivo del dia: ' + planGpsFmt(r[0], 0) + ' - ' + planGpsFmt(r[1], 0) + ' m.' : '') + sinDatos + ' Pulsa para ver el detalle.' };
+    });
 }
 function planGpsSetObj(k, valor) {
     var n = parseFloat(String(valor).replace(',', '.'));

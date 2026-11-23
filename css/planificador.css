@@ -1131,3 +1131,33 @@ body.bib-detalle #bib-det-cerrar { display: block; background: none; border: non
     #lista-ejercicios { overflow: visible; }
     body.bib-abierta.bib-detalle .planificador-layout > .panel:nth-child(3) { top: 0; bottom: 0; right: 0; width: 100vw; border-radius: 0; }
 }
+
+/* ---- Barra fija de la sesión ---- */
+.duracion-total-display { display: none; }
+#planificador-crear .section-header { margin-bottom: 14px; }
+#plan-barra { position: sticky; bottom: 0; z-index: 60; display: flex; align-items: center; gap: 22px; margin-top: 18px; padding: 10px 90px 10px 18px; background: #fff; border: 1px solid #e5e7eb; border-bottom: none; border-radius: 14px 14px 0 0; box-shadow: 0 -8px 24px rgba(15, 23, 42, .10); }
+#plan-barra .pb-total { display: flex; flex-direction: column; line-height: 1.15; white-space: nowrap; }
+#plan-barra .pb-total span { font-size: 11px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: .04em; }
+#plan-barra .pb-total b { font-size: 24px; color: #111827; }
+#plan-barra .pb-reparto { flex: 1; min-width: 160px; }
+#plan-barra .pb-franja { display: flex; height: 10px; border-radius: 5px; overflow: hidden; background: #e5e7eb; gap: 2px; }
+#plan-barra .pb-franja i { display: block; min-width: 4px; }
+#plan-barra .pb-leyenda { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 6px; font-size: 12px; color: #4b5563; }
+#plan-barra .pb-leyenda span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+#plan-barra .pb-leyenda i { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
+#plan-barra .pb-leyenda b { color: #111827; }
+#plan-barra .pb-carga { display: flex; gap: 8px; }
+#plan-barra .pb-chip { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.2; background: #f0fdfa; border: 1px solid #99f6e4; border-radius: 10px; padding: 5px 12px; cursor: pointer; white-space: nowrap; }
+#plan-barra .pb-chip:hover { background: #ccfbf1; }
+#plan-barra .pb-chip span { font-size: 10px; font-weight: 600; color: #0f766e; text-transform: uppercase; letter-spacing: .03em; }
+#plan-barra .pb-chip b { font-size: 15px; color: #134e4a; display: inline-flex; align-items: center; gap: 6px; }
+#plan-barra .pb-chip b i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+#plan-barra .pb-chip small { font-size: 11px; color: #475569; }
+#plan-barra .pb-acciones { display: flex; align-items: center; gap: 8px; }
+@media (max-width: 1250px) { #plan-barra .pb-carga { display: none; } }
+@media (max-width: 900px) {
+    #plan-barra { flex-wrap: wrap; gap: 8px 14px; padding: 8px 12px; }
+    #plan-barra .pb-reparto { order: 3; flex-basis: 100%; }
+    #plan-barra .pb-leyenda { display: none; }
+    #plan-barra .pb-acciones { margin-left: auto; flex-wrap: wrap; justify-content: flex-end; }
+}
