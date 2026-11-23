@@ -3723,7 +3723,13 @@ function ejBuildBanco() {
     if (!root) return;
     root.innerHTML = `
     <div class="ej-banco-wrap">
-        <h3 class="ej-ficha-title" style="margin-bottom:12px">🗂 Banco de ejercicios</h3>
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:12px">
+            <h3 class="ej-ficha-title" style="margin:0">🗂 Banco de ejercicios</h3>
+            <div style="display:flex;gap:6px">
+                <button type="button" id="ej-banco-tab-mio" onclick="ejBancoCambiarFuente('mio')" style="padding:6px 14px;font-size:12px;font-weight:700;border-radius:8px;cursor:pointer">Mis ejercicios</button>
+                <button type="button" id="ej-banco-tab-com" onclick="ejBancoCambiarFuente('com')" style="padding:6px 14px;font-size:12px;font-weight:700;border-radius:8px;cursor:pointer">Comunidad</button>
+            </div>
+        </div>
         <div style="background:#0f172a;border:1px solid #1e3a5f;border-radius:10px;padding:12px 14px;margin-bottom:14px">
             <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
                 <input type="text" id="ej-search" placeholder="🔍 Buscar por nombre..." oninput="ejBancoSearch()" style="flex:1">
@@ -3777,30 +3783,59 @@ function ejBuildBanco() {
             <div style="color:#9ca3af;padding:20px">Cargando ejercicios...</div>
         </div>
     </div>`;
+    ejBancoPintarTabs();
     ejBancoLoad();
 }
 let ejBancoCache = [];
+// Qué se ve en el Banco: 'mio' (ejercicios propios) o 'com' (Comunidad)
+var ejBancoFuente = 'mio';
+function ejBancoFiltroFuente() {
+    if (ejBancoFuente === 'com') return 'and(visibility.eq.community,approval_status.eq.approved)';
+    return window.ejClubId ? ('club_id.eq.' + window.ejClubId + ',coach_id.eq.' + String(window.ejCoachId)) : ('coach_id.eq.' + String(window.ejCoachId));
+}
+function ejBancoPintarTabs() {
+    [['mio', 'ej-banco-tab-mio'], ['com', 'ej-banco-tab-com']].forEach(function (t) {
+        var b = document.getElementById(t[1]); if (!b) return;
+        var on = ejBancoFuente === t[0];
+        b.style.background = on ? '#7c3aed' : 'transparent';
+        b.style.color = on ? '#fff' : '#c4b5fd';
+        b.style.border = '2px solid #7c3aed';
+    });
+    // Importar solo tiene sentido en los ejercicios propios
+    var imp = document.getElementById('ej-import-file');
+    if (imp && imp.previousElementSibling) imp.previousElementSibling.style.display = ejBancoFuente === 'com' ? 'none' : '';
+}
+function ejBancoCambiarFuente(f) {
+    if (f === ejBancoFuente) return;
+    ejBancoFuente = f;
+    ejBancoPintarTabs();
+    ejBancoCache = [];
+    var grid = document.getElementById('ej-banco-grid');
+    if (grid) grid.innerHTML = '<div style="color:#9ca3af;padding:20px">Cargando ejercicios...</div>';
+    ejBancoLoad(true);
+}
 let ejEditandoId = null;
 
-async function ejBancoLoad() {
+async function ejBancoLoad(conservarEdicion) {
+    var ejFuenteCarga = ejBancoFuente;
     try {
         const { data, error } = await supabaseClient
             .from('custom_exercises')
             .select('id,name,category,age_group,difficulty,duration_min,players_count,game_phase,field_width,field_length,eii,objectives,description,variants,coach_notes,materials, animation_url,tema,num_goalkeepers,es_portero,subcategoria_portero')
             
-            .or(window.ejClubId ? ('club_id.eq.' + window.ejClubId + ',coach_id.eq.' + String(window.ejCoachId)) : ('coach_id.eq.' + String(window.ejCoachId)))
+            .or(ejBancoFiltroFuente())
             .order('created_at', { ascending: false })
             .order('id', { ascending: true })
             .range(0, 999);
         if (error) throw error;
-        ejEditandoId = null;
+        if (!conservarEdicion) ejEditandoId = null;
         // Páginas siguientes (Supabase devuelve como mucho 1000 filas por petición)
         let ejTodos = data || [], ejDesde = 1000;
         while (ejTodos.length === ejDesde) {
             const ejPag = await supabaseClient
                 .from('custom_exercises')
                 .select('id,name,category,age_group,difficulty,duration_min,players_count,game_phase,field_width,field_length,eii,objectives,description,variants,coach_notes,materials, animation_url,tema,num_goalkeepers,es_portero,subcategoria_portero')
-                .or(window.ejClubId ? ('club_id.eq.' + window.ejClubId + ',coach_id.eq.' + String(window.ejCoachId)) : ('coach_id.eq.' + String(window.ejCoachId)))
+                .or(ejBancoFiltroFuente())
                 .order('created_at', { ascending: false })
                 .order('id', { ascending: true })
                 .range(ejDesde, ejDesde + 999);
@@ -3808,6 +3843,8 @@ async function ejBancoLoad() {
             ejTodos = ejTodos.concat(ejPag.data || []);
             ejDesde += 1000;
         }
+        if (ejFuenteCarga !== ejBancoFuente) return; // se cambió de pestaña mientras cargaba
+        if (ejFuenteCarga === 'com') ejTodos.forEach(function (e) { e._com = true; });
         ejBancoCache = ejTodos;
         ejBancoRender(ejBancoCache);
         ejBancoCargarThumbs();
@@ -3921,12 +3958,12 @@ function ejComunidadAnonimizar(bd) {
     });
     return c;
 }
-function ejComunidadCaja(html) {
+function ejComunidadCaja(html, ancho) {
     ejComunidadCerrar();
     var m = document.createElement('div');
     m.id = 'ej-comunidad-modal';
     m.style.cssText = 'position:fixed;inset:0;z-index:99990;background:rgba(2,6,23,.72);display:flex;align-items:center;justify-content:center;padding:12px';
-    m.innerHTML = '<div style="background:#111a2b;border:1px solid #2f405c;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.6);width:470px;max-width:100%;padding:18px 20px;color:#e2e8f0;font-family:system-ui,sans-serif">' + html + '</div>';
+    m.innerHTML = '<div style="background:#111a2b;border:1px solid #2f405c;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.6);width:' + (ancho || 470) + 'px;max-width:100%;padding:18px 20px;color:#e2e8f0;font-family:system-ui,sans-serif">' + html + '</div>';
     document.body.appendChild(m);
 }
 function ejComunidadCerrar() { var m = document.getElementById('ej-comunidad-modal'); if (m) m.remove(); }
@@ -3999,6 +4036,81 @@ async function ejComunidadRetirar(idCopia) {
     } catch (e) { ejToast('No se ha podido retirar: ' + (e.message || e), 'error'); }
 }
 
+function ejComEsc(t) { return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+// Ficha de solo lectura de un ejercicio de la Comunidad (no se puede editar: para cambiarlo hay que clonarlo)
+async function ejComunidadVer(id) {
+    try {
+        var r = await supabaseClient.from('custom_exercises').select('*').eq('id', id).single();
+        if (r.error) throw r.error;
+        var o = r.data, bt = 'border:none;border-radius:8px;padding:9px 16px;cursor:pointer;font-size:13px;font-weight:700';
+        var datos = [];
+        if (o.tema) datos.push(o.tema);
+        if (o.category) datos.push(o.category);
+        if (o.game_phase) datos.push(o.game_phase);
+        if (o.age_group) datos.push(o.age_group);
+        if (o.duration_min) datos.push(o.duration_min + ' min');
+        if (o.players_count) datos.push(o.players_count + ' jugadores');
+        if (o.num_goalkeepers) datos.push(o.num_goalkeepers + ' porteros');
+        if (o.field_width && o.field_length) datos.push(o.field_width + ' × ' + o.field_length + ' m');
+        if (o.materials) datos.push(o.materials);
+        var bloque = function (tit, txt) {
+            return txt ? '<div style="margin-top:10px"><div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em">' + tit + '</div><div style="font-size:13px;color:#e2e8f0;line-height:1.5;white-space:pre-wrap">' + ejComEsc(txt) + '</div></div>' : '';
+        };
+        var textos = bloque('Objetivos', o.objectives) + bloque('Descripción', o.description) + bloque('Variantes', o.variants) + bloque('Notas', o.coach_notes);
+        ejComunidadCaja('<div style="display:flex;align-items:center;justify-content:space-between;gap:10px"><b style="font-size:16px">' + ejComEsc(o.name) + '</b>'
+            + '<button type="button" onclick="ejComunidadCerrar()" title="Cerrar" style="background:none;border:none;color:#94a3b8;font-size:18px;cursor:pointer"><i class="ej-ico ej-ico-nueva"></i></button></div>'
+            + '<div style="font-size:11px;color:#a78bfa;margin-top:2px">Comunidad' + (o.shared_by_name ? ' · ' + ejComEsc(o.shared_by_name) : '') + '</div>'
+            + '<div style="max-height:70vh;overflow:auto;margin-top:10px">'
+            + '<div style="width:100%;aspect-ratio:8/5;border-radius:8px;overflow:hidden;background:#0f4c2a"><img id="ej-comunidad-img" alt="" style="width:100%;height:100%;object-fit:contain;display:block"></div>'
+            + (datos.length ? '<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:10px">' + datos.map(function (d) { return '<span style="font-size:11px;color:#cbd5e1;background:#1e293b;padding:2px 8px;border-radius:5px">' + ejComEsc(d) + '</span>'; }).join('') + '</div>' : '')
+            + (textos || '<div style="font-size:13px;color:#64748b;margin-top:10px">Este ejercicio no tiene texto.</div>')
+            + '</div>'
+            + '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button type="button" onclick="ejComunidadCerrar()" style="' + bt + ';background:#0b1220;color:#e2e8f0;border:1px solid #2f405c">Cerrar</button>'
+            + '<button type="button" onclick="ejComunidadClonar(\'' + o.id + '\')" style="' + bt + ';background:#7c3aed;color:#fff">Clonar a mis ejercicios</button></div>', 720);
+        var img = document.getElementById('ej-comunidad-img');
+        if (img && o.thumbnail_svg) {
+            img.src = o.thumbnail_svg.indexOf('data:') === 0 ? o.thumbnail_svg : URL.createObjectURL(new Blob([o.thumbnail_svg], { type: 'image/svg+xml' }));
+        } else if (img) { img.parentElement.innerHTML = '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#475569;font-size:12px">sin dibujo</div>'; }
+    } catch (e) { ejToast('No se ha podido abrir: ' + (e.message || e), 'error'); }
+}
+// Clonar: copia un ejercicio de la Comunidad a "Mis ejercicios". La copia es del usuario y puede cambiarla; la de la Comunidad no se toca.
+async function ejComunidadClonar(id) {
+    var mio = String(window.ejCoachId || (typeof usuario !== 'undefined' && usuario && usuario.id != null ? usuario.id : ''));
+    if (!mio) { ejToast('No se ha podido identificar tu usuario.', 'error'); return; }
+    try {
+        var ya = await supabaseClient.from('custom_exercises').select('id').eq('shared_from', id).eq('coach_id', mio).limit(1);
+        if (ya.error) throw ya.error;
+        if ((ya.data || []).length) { ejConfirm('Ya tienes una copia de este ejercicio en Mis ejercicios. ¿Quieres clonarlo otra vez?', function () { ejComunidadClonarHacer(id, mio); }); return; }
+        await ejComunidadClonarHacer(id, mio);
+    } catch (e) { ejToast('No se ha podido clonar: ' + (e.message || e), 'error'); }
+}
+async function ejComunidadClonarHacer(id, mio) {
+    try {
+        var r = await supabaseClient.from('custom_exercises').select('*').eq('id', id).eq('visibility', 'community').single();
+        if (r.error) throw r.error;
+        var o = r.data, campos = ['name','description','objectives','variants','coach_notes','materials','category','tema','age_group','difficulty','game_phase','duration_min','players_count','num_goalkeepers','field_width','field_length','field_area','eii','eii_analysis','es_portero','subcategoria_portero'];
+        var fila = {};
+        campos.forEach(function (k) { if (o[k] !== undefined) fila[k] = o[k]; });
+        if (o.board_data && (o.board_data.players || o.board_data.lines || o.board_data.equipment)) {
+            // Las fichas de equipo toman el color y la equipación del club que lo clona
+            fila.board_data = JSON.parse(JSON.stringify(o.board_data));
+            ejColoresResolver(fila.board_data.players);
+            fila.thumbnail_svg = await ejMiniaturaCompacta(ejMiniaturaDeDatos(fila.board_data) || o.thumbnail_svg || null);
+        } else {
+            fila.board_data = o.board_data || null;
+            fila.thumbnail_svg = o.thumbnail_svg || null;
+        }
+        Object.assign(fila, { coach_id: mio, club_id: window.ejClubId || null, source: 'comunidad', visibility: 'private', shared_from: o.id, shared_by_name: o.shared_by_name || null });
+        var w = await supabaseClient.from('custom_exercises').insert(fila);
+        if (w.error) throw w.error;
+        ejComunidadCerrar();
+        ejToast('Clonado. Ya lo tienes en Mis ejercicios.', 'success');
+    } catch (e) {
+        console.error('ejComunidadClonar:', e);
+        ejToast('No se ha podido clonar: ' + (e.message || e), 'error');
+    }
+}
+
 // Dibuja unos datos de pizarra sin abrirlos y devuelve su miniatura, dejando la pizarra como estaba
 function ejMiniaturaDeDatos(bd, neutra) {
     var svg = document.getElementById('ej-svg');
@@ -4067,13 +4179,16 @@ function ejBancoRender(list) {
     const grid = document.getElementById('ej-banco-grid');
     if (!grid) return;
 
+    var esCom = ejBancoFuente === 'com';
+    // En cada pestaña solo lo suyo (un ejercicio propio recién guardado no se cuela en la Comunidad)
+    list = list.filter(function (e) { return !!e._com === esCom; });
     var MAX = 1000;
     if (list.length > MAX) list = list.slice(0, MAX);
     var countEl = document.getElementById('ej-banco-count');
     if (countEl) countEl.textContent = list.length + ' ejercicio' + (list.length !== 1 ? 's' : '');
 
     if (!list.length) {
-        grid.innerHTML = '<div style="color:#64748b;padding:30px;text-align:center;grid-column:1/-1">No hay ejercicios con estos filtros.</div>';
+        grid.innerHTML = '<div style="color:#64748b;padding:30px;text-align:center;grid-column:1/-1">' + (esCom && !ejBancoCache.length ? 'Todavía no hay ejercicios en la Comunidad.' : 'No hay ejercicios con estos filtros.') + '</div>';
         return;
     }
 
@@ -4107,16 +4222,20 @@ function ejBancoRender(list) {
             + (e.difficulty ? '<span style="font-size:10px;background:' + difCol + '20;color:' + difCol + ';padding:1px 7px;border-radius:4px;flex-shrink:0">' + e.difficulty + '</span>' : '')
             + '</div>'
             + '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px">' + tagsHTML + '</div>'
-            + '<div onclick="ejVerFicha(\'' + e.id + '\')" style="width:100%;aspect-ratio:8/5;overflow:hidden;border-radius:6px;margin-bottom:8px;background:#0f4c2a;cursor:pointer">'
+            + '<div onclick="' + (esCom ? 'ejComunidadVer' : 'ejVerFicha') + '(\'' + e.id + '\')" style="width:100%;aspect-ratio:8/5;overflow:hidden;border-radius:6px;margin-bottom:8px;background:#0f4c2a;cursor:pointer">'
             + thumbHTML
             + '</div>'
-            + '<div style="display:flex;gap:4px">'
+            + (esCom ? '<div style="display:flex;gap:4px">'
+                + '<button onclick="ejComunidadVer(\'' + e.id + '\')" style="flex:1;padding:5px;font-size:11px;background:#1e293b;border:1px solid #334155;color:#93c5fd;border-radius:6px;cursor:pointer">Ver</button>'
+                + '<button onclick="ejComunidadClonar(\'' + e.id + '\')" style="flex:2;padding:5px;font-size:11px;font-weight:700;background:#7c3aed;border:1px solid #7c3aed;color:#fff;border-radius:6px;cursor:pointer" title="Copiar a Mis ejercicios para usarlo y cambiarlo">Clonar a mis ejercicios</button>'
+                + '</div></div>' : '')
+            + (esCom ? '' : '<div style="display:flex;gap:4px">'
             + '<button onclick="ejVerFicha(\'' + e.id + '\')" style="flex:1;padding:5px;font-size:11px;background:#1e293b;border:1px solid #334155;color:#93c5fd;border-radius:6px;cursor:pointer">Ver ficha</button>'
             + '<button onclick="ejBancoCargar(\'' + e.id + '\')" style="flex:1;padding:5px;font-size:11px;background:#1e293b;border:1px solid #334155;color:#cbd5e1;border-radius:6px;cursor:pointer">Editar</button>'
             + '<button data-ejgps="' + e.id + '" onclick="ejGpsFicha(\'' + e.id + '\')" style="display:none;padding:5px 8px;font-size:11px;background:#0f3d3e;border:1px solid #14b8a6;color:#5eead4;border-radius:6px;cursor:pointer" title="Datos GPS medidos en este ejercicio">GPS</button>'
             + '<button onclick="ejEliminarDesdeBanco(\'' + e.id + '\')" style="padding:5px 6px;font-size:11px;background:#1e293b;border:1px solid #7f1d1d;color:#fca5a5;border-radius:6px;cursor:pointer" title="Eliminar">🗑</button>'
             + '</div>'
-            + '</div>';
+            + '</div>');
     }
 
 grid.innerHTML = html;
