@@ -2273,7 +2273,7 @@ async function cargarMisEjerciciosBiblioteca() {
             const res = await supabaseClient
                 .from('custom_exercises')
                 .select('id, name, category, tema, difficulty, duration_min, players_count, game_phase, es_portero, subcategoria_portero')
-                .or(filtroOr)
+                .or(bibliotecaFuente === 'com' ? 'and(visibility.eq.community,approval_status.eq.approved)' : filtroOr)
                 .order('created_at', { ascending: false })
                 .order('id', { ascending: true })
                 .range(desde, desde + PAG - 1);
@@ -2286,7 +2286,7 @@ async function cargarMisEjerciciosBiblioteca() {
         if (error) throw error;
         
         if (!data || data.length === 0) {
-            lista.innerHTML = '<p style="text-align:center;color:#9ca3af;padding:20px;">No tienes ejercicios propios.<br>Crea uno desde la Pizarra.</p>';
+            lista.innerHTML = '<p style="text-align:center;color:#9ca3af;padding:20px;">' + (bibliotecaFuente === 'com' ? 'Todavía no hay ejercicios en la Comunidad.' : 'No tienes ejercicios propios.<br>Crea uno desde la Pizarra.') + '</p>';
             return;
         }
         
