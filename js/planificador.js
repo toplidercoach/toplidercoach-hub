@@ -647,6 +647,7 @@ registrarSubTab('planificador', 'calendario', cargarCalendarioUnificado);
         
         function abrirModalSeccion() {
             if (!ejercicioSeleccionado) return;
+            if (planBibSeccion) { planBibAnadir(); return; }
             document.getElementById('modal-seccion').style.display = 'flex';
         }
         
@@ -722,6 +723,76 @@ registrarSubTab('planificador', 'calendario', cargarCalendarioUnificado);
             }
         }
         
+        // ---- Biblioteca en ventana grande ----
+        // La biblioteca y el detalle ya no son columnas: se abren en una ventana desde "+ Añadir tarea" de cada bloque,
+        // y lo que se añade va directo a ese bloque. La ventana sigue abierta para añadir varias tareas seguidas.
+        var planBibSeccion = null;
+        var PLAN_BIB_NOMBRES = { previo: 'Trabajo previo a campo', calentamiento: 'Calentamiento', principal: 'Parte Principal', enfriamiento: 'Parte Final', postcampo: 'Trabajo post-campo', porteros: 'Porteros' };
+        function planBibBoton(seccion) {
+            return '<button type="button" class="tarea-anadir" onclick="planBibAbrir(\'' + seccion + '\')">+ Añadir tarea</button>';
+        }
+        function planBibMontar() {
+            if (document.getElementById('bib-cabecera')) return;
+            const f = document.createElement('div'); f.id = 'bib-fondo'; f.onclick = planBibCerrar;
+            const c = document.createElement('div'); c.id = 'bib-cabecera';
+            c.innerHTML = '<div><span class="bib-cab-pre">Añadir tarea a</span> <select id="bib-cab-seccion" onchange="planBibCambiar(this.value)">'
+                + Object.keys(PLAN_BIB_NOMBRES).map(k => '<option value="' + k + '">' + PLAN_BIB_NOMBRES[k] + '</option>').join('') + '</select>'
+                + '<span id="bib-cab-cuenta"></span></div><button type="button" onclick="planBibCerrar()">Cerrar</button>';
+            document.body.appendChild(f); document.body.appendChild(c);
+            document.addEventListener('keydown', function (e) {
+                if (e.key !== 'Escape' || !planBibSeccion) return;
+                const m = document.getElementById('modal-seccion');
+                if (m && m.style.display !== 'none') return;
+                if (document.getElementById('dl-visor')) return;
+                if (document.body.classList.contains('bib-detalle')) planBibDetalleCerrar(); else planBibCerrar();
+            });
+            // El detalle entra por la derecha cuando se elige un ejercicio (desde cualquier pestaña)
+            const det = document.getElementById('detalle-ejercicio');
+            if (det) {
+                const cab = det.closest('.panel').querySelector('.panel-header');
+                if (cab && !document.getElementById('bib-det-cerrar')) {
+                    const x = document.createElement('button'); x.type = 'button'; x.id = 'bib-det-cerrar'; x.title = 'Cerrar el detalle'; x.textContent = '×'; x.onclick = planBibDetalleCerrar;
+                    cab.appendChild(x);
+                }
+                new MutationObserver(function () {
+                    if (planBibSeccion && det.classList.contains('active')) document.body.classList.add('bib-detalle');
+                }).observe(det, { childList: true });
+            }
+            // Los filtros de la biblioteca TopLiderCoach se aplican al cambiarlos, sin pulsar "Filtrar"
+            const fb = document.getElementById('filtros-biblioteca');
+            if (fb) {
+                fb.addEventListener('change', function (e) { if (e.target && e.target.tagName === 'SELECT') cargarEjercicios(1); });
+                fb.addEventListener('keydown', function (e) { if (e.key === 'Enter' && e.target && e.target.id === 'filtro-buscar') cargarEjercicios(1); });
+            }
+        }
+        function planBibDetalleCerrar() { document.body.classList.remove('bib-detalle'); }
+        function planBibCuenta() {
+            const el = document.getElementById('bib-cab-cuenta');
+            if (!el || !planBibSeccion) return;
+            const l = (typeof sesion !== 'undefined' && sesion && Array.isArray(sesion[planBibSeccion])) ? sesion[planBibSeccion] : [];
+            const min = l.reduce((a, e) => a + (e.duracion || 0), 0);
+            el.textContent = l.length + (l.length === 1 ? ' tarea' : ' tareas') + ' · ' + min + ' min';
+        }
+        function planBibCambiar(seccion) { planBibSeccion = seccion; planBibCuenta(); }
+        function planBibAbrir(seccion) {
+            planBibMontar();
+            planBibSeccion = seccion || 'principal';
+            document.getElementById('bib-cab-seccion').value = planBibSeccion;
+            planBibCuenta();
+            document.body.classList.add('bib-abierta');
+        }
+        function planBibCerrar() {
+            planBibSeccion = null;
+            document.body.classList.remove('bib-abierta', 'bib-detalle');
+        }
+        function planBibAnadir() {
+            const seccion = planBibSeccion, inp = document.getElementById('ejercicio-duracion-input');
+            if (inp) inp.value = parseInt(ejercicioSeleccionado.duracion) || 15;
+            seleccionarSeccion(seccion);
+            planBibCuenta();
+            if (typeof showToast === 'function') showToast('Añadida a ' + PLAN_BIB_NOMBRES[seccion], 'success', 1800);
+        }
+
         // ---- Tarjetas de tarea de la sesion: imagen, series y minutos ----
         // Cada tarea guarda nSeries y minSerie; "duracion" sigue siendo el total (series x minutos),
         // que es lo que leen los PDF, la carga GPS y la periodizacion.
@@ -758,7 +829,7 @@ registrarSubTab('planificador', 'calendario', cargarCalendarioUnificado);
             const nEq = (ej.equipos && ej.equipos.series) ? ej.equipos.series.length : 0;
             return '<div class="tarea-card' + (libre ? ' libre' : '') + '">'
                 + (libre ? '<div class="tarea-img vacia">Bloque libre</div>'
-                         : '<div class="tarea-img' + (ej.imagen ? '' : ' vacia') + '" onclick="seleccionarEjercicio(\'' + ej.id + '\')" title="Ver el ejercicio">' + (ej.imagen ? '<img src="' + planEsc(ej.imagen) + '" alt="" loading="lazy">' : 'Sin imagen') + '</div>')
+                         : '<div class="tarea-img' + (ej.imagen ? '' : ' vacia') + '" onclick="planBibAbrir(\'' + seccion + '\'); seleccionarEjercicio(\'' + ej.id + '\')" title="Ver el ejercicio">' + (ej.imagen ? '<img src="' + planEsc(ej.imagen) + '" alt="" loading="lazy">' : 'Sin imagen') + '</div>')
                 + '<div class="tarea-cuerpo">'
                 + '<div class="tarea-titulo" title="' + planEsc(ej.titulo) + '">' + planEsc(ej.titulo) + '</div>'
                 + '<div class="tarea-meta"><span>' + (meta.join(' · ') || '&nbsp;') + '</span>'
@@ -790,10 +861,10 @@ registrarSubTab('planificador', 'calendario', cargarCalendarioUnificado);
                 tiempo.textContent = `${totalMin} min`;
                 
                 if (sesion[seccion].length === 0) {
-                    lista.innerHTML = '<p style="text-align:center;color:#9ca3af;padding:20px;font-size:13px;">Arrastra ejercicios aqui</p>';
+                    lista.innerHTML = '<div class="tareas-grid">' + planBibBoton(seccion) + '</div>';
               } else {
                     const totalEnSeccion = sesion[seccion].length;
-                    lista.innerHTML = '<div class="tareas-grid">' + sesion[seccion].map((ej, idx) => planTareaTarjeta(ej, seccion, idx, totalEnSeccion)).join('') + '</div>';
+                    lista.innerHTML = '<div class="tareas-grid">' + sesion[seccion].map((ej, idx) => planTareaTarjeta(ej, seccion, idx, totalEnSeccion)).join('') + planBibBoton(seccion) + '</div>';
                 }
             });
             
