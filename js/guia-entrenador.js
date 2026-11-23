@@ -72,7 +72,7 @@
         { id: 'sesiones', ico: '📋', title: 'Crea tu primera sesión', sub: 'Con ejercicios de la biblioteca',
           hecho: function () { return E.reales.sesiones > 0; }, steps: [
             { go: sub('planificador', 'crear'), sel: '#sesion-nombre', title: 'Ponle nombre y fecha', text: 'Empieza por el nombre de la sesión y el día. Lo demás es opcional.' },
-            { sel: '#lista-ejercicios', title: 'La biblioteca de ejercicios', text: 'Más de 2.500 ejercicios de los mejores entrenadores. Filtra por tema o por entrenador y arrastra el que te guste a la parte de la sesión que quieras.' },
+            { sel: '#lista-principal .tarea-anadir', title: 'La biblioteca de ejercicios', text: 'Pulsa <b>+ Añadir tarea</b> en la parte de la sesión que quieras y se abre la biblioteca: más de 2.500 ejercicios de los mejores entrenadores, los tuyos y los de la Comunidad. Filtra y pulsa <b>+ Añadir</b>.' },
             { sel: '#lista-principal', title: 'Tu sesión', text: 'Aquí se va montando: calentamiento, parte principal y vuelta a la calma. Puedes cambiar los minutos, reordenar y añadir bloques libres con tus propios ejercicios.' },
             { sel: 'button[onclick="guardarSesion()"]', title: 'Guárdala', text: 'Pulsa <b>Guardar sesión</b> y quedará en Mis Sesiones y en el calendario.' }
         ] },
