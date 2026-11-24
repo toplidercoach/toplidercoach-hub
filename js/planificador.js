@@ -872,21 +872,22 @@ registrarSubTab('planificador', 'calendario', cargarCalendarioUnificado);
             if (!libre && ej.espacio) meta.push(planEsc(ej.espacio));
             if (libre && ej.notas) meta.push('<i>' + planEsc(ej.notas.length > 90 ? ej.notas.slice(0, 90) + '…' : ej.notas) + '</i>');
             const nEq = (ej.equipos && ej.equipos.series) ? ej.equipos.series.length : 0;
-            return '<div class="tarea-card' + (libre ? ' libre' : '') + '"' + ((libre || ej.id === null || ej.id === undefined) ? '' : ' data-ejid="' + planEsc(ej.id) + '" data-min="' + (parseFloat(ej.duracion) || 0) + '"') + '>'
+            return '<div class="tarea-card' + (libre ? ' libre' : '') + '"' + ((libre || ej.id === null || ej.id === undefined) ? '' : ' data-ejid="' + planEsc(ej.id) + '" data-min="' + (parseFloat(ej.duracion) || 0) + '"')
+                + ' data-sec="' + seccion + '" data-idx="' + idx + '"' + (total > 1 ? ' draggable="true" ondragstart="planTareaArrastra(event)" ondragover="planTareaSobre(event)" ondragleave="planTareaSale(event)" ondrop="planTareaSuelta(event)" ondragend="planTareaFin()"' : '') + '>'
                 + (libre ? '<div class="tarea-img vacia">Bloque libre</div>'
-                         : '<div class="tarea-img' + (ej.imagen ? '' : ' vacia') + '" onclick="planBibAbrir(\'' + seccion + '\'); seleccionarEjercicio(\'' + ej.id + '\')" title="Ver el ejercicio">' + (ej.imagen ? '<img src="' + planEsc(ej.imagen) + '" alt="" loading="lazy">' : 'Sin imagen') + '</div>')
+                         : '<div class="tarea-img' + (ej.imagen ? '' : ' vacia') + '" onclick="planBibAbrir(\'' + seccion + '\'); seleccionarEjercicio(\'' + ej.id + '\')" title="Ver el ejercicio">' + (ej.imagen ? '<img src="' + planEsc(ej.imagen) + '" alt="" loading="lazy" draggable="false">' : 'Sin imagen') + '</div>')
                 + '<div class="tarea-cuerpo">'
-                + '<div class="tarea-titulo" title="' + planEsc(ej.titulo) + '">' + planEsc(ej.titulo) + '</div>'
+                + '<div class="tarea-cab"><div class="tarea-titulo" title="' + planEsc(ej.titulo) + '">' + planEsc(ej.titulo) + '</div>'
+                + '<button type="button" class="tarea-lapiz" title="Cambiar el título solo en esta sesión" onclick="event.stopPropagation(); editarTituloSesion(' + a + ')">✏️</button></div>'
                 + '<div class="tarea-meta"><span>' + (meta.join(' · ') || '&nbsp;') + '</span>'
-                + '<button type="button" class="tarea-orden" title="Subir"' + (idx === 0 ? ' disabled' : '') + ' onclick="event.stopPropagation(); moverEjercicio(' + a + ', -1)">▲</button>'
-                + '<button type="button" class="tarea-orden" title="Bajar"' + (idx === total - 1 ? ' disabled' : '') + ' onclick="event.stopPropagation(); moverEjercicio(' + a + ', 1)">▼</button></div>'
+                + '<button type="button" class="tarea-orden" title="Poner antes"' + (idx === 0 ? ' disabled' : '') + ' onclick="event.stopPropagation(); moverEjercicio(' + a + ', -1)">◀</button>'
+                + '<button type="button" class="tarea-orden" title="Poner después"' + (idx === total - 1 ? ' disabled' : '') + ' onclick="event.stopPropagation(); moverEjercicio(' + a + ', 1)">▶</button></div>'
                 + '<div class="tarea-tiempos">'
                 + '<div class="tarea-tiempo"><span>Series</span><div>' + paso('series', -1, '−', 'Una serie menos', p.series <= 1) + '<b>' + p.series + '</b>' + paso('series', 1, '+', 'Una serie más', p.series >= 20) + '</div></div>'
                 + '<div class="tarea-tiempo"><span>Minutos</span><div>' + paso('min', -1, '−', 'Un minuto menos', p.min <= 1) + '<b>' + p.min + '</b>' + paso('min', 1, '+', 'Un minuto más', p.min >= 180) + '</div></div>'
                 + '<div class="tarea-total" title="Tiempo total de la tarea">' + p.total + ' min</div>'
                 + '</div>'
                 + '<div class="tarea-acciones">'
-                + '<button type="button" title="Cambiar el título solo en esta sesión" onclick="event.stopPropagation(); editarTituloSesion(' + a + ')">Editar</button>'
                 + '<button type="button" class="eq" title="Montar equipos" onclick="event.stopPropagation(); eqAbrirModal(' + a + ')">Equipos' + (nEq ? ' ' + nEq : '') + '</button>'
                 + '<button type="button" class="quitar" title="Quitar de la sesión" onclick="event.stopPropagation(); quitarEjercicio(' + a + ')">Quitar</button>'
                 + '</div></div></div>';
@@ -952,6 +953,55 @@ registrarSubTab('planificador', 'calendario', cargarCalendarioUnificado);
         function quitarEjercicio(seccion, idx) {
             sesion[seccion].splice(idx, 1);
             renderizarSesion();
+        }
+        // ---- Recolocar una tarea arrastrándola (dentro de su mismo bloque) ----
+        let planArrastre = null;
+        function planTareaArrastra(ev) {
+            const c = ev.currentTarget;
+            planArrastre = { seccion: c.dataset.sec, idx: parseInt(c.dataset.idx) };
+            try { ev.dataTransfer.effectAllowed = 'move'; ev.dataTransfer.setData('text/plain', 'tarea'); } catch (e) {}
+            setTimeout(function () { c.classList.add('arrastrando'); }, 0);
+        }
+        function planTareaLado(ev, c) {
+            const r = c.getBoundingClientRect();
+            return (ev.clientX - r.left) > r.width / 2 ? 1 : 0;
+        }
+        function planTareaSobre(ev) {
+            const c = ev.currentTarget;
+            if (!planArrastre || c.dataset.sec !== planArrastre.seccion) return;
+            ev.preventDefault();
+            try { ev.dataTransfer.dropEffect = 'move'; } catch (e) {}
+            if (parseInt(c.dataset.idx) === planArrastre.idx) return;
+            const despues = planTareaLado(ev, c);
+            c.classList.toggle('soltar-antes', !despues);
+            c.classList.toggle('soltar-despues', !!despues);
+        }
+        function planTareaSale(ev) {
+            const c = ev.currentTarget;
+            if (ev.relatedTarget && c.contains(ev.relatedTarget)) return;
+            c.classList.remove('soltar-antes', 'soltar-despues');
+        }
+        function planTareaSuelta(ev) {
+            const c = ev.currentTarget;
+            if (!planArrastre || c.dataset.sec !== planArrastre.seccion) return;
+            ev.preventDefault();
+            const lista = sesion[planArrastre.seccion];
+            const desde = planArrastre.idx;
+            let hasta = parseInt(c.dataset.idx) + planTareaLado(ev, c);
+            planArrastre = null;
+            if (!Array.isArray(lista) || !lista[desde]) { renderizarSesion(); return; }
+            if (hasta > desde) hasta--;
+            if (hasta !== desde) {
+                const mov = lista.splice(desde, 1)[0];
+                lista.splice(hasta, 0, mov);
+            }
+            renderizarSesion();
+        }
+        function planTareaFin() {
+            planArrastre = null;
+            document.querySelectorAll('.tarea-card.arrastrando, .tarea-card.soltar-antes, .tarea-card.soltar-despues').forEach(function (c) {
+                c.classList.remove('arrastrando', 'soltar-antes', 'soltar-despues');
+            });
         }
         function moverEjercicio(seccion, idx, direccion) {
             const nuevoIdx = idx + direccion;
