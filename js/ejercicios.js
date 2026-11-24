@@ -4142,11 +4142,33 @@ function ejComunidadBoton() {
 }
 function ejComunidadYo() { return String((typeof usuario !== 'undefined' && usuario && usuario.id != null) ? usuario.id : (window.ejCoachId || '')); }
 // Lo que le falta a un ejercicio para poder enviarse a la Comunidad (lista vacía = completo)
+// En la Comunidad solo entran ejercicios DIBUJADOS con la pizarra de TopLiderCoach (diseño uniforme): una imagen subida
+// no vale, tampoco para el administrador. Se pide un mínimo de elementos para que no se cuele un dibujo simbólico.
+var EJ_COMUNIDAD_MIN_DIBUJO = 5;
+function ejComunidadElementos(bd) {
+    var n = 0;
+    if (bd && typeof bd === 'object') ['players', 'lines', 'equipment', 'shapes'].forEach(function (k) { if (Array.isArray(bd[k])) n += bd[k].length; });
+    return n;
+}
+// Motivo por el que el dibujo no sirve para la Comunidad, o '' si sirve
+function ejComunidadDibujoFalta(o) {
+    var n = ejComunidadElementos(o && o.board_data);
+    if (n >= EJ_COMUNIDAD_MIN_DIBUJO) return '';
+    if (n > 0) return 'Dibujo más completo: tiene ' + n + (n === 1 ? ' elemento' : ' elementos') + ' y hacen falta al menos ' + EJ_COMUNIDAD_MIN_DIBUJO + ' (jugadores, material, flechas...)';
+    return 'Dibujo hecho con la pizarra de TopLiderCoach' + (o && o.thumbnail_svg ? ' (las imágenes subidas no valen para la Comunidad: pulsa «Editar dibujo» y dibújalo)' : '');
+}
+// Imagen que se publica: sale SIEMPRE del dibujo, nunca de una imagen subida
+async function ejComunidadMiniatura(bdAnonimo, o) {
+    var mini = ejMiniaturaDeDatos(bdAnonimo, true);
+    if (!mini && o && o.thumbnail_svg && o.thumbnail_svg.indexOf('data:') !== 0) mini = o.thumbnail_svg;   // miniatura que ya generó la pizarra
+    if (!mini) throw new Error('no se ha podido generar la imagen del dibujo; abre la pizarra y vuelve a intentarlo');
+    return await ejMiniaturaCompacta(mini);
+}
 function ejComunidadFaltan(o) {
-    var f = [], txt = function (v) { return String(v == null ? '' : v).trim(); }, bd = o.board_data || {};
-    var hayDibujo = !!((bd.players && bd.players.length) || (bd.lines && bd.lines.length) || (bd.equipment && bd.equipment.length) || (bd.shapes && bd.shapes.length) || o.thumbnail_svg);
+    var f = [], txt = function (v) { return String(v == null ? '' : v).trim(); };
+    var dibujo = ejComunidadDibujoFalta(o);
     if (!txt(o.name)) f.push('Nombre');
-    if (!hayDibujo) f.push('Dibujo o imagen del ejercicio');
+    if (dibujo) f.push(dibujo);
     if (!(parseInt(o.duration_min) > 0)) f.push('Duración');
     if (!(parseInt(o.players_count) > 0)) f.push('Nº de jugadores');
     if (!txt(o.category)) f.push('Categoría');
@@ -4238,14 +4260,10 @@ async function ejComunidadPublicar(idCopia) {
         var o = r.data, campos = ['name','description','objectives','variants','coach_notes','materials','category','tema','age_group','difficulty','game_phase','duration_min','players_count','num_goalkeepers','field_width','field_length','field_area','eii','eii_analysis','es_portero','subcategoria_portero'];
         var fila = {};
         campos.forEach(function (k) { if (o[k] !== undefined) fila[k] = o[k]; });
-        if (o.board_data && (o.board_data.players || o.board_data.lines || o.board_data.equipment)) {
-            fila.board_data = ejComunidadAnonimizar(o.board_data);
-            fila.thumbnail_svg = await ejMiniaturaCompacta(ejMiniaturaDeDatos(fila.board_data, true) || o.thumbnail_svg || null);
-        } else {
-            // Ejercicio hecho con una imagen subida, sin dibujo de pizarra: se comparte la imagen tal cual
-            fila.board_data = o.board_data || null;
-            fila.thumbnail_svg = o.thumbnail_svg || null;
-        }
+        var sinDibujo = ejComunidadDibujoFalta(o);
+        if (sinDibujo) { ejComunidadCerrar(); ejToast('No se puede compartir. Falta: ' + sinDibujo, 'warning'); return; }
+        fila.board_data = ejComunidadAnonimizar(o.board_data);
+        fila.thumbnail_svg = await ejComunidadMiniatura(fila.board_data, o);
         var ahora = new Date().toISOString(), quien = String(usuario && usuario.id != null ? usuario.id : window.ejCoachId);
         Object.assign(fila, { club_id: null, coach_id: 'comunidad', source: 'comunidad', visibility: 'community', approval_status: 'approved',
             approved_by: quien, approved_at: ahora, shared_from: o.id, shared_by: quien, shared_by_name: 'TopLiderCoach', updated_at: ahora });
@@ -4361,13 +4379,8 @@ async function ejComunidadEnviar(idEnvio) {
         var campos = ['name','description','objectives','variants','coach_notes','materials','category','tema','age_group','difficulty','game_phase','duration_min','players_count','num_goalkeepers','field_width','field_length','field_area','eii','eii_analysis','es_portero','subcategoria_portero'];
         var fila = {};
         campos.forEach(function (k) { if (o[k] !== undefined) fila[k] = o[k]; });
-        if (o.board_data && (o.board_data.players || o.board_data.lines || o.board_data.equipment)) {
-            fila.board_data = ejComunidadAnonimizar(o.board_data);
-            fila.thumbnail_svg = await ejMiniaturaCompacta(ejMiniaturaDeDatos(fila.board_data, true) || o.thumbnail_svg || null);
-        } else {
-            fila.board_data = o.board_data || null;
-            fila.thumbnail_svg = o.thumbnail_svg || null;
-        }
+        fila.board_data = ejComunidadAnonimizar(o.board_data);
+        fila.thumbnail_svg = await ejComunidadMiniatura(fila.board_data, o);
         var chk = document.getElementById('ej-comunidad-autor'), yo = ejComunidadYo();
         var nombre = (chk && chk.checked && typeof usuario !== 'undefined' && usuario) ? (usuario.display_name || usuario.name || null) : null;
         Object.assign(fila, { club_id: null, coach_id: 'comunidad', source: 'comunidad', visibility: 'community', approval_status: 'pending_review',
@@ -4420,6 +4433,7 @@ async function ejComunidadRevisar(id, aprobar, motivo) {
             var r = await supabaseClient.from('custom_exercises').select('*').eq('id', id).eq('visibility', 'community').single();
             if (r.error) throw new Error('el envío ya no existe (puede que lo hayan cancelado)');
             var e = r.data;
+            if (ejComunidadElementos(e.board_data) < EJ_COMUNIDAD_MIN_DIBUJO) throw new Error('no está dibujado con la pizarra (tiene ' + ejComunidadElementos(e.board_data) + ' elementos). Recházalo indicando el motivo');
             var p = e.shared_from ? await supabaseClient.from('custom_exercises').select('id').eq('shared_from', e.shared_from).eq('visibility', 'community').eq('approval_status', 'approved').limit(1) : { data: [] };
             if (p.error) throw p.error;
             var publicada = (p.data || []).filter(function (x) { return x.id !== id; })[0];
@@ -4487,6 +4501,7 @@ async function ejComunidadVer(id) {
         if (r.error) throw r.error;
         var o = r.data, bt = 'border:none;border-radius:8px;padding:9px 16px;cursor:pointer;font-size:13px;font-weight:700';
         var datos = [];
+        if (ejComunidadEsAdmin() && o.visibility === 'community') datos.push('Pizarra: ' + ejComunidadElementos(o.board_data) + ' elementos');
         if (o.tema) datos.push(o.tema);
         if (o.category) datos.push(o.category);
         if (o.game_phase) datos.push(o.game_phase);
