@@ -985,7 +985,7 @@ sesion = { nombre: '', fecha: fechaHoy, previo: [], calentamiento: [], principal
             renderizarJugadoresSesion();
         }
         
-        async function guardarSesion() {
+        async function guardarSesion(sinCierre) {
             const nombre = document.getElementById('sesion-nombre').value.trim();
             const fecha = document.getElementById('sesion-fecha').value;
             const hora = document.getElementById('sesion-hora').value;
@@ -1075,7 +1075,9 @@ if (!sesionEditandoId) {
 
 if (typeof scGuardarConceptos === 'function') { await scGuardarConceptos(sesionId, !!sesionEditandoId); }
                 showToast(sesionEditandoId ? 'Sesión actualizada correctamente' : 'Sesión guardada correctamente');
+                const eraNueva = !sesionEditandoId;
                 sesionEditandoId = sesionId; // Permanecer en la sesión tras guardar (Nueva Sesion = empezar de cero)
+                if (eraNueva && !sinCierre && sesionId && typeof sesCierreAbrir === 'function') sesCierreAbrir(sesionId, true);
                 return true;
                 
             } catch (error) {
@@ -1090,7 +1092,7 @@ if (typeof scGuardarConceptos === 'function') { await scGuardarConceptos(sesionI
                 showToast('Esta sesion no tiene trabajo de porteros');
                 return;
             }
-            const guardada = await guardarSesion();
+            const guardada = await guardarSesion(true);
             if (!guardada || !sesionEditandoId) return;
             const id = sesionEditandoId;
             if (accion === 'vestuario') abrirModoVestuario(id);
@@ -1235,7 +1237,7 @@ if (typeof scGuardarConceptos === 'function') { await scGuardarConceptos(sesionI
                                         <button class="sc-btn" style="background:#7c2d12;" onclick="abrirMontajesSesion('${s.id}')" title="Montajes de campo">🏟️</button>
                                         <button class="sc-btn sc-btn-cargar" onclick="cargarSesionEnEditor('${s.id}')" title="Cargar">✏️</button>
                                         <button class="sc-btn sc-btn-asistencia" onclick="abrirModalAsistenciaSesion('${s.id}')" title="Asistencia">📋</button>
-                                        <button class="sc-btn sc-btn-pdf" onclick="abrirModalPDFSesion('${s.id}')" title="PDF">📄</button>
+                                        <button class="sc-btn sc-btn-pdf" onclick="abrirModalPDFSesion('${s.id}')" title="PDF y compartir">📄</button>
                                         ${gk.length ? `<button class="sc-btn" style="background:#0e7490;" onclick="exportarSesionPDF('${s.id}', true, false, true)" title="PDF porteros">🧤</button>` : ''}
                                         <button class="sc-btn sc-btn-eliminar" onclick="eliminarSesion('${s.id}')" title="Eliminar">🗑️</button>
                                     </div>
@@ -1322,6 +1324,7 @@ if (typeof scGuardarConceptos === 'function') { await scGuardarConceptos(sesionI
         let sesionPDFId = null;
 
 function abrirModalPDFSesion(id) {
+    if (typeof sesCierreAbrir === 'function') { sesCierreAbrir(id, false); return; }
     sesionPDFId = id;
     document.getElementById('modal-pdf-sesion').style.display = 'flex';
 }

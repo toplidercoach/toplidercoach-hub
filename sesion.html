@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Sesión — TopLiderCoach</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; background: #f1f5f9; color: #0f172a; }
+    .pagina { max-width: 720px; margin: 0 auto; min-height: 100vh; background: #f1f5f9; }
+    .top { background: linear-gradient(135deg, #4c1d95, #7c3aed); color: #fff; padding: 18px 16px 16px; }
+    .club { font-size: 12.5px; opacity: .9; display: flex; align-items: center; gap: 8px; }
+    .club img { width: 26px; height: 26px; object-fit: contain; border-radius: 4px; background: #fff; padding: 2px; }
+    h1 { font-size: 20px; margin: 10px 0 4px; line-height: 1.25; }
+    .fecha { font-size: 13.5px; opacity: .92; }
+    .fecha::first-letter { text-transform: uppercase; }
+    .chips { display: flex; gap: 6px; margin-top: 12px; flex-wrap: wrap; }
+    .chips span { background: rgba(255,255,255,.16); border-radius: 999px; padding: 4px 11px; font-size: 12.5px; font-weight: 600; }
+    .objetivo { margin: 14px 14px 0; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 11px 13px; font-size: 13.5px; color: #334155; line-height: 1.45; }
+    .objetivo b { display: block; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: #64748b; margin-bottom: 3px; }
+    .bloque { padding: 18px 14px 0; }
+    .bloque-t { display: flex; justify-content: space-between; align-items: baseline; font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #64748b; margin-bottom: 8px; }
+    .tarea { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; overflow: hidden; margin-bottom: 12px; }
+    .tarea-img { display: block; width: 100%; background: #e2e8f0; cursor: zoom-in; }
+    .tarea-img img { display: block; width: 100%; height: auto; }
+    .tarea-tx { padding: 11px 13px 13px; }
+    .tarea-tx h2 { font-size: 15.5px; margin: 0; line-height: 1.3; }
+    .tiempo { display: inline-block; background: #ede9fe; color: #6d28d9; font-weight: 700; font-size: 12.5px; border-radius: 6px; padding: 2px 9px; margin: 7px 6px 0 0; }
+    .dato { display: inline-block; background: #f1f5f9; color: #475569; font-size: 12px; border-radius: 6px; padding: 2px 8px; margin: 7px 6px 0 0; }
+    .tarea-tx p { margin: 9px 0 0; font-size: 13.5px; color: #475569; line-height: 1.5; white-space: pre-line; }
+    .pie { text-align: center; font-size: 11.5px; color: #94a3b8; padding: 10px 0 22px; }
+    .estado { padding: 70px 26px; text-align: center; color: #475569; font-size: 15px; line-height: 1.5; }
+    .estado b { display: block; color: #0f172a; font-size: 17px; margin-bottom: 8px; }
+    #zoom { position: fixed; inset: 0; background: rgba(15,23,42,.94); display: none; align-items: center; justify-content: center; z-index: 10; cursor: zoom-out; }
+    #zoom img { max-width: 100%; max-height: 100%; }
+</style>
+</head>
+<body>
+<div class="pagina" id="pagina"><div class="estado">Cargando la sesión...</div></div>
+<div id="zoom" onclick="this.style.display='none'"><img alt=""></div>
+<script>
+const SUPABASE_URL = 'https://cqteodxyvavyroxeshoz.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNxdGVvZHh5dmF2eXJveGVzaG96Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUyNzc2OTksImV4cCI6MjA4MDg1MzY5OX0.8sJC6twae2pnrf8NDVlOV2KnSOhBC1RrqWC0IiuE614';
+const sb = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+
+function esc(s) { return String(s === null || s === undefined ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+// Los textos de la biblioteca vienen con HTML: se queda solo el texto
+function soloTexto(html) {
+    if (!html) return '';
+    var d = document.createElement('div');
+    d.innerHTML = String(html).replace(/<br\s*\/?>/gi, '\n').replace(/<\/p>/gi, '\n');
+    return (d.textContent || '').replace(/\n{3,}/g, '\n\n').trim();
+}
+// Mismo criterio que el planificador: "3 x 5 min" si las series cuadran con el total
+function tiempo(t) {
+    var total = Math.max(0, Math.round(parseFloat(t.duracion) || 0));
+    var s = parseInt(t.nSeries) || 1, m = parseInt(t.minSerie) || 0;
+    return (s > 1 && m > 0 && s * m === total) ? (s + ' x ' + m + ' min') : (total + ' min');
+}
+function imagenDe(t, miniaturas) {
+    var img = t.imagen || '';
+    if (/^(data:|https?:)/.test(img)) return img;
+    var m = miniaturas && t.id ? miniaturas[t.id] : '';
+    if (!m) return '';
+    if (m.indexOf('data:') === 0) return m;
+    return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(m);
+}
+function ampliar(el) {
+    var z = document.getElementById('zoom');
+    z.querySelector('img').src = el.querySelector('img').src;
+    z.style.display = 'flex';
+}
+function estado(titulo, texto) {
+    document.getElementById('pagina').innerHTML = '<div class="estado"><b>' + esc(titulo) + '</b>' + esc(texto) + '</div>';
+}
+
+async function iniciar() {
+    var token = new URLSearchParams(window.location.search).get('s');
+    if (!token) { estado('Enlace incompleto', 'Pide a tu entrenador que te lo vuelva a enviar.'); return; }
+    if (!sb) { estado('No se pudo cargar la sesión', 'Comprueba tu conexión y vuelve a abrir el enlace.'); return; }
+    var r;
+    try { r = await sb.rpc('fn_sesion_compartida', { p_token: token }); }
+    catch (e) { r = { error: e }; }
+    if (r.error) { estado('No se pudo cargar la sesión', 'Comprueba tu conexión y vuelve a abrir el enlace.'); return; }
+    var s = r.data;
+    if (!s) { estado('Este enlace ya no está disponible', 'El entrenador ha dejado de compartir la sesión. Pídele un enlace nuevo.'); return; }
+
+    document.title = (s.nombre || 'Sesión') + ' — TopLiderCoach';
+    var total = 0, nTareas = 0, cuerpo = '';
+    (s.bloques || []).forEach(function (b) {
+        var tareas = Array.isArray(b.tareas) ? b.tareas : [];
+        if (!tareas.length) return;
+        var min = 0;
+        var html = tareas.map(function (t) {
+            var libre = t.tipo === 'libre';
+            min += Math.max(0, Math.round(parseFloat(t.duracion) || 0));
+            nTareas++;
+            var img = libre ? '' : imagenDe(t, s.miniaturas);
+            var datos = '';
+            if (!libre && t.jugadores) datos += '<span class="dato">' + esc(t.jugadores) + ' jugadores</span>';
+            if (!libre && t.espacio) datos += '<span class="dato">' + esc(t.espacio) + '</span>';
+            if (t.material) datos += '<span class="dato">' + esc(soloTexto(t.material)) + '</span>';
+            var texto = soloTexto(libre ? t.notas : (t.objetivo || t.descripcion));
+            return '<div class="tarea">' +
+                (img ? '<div class="tarea-img" onclick="ampliar(this)"><img src="' + esc(img) + '" alt="" loading="lazy"></div>' : '') +
+                '<div class="tarea-tx"><h2>' + esc(t.titulo || (libre ? 'Bloque libre' : 'Ejercicio')) + '</h2>' +
+                '<span class="tiempo">' + tiempo(t) + '</span>' + datos +
+                (texto ? '<p>' + esc(texto) + '</p>' : '') + '</div></div>';
+        }).join('');
+        total += min;
+        cuerpo += '<div class="bloque"><div class="bloque-t"><span>' + esc(b.nombre) + '</span><span>' + min + ' min</span></div>' + html + '</div>';
+    });
+
+    var fecha = '';
+    if (s.fecha) {
+        fecha = new Date(s.fecha + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+        if (s.hora) fecha += ' · ' + String(s.hora).substring(0, 5);
+    }
+    var chips = '';
+    if (s.md) chips += '<span>' + esc(s.md) + '</span>';
+    if (s.microciclo) chips += '<span>Microciclo ' + esc(s.microciclo) + '</span>';
+    chips += '<span>' + total + ' min</span><span>' + nTareas + (nTareas === 1 ? ' tarea' : ' tareas') + '</span>';
+
+    document.getElementById('pagina').innerHTML =
+        '<div class="top"><div class="club">' + (s.logo ? '<img src="' + esc(s.logo) + '" alt="" onerror="this.remove()">' : '') + esc(s.club || '') + '</div>' +
+        '<h1>' + esc(s.nombre || 'Sesión') + '</h1><div class="fecha">' + esc(fecha) + '</div><div class="chips">' + chips + '</div></div>' +
+        (s.objetivo ? '<div class="objetivo"><b>Objetivo</b>' + esc(s.objetivo) + '</div>' : '') +
+        (cuerpo || '<div class="estado">Esta sesión todavía no tiene tareas.</div>') +
+        '<div class="pie">Sesión compartida desde TopLiderCoach</div>';
+}
+iniciar();
+</script>
+</body>
+</html>
