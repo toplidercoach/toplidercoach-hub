@@ -3829,6 +3829,82 @@ function ejBancoPintarTabs() {
     ejBancoPendientes();
     ejBancoAporte();
 }
+// ---- Avisos de la Comunidad al entrar en la aplicación ----
+// Sin tabla de avisos: se leen del propio estado de los envíos.
+//  · Administrador: cuántos envíos y solicitudes de retirada esperan revisión.
+//  · Usuario: envíos suyos aprobados o rechazados cuyo resultado aún no ha visto (resultado_visto_at vacío).
+function ejComunidadAvisoCaja(html) {
+    var c = document.getElementById('ej-comunidad-aviso');
+    if (!c) { c = document.createElement('div'); c.id = 'ej-comunidad-aviso'; document.body.appendChild(c); }
+    c.style.cssText = 'position:fixed;right:18px;top:74px;z-index:9000;width:370px;max-width:calc(100vw - 36px);background:#111a2b;border:1px solid #2f405c;border-left:4px solid #7c3aed;border-radius:12px;box-shadow:0 14px 40px rgba(0,0,0,.45);padding:14px 16px;color:#e2e8f0;font-family:system-ui,sans-serif;font-size:13px;line-height:1.45';
+    c.innerHTML = html;
+}
+function ejComunidadAvisoCerrar() { var c = document.getElementById('ej-comunidad-aviso'); if (c) c.remove(); }
+async function ejComunidadAvisos() {
+    if (typeof supabaseClient === 'undefined' || !supabaseClient) return;
+    var yo = ejComunidadYo();
+    if (!yo) return;
+    var bt = 'border:none;border-radius:8px;padding:7px 14px;cursor:pointer;font-size:12px;font-weight:700';
+    var cab = '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px"><b style="font-size:14px">Comunidad</b>'
+        + '<button type="button" onclick="CIERRE" title="Cerrar" style="background:none;border:none;color:#94a3b8;font-size:20px;line-height:1;cursor:pointer;padding:0 2px">×</button></div>';
+    try {
+        if (ejComunidadEsAdmin()) {
+            var r = await supabaseClient.from('custom_exercises').select('id,approval_status').eq('visibility', 'community').or('approval_status.eq.pending_review,retirada_solicitada_at.not.is.null').limit(200);
+            if (r.error) return;
+            var filas = r.data || [], envios = filas.filter(function (x) { return x.approval_status === 'pending_review'; }).length, retiradas = filas.length - envios;
+            var clave = envios + '/' + retiradas, visto = null;
+            try { visto = sessionStorage.getItem('tlc_comunidad_aviso'); } catch (e) {}
+            if (!filas.length || visto === clave) return;     // nada pendiente, o ya se cerró este mismo aviso en esta sesión
+            var partes = [];
+            if (envios) partes.push('<b>' + envios + '</b> ' + (envios === 1 ? 'ejercicio enviado' : 'ejercicios enviados'));
+            if (retiradas) partes.push('<b>' + retiradas + '</b> ' + (retiradas === 1 ? 'solicitud de retirada' : 'solicitudes de retirada'));
+            ejComunidadAvisoCaja(cab.replace('CIERRE', "ejComunidadAvisoDescartar('" + clave + "')")
+                + '<div>Tienes ' + partes.join(' y ') + ' por revisar.</div>'
+                + '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px"><button type="button" onclick="ejComunidadAvisoDescartar(\'' + clave + '\')" style="' + bt + ';background:#0b1220;color:#e2e8f0;border:1px solid #2f405c">Luego</button>'
+                + '<button type="button" onclick="ejComunidadAvisoDescartar(\'' + clave + '\');ejComunidadIrARevisar()" style="' + bt + ';background:#7c3aed;color:#fff">Ir a revisar</button></div>');
+            return;
+        }
+        var u = await supabaseClient.from('custom_exercises').select('id,name,approval_status,approval_notes').eq('visibility', 'community').eq('shared_by', yo).or('approval_status.eq.approved,approval_status.eq.rejected').is('resultado_visto_at', null).limit(50);
+        if (u.error) return;
+        var res = u.data || [];
+        if (!res.length) return;
+        var ok = res.filter(function (x) { return x.approval_status === 'approved'; }), no = res.filter(function (x) { return x.approval_status === 'rejected'; });
+        var lista = ok.map(function (x) { return '<div style="margin-top:8px"><span style="color:#4ade80;font-weight:700">Publicado</span> · «' + ejComEsc(x.name) + '» ya está en la Comunidad.</div>'; }).join('')
+            + no.map(function (x) { return '<div style="margin-top:8px"><span style="color:#f87171;font-weight:700">No aceptado</span> · «' + ejComEsc(x.name) + '»' + (x.approval_notes ? '<div style="color:#cbd5e1;background:#1e293b;border-radius:6px;padding:6px 8px;margin-top:4px;white-space:pre-wrap"><b>Motivo:</b> ' + ejComEsc(x.approval_notes) + '</div>' : '') + '</div>'; }).join('');
+        var ids = res.map(function (x) { return x.id; }).join(',');
+        ejComunidadAvisoCaja(cab.replace('CIERRE', "ejComunidadAvisoVisto('" + ids + "')")
+            + '<div style="max-height:46vh;overflow:auto">' + lista + '</div>'
+            + (ok.length ? '<div style="color:#c4b5fd;margin-top:10px">Sumas <b>' + (ok.length * EJ_COMUNIDAD_PUNTOS) + ' puntos</b>. Gracias por aportar.</div>' : '')
+            + (no.length ? '<div style="color:#94a3b8;margin-top:8px">Para corregirlo, ábrelo en tu Banco, cámbialo, guarda y pulsa <b>Comunidad</b> para enviarlo de nuevo.</div>' : '')
+            + '<div style="display:flex;justify-content:flex-end;margin-top:12px"><button type="button" onclick="ejComunidadAvisoVisto(\'' + ids + '\')" style="' + bt + ';background:#7c3aed;color:#fff">Entendido</button></div>');
+    } catch (e) { /* los avisos nunca deben estorbar el arranque */ }
+}
+function ejComunidadAvisoDescartar(clave) {
+    try { sessionStorage.setItem('tlc_comunidad_aviso', clave); } catch (e) {}
+    ejComunidadAvisoCerrar();
+}
+// El usuario ha visto el resultado: no se le vuelve a enseñar, tampoco en otro ordenador
+async function ejComunidadAvisoVisto(ids) {
+    ejComunidadAvisoCerrar();
+    try {
+        await supabaseClient.from('custom_exercises').update({ resultado_visto_at: new Date().toISOString() }).in('id', String(ids).split(',')).eq('visibility', 'community').eq('shared_by', ejComunidadYo());
+    } catch (e) { /* se volverá a enseñar la próxima vez */ }
+}
+// Lleva al administrador a Pizarra > Banco > Por revisar
+function ejComunidadIrARevisar() {
+    var tab = document.querySelector('.main-tab.pizarra');
+    if (tab && typeof cambiarModulo === 'function' && !(document.getElementById('modulo-pizarra') || {}).classList.contains('active')) cambiarModulo('pizarra', tab);
+    var intentos = 0, espera = setInterval(function () {
+        intentos++;
+        if (document.getElementById('ej-tab-banco')) {
+            clearInterval(espera);
+            ejShowTab('banco', document.querySelector('.ej-nav-btn[onclick*="\'banco\'"]'));
+            if (ejBancoFuente !== 'rev') ejBancoCambiarFuente('rev'); else { ejBancoCache = []; ejBancoLoad(true); }
+        } else if (intentos > 40) clearInterval(espera);
+    }, 150);
+}
+if (typeof registrarInit === 'function') registrarInit(function () { setTimeout(ejComunidadAvisos, 2500); });
+
 // ---- Puntos por aportar a la Comunidad ----
 // No hay tabla de puntos: se cuentan en el momento los ejercicios PUBLICADOS de cada usuario
 // (EJ_COMUNIDAD_PUNTOS por cada uno). Si un ejercicio se retira, deja de contar. Lo publicado por
@@ -4295,7 +4371,7 @@ async function ejComunidadEnviar(idEnvio) {
         var chk = document.getElementById('ej-comunidad-autor'), yo = ejComunidadYo();
         var nombre = (chk && chk.checked && typeof usuario !== 'undefined' && usuario) ? (usuario.display_name || usuario.name || null) : null;
         Object.assign(fila, { club_id: null, coach_id: 'comunidad', source: 'comunidad', visibility: 'community', approval_status: 'pending_review',
-            approved_by: null, approved_at: null, approval_notes: null, shared_from: o.id, shared_by: yo, shared_by_name: nombre, updated_at: new Date().toISOString() });
+            approved_by: null, approved_at: null, approval_notes: null, resultado_visto_at: null, shared_from: o.id, shared_by: yo, shared_by_name: nombre, updated_at: new Date().toISOString() });
         var w = idEnvio ? await supabaseClient.from('custom_exercises').update(fila).eq('id', idEnvio).eq('shared_by', yo).neq('approval_status', 'approved').select('id')
                         : await supabaseClient.from('custom_exercises').insert(fila).select('id');
         if (w.error) throw w.error;
@@ -4349,7 +4425,7 @@ async function ejComunidadRevisar(id, aprobar, motivo) {
             var publicada = (p.data || []).filter(function (x) { return x.id !== id; })[0];
             if (publicada) {
                 var campos = ['name','description','objectives','variants','coach_notes','materials','category','tema','age_group','difficulty','game_phase','duration_min','players_count','num_goalkeepers','field_width','field_length','field_area','eii','eii_analysis','es_portero','subcategoria_portero','board_data','thumbnail_svg','shared_by_name'];
-                var nuevo = { approved_by: yo, approved_at: ahora, approval_notes: null, updated_at: ahora };
+                var nuevo = { approved_by: yo, approved_at: ahora, approval_notes: null, updated_at: ahora, resultado_visto_at: null };
                 campos.forEach(function (k) { nuevo[k] = e[k] === undefined ? null : e[k]; });
                 var u = await supabaseClient.from('custom_exercises').update(nuevo).eq('id', publicada.id).select('id');
                 if (u.error) throw u.error;
@@ -4360,8 +4436,8 @@ async function ejComunidadRevisar(id, aprobar, motivo) {
             }
         }
         if (!hecho) {
-            var cambio = aprobar ? { approval_status: 'approved', approved_by: yo, approved_at: ahora, approval_notes: null }
-                                 : { approval_status: 'rejected', approved_by: yo, approved_at: ahora, approval_notes: motivo || null };
+            var cambio = aprobar ? { approval_status: 'approved', approved_by: yo, approved_at: ahora, approval_notes: null, resultado_visto_at: null }
+                                 : { approval_status: 'rejected', approved_by: yo, approved_at: ahora, approval_notes: motivo || null, resultado_visto_at: null };
             var w = await supabaseClient.from('custom_exercises').update(cambio).eq('id', id).eq('visibility', 'community').eq('approval_status', 'pending_review').select('id');
             if (w.error) throw w.error;
             if (!(w.data || []).length) throw new Error('el envío ya no existe o ya estaba revisado');
