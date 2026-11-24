@@ -872,7 +872,7 @@ registrarSubTab('planificador', 'calendario', cargarCalendarioUnificado);
             if (!libre && ej.espacio) meta.push(planEsc(ej.espacio));
             if (libre && ej.notas) meta.push('<i>' + planEsc(ej.notas.length > 90 ? ej.notas.slice(0, 90) + '…' : ej.notas) + '</i>');
             const nEq = (ej.equipos && ej.equipos.series) ? ej.equipos.series.length : 0;
-            return '<div class="tarea-card' + (libre ? ' libre' : '') + '">'
+            return '<div class="tarea-card' + (libre ? ' libre' : '') + '"' + ((libre || ej.id === null || ej.id === undefined) ? '' : ' data-ejid="' + planEsc(ej.id) + '" data-min="' + (parseFloat(ej.duracion) || 0) + '"') + '>'
                 + (libre ? '<div class="tarea-img vacia">Bloque libre</div>'
                          : '<div class="tarea-img' + (ej.imagen ? '' : ' vacia') + '" onclick="planBibAbrir(\'' + seccion + '\'); seleccionarEjercicio(\'' + ej.id + '\')" title="Ver el ejercicio">' + (ej.imagen ? '<img src="' + planEsc(ej.imagen) + '" alt="" loading="lazy">' : 'Sin imagen') + '</div>')
                 + '<div class="tarea-cuerpo">'

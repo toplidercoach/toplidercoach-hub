@@ -1067,6 +1067,7 @@
 .tarea-meta > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tarea-orden { background: #f1f5f9; border: 1px solid #e2e8f0; color: #334155; border-radius: 6px; padding: 2px 6px; font-size: 10px; cursor: pointer; }
 .tarea-orden:disabled { opacity: .35; cursor: not-allowed; }
+.tarea-gps { align-self: flex-start; max-width: 100%; background: #ccfbf1; color: #0f766e; font-size: 11.5px; font-weight: 600; border-radius: 6px; padding: 2px 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tarea-tiempos { display: flex; align-items: flex-end; gap: 6px; }
 .tarea-tiempo > span { display: block; font-size: 10px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: .03em; margin-bottom: 2px; }
 .tarea-tiempo > div { display: flex; align-items: center; }

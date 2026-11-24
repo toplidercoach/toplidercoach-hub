@@ -432,9 +432,33 @@ async function planGpsAnadir(id) {
 }
 
 // ---------- Pintar en el editor ----------
+// Dato GPS en cada tarjeta de tarea de la sesion: metros previstos (ritmo medido x minutos de la tarea)
+function planGpsMarcarTareas() {
+    var cards = document.querySelectorAll('.tarea-card[data-ejid]');
+    for (var i = 0; i < cards.length; i++) {
+        var card = cards[i];
+        var viejo = card.querySelector('.tarea-gps');
+        if (viejo) viejo.parentNode.removeChild(viejo);
+        if (!planGps.mapa) continue;
+        var r = planGps.mapa[card.getAttribute('data-ejid')];
+        if (!r) continue;
+        var td = parseFloat(r.td_min);
+        if (isNaN(td)) continue;
+        var min = parseFloat(card.getAttribute('data-min')) || 0;
+        var hsr = parseFloat(r.hsr19_min);
+        var d = document.createElement('div');
+        d.className = 'tarea-gps';
+        d.title = 'Media por jugador que suele dar esta tarea en ' + min + ' min, con el ritmo medido con GPS en ' + r.n_sesiones + (r.n_sesiones === 1 ? ' sesion.' : ' sesiones.');
+        d.textContent = 'GPS \u2248 ' + planGpsFmt(td * min, 0) + ' m \u00b7 ' + planGpsFmt(td, 0) + ' m/min' + (hsr >= 0.5 ? ' \u00b7 alta vel. ' + planGpsFmt(hsr * min, 0) + ' m' : '');
+        var antes = card.querySelector('.tarea-tiempos');
+        if (antes && antes.parentNode) antes.parentNode.insertBefore(d, antes);
+    }
+}
+
 function planGpsRender() {
     var ancla = document.getElementById('lista-previo');
     if (!ancla) return;
+    try { planGpsMarcarTareas(); } catch (e) { console.warn('[PlanGps] tarjetas:', e); }
     var caja = document.getElementById('plan-gps-objetivo');
     if (!caja) {
         var seccion = ancla.closest ? ancla.closest('.seccion-ejercicios') : ancla.parentNode;
@@ -528,4 +552,4 @@ function planGpsMarcarBiblioteca() {
 }
 setInterval(planGpsMarcarBiblioteca, 1500);
 
-console.log('[PlanGps] plan-gps-objetivo.js v3 cargado');
+console.log('[PlanGps] plan-gps-objetivo.js v4 cargado');
