@@ -3797,6 +3797,7 @@ function ejBuildBanco() {
             </div>
         </div>
         
+        <div id="ej-banco-aporte"></div>
         <div id="ej-banco-grid" style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;background:#0f172a;border:1px solid #1e3a5f;border-radius:10px;overflow:hidden">
             <div style="color:#9ca3af;padding:20px">Cargando ejercicios...</div>
         </div>
@@ -3826,6 +3827,82 @@ function ejBancoPintarTabs() {
     var imp = document.getElementById('ej-import-file');
     if (imp && imp.previousElementSibling) imp.previousElementSibling.style.display = ejBancoFuente === 'mio' ? '' : 'none';
     ejBancoPendientes();
+    ejBancoAporte();
+}
+// ---- Puntos por aportar a la Comunidad ----
+// No hay tabla de puntos: se cuentan en el momento los ejercicios PUBLICADOS de cada usuario
+// (EJ_COMUNIDAD_PUNTOS por cada uno). Si un ejercicio se retira, deja de contar. Lo publicado por
+// los administradores no entra en la clasificación.
+var EJ_COMUNIDAD_PUNTOS = 5;
+async function ejComunidadClasificacion() {
+    var r = await supabaseClient.from('custom_exercises').select('shared_by,shared_by_name,approval_status').eq('visibility', 'community').limit(1000);
+    if (r.error) throw r.error;
+    var mapa = {};
+    (r.data || []).forEach(function (x) {
+        var id = x.shared_by == null ? '' : String(x.shared_by);
+        if (!id || EJ_COMUNIDAD_ADMINS.indexOf(id) > -1) return;
+        var u = mapa[id] || (mapa[id] = { id: id, nombre: null, publicados: 0, revision: 0 });
+        if (x.shared_by_name) u.nombre = x.shared_by_name;
+        if (x.approval_status === 'approved') u.publicados++;
+        else if (x.approval_status === 'pending_review') u.revision++;
+    });
+    var lista = Object.keys(mapa).map(function (k) { var u = mapa[k]; u.puntos = u.publicados * EJ_COMUNIDAD_PUNTOS; return u; });
+    lista.sort(function (a, b) { return b.puntos - a.puntos || (a.id < b.id ? -1 : 1); });
+    // Mismo puesto para los que empatan a puntos; solo tienen puesto los que han publicado algo
+    var puesto = 0, anterior = null, conPuntos = 0;
+    lista.forEach(function (u, i) {
+        if (!u.puntos) { u.puesto = null; return; }
+        conPuntos++;
+        if (u.puntos !== anterior) { puesto = i + 1; anterior = u.puntos; }
+        u.puesto = puesto;
+    });
+    return { lista: lista, participantes: conPuntos };
+}
+// Panel encima de las tarjetas: al usuario, sus puntos y su puesto; al administrador, en "Por revisar", la lista entera
+async function ejBancoAporte() {
+    var caja = document.getElementById('ej-banco-aporte');
+    if (!caja) return;
+    var fuente = ejBancoFuente, admin = ejComunidadEsAdmin();
+    if (admin && fuente !== 'rev') { caja.innerHTML = ''; return; }
+    try {
+        var c = await ejComunidadClasificacion();
+        if (fuente !== ejBancoFuente) return;
+        var marco = 'margin-bottom:10px;padding:10px 14px;background:#111a2b;border:1px solid #1e3a5f;border-radius:10px;font-size:13px;color:#e2e8f0';
+        if (!admin) {
+            var yo = c.lista.filter(function (u) { return u.id === ejComunidadYo(); })[0] || { publicados: 0, puntos: 0, revision: 0, puesto: null };
+            var dato = function (n, t) { return '<span style="white-space:nowrap"><b style="font-size:16px;color:#c4b5fd">' + n + '</b> <span style="color:#94a3b8">' + t + '</span></span>'; };
+            caja.innerHTML = '<div style="' + marco + ';display:flex;align-items:center;gap:8px 20px;flex-wrap:wrap">'
+                + '<b>Tu aportación a la Comunidad</b>'
+                + dato(yo.publicados, yo.publicados === 1 ? 'ejercicio publicado' : 'ejercicios publicados')
+                + dato(yo.puntos, 'puntos')
+                + (yo.puesto ? dato(yo.puesto + 'º', 'de ' + c.participantes + (c.participantes === 1 ? ' entrenador' : ' entrenadores')) : '')
+                + (yo.revision ? '<span style="color:#fbbf24;white-space:nowrap">' + yo.revision + ' en revisión</span>' : '')
+                + '<span style="color:#64748b;font-size:12px">' + (yo.publicados ? 'Cada ejercicio publicado suma ' + EJ_COMUNIDAD_PUNTOS + ' puntos.' : 'Abre un ejercicio tuyo y pulsa Comunidad para enviarlo: cada uno publicado suma ' + EJ_COMUNIDAD_PUNTOS + ' puntos.') + '</span>'
+                + '</div>';
+            return;
+        }
+        // Administrador: nombre del club de quien no quiso mostrar el suyo, para saber quién es
+        var sin = c.lista.filter(function (u) { return !u.nombre; }).map(function (u) { return u.id; }).filter(function (id) { return /^[0-9]+$/.test(id); });
+        var clubes = {};
+        if (sin.length) {
+            try {
+                var k = await supabaseClient.from('clubs').select('wp_user_id,name').in('wp_user_id', sin);
+                (k.data || []).forEach(function (x) { if (x.name && !clubes[String(x.wp_user_id)]) clubes[String(x.wp_user_id)] = x.name; });
+            } catch (e) { /* sin nombres de club */ }
+            if (fuente !== ejBancoFuente) return;
+        }
+        var th = 'text-align:left;padding:5px 10px;font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid #1e3a5f', td = 'padding:6px 10px;border-bottom:1px solid #16233a';
+        caja.innerHTML = '<div style="' + marco + '">'
+            + '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap"><b>Aportaciones de los usuarios</b><span style="color:#64748b;font-size:12px">' + EJ_COMUNIDAD_PUNTOS + ' puntos por ejercicio publicado. Solo lo ves tú.</span></div>'
+            + (c.lista.length
+                ? '<div style="max-height:220px;overflow:auto;margin-top:6px"><table style="width:100%;border-collapse:collapse;font-size:13px"><tr><th style="' + th + '">Puesto</th><th style="' + th + '">Usuario</th><th style="' + th + '">Publicados</th><th style="' + th + '">Puntos</th><th style="' + th + '">En revisión</th></tr>'
+                  + c.lista.map(function (u) {
+                        var quien = u.nombre ? ejComEsc(u.nombre) : (clubes[u.id] ? ejComEsc(clubes[u.id]) + ' <span style="color:#64748b">(club; no muestra su nombre)</span>' : '<span style="color:#94a3b8">Usuario ' + ejComEsc(u.id) + '</span>');
+                        return '<tr><td style="' + td + '">' + (u.puesto ? u.puesto + 'º' : '–') + '</td><td style="' + td + '">' + quien + ' <span style="color:#475569;font-size:11px">#' + ejComEsc(u.id) + '</span></td><td style="' + td + '">' + u.publicados + '</td><td style="' + td + ';font-weight:700;color:#c4b5fd">' + u.puntos + '</td><td style="' + td + ';color:' + (u.revision ? '#fbbf24' : '#475569') + '">' + u.revision + '</td></tr>';
+                    }).join('') + '</table></div>'
+                : '<div style="color:#64748b;margin-top:6px">Todavía ningún usuario ha enviado ejercicios.</div>')
+            + '</div>';
+    } catch (e) { caja.innerHTML = ''; }
 }
 // Muestra a los administradores la pestaña "Por revisar" con el número de envíos pendientes
 async function ejBancoPendientes() {
@@ -4120,6 +4197,7 @@ async function ejComunidadRetirar(idCopia) {
         ejToast(ejComunidadEsAdmin() ? 'Ejercicio retirado de la Comunidad.' : 'Envío cancelado.', 'success');
         if (document.getElementById('ej-banco-grid')) { if (ejBancoFuente !== 'mio') ejBancoCache = []; ejBancoLoad(true); }
         ejBancoPendientes();
+        ejBancoAporte();
     } catch (e) { ejToast('No se ha podido retirar: ' + (e.message || e), 'error'); }
 }
 
@@ -4225,6 +4303,7 @@ async function ejComunidadEnviar(idEnvio) {
         ejComunidadCerrar();
         ejToast('Enviado. Lo verás publicado cuando se revise.', 'success');
         if (ejBancoFuente === 'mio' && document.getElementById('ej-banco-grid')) ejBancoLoad(true);
+        ejBancoAporte();
     } catch (e) {
         console.error('ejComunidadEnviar:', e);
         if (boton) { boton.disabled = false; boton.textContent = rotulo || 'Enviar a revisión'; }
@@ -4292,6 +4371,7 @@ async function ejComunidadRevisar(id, aprobar, motivo) {
     } catch (err) { ejToast('No se ha podido guardar la revisión: ' + (err.message || err), 'error'); }
     if (ejBancoFuente === 'rev') { ejBancoCache = []; ejBancoLoad(true); }
     ejBancoPendientes();
+    ejBancoAporte();
 }
 function ejComunidadRechazarAbrir(id) {
     if (!ejComunidadEsAdmin()) return;
@@ -4320,6 +4400,7 @@ async function ejComunidadRetiradaResolver(id, retirar) {
     } catch (e) { ejToast('No se ha podido guardar: ' + (e.message || e), 'error'); }
     if (ejBancoFuente === 'rev') { ejBancoCache = []; ejBancoLoad(true); }
     ejBancoPendientes();
+    ejBancoAporte();
 }
 
 function ejComEsc(t) { return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
