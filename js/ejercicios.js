@@ -4764,9 +4764,10 @@ async function ejVerFicha(id) {
         const set = (fid, val) => { const el = document.getElementById(fid); if (el && val != null && val !== '') el.value = val; };
         set('ej-nombre', data.name);
         var nombreInput = document.getElementById('ej-nombre');
-        if (nombreInput) { nombreInput.readOnly = true; nombreInput.style.background = '#1e293b'; nombreInput.style.color = '#64748b'; }
+        // El nombre se puede cambiar: todo (sesiones, GPS, Comunidad, TopLiderCoach) enlaza por id, no por nombre.
+        if (nombreInput) { nombreInput.readOnly = false; nombreInput.style.background = ''; nombreInput.style.color = ''; }
         var lockMsg = document.getElementById('ej-nombre-lock-msg');
-        if (lockMsg) lockMsg.style.display = 'block';
+        if (lockMsg) lockMsg.style.display = 'none';
         set('ej-categoria', data.category);
         set('ej-edad', data.age_group);
         set('ej-duracion', data.duration_min);
