@@ -1,4 +1,4 @@
-// ========== EJ-TLC.JS (v2) - Publicar ejercicios en la biblioteca TopLiderCoach ==========
+// ========== EJ-TLC.JS (v3) - Publicar ejercicios en la biblioteca TopLiderCoach ==========
 // La biblioteca TopLiderCoach (ejercicios de los mejores entrenadores) es distinta de "Mis ejercicios" y de la Comunidad.
 // Solo los administradores publican en ella, desde la ficha de un ejercicio de su banco ya dibujado con la pizarra.
 // Tabla de Supabase: tlc_ejercicios (ids a partir de 1.000.000, para no chocar con los de WordPress).
@@ -18,16 +18,33 @@ function ejTlcCanon(v, lista) {
     for (var i = 0; i < (lista || []).length; i++) if (llano(lista[i]) === k) return lista[i];
     return v;
 }
+// Un mismo entrenador (o equipo) escrito de dos formas saldria dos veces en el filtro: los demas ejercicios
+// que lo tengan con otras mayusculas o acentos pasan a la forma que se acaba de guardar
+async function ejTlcUnificar(campo, valor) {
+    try {
+        var llano = function (t) { return ejTlcLimpio(t).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); };
+        var k = llano(valor), desde = 0, cambiar = [];
+        while (true) {
+            var r = await supabaseClient.from('tlc_ejercicios').select('id, ' + campo).order('id').range(desde, desde + 999);
+            if (r.error) throw r.error;
+            (r.data || []).forEach(function (x) { if (x[campo] && x[campo] !== valor && llano(x[campo]) === k) cambiar.push(x.id); });
+            if (!r.data || r.data.length < 1000) break;
+            desde += 1000;
+        }
+        if (cambiar.length) { var d = {}; d[campo] = valor; var w = await supabaseClient.from('tlc_ejercicios').update(d).in('id', cambiar); if (w.error) throw w.error; }
+    } catch (e) { console.warn('[EjTlc] unificar ' + campo + ':', e); }
+}
 function ejTlcTemaAlternar(b) { b.className = 'ej-tlc-chip' + (/\bon\b/.test(b.className) ? '' : ' on'); }
 function ejTlcTemaNuevo() {
     var inp = document.getElementById('ej-tlc-tema-nuevo'), caja = document.getElementById('ej-tlc-temas');
     if (!inp || !caja) return;
     var op = ejTlc.opciones || { temas: [] };
     String(inp.value || '').split(',').forEach(function (t) {
-        t = ejTlcCanon(t, op.temas);
+        t = ejTlcCanon(t, (op.wp && op.wp.temas) || []);
         if (!t) return;
         var chips = caja.querySelectorAll('.ej-tlc-chip'), ya = null;
         for (var i = 0; i < chips.length; i++) if (chips[i].getAttribute('data-t').toLowerCase() === t.toLowerCase()) ya = chips[i];
+        if (ya) { ya.setAttribute('data-t', t); ya.textContent = t; }
         if (!ya) {
             if (!chips.length) caja.innerHTML = '';
             ya = document.createElement('button'); ya.type = 'button'; ya.setAttribute('data-t', t); ya.textContent = t;
@@ -61,22 +78,23 @@ function ejTlcBoton() {
 // Entrenadores, equipos y temas ya usados (WordPress + nuestra tabla), para escribirlos siempre igual
 async function ejTlcOpciones() {
     if (ejTlc.opciones) return ejTlc.opciones;
-    var o = { entrenadores: {}, equipos: {}, temas: {} };
+    var o = { entrenadores: {}, equipos: {}, temas: {} }, wp = { entrenadores: [], equipos: [], temas: [] };
     try {
         if (typeof API_BASE !== 'undefined') {
             var d = await (await fetch(API_BASE + '/filtros')).json();
-            if (d && d.filtros) ['entrenadores', 'equipos', 'temas'].forEach(function (k) { (d.filtros[k] || []).forEach(function (v) { v = ejTlcLimpio(v); if (v) o[k][v.toLowerCase()] = v; }); });
+            if (d && d.filtros) ['entrenadores', 'equipos', 'temas'].forEach(function (k) { (d.filtros[k] || []).forEach(function (v) { v = ejTlcLimpio(v); if (v) { o[k][v.toLowerCase()] = v; wp[k].push(v); } }); });
         }
     } catch (e) { /* sin WordPress se sigue con lo nuestro */ }
     try {
         var r = await supabaseClient.from('tlc_ejercicios').select('entrenador, equipo, tema').range(0, 999);
         (r.data || []).forEach(function (x) {
-            [['entrenadores', x.entrenador], ['equipos', x.equipo]].forEach(function (p) { var v = ejTlcLimpio(p[1]); if (v) o[p[0]][v.toLowerCase()] = v; });
-            String(x.tema || '').split(',').forEach(function (t) { t = ejTlcLimpio(t); if (t) o.temas[t.toLowerCase()] = t; });
+            // lo de WordPress manda: lo nuestro solo se añade si alli no existe
+            [['entrenadores', x.entrenador], ['equipos', x.equipo]].forEach(function (p) { var v = ejTlcLimpio(p[1]); if (v && !o[p[0]][v.toLowerCase()]) o[p[0]][v.toLowerCase()] = v; });
+            String(x.tema || '').split(',').forEach(function (t) { t = ejTlcLimpio(t); if (t && !o.temas[t.toLowerCase()]) o.temas[t.toLowerCase()] = t; });
         });
     } catch (e) { /* sin lista de sugerencias */ }
     var lista = function (m) { return Object.keys(m).map(function (k) { return m[k]; }).sort(function (a, b) { return a.localeCompare(b, 'es'); }); };
-    ejTlc.opciones = { entrenadores: lista(o.entrenadores), equipos: lista(o.equipos), temas: lista(o.temas) };
+    ejTlc.opciones = { entrenadores: lista(o.entrenadores), equipos: lista(o.equipos), temas: lista(o.temas), wp: wp };
     return ejTlc.opciones;
 }
 
@@ -88,7 +106,7 @@ async function ejTlcAbrir() {
         var r = await supabaseClient.from('custom_exercises').select('*').eq('id', ejEditandoId).single();
         if (r.error) throw r.error;
         o = r.data;
-        var p = await supabaseClient.from('tlc_ejercicios').select('id, activo, updated_at, tema, dificultad').eq('origen_id', ejEditandoId).limit(1);
+        var p = await supabaseClient.from('tlc_ejercicios').select('id, activo, updated_at, titulo, entrenador, equipo, tema, dificultad').eq('origen_id', ejEditandoId).limit(1);
         if (p.error) throw p.error;
         pub = (p.data || [])[0] || null;
         op = await ejTlcOpciones();
@@ -137,8 +155,9 @@ async function ejTlcAbrir() {
     try { vista = ejMiniaturaDeDatos(ejComunidadAnonimizar(o.board_data), true) || o.thumbnail_svg; } catch (e) { vista = o.thumbnail_svg || null; }
     ejComunidadCaja(cab + estado
         + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 12px;margin-top:14px">'
-        + '<div><label style="' + rot + '">Entrenador *</label><input id="ej-tlc-entrenador" list="ej-tlc-l-ent" maxlength="80" placeholder="Ej: Guardiola" style="' + campo + '" value="' + ejTlcEsc(ejTlcLimpio(o.entrenador)) + '">' + lista('ej-tlc-l-ent', op.entrenadores) + '</div>'
-        + '<div><label style="' + rot + '">Equipo</label><input id="ej-tlc-equipo" list="ej-tlc-l-eq" maxlength="80" placeholder="Ej: Manchester City" style="' + campo + '" value="' + ejTlcEsc(ejTlcLimpio(o.equipo)) + '">' + lista('ej-tlc-l-eq', op.equipos) + '</div>'
+        + '<div style="grid-column:1 / -1"><label style="' + rot + '">Título en TopLiderCoach *</label><input id="ej-tlc-titulo" maxlength="120" style="' + campo + '" value="' + ejTlcEsc((pub && pub.titulo) || o.name || '') + '"></div>'
+        + '<div><label style="' + rot + '">Entrenador *</label><input id="ej-tlc-entrenador" list="ej-tlc-l-ent" maxlength="80" placeholder="Ej: Guardiola" style="' + campo + '" value="' + ejTlcEsc(ejTlcLimpio((pub && pub.entrenador) || o.entrenador)) + '">' + lista('ej-tlc-l-ent', op.entrenadores) + '</div>'
+        + '<div><label style="' + rot + '">Equipo</label><input id="ej-tlc-equipo" list="ej-tlc-l-eq" maxlength="80" placeholder="Ej: Manchester City" style="' + campo + '" value="' + ejTlcEsc(ejTlcLimpio((pub && pub.equipo) || o.equipo)) + '">' + lista('ej-tlc-l-eq', op.equipos) + '</div>'
         + '<div style="grid-column:1 / -1"><label style="' + rot + '">Tema <span style="text-transform:none;letter-spacing:0;font-weight:400">(pulsa uno o varios)</span></label>'
         + '<style>.ej-tlc-chip{background:#0b1220;border:1px solid #2f405c;color:#cbd5e1;border-radius:999px;padding:4px 10px;font-size:12px;cursor:pointer}.ej-tlc-chip.on{background:#f59e0b;border-color:#f59e0b;color:#1a1200;font-weight:700}</style>'
         + '<div id="ej-tlc-temas" style="display:flex;flex-wrap:wrap;gap:5px;max-height:104px;overflow:auto;background:#0b1220;border:1px solid #2f405c;border-radius:7px;padding:7px">' + (chipsTema || '<span style="font-size:12px;color:#64748b">Todavía no hay temas: escribe el primero abajo.</span>') + '</div>'
@@ -149,7 +168,7 @@ async function ejTlcAbrir() {
         + '<div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;margin-top:14px">Así se verá</div>'
         + '<div style="display:flex;gap:12px;margin-top:4px;align-items:flex-start">'
         + '<div style="flex:0 0 230px;aspect-ratio:8/5;border-radius:8px;overflow:hidden;background:#0f4c2a"><img id="ej-tlc-vista" alt="" style="width:100%;height:100%;object-fit:contain;display:block"></div>'
-        + '<div style="flex:1;min-width:0;font-size:13px;color:#cbd5e1;line-height:1.5"><b style="color:#fff">' + ejTlcEsc(o.name) + '</b><br>' + ejTlcEsc(resumen)
+        + '<div style="flex:1;min-width:0;font-size:13px;color:#cbd5e1;line-height:1.5">' + ejTlcEsc(resumen)
         + '<div style="color:#94a3b8;font-size:12px;margin-top:6px">Se copian el dibujo, el objetivo, la descripción, las variantes y el material de la ficha. Las fichas van sin nombres ni fotos.</div></div></div>'
         + '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;flex-wrap:wrap">'
         + (pub && pub.activo ? '<button type="button" onclick="ejTlcRetirar()" style="' + bt + ';background:#7f1d1d;color:#fecaca;margin-right:auto">Retirar</button>' : '')
@@ -162,15 +181,18 @@ async function ejTlcAbrir() {
 
 async function ejTlcPublicar() {
     if (!ejComunidadEsAdmin() || !ejEditandoId) return;
-    var op = ejTlc.opciones || { entrenadores: [], equipos: [], temas: [] };
-    var ent = ejTlcCanon((document.getElementById('ej-tlc-entrenador') || {}).value, op.entrenadores);
-    var eq = ejTlcCanon((document.getElementById('ej-tlc-equipo') || {}).value, op.equipos);
+    // Solo se respeta la grafia de WordPress. Frente a lo nuestro manda lo que se escribe ahora (asi se puede corregir)
+    var wp = (ejTlc.opciones && ejTlc.opciones.wp) || { entrenadores: [], equipos: [], temas: [] };
+    var titulo = String((document.getElementById('ej-tlc-titulo') || {}).value || '').replace(/\s+/g, ' ').trim();
+    var ent = ejTlcCanon((document.getElementById('ej-tlc-entrenador') || {}).value, wp.entrenadores);
+    var eq = ejTlcCanon((document.getElementById('ej-tlc-equipo') || {}).value, wp.equipos);
     var pendiente = ejTlcLimpio((document.getElementById('ej-tlc-tema-nuevo') || {}).value);
     if (pendiente) ejTlcTemaNuevo();      // un tema escrito y sin añadir tambien cuenta
     var marcados = document.querySelectorAll('#ej-tlc-temas .ej-tlc-chip.on'), temas = [];
     for (var i = 0; i < marcados.length; i++) temas.push(marcados[i].getAttribute('data-t'));
     var tema = temas.join(', ');
     var dif = parseInt((document.getElementById('ej-tlc-dificultad') || {}).value) || null;
+    if (!titulo) { ejToast('Escribe el título del ejercicio.', 'warning'); var it = document.getElementById('ej-tlc-titulo'); if (it) it.focus(); return; }
     if (!ent) { ejToast('Escribe el entrenador del ejercicio.', 'warning'); var ie = document.getElementById('ej-tlc-entrenador'); if (ie) ie.focus(); return; }
     var boton = document.getElementById('ej-tlc-publicar'), rotulo = boton ? boton.textContent : '';
     if (boton) { if (boton.disabled) return; boton.disabled = true; boton.textContent = 'Publicando...'; }
@@ -184,7 +206,7 @@ async function ejTlcPublicar() {
         var org = String(o.description || '').trim();
         if (String(o.variants || '').trim()) org += '\n\nVariantes: ' + String(o.variants).trim();
         var fila = {
-            titulo: String(o.name || '').trim(), entrenador: ent, equipo: eq || null, tema: tema || null, dificultad: dif,
+            titulo: titulo, entrenador: ent, equipo: eq || null, tema: tema || null, dificultad: dif,
             jugadores: parseInt(o.players_count) || null, duracion: parseInt(o.duration_min) || null,
             espacio: (parseFloat(o.field_width) > 0 && parseFloat(o.field_length) > 0) ? (o.field_width + ' x ' + o.field_length + ' m') : null,
             material: o.materials || null, objetivo: o.objectives || null, organizacion: org || null,
@@ -199,6 +221,8 @@ async function ejTlcPublicar() {
         var w = pub ? await supabaseClient.from('tlc_ejercicios').update(fila).eq('id', pub.id)
                     : await supabaseClient.from('tlc_ejercicios').insert(fila);
         if (w.error) throw w.error;
+        await ejTlcUnificar('entrenador', ent);
+        if (eq) await ejTlcUnificar('equipo', eq);
         ejTlc.opciones = null;
         ejComunidadCerrar();
         ejToast(pub && pub.activo ? 'Ejercicio de TopLiderCoach actualizado.' : 'Publicado en TopLiderCoach.', 'success');
@@ -231,4 +255,4 @@ function ejTlcRetirar() {
     ejComunidadBoton = function () { original.apply(this, arguments); try { ejTlcBoton(); } catch (e) {} };
 })();
 
-console.log('[EjTlc] ej-tlc.js v2 cargado');
+console.log('[EjTlc] ej-tlc.js v3 cargado');
