@@ -4230,6 +4230,21 @@ async function ejComunidadAbrir() {
     var bt = 'border:none;border-radius:8px;padding:9px 16px;cursor:pointer;font-size:13px;font-weight:700';
     var cab = '<div style="display:flex;align-items:center;justify-content:space-between"><b style="font-size:16px">Compartir en la Comunidad</b>'
         + '<button type="button" onclick="ejComunidadCerrar()" title="Cerrar" style="background:none;border:none;color:#94a3b8;font-size:18px;cursor:pointer"><i class="ej-ico ej-ico-nueva"></i></button></div>';
+    // Sin dibujo de pizarra no se ofrece compartir ni actualizar (si ya hay una copia publicada, sí se puede retirar)
+    var sinDibujo = '';
+    try {
+        var rd = await supabaseClient.from('custom_exercises').select('board_data, thumbnail_svg').eq('id', ejEditandoId).single();
+        if (rd.error) throw rd.error;
+        sinDibujo = ejComunidadDibujoFalta(rd.data);
+    } catch (e) { ejToast('No se ha podido leer el ejercicio: ' + (e.message || e), 'error'); return; }
+    if (sinDibujo) {
+        ejComunidadCaja(cab + '<div style="font-size:13px;color:#fca5a5;margin-top:8px;line-height:1.5"><b>Este ejercicio no se puede compartir.</b> En la Comunidad solo entran ejercicios dibujados con la pizarra de TopLiderCoach.</div>'
+            + '<ul style="margin:8px 0 0;padding-left:18px;font-size:13px;color:#fca5a5;line-height:1.7"><li>Falta: ' + sinDibujo + '</li></ul>'
+            + '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;flex-wrap:wrap">'
+            + (copia ? '<button type="button" onclick="ejComunidadRetirar(\'' + copia.id + '\')" style="' + bt + ';background:#7f1d1d;color:#fecaca">Retirar la copia de la Comunidad</button>' : '')
+            + '<button type="button" onclick="ejComunidadCerrar()" style="' + bt + ';background:#0b1220;color:#e2e8f0;border:1px solid #2f405c">Entendido</button></div>');
+        return;
+    }
     var notas = '<ul style="margin:10px 0 0;padding-left:18px;font-size:13px;color:#cbd5e1;line-height:1.6">'
         + '<li>Se publica <b>una copia</b>. Tu ejercicio no cambia.</li>'
         + '<li>En la copia las fichas van <b>sin nombres ni fotos</b>.</li>'
