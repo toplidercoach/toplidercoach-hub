@@ -4100,7 +4100,7 @@ async function ejImportarJSON(input) {
     var lista;
     try { lista = JSON.parse(await file.text()); } catch(e) { ejToast('El archivo no es un JSON válido', 'error'); return; }
     if (!Array.isArray(lista) || !lista.length) { ejToast('El JSON no contiene ejercicios', 'warning'); return; }
-    var PERMITIDOS = ['name','description','objectives','variants','coach_notes','materials','category','tema','age_group','difficulty','game_phase','duration_min','players_count','num_goalkeepers','field_width','field_length','es_portero','subcategoria_portero','thumbnail_svg','source','board_data'];
+    var PERMITIDOS = ['name','description','objectives','variants','coach_notes','materials','category','tema','entrenador','equipo','age_group','difficulty','game_phase','duration_min','players_count','num_goalkeepers','field_width','field_length','es_portero','subcategoria_portero','thumbnail_svg','source','board_data'];
     ejConfirm('Se van a importar ' + lista.length + ' ejercicios a tu banco. ¿Continuar?', async function() {
         var LOTE = 10, ok = 0, fallos = 0;
         var countEl = document.getElementById('ej-banco-count');
