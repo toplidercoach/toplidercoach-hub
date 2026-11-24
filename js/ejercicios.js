@@ -1239,6 +1239,10 @@ let ejProyActual = null;
 let ejProyItems = [];
 let ejProyIdx = -1;
 let ejProyFaseCargadaId = null; // id de la fase cuyo contenido esta en la pizarra (para autoguardado)
+// Id del ejercicio del Banco cuyo dibujo está ahora en la pizarra (null = dibujo nuevo o de un proyecto).
+// "Ver ficha" abre los datos de un ejercicio SIN cargar su dibujo: al guardar desde ahí no se toca el dibujo
+// guardado. Antes se sustituía por lo que hubiera en la pizarra (o se borraba si estaba vacía).
+var ejPizarraDeId = null;
 
 function ejProyPanel() {
     let p = document.getElementById('ej-proy-panel');
@@ -1540,7 +1544,7 @@ function ejProyCargarFase(it) {
     // Copia profunda: la pizarra no debe compartir referencias con la copia
     // en memoria de la fase (si no, la deteccion de cambios del autoguardado falla)
     const bd = JSON.parse(JSON.stringify(it.board_data));
-    ejProyFaseCargadaId = it.id;
+    ejProyFaseCargadaId = it.id; ejPizarraDeId = null;
     ejFrameStop();
     ejSaveHistory();
     ejP.players = ejColoresResolver(bd.players || []);
@@ -1605,6 +1609,7 @@ function ejNuevaPizarra() {
     ejConfirm('¿Limpiar la pizarra y empezar desde cero?', () => {
     ejSaveHistory();
     ejProyFaseCargadaId = null; // el dibujo nuevo ya no pertenece a ninguna fase
+    ejPizarraDeId = null;
     ejP.players = []; ejP.lines = []; ejP.shapes = []; ejP.texts = []; ejP.equipment = []; ejP.connections = [];
     ejP.selectedId = null; ejP.playerCounts = {}; ejP.nextId = 1;
     ejFrameStop();
@@ -2155,6 +2160,8 @@ async function ejCapturarParaFicha() {
         window._ejPdfThumbData = null;
         ejLimpiarFicha();
         ejBuildFicha();
+    } else {
+        ejPizarraDeId = ejEditandoId;   // "usar en ficha": el dibujo de la pizarra pasa a ser el de este ejercicio
     }
     
     // Capturar SVG limpio (sin fantasmas ni trayectorias)
@@ -2978,6 +2985,7 @@ function ejCapturarMiniatura() {
     thumbContainer.innerHTML = '';
     thumbContainer.appendChild(clone);
     window.ejThumbnailPendiente = new XMLSerializer().serializeToString(svgEl);
+    if (ejEditandoId) ejPizarraDeId = ejEditandoId;
     ejPrepararThumbParaPDF();
     const msg = document.getElementById('ej-ficha-msg');
     if (msg) msg.innerHTML = '<span style="color:#a855f7">📸 Miniatura capturada — se guardará con el ejercicio</span>';
@@ -3533,6 +3541,7 @@ async function ejEditarDibujo() {
         var res = await supabaseClient.from('custom_exercises').select('*').eq('id', ejEditandoId).single();
         if (res.error) throw res.error;
         var data = res.data;
+        ejPizarraDeId = data.id;
         if (!data.board_data) {
             // No hay dibujo, abrir pizarra con selector de modo
             var overlay = document.getElementById('ej-modo-overlay');
@@ -3603,9 +3612,11 @@ async function ejGuardarEjercicio() {
     const j = parseFloat(document.getElementById('ej-jugadores')?.value) || null;
     const eii = (a && l && j) ? parseFloat(((a * l) / j).toFixed(2)) : null;
 
+    // ¿El dibujo de la pizarra es el de este ejercicio? (nuevo, o cargado con Editar / Editar dibujo / Usar en ficha)
+    const ejConDibujo = !ejEditandoId || ejPizarraDeId === ejEditandoId;
     // Capturar miniatura del SVG
 let thumbnailSvg = window.ejThumbnailPendiente || null;
-    if (!thumbnailSvg) {
+    if (!thumbnailSvg && ejConDibujo) {
         const svgEl = document.getElementById('ej-svg');
         if (svgEl) thumbnailSvg = new XMLSerializer().serializeToString(svgEl);
     }
@@ -3650,6 +3661,11 @@ let thumbnailSvg = window.ejThumbnailPendiente || null;
         
         source: 'custom'
     };
+    if (!ejConDibujo) {
+        // Solo se han cambiado los datos de la ficha: el dibujo guardado no se toca
+        delete data.board_data;
+        if (!data.thumbnail_svg) delete data.thumbnail_svg;
+    }
 
  try {
         let res, error;
@@ -3665,7 +3681,8 @@ let thumbnailSvg = window.ejThumbnailPendiente || null;
         if (error) throw error;
         if (res && res[0]) {
             ejEditandoId = res[0].id;
-            if (ejP.players.length > 0) {
+            if (ejConDibujo) ejPizarraDeId = ejEditandoId;
+            if (ejConDibujo && ejP.players.length > 0) {
                 const thumbUrl = await ejSubirThumbnail(ejEditandoId);
                 if (thumbUrl) {
                     await supabaseClient.from('custom_exercises').update({ thumbnail_url: thumbUrl }).eq('id', ejEditandoId);
@@ -3728,6 +3745,7 @@ function ejBuildBanco() {
             <div style="display:flex;gap:6px">
                 <button type="button" id="ej-banco-tab-mio" onclick="ejBancoCambiarFuente('mio')" style="padding:6px 14px;font-size:12px;font-weight:700;border-radius:8px;cursor:pointer">Mis ejercicios</button>
                 <button type="button" id="ej-banco-tab-com" onclick="ejBancoCambiarFuente('com')" style="padding:6px 14px;font-size:12px;font-weight:700;border-radius:8px;cursor:pointer">Comunidad</button>
+                <button type="button" id="ej-banco-tab-rev" onclick="ejBancoCambiarFuente('rev')" style="display:none;padding:6px 14px;font-size:12px;font-weight:700;border-radius:8px;cursor:pointer" title="Ejercicios que los usuarios han enviado a la Comunidad y esperan tu revisión">Por revisar</button>
             </div>
         </div>
         <div style="background:#0f172a;border:1px solid #1e3a5f;border-radius:10px;padding:12px 14px;margin-bottom:14px">
@@ -3787,14 +3805,17 @@ function ejBuildBanco() {
     ejBancoLoad();
 }
 let ejBancoCache = [];
-// Qué se ve en el Banco: 'mio' (ejercicios propios) o 'com' (Comunidad)
+// Qué se ve en el Banco: 'mio' (ejercicios propios), 'com' (Comunidad) o 'rev' (envíos por revisar, solo administradores)
 var ejBancoFuente = 'mio';
+// Envíos a la Comunidad hechos por este usuario: { id del ejercicio original: estado }
+var ejBancoEnvios = {};
 function ejBancoFiltroFuente() {
     if (ejBancoFuente === 'com') return 'and(visibility.eq.community,approval_status.eq.approved)';
+    if (ejBancoFuente === 'rev') return 'and(visibility.eq.community,or(approval_status.eq.pending_review,retirada_solicitada_at.not.is.null))';
     return window.ejClubId ? ('club_id.eq.' + window.ejClubId + ',coach_id.eq.' + String(window.ejCoachId)) : ('coach_id.eq.' + String(window.ejCoachId));
 }
 function ejBancoPintarTabs() {
-    [['mio', 'ej-banco-tab-mio'], ['com', 'ej-banco-tab-com']].forEach(function (t) {
+    [['mio', 'ej-banco-tab-mio'], ['com', 'ej-banco-tab-com'], ['rev', 'ej-banco-tab-rev']].forEach(function (t) {
         var b = document.getElementById(t[1]); if (!b) return;
         var on = ejBancoFuente === t[0];
         b.style.background = on ? '#7c3aed' : 'transparent';
@@ -3803,7 +3824,21 @@ function ejBancoPintarTabs() {
     });
     // Importar solo tiene sentido en los ejercicios propios
     var imp = document.getElementById('ej-import-file');
-    if (imp && imp.previousElementSibling) imp.previousElementSibling.style.display = ejBancoFuente === 'com' ? 'none' : '';
+    if (imp && imp.previousElementSibling) imp.previousElementSibling.style.display = ejBancoFuente === 'mio' ? '' : 'none';
+    ejBancoPendientes();
+}
+// Muestra a los administradores la pestaña "Por revisar" con el número de envíos pendientes
+async function ejBancoPendientes() {
+    var b = document.getElementById('ej-banco-tab-rev');
+    if (!b) return;
+    if (!ejComunidadEsAdmin()) { b.style.display = 'none'; return; }
+    b.style.display = '';
+    try {
+        var r = await supabaseClient.from('custom_exercises').select('id').eq('visibility', 'community').or('approval_status.eq.pending_review,retirada_solicitada_at.not.is.null').limit(200);
+        if (r.error) return;
+        var n = (r.data || []).length;
+        b.textContent = 'Por revisar' + (n ? ' (' + n + ')' : '');
+    } catch (e) { /* sin número: la pestaña sigue funcionando */ }
 }
 function ejBancoCambiarFuente(f) {
     if (f === ejBancoFuente) return;
@@ -3844,7 +3879,28 @@ async function ejBancoLoad(conservarEdicion) {
             ejDesde += 1000;
         }
         if (ejFuenteCarga !== ejBancoFuente) return; // se cambió de pestaña mientras cargaba
-        if (ejFuenteCarga === 'com') ejTodos.forEach(function (e) { e._com = true; });
+        if (ejFuenteCarga !== 'mio') ejTodos.forEach(function (e) { e._com = ejFuenteCarga; });
+        if (ejFuenteCarga === 'rev' && ejTodos.length) {
+            // Cuáles son solicitudes de retirada (y su motivo), y cuáles cambios de algo ya publicado
+            try {
+                var ejSol = await supabaseClient.from('custom_exercises').select('id,approval_status,retirada_solicitada_at,retirada_motivo,shared_by_name').in('id', ejTodos.map(function (e) { return e.id; }));
+                var ejSolMapa = {};
+                (ejSol.data || []).forEach(function (x) { ejSolMapa[x.id] = x; });
+                ejTodos.forEach(function (e) { var x = ejSolMapa[e.id] || {}; e._retirada = (x.approval_status === 'approved' && x.retirada_solicitada_at) ? (x.retirada_motivo || 'sin motivo') : null; e._autor = x.shared_by_name || null; });
+            } catch (e) { /* sin detalle */ }
+            if (ejFuenteCarga !== ejBancoFuente) return;
+        }
+        if (ejFuenteCarga === 'mio') {
+            // Estado de lo que este usuario ha enviado a la Comunidad, para marcarlo en sus tarjetas
+            ejBancoEnvios = {};
+            try {
+                var ejEnv = await supabaseClient.from('custom_exercises').select('shared_from,approval_status').eq('visibility', 'community').eq('shared_by', ejComunidadYo()).limit(1000);
+                // Si hay dos filas (publicada y cambios), manda lo que está en revisión; lo publicado gana a lo rechazado
+                var ejPeso = { pending_review: 3, approved: 2, rejected: 1 };
+                (ejEnv.data || []).forEach(function (x) { if (x.shared_from && (ejPeso[x.approval_status] || 0) > (ejPeso[ejBancoEnvios[x.shared_from]] || 0)) ejBancoEnvios[x.shared_from] = x.approval_status; });
+            } catch (e) { /* sin marcas */ }
+            if (ejFuenteCarga !== ejBancoFuente) return;
+        }
         ejBancoCache = ejTodos;
         ejBancoRender(ejBancoCache);
         ejBancoCargarThumbs();
@@ -3920,7 +3976,8 @@ async function ejImportarJSON(input) {
 
 // ---- Comunidad: ejercicios compartidos con todos los usuarios ----
 // Compartir publica una COPIA con las fichas anónimas; el ejercicio original no se toca.
-// Fase 1: solo publican los administradores de la plataforma.
+// Los administradores publican directamente. El resto de usuarios ENVÍA el ejercicio: queda pendiente
+// (approval_status 'pending_review') y solo aparece en la Comunidad cuando un administrador lo aprueba.
 var EJ_COMUNIDAD_ADMINS = ['1433'];
 function ejComunidadEsAdmin() {
     var id = (typeof usuario !== 'undefined' && usuario && usuario.id != null) ? String(usuario.id) : (window.ejCoachId ? String(window.ejCoachId) : '');
@@ -3928,7 +3985,26 @@ function ejComunidadEsAdmin() {
 }
 function ejComunidadBoton() {
     var b = document.getElementById('ej-btn-comunidad');
-    if (b) b.style.display = ejComunidadEsAdmin() ? '' : 'none';
+    if (b) { b.style.display = ''; b.title = ejComunidadEsAdmin() ? 'Publicar una copia de este ejercicio para todos los usuarios' : 'Enviar una copia de este ejercicio a la Comunidad (se publica cuando TopLiderCoach la aprueba)'; }
+}
+function ejComunidadYo() { return String((typeof usuario !== 'undefined' && usuario && usuario.id != null) ? usuario.id : (window.ejCoachId || '')); }
+// Lo que le falta a un ejercicio para poder enviarse a la Comunidad (lista vacía = completo)
+function ejComunidadFaltan(o) {
+    var f = [], txt = function (v) { return String(v == null ? '' : v).trim(); }, bd = o.board_data || {};
+    var hayDibujo = !!((bd.players && bd.players.length) || (bd.lines && bd.lines.length) || (bd.equipment && bd.equipment.length) || (bd.shapes && bd.shapes.length) || o.thumbnail_svg);
+    if (!txt(o.name)) f.push('Nombre');
+    if (!hayDibujo) f.push('Dibujo o imagen del ejercicio');
+    if (!(parseInt(o.duration_min) > 0)) f.push('Duración');
+    if (!(parseInt(o.players_count) > 0)) f.push('Nº de jugadores');
+    if (!txt(o.category)) f.push('Categoría');
+    if (!txt(o.tema)) f.push('Tema');
+    if (!o.es_portero) {
+        if (!txt(o.game_phase)) f.push('Fase de juego');
+        if (!(parseFloat(o.field_width) > 0) || !(parseFloat(o.field_length) > 0)) f.push('Espacio (ancho y largo)');
+    }
+    if (txt(o.objectives).length < 20) f.push('Objetivos (al menos 20 letras)');
+    if (txt(o.description).length < 40) f.push('Descripción / desarrollo (al menos 40 letras)');
+    return f;
 }
 // Las fichas guardadas con color "@mi", "@rival"... toman el color de equipo de quien las abre
 function ejColoresResolver(players) {
@@ -3968,13 +4044,13 @@ function ejComunidadCaja(html, ancho) {
 }
 function ejComunidadCerrar() { var m = document.getElementById('ej-comunidad-modal'); if (m) m.remove(); }
 async function ejComunidadAbrir() {
-    if (!ejComunidadEsAdmin()) return;
+    if (!ejComunidadEsAdmin()) { ejComunidadEnviarAbrir(); return; }
     if (!ejEditandoId) { ejToast('Guarda primero el ejercicio para poder compartirlo.', 'warning'); return; }
     var copia = null;
     try {
-        var res = await supabaseClient.from('custom_exercises').select('id, created_at, updated_at').eq('shared_from', ejEditandoId).eq('visibility', 'community').limit(1);
+        var res = await supabaseClient.from('custom_exercises').select('id, approval_status, created_at, updated_at').eq('shared_from', ejEditandoId).eq('visibility', 'community').limit(20);
         if (res.error) throw res.error;
-        copia = (res.data || [])[0] || null;
+        copia = (res.data || []).filter(function (x) { return x.approval_status === 'approved'; })[0] || (res.data || [])[0] || null;
     } catch (e) { ejToast('No se ha podido consultar la Comunidad: ' + e.message, 'error'); return; }
     var bt = 'border:none;border-radius:8px;padding:9px 16px;cursor:pointer;font-size:13px;font-weight:700';
     var cab = '<div style="display:flex;align-items:center;justify-content:space-between"><b style="font-size:16px">Compartir en la Comunidad</b>'
@@ -3990,8 +4066,12 @@ async function ejComunidadAbrir() {
             + '<button type="button" onclick="ejComunidadPublicar(null)" style="' + bt + ';background:#22c55e;color:#052e14">Compartir</button></div>');
     } else {
         var f = new Date(copia.updated_at || copia.created_at);
-        ejComunidadCaja(cab + '<div style="font-size:13px;color:#4ade80;margin-top:6px"><i class="ej-ico ej-ico-ok"></i> Este ejercicio ya está en la Comunidad' + (isNaN(f) ? '' : ' (publicado el ' + f.toLocaleDateString('es-ES') + ')') + '.</div>'
-            + '<div style="font-size:13px;color:#cbd5e1;margin-top:8px;line-height:1.5">Si lo has cambiado, puedes <b>actualizar</b> la copia publicada con la versión de ahora, o <b>retirarlo</b> para que deje de verse.</div>'
+        var publicado = copia.approval_status === 'approved';
+        ejComunidadCaja(cab + (publicado
+              ? '<div style="font-size:13px;color:#4ade80;margin-top:6px"><i class="ej-ico ej-ico-ok"></i> Este ejercicio ya está en la Comunidad' + (isNaN(f) ? '' : ' (publicado el ' + f.toLocaleDateString('es-ES') + ')') + '.</div>'
+                + '<div style="font-size:13px;color:#cbd5e1;margin-top:8px;line-height:1.5">Si lo has cambiado, puedes <b>actualizar</b> la copia publicada con la versión de ahora, o <b>retirarlo</b> para que deje de verse.</div>'
+              : '<div style="font-size:13px;color:#fbbf24;margin-top:6px">Hay un envío de este ejercicio que <b>todavía no está publicado</b> (' + (copia.approval_status === 'rejected' ? 'rechazado' : 'pendiente de revisión') + (isNaN(f) ? '' : ', del ' + f.toLocaleDateString('es-ES')) + ').</div>'
+                + '<div style="font-size:13px;color:#cbd5e1;margin-top:8px;line-height:1.5"><b>Actualizar</b> lo publica ahora con la versión actual del ejercicio. <b>Retirar</b> borra el envío.</div>')
             + '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;flex-wrap:wrap"><button type="button" onclick="ejComunidadRetirar(\'' + copia.id + '\')" style="' + bt + ';background:#7f1d1d;color:#fecaca">Retirar</button>'
             + '<button type="button" onclick="ejComunidadPublicar(\'' + copia.id + '\')" style="' + bt + ';background:#22c55e;color:#052e14">Actualizar</button></div>');
     }
@@ -4026,14 +4106,220 @@ async function ejComunidadPublicar(idCopia) {
         ejToast('No se ha podido compartir: ' + (e.message || e), 'error');
     }
 }
+// Retirar. Un usuario solo puede cancelar un envío suyo que todavía NO está publicado.
+// Lo publicado solo lo retira un administrador: el usuario lo solicita (ejComunidadSolicitarRetirada).
 async function ejComunidadRetirar(idCopia) {
-    if (!ejComunidadEsAdmin() || !idCopia) return;
+    if (!idCopia) return;
     try {
-        var w = await supabaseClient.from('custom_exercises').delete().eq('id', idCopia).eq('visibility', 'community');
+        var q = supabaseClient.from('custom_exercises').delete().eq('id', idCopia).eq('visibility', 'community');
+        if (!ejComunidadEsAdmin()) q = q.eq('shared_by', ejComunidadYo()).neq('approval_status', 'approved');
+        var w = await q.select('id');
+        if (w.error) throw w.error;
+        if (!(w.data || []).length) { ejToast('No se ha podido retirar: no es un envío tuyo o ya está publicado.', 'warning'); return; }
+        ejComunidadCerrar();
+        ejToast(ejComunidadEsAdmin() ? 'Ejercicio retirado de la Comunidad.' : 'Envío cancelado.', 'success');
+        if (document.getElementById('ej-banco-grid')) { if (ejBancoFuente !== 'mio') ejBancoCache = []; ejBancoLoad(true); }
+        ejBancoPendientes();
+    } catch (e) { ejToast('No se ha podido retirar: ' + (e.message || e), 'error'); }
+}
+
+// ---- Envío de un usuario a la Comunidad (queda pendiente de revisión) ----
+// De un mismo ejercicio puede haber dos filas en la Comunidad: la PUBLICADA y un ENVÍO (cambios pendientes o
+// rechazados). Enviar cambios no quita de la vista lo publicado: cuando se aprueban, sustituyen a la publicada.
+async function ejComunidadCopias(idOriginal) {
+    var c = await supabaseClient.from('custom_exercises').select('id, approval_status, approval_notes, shared_by, created_at, updated_at, retirada_solicitada_at').eq('shared_from', idOriginal).eq('visibility', 'community').limit(20);
+    if (c.error) throw c.error;
+    var filas = c.data || [];
+    return { publicada: filas.filter(function (x) { return x.approval_status === 'approved'; })[0] || null,
+             envio: filas.filter(function (x) { return x.approval_status === 'pending_review'; })[0] || filas.filter(function (x) { return x.approval_status === 'rejected'; })[0] || null };
+}
+async function ejComunidadEnviarAbrir() {
+    if (!ejEditandoId) { ejToast('Guarda primero el ejercicio para poder enviarlo.', 'warning'); return; }
+    var o, pub, env;
+    try {
+        var r = await supabaseClient.from('custom_exercises').select('*').eq('id', ejEditandoId).single();
+        if (r.error) throw r.error;
+        o = r.data;
+        var cs = await ejComunidadCopias(ejEditandoId);
+        pub = cs.publicada; env = cs.envio;
+    } catch (e) { ejToast('No se ha podido consultar la Comunidad: ' + (e.message || e), 'error'); return; }
+    if (o.shared_from) { ejToast('Este ejercicio lo clonaste de la Comunidad: ya está allí.', 'warning'); return; }
+    var bt = 'border:none;border-radius:8px;padding:9px 16px;cursor:pointer;font-size:13px;font-weight:700';
+    var cab = '<div style="display:flex;align-items:center;justify-content:space-between"><b style="font-size:16px">Enviar a la Comunidad</b>'
+        + '<button type="button" onclick="ejComunidadCerrar()" title="Cerrar" style="background:none;border:none;color:#94a3b8;font-size:18px;cursor:pointer"><i class="ej-ico ej-ico-nueva"></i></button></div>';
+    var gris = bt + ';background:#0b1220;color:#e2e8f0;border:1px solid #2f405c', verde = bt + ';background:#22c55e;color:#052e14', rojo = bt + ';background:#7f1d1d;color:#fecaca';
+    var yo = ejComunidadYo(), dia = function (x) { var f = new Date(x.updated_at || x.created_at); return isNaN(f) ? '' : ' (' + f.toLocaleDateString('es-ES') + ')'; };
+    var estado = '';
+    if (pub) estado += '<div style="font-size:13px;color:#4ade80;margin-top:8px"><i class="ej-ico ej-ico-ok"></i> Este ejercicio está publicado en la Comunidad' + dia(pub) + '.</div>'
+        + (pub.retirada_solicitada_at ? '<div style="font-size:13px;color:#fbbf24;margin-top:6px">Has solicitado su retirada. TopLiderCoach la revisará.</div>' : '');
+    if (env && env.approval_status === 'rejected') estado += '<div style="font-size:13px;color:#fca5a5;margin-top:8px">' + (pub ? 'Los cambios que enviaste no se han aceptado' : 'No se ha aceptado en la Comunidad') + dia(env) + '.</div>'
+        + (env.approval_notes ? '<div style="font-size:13px;color:#e2e8f0;background:#1e293b;border-left:3px solid #f87171;border-radius:6px;padding:8px 10px;margin-top:6px;white-space:pre-wrap"><b>Motivo:</b> ' + ejComEsc(env.approval_notes) + '</div>' : '');
+    else if (env) estado += '<div style="font-size:13px;color:#fbbf24;margin-top:8px">' + (pub ? 'Has enviado cambios' : 'Enviado') + dia(env) + '. ' + (pub ? 'Están pendientes' : 'Está pendiente') + ' de revisión.</div>';
+    if ((pub && pub.shared_by !== yo) || (env && env.shared_by !== yo)) {
+        ejComunidadCaja(cab + estado + '<div style="font-size:13px;color:#94a3b8;margin-top:8px">Lo envió otra persona de tu club: solo ella puede cambiarlo.</div>'
+            + '<div style="display:flex;justify-content:flex-end;margin-top:16px"><button type="button" onclick="ejComunidadCerrar()" style="' + gris + '">Cerrar</button></div>');
+        return;
+    }
+    // Botones de la izquierda: cancelar un envío sin publicar, o solicitar la retirada de lo publicado
+    var extra = '';
+    if (env) extra += '<button type="button" onclick="ejComunidadRetirar(\'' + env.id + '\')" style="' + rojo + '">' + (env.approval_status === 'rejected' ? 'Borrar el envío' : 'Cancelar el envío') + '</button>';
+    if (pub && !pub.retirada_solicitada_at) extra += '<button type="button" onclick="ejComunidadRetiradaAbrir(\'' + pub.id + '\')" style="' + gris + '">Solicitar retirada</button>';
+    var faltan = ejComunidadFaltan(o);
+    if (faltan.length) {
+        ejComunidadCaja(cab + estado + '<div style="font-size:13px;color:#cbd5e1;margin-top:8px;line-height:1.5">Para que la Comunidad tenga ejercicios completos, antes de enviarlo rellena en la ficha y <b>guarda</b>:</div>'
+            + '<ul style="margin:8px 0 0;padding-left:18px;font-size:13px;color:#fca5a5;line-height:1.7">' + faltan.map(function (x) { return '<li>' + x + '</li>'; }).join('') + '</ul>'
+            + '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;flex-wrap:wrap">' + extra + '<button type="button" onclick="ejComunidadCerrar()" style="' + gris + '">Entendido</button></div>');
+        return;
+    }
+    var nombre = (typeof usuario !== 'undefined' && usuario && (usuario.display_name || usuario.name)) || '';
+    // Así se verá en la Comunidad: se dibuja ahora con los datos guardados, para que se vea antes de enviar
+    var vista = null;
+    try {
+        vista = (o.board_data && (o.board_data.players || o.board_data.lines || o.board_data.equipment)) ? (ejMiniaturaDeDatos(ejComunidadAnonimizar(o.board_data), true) || o.thumbnail_svg) : o.thumbnail_svg;
+    } catch (e) { vista = o.thumbnail_svg || null; }
+    var vistaHtml = vista ? '<div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;margin-top:12px">Así se verá en la Comunidad</div>'
+        + '<div style="width:100%;aspect-ratio:8/5;border-radius:8px;overflow:hidden;background:#0f4c2a;margin-top:4px"><img id="ej-comunidad-vista" alt="" style="width:100%;height:100%;object-fit:contain;display:block"></div>'
+        + '<div style="font-size:12px;color:#94a3b8;margin-top:4px">Si no es el dibujo de este ejercicio, cancela, pulsa <b>Editar dibujo</b>, corrígelo y guarda.</div>' : '';
+    var notas = vistaHtml + '<ul style="margin:10px 0 0;padding-left:18px;font-size:13px;color:#cbd5e1;line-height:1.6">'
+        + '<li>Se envía <b>una copia</b>. Tu ejercicio no cambia.</li>'
+        + '<li>En la copia las fichas van <b>sin nombres ni fotos</b>, y el vídeo no se comparte.</li>'
+        + '<li><b>TopLiderCoach la revisa</b> antes de publicarla. Verás el resultado en este botón y en tu Banco.</li>'
+        + (pub ? '<li>Mientras se revisan los cambios, en la Comunidad <b>se sigue viendo la versión publicada</b>.</li>'
+               : '<li>Una vez publicada <b>pasa a formar parte de la Comunidad</b>: para retirarla hay que solicitarlo a TopLiderCoach.</li>') + '</ul>'
+        + (nombre ? '<label style="display:flex;align-items:center;gap:8px;margin-top:12px;font-size:13px;color:#e2e8f0;cursor:pointer"><input type="checkbox" id="ej-comunidad-autor" checked> Mostrar mi nombre como autor (' + ejComEsc(nombre) + ')</label>' : '');
+    ejComunidadCaja(cab + estado + (pub || env ? '' : '<div style="font-size:13px;color:#94a3b8;margin-top:6px">Cuando se apruebe, lo verán y podrán usarlo todos los usuarios de TopLiderCoach.</div>') + notas
+        + '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;flex-wrap:wrap">' + extra
+        + '<button type="button" onclick="ejComunidadCerrar()" style="' + gris + '">Cancelar</button>'
+        + '<button type="button" id="ej-comunidad-enviar" onclick="ejComunidadEnviar(' + (env ? "\'" + env.id + "\'" : 'null') + ')" style="' + verde + '">' + (env ? 'Enviar de nuevo' : pub ? 'Enviar cambios' : 'Enviar a revisión') + '</button></div>', 540);
+    var iv = document.getElementById('ej-comunidad-vista');
+    if (iv && vista) iv.src = vista.indexOf('data:') === 0 ? vista : URL.createObjectURL(new Blob([vista], { type: 'image/svg+xml' }));
+}
+// idEnvio: id del envío pendiente o rechazado que se sustituye; null = envío nuevo (aunque ya haya una versión publicada)
+async function ejComunidadEnviar(idEnvio) {
+    if (!ejEditandoId) return;
+    var boton = document.getElementById('ej-comunidad-enviar'), rotulo = boton ? boton.textContent : '';
+    if (boton) { if (boton.disabled) return; boton.disabled = true; boton.textContent = 'Enviando...'; }
+    try {
+        var r = await supabaseClient.from('custom_exercises').select('*').eq('id', ejEditandoId).single();
+        if (r.error) throw r.error;
+        var o = r.data;
+        if (ejComunidadFaltan(o).length) { ejComunidadEnviarAbrir(); return; }
+        var campos = ['name','description','objectives','variants','coach_notes','materials','category','tema','age_group','difficulty','game_phase','duration_min','players_count','num_goalkeepers','field_width','field_length','field_area','eii','eii_analysis','es_portero','subcategoria_portero'];
+        var fila = {};
+        campos.forEach(function (k) { if (o[k] !== undefined) fila[k] = o[k]; });
+        if (o.board_data && (o.board_data.players || o.board_data.lines || o.board_data.equipment)) {
+            fila.board_data = ejComunidadAnonimizar(o.board_data);
+            fila.thumbnail_svg = await ejMiniaturaCompacta(ejMiniaturaDeDatos(fila.board_data, true) || o.thumbnail_svg || null);
+        } else {
+            fila.board_data = o.board_data || null;
+            fila.thumbnail_svg = o.thumbnail_svg || null;
+        }
+        var chk = document.getElementById('ej-comunidad-autor'), yo = ejComunidadYo();
+        var nombre = (chk && chk.checked && typeof usuario !== 'undefined' && usuario) ? (usuario.display_name || usuario.name || null) : null;
+        Object.assign(fila, { club_id: null, coach_id: 'comunidad', source: 'comunidad', visibility: 'community', approval_status: 'pending_review',
+            approved_by: null, approved_at: null, approval_notes: null, shared_from: o.id, shared_by: yo, shared_by_name: nombre, updated_at: new Date().toISOString() });
+        var w = idEnvio ? await supabaseClient.from('custom_exercises').update(fila).eq('id', idEnvio).eq('shared_by', yo).neq('approval_status', 'approved').select('id')
+                        : await supabaseClient.from('custom_exercises').insert(fila).select('id');
+        if (w.error) throw w.error;
+        if (!(w.data || []).length) throw new Error('no se ha guardado el envío');
+        ejComunidadCerrar();
+        ejToast('Enviado. Lo verás publicado cuando se revise.', 'success');
+        if (ejBancoFuente === 'mio' && document.getElementById('ej-banco-grid')) ejBancoLoad(true);
+    } catch (e) {
+        console.error('ejComunidadEnviar:', e);
+        if (boton) { boton.disabled = false; boton.textContent = rotulo || 'Enviar a revisión'; }
+        ejToast('No se ha podido enviar: ' + (e.message || e), 'error');
+    }
+}
+// El usuario no retira lo publicado: lo solicita, con su motivo, y decide el administrador
+function ejComunidadRetiradaAbrir(idPublicada) {
+    var bt = 'border:none;border-radius:8px;padding:9px 16px;cursor:pointer;font-size:13px;font-weight:700';
+    ejComunidadCaja('<b style="font-size:16px">Solicitar la retirada</b>'
+        + '<div style="font-size:13px;color:#cbd5e1;margin-top:8px;line-height:1.5">Los ejercicios publicados forman parte de la Comunidad. Cuéntanos por qué quieres retirarlo y TopLiderCoach lo revisará. Mientras tanto <b>sigue publicado</b>.</div>'
+        + '<textarea id="ej-comunidad-motivo" rows="4" placeholder="Motivo de la solicitud" style="width:100%;box-sizing:border-box;margin-top:10px;padding:9px 10px;background:#0b1220;border:1px solid #2f405c;border-radius:8px;color:#e2e8f0;font-size:13px;font-family:inherit;resize:vertical"></textarea>'
+        + '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button type="button" onclick="ejComunidadCerrar()" style="' + bt + ';background:#0b1220;color:#e2e8f0;border:1px solid #2f405c">Cancelar</button>'
+        + '<button type="button" onclick="ejComunidadSolicitarRetirada(\'' + idPublicada + '\')" style="' + bt + ';background:#f59e0b;color:#1c1917">Enviar solicitud</button></div>');
+    var t = document.getElementById('ej-comunidad-motivo'); if (t) t.focus();
+}
+async function ejComunidadSolicitarRetirada(idPublicada) {
+    var t = document.getElementById('ej-comunidad-motivo'), motivo = t ? t.value.trim() : '';
+    if (motivo.length < 5) { ejToast('Escribe el motivo de la solicitud.', 'warning'); return; }
+    try {
+        var w = await supabaseClient.from('custom_exercises').update({ retirada_solicitada_at: new Date().toISOString(), retirada_motivo: motivo })
+            .eq('id', idPublicada).eq('visibility', 'community').eq('shared_by', ejComunidadYo()).select('id');
+        if (w.error) throw w.error;
+        if (!(w.data || []).length) throw new Error('solo puede solicitarlo quien lo envió');
+        ejComunidadCerrar();
+        ejToast('Solicitud enviada. El ejercicio sigue publicado hasta que se revise.', 'success');
+    } catch (e) { ejToast('No se ha podido enviar la solicitud: ' + (e.message || e), 'error'); }
+}
+
+// ---- Revisión de los envíos (solo administradores) ----
+async function ejComunidadRevisar(id, aprobar, motivo) {
+    if (!ejComunidadEsAdmin() || !id) return;
+    try {
+        var ahora = new Date().toISOString(), yo = ejComunidadYo(), hecho = false;
+        if (aprobar) {
+            // Si son cambios de un ejercicio ya publicado, se vuelcan en la fila publicada (conserva su id, y con él
+            // los clones y el historial) y el envío se borra. Si no, el envío pasa a publicado.
+            var r = await supabaseClient.from('custom_exercises').select('*').eq('id', id).eq('visibility', 'community').single();
+            if (r.error) throw new Error('el envío ya no existe (puede que lo hayan cancelado)');
+            var e = r.data;
+            var p = e.shared_from ? await supabaseClient.from('custom_exercises').select('id').eq('shared_from', e.shared_from).eq('visibility', 'community').eq('approval_status', 'approved').limit(1) : { data: [] };
+            if (p.error) throw p.error;
+            var publicada = (p.data || []).filter(function (x) { return x.id !== id; })[0];
+            if (publicada) {
+                var campos = ['name','description','objectives','variants','coach_notes','materials','category','tema','age_group','difficulty','game_phase','duration_min','players_count','num_goalkeepers','field_width','field_length','field_area','eii','eii_analysis','es_portero','subcategoria_portero','board_data','thumbnail_svg','shared_by_name'];
+                var nuevo = { approved_by: yo, approved_at: ahora, approval_notes: null, updated_at: ahora };
+                campos.forEach(function (k) { nuevo[k] = e[k] === undefined ? null : e[k]; });
+                var u = await supabaseClient.from('custom_exercises').update(nuevo).eq('id', publicada.id).select('id');
+                if (u.error) throw u.error;
+                if (!(u.data || []).length) throw new Error('no se ha podido actualizar la versión publicada');
+                var d = await supabaseClient.from('custom_exercises').delete().eq('id', id).eq('visibility', 'community').neq('approval_status', 'approved');
+                if (d.error) throw d.error;
+                hecho = true;
+            }
+        }
+        if (!hecho) {
+            var cambio = aprobar ? { approval_status: 'approved', approved_by: yo, approved_at: ahora, approval_notes: null }
+                                 : { approval_status: 'rejected', approved_by: yo, approved_at: ahora, approval_notes: motivo || null };
+            var w = await supabaseClient.from('custom_exercises').update(cambio).eq('id', id).eq('visibility', 'community').eq('approval_status', 'pending_review').select('id');
+            if (w.error) throw w.error;
+            if (!(w.data || []).length) throw new Error('el envío ya no existe o ya estaba revisado');
+        }
+        ejComunidadCerrar();
+        ejToast(aprobar ? 'Aprobado. Ya está en la Comunidad.' : 'Rechazado. El usuario verá el motivo.', 'success');
+    } catch (err) { ejToast('No se ha podido guardar la revisión: ' + (err.message || err), 'error'); }
+    if (ejBancoFuente === 'rev') { ejBancoCache = []; ejBancoLoad(true); }
+    ejBancoPendientes();
+}
+function ejComunidadRechazarAbrir(id) {
+    if (!ejComunidadEsAdmin()) return;
+    var bt = 'border:none;border-radius:8px;padding:9px 16px;cursor:pointer;font-size:13px;font-weight:700';
+    ejComunidadCaja('<b style="font-size:16px">Rechazar el envío</b>'
+        + '<div style="font-size:13px;color:#cbd5e1;margin-top:8px">Escribe el motivo. El usuario lo verá y podrá corregir el ejercicio y volver a enviarlo.</div>'
+        + '<textarea id="ej-comunidad-motivo" rows="4" placeholder="Ej: falta explicar el desarrollo; el dibujo no se entiende..." style="width:100%;box-sizing:border-box;margin-top:10px;padding:9px 10px;background:#0b1220;border:1px solid #2f405c;border-radius:8px;color:#e2e8f0;font-size:13px;font-family:inherit;resize:vertical"></textarea>'
+        + '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button type="button" onclick="ejComunidadCerrar()" style="' + bt + ';background:#0b1220;color:#e2e8f0;border:1px solid #2f405c">Cancelar</button>'
+        + '<button type="button" onclick="ejComunidadRechazar(\'' + id + '\')" style="' + bt + ';background:#7f1d1d;color:#fecaca">Rechazar</button></div>');
+    var t = document.getElementById('ej-comunidad-motivo'); if (t) t.focus();
+}
+function ejComunidadRechazar(id) {
+    var t = document.getElementById('ej-comunidad-motivo'), motivo = t ? t.value.trim() : '';
+    if (motivo.length < 5) { ejToast('Escribe el motivo para que el usuario sepa qué corregir.', 'warning'); return; }
+    ejComunidadRevisar(id, false, motivo);
+}
+// Solicitudes de retirada: el administrador retira el ejercicio o lo mantiene publicado
+async function ejComunidadRetiradaResolver(id, retirar) {
+    if (!ejComunidadEsAdmin() || !id) return;
+    try {
+        var w = retirar ? await supabaseClient.from('custom_exercises').delete().eq('id', id).eq('visibility', 'community').select('id')
+                        : await supabaseClient.from('custom_exercises').update({ retirada_solicitada_at: null, retirada_motivo: null }).eq('id', id).eq('visibility', 'community').select('id');
         if (w.error) throw w.error;
         ejComunidadCerrar();
-        ejToast('Ejercicio retirado de la Comunidad.', 'success');
-    } catch (e) { ejToast('No se ha podido retirar: ' + (e.message || e), 'error'); }
+        ejToast(retirar ? 'Retirado de la Comunidad.' : 'Se mantiene publicado.', 'success');
+    } catch (e) { ejToast('No se ha podido guardar: ' + (e.message || e), 'error'); }
+    if (ejBancoFuente === 'rev') { ejBancoCache = []; ejBancoLoad(true); }
+    ejBancoPendientes();
 }
 
 function ejComEsc(t) { return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
@@ -4059,14 +4345,16 @@ async function ejComunidadVer(id) {
         var textos = bloque('Objetivos', o.objectives) + bloque('Descripción', o.description) + bloque('Variantes', o.variants) + bloque('Notas', o.coach_notes);
         ejComunidadCaja('<div style="display:flex;align-items:center;justify-content:space-between;gap:10px"><b style="font-size:16px">' + ejComEsc(o.name) + '</b>'
             + '<button type="button" onclick="ejComunidadCerrar()" title="Cerrar" style="background:none;border:none;color:#94a3b8;font-size:18px;cursor:pointer"><i class="ej-ico ej-ico-nueva"></i></button></div>'
-            + '<div style="font-size:11px;color:#a78bfa;margin-top:2px">Comunidad' + (o.shared_by_name ? ' · ' + ejComEsc(o.shared_by_name) : '') + '</div>'
+            + '<div style="font-size:11px;color:#a78bfa;margin-top:2px">' + (o.approval_status === 'pending_review' ? 'Pendiente de revisión' : 'Comunidad') + (o.shared_by_name ? ' · ' + ejComEsc(o.shared_by_name) : '') + '</div>'
             + '<div style="max-height:70vh;overflow:auto;margin-top:10px">'
             + '<div style="width:100%;aspect-ratio:8/5;border-radius:8px;overflow:hidden;background:#0f4c2a"><img id="ej-comunidad-img" alt="" style="width:100%;height:100%;object-fit:contain;display:block"></div>'
             + (datos.length ? '<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:10px">' + datos.map(function (d) { return '<span style="font-size:11px;color:#cbd5e1;background:#1e293b;padding:2px 8px;border-radius:5px">' + ejComEsc(d) + '</span>'; }).join('') + '</div>' : '')
             + (textos || '<div style="font-size:13px;color:#64748b;margin-top:10px">Este ejercicio no tiene texto.</div>')
             + '</div>'
             + '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button type="button" onclick="ejComunidadCerrar()" style="' + bt + ';background:#0b1220;color:#e2e8f0;border:1px solid #2f405c">Cerrar</button>'
-            + '<button type="button" onclick="ejComunidadClonar(\'' + o.id + '\')" style="' + bt + ';background:#7c3aed;color:#fff">Clonar a mis ejercicios</button></div>', 720);
+            + (o.approval_status === 'pending_review' && ejComunidadEsAdmin()
+                ? '<button type="button" onclick="ejComunidadRechazarAbrir(\'' + o.id + '\')" style="' + bt + ';background:#7f1d1d;color:#fecaca">Rechazar</button><button type="button" onclick="ejComunidadRevisar(\'' + o.id + '\', true)" style="' + bt + ';background:#16a34a;color:#fff">Aprobar</button>'
+                : '<button type="button" onclick="ejComunidadClonar(\'' + o.id + '\')" style="' + bt + ';background:#7c3aed;color:#fff">Clonar a mis ejercicios</button>') + '</div>', 720);
         var img = document.getElementById('ej-comunidad-img');
         if (img && o.thumbnail_svg) {
             img.src = o.thumbnail_svg.indexOf('data:') === 0 ? o.thumbnail_svg : URL.createObjectURL(new Blob([o.thumbnail_svg], { type: 'image/svg+xml' }));
@@ -4086,7 +4374,7 @@ async function ejComunidadClonar(id) {
 }
 async function ejComunidadClonarHacer(id, mio) {
     try {
-        var r = await supabaseClient.from('custom_exercises').select('*').eq('id', id).eq('visibility', 'community').single();
+        var r = await supabaseClient.from('custom_exercises').select('*').eq('id', id).eq('visibility', 'community').eq('approval_status', 'approved').single();
         if (r.error) throw r.error;
         var o = r.data, campos = ['name','description','objectives','variants','coach_notes','materials','category','tema','age_group','difficulty','game_phase','duration_min','players_count','num_goalkeepers','field_width','field_length','field_area','eii','eii_analysis','es_portero','subcategoria_portero'];
         var fila = {};
@@ -4179,16 +4467,17 @@ function ejBancoRender(list) {
     const grid = document.getElementById('ej-banco-grid');
     if (!grid) return;
 
-    var esCom = ejBancoFuente === 'com';
+    var esRev = ejBancoFuente === 'rev', esCom = ejBancoFuente === 'com' || esRev;
     // En cada pestaña solo lo suyo (un ejercicio propio recién guardado no se cuela en la Comunidad)
-    list = list.filter(function (e) { return !!e._com === esCom; });
+    list = list.filter(function (e) { return (e._com || 'mio') === ejBancoFuente; });
+    var ENVIO = { pending_review: ['En revisión', '#fbbf24'], approved: ['En la Comunidad', '#4ade80'], rejected: ['No aceptado', '#f87171'] };
     var MAX = 1000;
     if (list.length > MAX) list = list.slice(0, MAX);
     var countEl = document.getElementById('ej-banco-count');
     if (countEl) countEl.textContent = list.length + ' ejercicio' + (list.length !== 1 ? 's' : '');
 
     if (!list.length) {
-        grid.innerHTML = '<div style="color:#64748b;padding:30px;text-align:center;grid-column:1/-1">' + (esCom && !ejBancoCache.length ? 'Todavía no hay ejercicios en la Comunidad.' : 'No hay ejercicios con estos filtros.') + '</div>';
+        grid.innerHTML = '<div style="color:#64748b;padding:30px;text-align:center;grid-column:1/-1">' + (esRev && !ejBancoCache.length ? 'No hay ejercicios pendientes de revisar.' : esCom && !ejBancoCache.length ? 'Todavía no hay ejercicios en la Comunidad.' : 'No hay ejercicios con estos filtros.') + '</div>';
         return;
     }
 
@@ -4221,11 +4510,21 @@ function ejBancoRender(list) {
             + '<span style="font-size:13px;font-weight:600;color:#e2e8f0;line-height:1.3;flex:1;margin-right:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + e.name + '</span>'
             + (e.difficulty ? '<span style="font-size:10px;background:' + difCol + '20;color:' + difCol + ';padding:1px 7px;border-radius:4px;flex-shrink:0">' + e.difficulty + '</span>' : '')
             + '</div>'
-            + '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px">' + tagsHTML + '</div>'
+            + '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px">' + tagsHTML
+            + (!esCom && ENVIO[ejBancoEnvios[e.id]] ? '<span title="Estado de tu envío a la Comunidad" style="font-size:10px;font-weight:700;color:' + ENVIO[ejBancoEnvios[e.id]][1] + ';border:1px solid ' + ENVIO[ejBancoEnvios[e.id]][1] + ';padding:0 6px;border-radius:4px">' + ENVIO[ejBancoEnvios[e.id]][0] + '</span>' : '')
+            + '</div>'
             + '<div onclick="' + (esCom ? 'ejComunidadVer' : 'ejVerFicha') + '(\'' + e.id + '\')" style="width:100%;aspect-ratio:8/5;overflow:hidden;border-radius:6px;margin-bottom:8px;background:#0f4c2a;cursor:pointer">'
             + thumbHTML
             + '</div>'
-            + (esCom ? '<div style="display:flex;gap:4px">'
+            + (esRev && e._retirada ? '<div style="font-size:11px;color:#fbbf24;background:#1e293b;border-left:3px solid #f59e0b;border-radius:5px;padding:5px 7px;margin-bottom:6px;white-space:pre-wrap;max-height:64px;overflow:auto"><b>Solicita retirarlo' + (e._autor ? ' (' + ejComEsc(e._autor) + ')' : '') + ':</b> ' + ejComEsc(e._retirada) + '</div><div style="display:flex;gap:4px">'
+                + '<button onclick="ejComunidadVer(\'' + e.id + '\')" style="flex:1;padding:5px;font-size:11px;background:#1e293b;border:1px solid #334155;color:#93c5fd;border-radius:6px;cursor:pointer">Ver</button>'
+                + '<button onclick="ejComunidadRetiradaResolver(\'' + e.id + '\', false)" style="flex:1;padding:5px;font-size:11px;font-weight:700;background:#16a34a;border:1px solid #16a34a;color:#fff;border-radius:6px;cursor:pointer">Mantener</button>'
+                + '<button onclick="ejConfirm(\'¿Retirar este ejercicio de la Comunidad? No se puede deshacer.\', function(){ ejComunidadRetiradaResolver(\'' + e.id + '\', true); })" style="flex:1;padding:5px;font-size:11px;background:#1e293b;border:1px solid #7f1d1d;color:#fca5a5;border-radius:6px;cursor:pointer">Retirar</button>'
+                + '</div></div>' : esRev ? '<div style="display:flex;gap:4px">'
+                + '<button onclick="ejComunidadVer(\'' + e.id + '\')" style="flex:1;padding:5px;font-size:11px;background:#1e293b;border:1px solid #334155;color:#93c5fd;border-radius:6px;cursor:pointer">Ver</button>'
+                + '<button onclick="ejComunidadRevisar(\'' + e.id + '\', true)" style="flex:1;padding:5px;font-size:11px;font-weight:700;background:#16a34a;border:1px solid #16a34a;color:#fff;border-radius:6px;cursor:pointer">Aprobar</button>'
+                + '<button onclick="ejComunidadRechazarAbrir(\'' + e.id + '\')" style="flex:1;padding:5px;font-size:11px;background:#1e293b;border:1px solid #7f1d1d;color:#fca5a5;border-radius:6px;cursor:pointer">Rechazar</button>'
+                + '</div></div>' : esCom ? '<div style="display:flex;gap:4px">'
                 + '<button onclick="ejComunidadVer(\'' + e.id + '\')" style="flex:1;padding:5px;font-size:11px;background:#1e293b;border:1px solid #334155;color:#93c5fd;border-radius:6px;cursor:pointer">Ver</button>'
                 + '<button onclick="ejComunidadClonar(\'' + e.id + '\')" style="flex:2;padding:5px;font-size:11px;font-weight:700;background:#7c3aed;border:1px solid #7c3aed;color:#fff;border-radius:6px;cursor:pointer" title="Copiar a Mis ejercicios para usarlo y cambiarlo">Clonar a mis ejercicios</button>'
                 + '</div></div>' : '')
@@ -4266,7 +4565,16 @@ async function ejVerFicha(id) {
             .from('custom_exercises').select('*').eq('id', id).single();
         if (error) throw error;
         ejEditandoId = data.id;
-        const set = (fid, val) => { const el = document.getElementById(fid); if (el && val) el.value = val; };
+        // Vaciar antes todos los campos: si no, lo que este ejercicio tiene vacío se quedaba con el texto
+        // del ejercicio abierto antes, y al guardar se le copiaba.
+        ['ej-nombre','ej-objetivos','ej-descripcion','ej-variantes','ej-notas','ej-material',
+         'ej-duracion','ej-jugadores','ej-ancho','ej-largo','ej-porteros'].forEach(function (fid) {
+            var el = document.getElementById(fid); if (el) el.value = '';
+        });
+        ['ej-categoria','ej-edad','ej-dificultad','ej-fase','ej-tema','ej-subcat-portero'].forEach(function (fid) {
+            var el = document.getElementById(fid); if (el) el.selectedIndex = 0;
+        });
+        const set = (fid, val) => { const el = document.getElementById(fid); if (el && val != null && val !== '') el.value = val; };
         set('ej-nombre', data.name);
         var nombreInput = document.getElementById('ej-nombre');
         if (nombreInput) { nombreInput.readOnly = true; nombreInput.style.background = '#1e293b'; nombreInput.style.color = '#64748b'; }
@@ -4307,6 +4615,7 @@ async function ejBancoCargar(id) {
         // 1. Parar animación si estaba reproduciéndose
         ejFrameStop();
         ejProyFaseCargadaId = null; // la pizarra pasa a mostrar un ejercicio del banco
+        ejPizarraDeId = data.board_data ? data.id : null;
 
         // 1b. Limpiar media del ejercicio anterior
         window.ejThumbnailPendiente = null;
