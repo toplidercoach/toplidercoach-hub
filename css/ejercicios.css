@@ -295,6 +295,8 @@
   #ej-pizarra-wrap.ej-panel-encima #ej-toolbar > .ej-section-body .ej-field-btns > :only-child { grid-column: 1 / -1; }
   /* Con hueco de césped, los fotogramas también van encima del margen derecho y el campo no se mueve al animar */
   #ej-pizarra-wrap.ej-panel-encima #ej-timeline-bar { position: absolute; right: 6px; top: 6px; z-index: 7; }
+  /* Ahí el aviso del vídeo no puede flotar (quedaba recortado y tapaba el botón de guardar): va dentro del carril, debajo de los botones */
+  #ej-pizarra-wrap.ej-panel-encima #ej-anim-msg { position: static; transform: none; white-space: normal; background: none; border: none; padding: 2px 0 0; font-size: 9.5px !important; line-height: 1.25; overflow-wrap: anywhere; }
 }
 /* Sin pregunta inicial "estático o animado" */
 #ej-modo-overlay { display: none !important; }

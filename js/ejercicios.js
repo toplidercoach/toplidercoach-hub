@@ -4696,7 +4696,7 @@ async function ejBancoCargar(id) {
         // 1. Parar animación si estaba reproduciéndose
         ejFrameStop();
         ejProyFaseCargadaId = null; // la pizarra pasa a mostrar un ejercicio del banco
-        ejPizarraDeId = data.board_data ? data.id : null;
+        ejPizarraDeId = data.id;   // "Editar" deja en la pizarra el dibujo de este ejercicio (o la vacía si no tiene)
 
         // 1b. Limpiar media del ejercicio anterior
         window.ejThumbnailPendiente = null;
@@ -5451,7 +5451,7 @@ function ejRenderTimeline() {
         </div>
         <span class="ej-tl-cuenta">${cur+1} / ${total}</span>
         <button class="ej-tl-btn acento" onclick="ejVideoAbrir()" title="Descargar la animación como vídeo MP4" ${total<2?'disabled':''}><i class="ej-ico ej-ico-descargar"></i><span>Vídeo</span></button>
-        ${ejEditandoId ? `<button class="ej-tl-btn pri" onclick="ejGuardarYExportar()" title="Guardar los cambios del ejercicio y su vídeo">${ejP._exportingVideo ? '<i class="ej-ico ej-ico-espera"></i><span>Generando…</span>' : '<i class="ej-ico ej-ico-guardar"></i><span>Guardar</span>'}</button>` : ''}
+        ${ejEditandoId && ejPizarraDeId === ejEditandoId ? `<button class="ej-tl-btn pri" onclick="ejGuardarYExportar()" title="Guardar los cambios del ejercicio y su vídeo">${ejP._exportingVideo ? '<i class="ej-ico ej-ico-espera"></i><span>Generando…</span>' : '<i class="ej-ico ej-ico-guardar"></i><span>Guardar</span>'}</button>` : ''}
     </div>
     <div id="ej-anim-msg" style="font-size:11px;color:#9ca3af;margin-top:4px;text-align:center">${ejP._exportingVideo ? '<i class="ej-ico ej-ico-espera"></i> Generando vídeo… no toques nada' : ejP._lastVideoUrl ? '<span style="color:#22c55e"><i class="ej-ico ej-ico-ok"></i> Vídeo MP4 guardado</span> — <a href="'+ejP._lastVideoUrl+'" target="_blank" style="color:#93c5fd;text-decoration:underline">Ver vídeo</a> · <a href="https://toplidercoach.com/wp-content/uploads/ejercicios/download-video.php?url='+encodeURIComponent(ejP._lastVideoUrl)+'" target="_blank" style="color:#93c5fd;text-decoration:underline">Descargar</a>' : ''}</div>`;
 }
@@ -5587,6 +5587,12 @@ function ejColocarJugadorPlantilla(idx) {
         return;
     }
     if (ejP._exportingVideo) return;
+    // Este botón guarda en el ejercicio lo que hay en la pizarra. Si la pizarra tiene el dibujo de otro
+    // (se abrió la ficha con "Ver ficha", o se cargó una fase de un proyecto), no se guarda nada.
+    if (ejPizarraDeId !== ejEditandoId) {
+        ejToast('La pizarra no tiene cargado el dibujo de este ejercicio. Ábrelo desde el Banco con Editar y vuelve a intentarlo. No se ha guardado nada.', 'warning');
+        return;
+    }
     
     // 1. Capturar miniatura limpia
     var prevSelected = ejP.selectedId;
