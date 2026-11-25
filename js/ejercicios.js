@@ -2749,6 +2749,129 @@ root.innerHTML = `
 // =============================================
 // SECCIÓN FICHA DEL EJERCICIO
 // =============================================
+// =====================================================================
+// Ficha · listas de Categoría, Edad, Tema y Fase (un solo sitio) y
+// desplegable de varias opciones. Se guardan en la misma columna de
+// texto, separadas por comas: "Cadete, Juvenil".
+// =====================================================================
+var EJ_LISTAS = {
+    categoria: ['Técnica individual', 'Posesión', 'Pressing', 'Ataque posicional', 'Defensa', 'Transiciones', 'Portería', 'Físico', 'Táctica',
+        'Evoluciones', 'Ruedas de pase', 'Rondos', 'Circuito técnico', 'Juegos de posición simple', 'Juegos de posición complejos',
+        'Partidos reducidos', 'Partidos condicionados', 'Partido libre', 'Circuitos físicos', 'Finalizaciones', 'Hábitos defensivos',
+        'Enfrentamientos', 'Juegos lúdicos'],
+    edad: ['Prebenjamín', 'Benjamín', 'Alevín', 'Infantil', 'Cadete', 'Juvenil', 'Senior'],
+    tema: ['Calentamiento', 'Cambios de orientación', 'Centros laterales', 'Contraataque', 'Defensa en bloque bajo', 'Defensa en inferioridad',
+        'Duelos', 'Finalización', 'Físico-Técnico', 'Juego de posición', 'Juego interior', 'Juegos Lúdicos', 'Partidos', 'Porteros', 'Posesiones',
+        'Presión', 'Press perdida', 'Progresión en el juego', 'Rondos', 'Ruedas de pases', 'Salida de balón', 'Tercer hombre', 'Trabajo táctico',
+        'Transiciones', 'Técnica individual'],
+    fase: ['Organización ofensiva', 'Organización defensiva', 'Transición ataque', 'Transición defensa', 'Balón parado']
+};
+var EJ_MULTI = {
+    'ej-categoria': { lista: 'categoria', max: 2, vacio: '-- Seleccionar --' },
+    'ej-edad':      { lista: 'edad', vacio: '-- Todas --' },
+    'ej-tema':      { lista: 'tema', vacio: '-- Seleccionar --' },
+    'ej-fase':      { lista: 'fase', vacio: '-- Todas --' }
+};
+function ejMultiEsc(t) {
+    return String(t == null ? '' : t).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; });
+}
+// "Cadete, Juvenil" -> ['Cadete', 'Juvenil'] (sin vacíos ni repetidos)
+function ejMultiPartes(v) {
+    var out = [];
+    String(v == null ? '' : v).split(',').forEach(function (x) { x = x.trim(); if (x && out.indexOf(x) === -1) out.push(x); });
+    return out;
+}
+// ¿El valor guardado (una o varias opciones) incluye esta opción? Para los filtros.
+function ejMultiTiene(v, opcion) { return ejMultiPartes(v).indexOf(opcion) !== -1; }
+function ejListaOpciones(lista) {
+    return (EJ_LISTAS[lista] || []).map(function (o) { return '<option>' + ejMultiEsc(o) + '</option>'; }).join('');
+}
+// Las elegidas, en el orden de la lista; las que no están en la lista (ejercicios antiguos o importados) van al final
+function ejMultiOrdenar(id, partes) {
+    var ops = EJ_LISTAS[EJ_MULTI[id].lista];
+    return partes.slice().sort(function (a, b) {
+        var ia = ops.indexOf(a), ib = ops.indexOf(b);
+        return (ia < 0 ? 999 : ia) - (ib < 0 ? 999 : ib);
+    });
+}
+function ejMultiHtml(id) {
+    return '<div class="ej-multi" id="' + id + '-caja"><input type="hidden" id="' + id + '">'
+        + '<button type="button" class="ej-multi-btn" id="' + id + '-btn" onclick="ejMultiAlternar(\'' + id + '\')"></button>'
+        + '<div class="ej-multi-lista" id="' + id + '-lista" style="display:none"></div></div>';
+}
+// El campo oculto se comporta como el desplegable de antes: el resto del código sigue leyendo y escribiendo .value
+function ejMultiMontar() {
+    Object.keys(EJ_MULTI).forEach(function (id) {
+        var el = document.getElementById(id);
+        if (!el || el._multi) return;
+        el._multi = true; el._v = '';
+        Object.defineProperty(el, 'value', {
+            configurable: true,
+            get: function () { return this._v; },
+            set: function (v) {
+                var p = ejMultiOrdenar(id, ejMultiPartes(v));
+                this._v = p.join(', ');
+                ejMultiPintar(id);
+            }
+        });
+        Object.defineProperty(el, 'selectedIndex', {
+            configurable: true,
+            get: function () { return this._v ? 1 : 0; },
+            set: function (i) { if (!i) { this._v = ''; ejMultiPintar(id); } }
+        });
+        ejMultiPintar(id);
+    });
+    if (!window.__ejMultiFuera) {
+        window.__ejMultiFuera = true;
+        document.addEventListener('mousedown', function (e) {
+            if (e.target && e.target.closest && e.target.closest('.ej-multi')) return;
+            ejMultiCerrar();
+        });
+        document.addEventListener('keydown', function (e) { if (e.key === 'Escape') ejMultiCerrar(); });
+    }
+}
+function ejMultiCerrar(menos) {
+    Object.keys(EJ_MULTI).forEach(function (id) {
+        if (id === menos) return;
+        var l = document.getElementById(id + '-lista'); if (l) l.style.display = 'none';
+        var b = document.getElementById(id + '-btn'); if (b) b.classList.remove('abierto');
+    });
+}
+function ejMultiAlternar(id) {
+    var l = document.getElementById(id + '-lista'), b = document.getElementById(id + '-btn');
+    if (!l) return;
+    var abrir = l.style.display === 'none';
+    ejMultiCerrar(id);
+    l.style.display = abrir ? 'block' : 'none';
+    if (b) b.classList.toggle('abierto', abrir);
+}
+function ejMultiPintar(id) {
+    var el = document.getElementById(id), b = document.getElementById(id + '-btn'), l = document.getElementById(id + '-lista');
+    if (!el || !b || !l) return;
+    var cfg = EJ_MULTI[id], sel = ejMultiPartes(el._v), ops = EJ_LISTAS[cfg.lista].slice();
+    sel.forEach(function (x) { if (ops.indexOf(x) === -1) ops.push(x); });
+    b.textContent = sel.length ? sel.join(', ') : cfg.vacio;
+    b.title = sel.join(', ');
+    b.classList.toggle('vacio', !sel.length);
+    var lleno = cfg.max && sel.length >= cfg.max, arriba = l.scrollTop;
+    l.innerHTML = (cfg.max ? '<div class="ej-multi-nota">Máximo ' + cfg.max + (lleno ? ' · quita una para elegir otra' : '') + '</div>' : '')
+        + ops.map(function (o) {
+            var on = sel.indexOf(o) !== -1, off = lleno && !on;
+            return '<label class="ej-multi-op' + (off ? ' off' : '') + '"><input type="checkbox" value="' + ejMultiEsc(o) + '"' + (on ? ' checked' : '') + (off ? ' disabled' : '')
+                + ' onchange="ejMultiMarcar(\'' + id + '\', this)"><span>' + ejMultiEsc(o) + '</span></label>';
+        }).join('');
+    l.scrollTop = arriba;
+}
+function ejMultiMarcar(id, chk) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    var cfg = EJ_MULTI[id], sel = ejMultiPartes(el._v), i = sel.indexOf(chk.value);
+    if (chk.checked && i === -1) {
+        if (cfg.max && sel.length >= cfg.max) { chk.checked = false; return; }
+        sel.push(chk.value);
+    } else if (!chk.checked && i !== -1) sel.splice(i, 1);
+    el.value = sel.join(', ');
+}
 function ejBuildFicha() {
     const root = document.getElementById('ej-ficha-container');
     if (!root) return;
@@ -2805,69 +2928,19 @@ function ejBuildFicha() {
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:10px">
                 <div class="ej-field">
                     <label>Categoría</label>
-                    <select id="ej-categoria">
-                        <option value="">-- Seleccionar --</option>
-                        <option>Técnica individual</option>
-                        <option>Posesión</option>
-                        <option>Pressing</option>
-                        <option>Ataque posicional</option>
-                        <option>Defensa</option>
-                        <option>Transiciones</option>
-                        <option>Portería</option>
-                        <option>Físico</option>
-                        <option>Táctica</option>
-                    </select>
+                    ${ejMultiHtml('ej-categoria')}
                 </div>
                 <div class="ej-field">
                     <label>Categoría de edad</label>
-                    <select id="ej-edad">
-                        <option value="">-- Todas --</option>
-                        <option>Prebenjamín</option><option>Benjamín</option><option>Alevín</option>
-                        <option>Infantil</option><option>Cadete</option><option>Juvenil</option>
-                        <option>Senior</option>
-                    </select>
+                    ${ejMultiHtml('ej-edad')}
                 </div>
                 <div class="ej-field">
                     <label>Tema</label>
-                    <select id="ej-tema">
-                        <option value="">-- Seleccionar --</option>
-                        <option>Calentamiento</option>
-                        <option>Cambios de orientación</option>
-                        <option>Centros laterales</option>
-                        <option>Contraataque</option>
-                        <option>Defensa en bloque bajo</option>
-                        <option>Defensa en inferioridad</option>
-                        <option>Duelos</option>
-                        <option>Finalización</option>
-                        <option>Físico-Técnico</option>
-                        <option>Juego de posición</option>
-                        <option>Juego interior</option>
-                        <option>Juegos Lúdicos</option>
-                        <option>Partidos</option>
-                        <option>Porteros</option>
-                        <option>Posesiones</option>
-                        <option>Presión</option>
-                        <option>Press perdida</option>
-                        <option>Progresión en el juego</option>
-                        <option>Rondos</option>
-                        <option>Ruedas de pases</option>
-                        <option>Salida de balón</option>
-                        <option>Tercer hombre</option>
-                        <option>Trabajo táctico</option>
-                        <option>Transiciones</option>
-                        <option>Técnica individual</option>
-                    </select>
+                    ${ejMultiHtml('ej-tema')}
                 </div>
                 <div class="ej-field">
                     <label>Fase de juego</label>
-                    <select id="ej-fase">
-                        <option value="">-- Todas --</option>
-                        <option>Organización ofensiva</option>
-                        <option>Organización defensiva</option>
-                        <option>Transición ataque</option>
-                        <option>Transición defensa</option>
-                        <option>Balón parado</option>
-                    </select>
+                    ${ejMultiHtml('ej-fase')}
                 </div>
             </div>
 
@@ -2931,6 +3004,7 @@ function ejBuildFicha() {
         </div>
         <div id="ej-ficha-msg" style="margin-top:8px"></div>
     </div>`;
+    ejMultiMontar();
 }
 function ejSubirImagenFicha(input) {
     var file = input && input.files && input.files[0];
@@ -3746,27 +3820,13 @@ function ejBuildBanco() {
             </div>
             <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
                 <select id="ej-filter-tema" onchange="ejBancoSearch()" style="padding:4px 8px;font-size:11px;background:#1e293b;border:1px solid #334155;color:#cbd5e1;border-radius:6px;cursor:pointer">
-                    <option value="">Tema ▾</option>
-                    <option>Calentamiento</option><option>Cambios de orientación</option><option>Centros laterales</option>
-                    <option>Contraataque</option><option>Defensa en bloque bajo</option><option>Defensa en inferioridad</option>
-                    <option>Duelos</option><option>Finalización</option><option>Físico-Técnico</option>
-                    <option>Juego de posición</option><option>Juego interior</option><option>Juegos Lúdicos</option>
-                    <option>Partidos</option><option>Porteros</option><option>Posesiones</option>
-                    <option>Presión</option><option>Press perdida</option><option>Progresión en el juego</option>
-                    <option>Rondos</option><option>Ruedas de pases</option><option>Salida de balón</option>
-                    <option>Tercer hombre</option><option>Trabajo táctico</option><option>Transiciones</option>
-                    <option>Técnica individual</option>
+                    <option value="">Tema ▾</option>${ejListaOpciones('tema')}
                 </select>
                 <select id="ej-filter-cat" onchange="ejBancoSearch()" style="padding:4px 8px;font-size:11px;background:#1e293b;border:1px solid #334155;color:#cbd5e1;border-radius:6px;cursor:pointer">
-                    <option value="">Categoría ▾</option>
-                    <option>Técnica individual</option><option>Posesión</option><option>Pressing</option>
-                    <option>Ataque posicional</option><option>Defensa</option><option>Transiciones</option>
-                    <option>Portería</option><option>Físico</option><option>Táctica</option>
+                    <option value="">Categoría ▾</option>${ejListaOpciones('categoria')}
                 </select>
                 <select id="ej-filter-edad" onchange="ejBancoSearch()" style="padding:4px 8px;font-size:11px;background:#1e293b;border:1px solid #334155;color:#cbd5e1;border-radius:6px;cursor:pointer">
-                    <option value="">Edad ▾</option>
-                    <option>Prebenjamín</option><option>Benjamín</option><option>Alevín</option>
-                    <option>Infantil</option><option>Cadete</option><option>Juvenil</option><option>Senior</option>
+                    <option value="">Edad ▾</option>${ejListaOpciones('edad')}
                 </select>
                 <select id="ej-filter-dif" onchange="ejBancoSearch()" style="padding:4px 8px;font-size:11px;background:#1e293b;border:1px solid #334155;color:#cbd5e1;border-radius:6px;cursor:pointer">
                     <option value="">Dificultad ▾</option>
@@ -3774,9 +3834,7 @@ function ejBuildBanco() {
                     <option value="4">4</option><option value="5">5</option>
                 </select>
                 <select id="ej-filter-fase" onchange="ejBancoSearch()" style="padding:4px 8px;font-size:11px;background:#1e293b;border:1px solid #334155;color:#cbd5e1;border-radius:6px;cursor:pointer">
-                    <option value="">Fase ▾</option>
-                    <option>Organización ofensiva</option><option>Organización defensiva</option>
-                    <option>Transición ataque</option><option>Transición defensa</option><option>Balón parado</option>
+                    <option value="">Fase ▾</option>${ejListaOpciones('fase')}
                 </select>
                 <input type="number" id="ej-filter-jug" placeholder="Jugadores" min="1" max="30" oninput="ejBancoSearch()" style="width:75px;padding:4px 8px;font-size:11px;background:#1e293b;border:1px solid #334155;color:#cbd5e1;border-radius:6px">
                 <select id="ej-filter-gk" onchange="ejBancoSearch()" style="padding:4px 8px;font-size:11px;background:#1e293b;border:1px solid #334155;color:#cbd5e1;border-radius:6px;cursor:pointer"><option value="">🧤 Todos ▾</option><option value="si">Solo porteros</option><option value="no">Sin porteros</option></select>
@@ -4625,11 +4683,11 @@ function ejBancoSearch() {
     const dur  = parseInt(document.getElementById('ej-filter-dur')?.value) || 0;
     const filtered = ejBancoCache.filter(e =>
         (!q    || e.name?.toLowerCase().includes(q)) &&
-        (!tema || e.tema === tema) &&
-        (!cat  || e.category === cat) &&
-        (!edad || e.age_group === edad) &&
+        (!tema || ejMultiTiene(e.tema, tema)) &&
+        (!cat  || ejMultiTiene(e.category, cat)) &&
+        (!edad || ejMultiTiene(e.age_group, edad)) &&
         (!dif  || String(e.difficulty) === dif) &&
-        (!fase || e.game_phase === fase) &&
+        (!fase || ejMultiTiene(e.game_phase, fase)) &&
         (!jug  || e.players_count == jug) &&
         (!port || e.num_goalkeepers == port) &&
         (!gk    || (gk === 'si' ? e.es_portero === true : !e.es_portero)) &&

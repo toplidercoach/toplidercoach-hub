@@ -2560,6 +2560,12 @@ function renderMisEjercicios(data) {
         
 }
 
+// Tema y Fase de un ejercicio propio pueden traer varias opciones separadas por comas ("Rondos, Posesiones")
+function planMultiPartes(v) {
+    var out = [];
+    String(v == null ? '' : v).split(',').forEach(function (x) { x = x.trim(); if (x && out.indexOf(x) === -1) out.push(x); });
+    return out;
+}
 function construirFiltrosMisEjercicios(data) {
     var lista = document.getElementById('lista-ejercicios');
     var barra = document.getElementById('filtros-mis-ejercicios');
@@ -2575,8 +2581,8 @@ function construirFiltrosMisEjercicios(data) {
     subcatsGk.sort();
     var fases = ['Organización ofensiva','Organización defensiva','Transición ataque','Transición defensa','Balón parado'];
     data.forEach(function(e){
-        if (e.tema && temas.indexOf(e.tema) === -1) temas.push(e.tema);
-        if (e.game_phase && fases.indexOf(e.game_phase) === -1) fases.push(e.game_phase);
+        planMultiPartes(e.tema).forEach(function (t) { if (temas.indexOf(t) === -1) temas.push(t); });
+        planMultiPartes(e.game_phase).forEach(function (f) { if (fases.indexOf(f) === -1) fases.push(f); });
     });
     var st = 'padding:6px 8px;font-size:12px;border:1px solid #d1d5db;border-radius:6px;background:white;color:#374151';
     barra.innerHTML =
@@ -2612,8 +2618,8 @@ function filtrarMisEjercicios() {
     var filtrados = misEjerciciosCache.filter(function(e){
         return (!q || (e.name || '').toLowerCase().indexOf(q) !== -1) &&
                (!jug || (gk === 'si' ? (!e.players_count || e.players_count <= jug) : e.players_count == jug)) &&
-               (!tema || e.tema === tema) &&
-               (!fase || e.game_phase === fase) &&
+               (!tema || planMultiPartes(e.tema).indexOf(tema) !== -1) &&
+               (!fase || planMultiPartes(e.game_phase).indexOf(fase) !== -1) &&
                (gk === '' || (gk === 'si' ? e.es_portero === true : !e.es_portero)) &&
                (!gksub || e.subcategoria_portero === gksub);
     });
