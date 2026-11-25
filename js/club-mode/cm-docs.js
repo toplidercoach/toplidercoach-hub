@@ -18,6 +18,9 @@ var CMDOCS_CATS = [
     ['autorizaciones', 'Autorizaciones'],
     ['viajes', 'Viajes'],
     ['sesiones', 'Sesiones'],
+    ['informes_rivales', 'Informes rivales'],
+    ['informes_propios', 'Informes propios'],
+    ['informes_jugadores', 'Informes jugadores'],
     ['otros', 'Otros']
 ];
 var CMDOCS_CAT_LABEL = {};
@@ -75,7 +78,7 @@ async function cmDocsInit(contenedorId) {
         '.cmdocs-tit{color:#e2e8f0;font-size:14px;font-weight:600;margin:0 0 3px;word-break:break-word}' +
         '.cmdocs-meta{color:#64748b;font-size:11px;margin-bottom:8px}' +
         '.cmdocs-badge{display:inline-block;background:#0f172a;border:1px solid #334155;color:#94a3b8;border-radius:5px;padding:1px 7px;font-size:10px;margin-right:4px}' +
-        '.cmdocs-acts{display:flex;gap:8px;margin-top:6px}' +
+        '.cmdocs-acts{display:flex;gap:4px 10px;flex-wrap:wrap;margin-top:6px}' +
         '.cmdocs-lk{color:#60a5fa;font-size:12px;cursor:pointer;text-decoration:none}.cmdocs-lk:hover{text-decoration:underline}' +
         '.cmdocs-lk.rojo{color:#f87171}' +
         '.cmdocs-empty{text-align:center;color:#64748b;padding:50px 20px}' +
@@ -183,6 +186,7 @@ function cmDocsRenderLista() {
                 '<span class="cmdocs-badge">' + vis + '</span>' +
                 '<div class="cmdocs-acts">' +
                     '<a class="cmdocs-lk" onclick="cmDocsDescargar(\'' + d.id + '\')">Ver / Descargar</a>' +
+                    (editable ? '<a class="cmdocs-lk" onclick="cmDocsAbrirMover(\'' + d.id + '\')">Cambiar categoria</a>' : '') +
                     (editable ? '<a class="cmdocs-lk rojo" onclick="cmDocsArchivar(\'' + d.id + '\')">Archivar</a>' : '') +
                 '</div>' +
             '</div>' +
@@ -298,6 +302,53 @@ async function cmDocsSubir() {
         showToast('Error al subir: ' + (e.message || e), 'error');
         if (btn) { btn.disabled = false; btn.textContent = 'Subir'; }
     }
+}
+
+// ========== CAMBIAR DE CATEGORIA ==========
+function cmDocsAbrirMover(id) {
+    if (!cmDocsPuedeEditar()) return;
+    var d = null;
+    cmDocsLista.forEach(function(x) { if (x.id === id) d = x; });
+    if (!d) return;
+    var prev = document.getElementById('cmdocs-modal-mover');
+    if (prev) prev.remove();
+    var catOpts = CMDOCS_CATS.map(function(c) {
+        return '<option value="' + c[0] + '"' + (c[0] === d.category ? ' selected' : '') + '>' + c[1] + '</option>';
+    }).join('');
+    var ov = document.createElement('div');
+    ov.className = 'cmdocs-ov';
+    ov.id = 'cmdocs-modal-mover';
+    ov.innerHTML =
+        '<div class="cmdocs-modal">' +
+            '<h3>Cambiar categoria</h3>' +
+            '<p style="color:#94a3b8;font-size:13px;margin:0 0 12px">' + cmDocsEsc(d.title) + '</p>' +
+            '<div class="cmdocs-fld"><label>Categoria</label><select id="cmdocs-mover-cat">' + catOpts + '</select></div>' +
+            '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">' +
+                '<button class="cmdocs-btn cmdocs-btn-secondary" onclick="document.getElementById(\'cmdocs-modal-mover\').remove()">Cancelar</button>' +
+                '<button class="cmdocs-btn cmdocs-btn-primary" id="cmdocs-btn-mover" onclick="cmDocsMover(\'' + d.id + '\')">Guardar</button>' +
+            '</div>' +
+        '</div>';
+    ov.addEventListener('click', function(e) { if (e.target === ov) ov.remove(); });
+    document.body.appendChild(ov);
+}
+
+async function cmDocsMover(id) {
+    var sel = document.getElementById('cmdocs-mover-cat');
+    if (!sel) return;
+    var cat = sel.value;
+    if (!CMDOCS_CAT_LABEL[cat]) return;
+    var btn = document.getElementById('cmdocs-btn-mover');
+    if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
+    var r = await supabaseClient.from('cm_docs').update({ category: cat }).eq('id', id);
+    if (r.error) {
+        showToast('Error: ' + r.error.message, 'error');
+        if (btn) { btn.disabled = false; btn.textContent = 'Guardar'; }
+        return;
+    }
+    var m = document.getElementById('cmdocs-modal-mover');
+    if (m) m.remove();
+    showToast('Documento movido a ' + CMDOCS_CAT_LABEL[cat]);
+    await cmDocsCargar();
 }
 
 // ========== ARCHIVAR ==========
