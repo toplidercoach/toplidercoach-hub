@@ -486,7 +486,7 @@ function ejRenderSVG() {
 
     // Jugadores (encima de todo)
     for (const p of ejP.players) {
-        const isGk = p.number == 1 && p.team !== 'tarea';
+        const isGk = p.number == 1 && p.team !== 'tarea' && !p.colorFijo;
         const gkColor = ejEsRival(p) ? ejP.rivalGkColor : ejP.myGkColor;
         const effectiveColor = isGk ? gkColor : p.color;
         const tc = ejFichaColores(p, effectiveColor);
@@ -2070,14 +2070,6 @@ function ejChangePlayerSize(dir) {
     ejRenderSVG();
 }
 
-function ejChangePlayerColor(color) {
-    if (!ejP.selectedId) return;
-    ejP.players = ejP.players.map(p =>
-        p.id === ejP.selectedId ? { ...p, color } : p
-    );
-    ejSaveHistory();
-    ejRenderSVG();
-}
 function ejChangePlayerNumber(val) {
     if (!ejP.selectedId) return;
     ejP.players = ejP.players.map(p =>
@@ -2354,8 +2346,7 @@ ${ejP.animMode ? `<div style="background:#7c3aed;border:1px solid #a855f7;margin
                     <input type="checkbox" ${selPlayer.showNumber?'checked':''} onchange="ejTogglePlayerNumber(this.checked)"> Ver nº
                 </label>
             </div>
-            <label style="font-size:11px;color:#9ca3af">Cambiar color:</label>
-            ${colorSwatches(selPlayer.color, true, true, 'ejChangePlayerColor')}
+            <div style="font-size:10px;color:#64748b">El color se cambia con el botón redondo de la barrita que sale junto al jugador.</div>
         </div>` : ''}
     </div>` : ''}
 
@@ -7018,6 +7009,11 @@ function ejObjColor(valor) {
     var it = s.items[0];
     ejSaveHistory();
     it.obj.color = valor === 'null' ? null : valor;
+    if (it.type === 'player') {
+        // Color puesto a mano: manda sobre el color de portero (dorsal 1) y sobre el del papel de la ficha de tarea
+        it.obj.colorFijo = true;
+        delete it.obj.rol;
+    }
     ejP._objPaleta = false;
     ejObjTrasCambio();
 }
@@ -7050,7 +7046,7 @@ function ejObjBar() {
     var bar = document.getElementById('ej-objbar');
     if (!bar) { bar = document.createElement('div'); bar.id = 'ej-objbar'; area.appendChild(bar); }
     var s = ejObjSel();
-    if (!s || ejP.activeTool !== 'select' || ejP.isDragging || ejP.isDrawing || ejP.isPlaying || ejP._presentOn || ejP._marquee) { bar.style.display = 'none'; ejP._objPaleta = false; return; }
+    if (!s || ejP._objBarQuieta || ejP.activeTool !== 'select' || ejP.isDragging || ejP.isDrawing || ejP.isPlaying || ejP._presentOn || ejP._marquee) { bar.style.display = 'none'; ejP._objPaleta = false; return; }
     var uno = s.varios ? null : s.items[0];
     var hay = function (t) { return s.items.some(function (it) { return it.type === t; }); };
     var B = function (ic, fn, titulo, cls) {
@@ -7066,7 +7062,9 @@ function ejObjBar() {
     if (hay('equipment')) { h += B('gi', 'ejObjGirar(-15)', 'Girar a la izquierda'); h += B('gd', 'ejObjGirar(15)', 'Girar a la derecha'); }
     if (hay('equipment') || hay('player')) { h += B('me', 'ejObjTam(\'down\')', 'Más pequeño'); h += B('ma', 'ejObjTam(\'up\')', 'Más grande'); }
     if (uno) {
-        var col = uno.type === 'player' ? ejFichaColores(uno.obj, uno.obj.color).fill : (uno.obj.color || '#94a3b8');
+        var colJug = uno.type === 'player' && uno.obj.number == 1 && uno.obj.team !== 'tarea' && !uno.obj.colorFijo
+            ? (ejEsRival(uno.obj) ? ejP.rivalGkColor : ejP.myGkColor) : uno.obj.color;
+        var col = uno.type === 'player' ? ejFichaColores(uno.obj, colJug).fill : (uno.obj.color || '#94a3b8');
         h += '<button type="button" class="ej-ob-col' + (ejP._objPaleta ? ' on' : '') + '" onclick="ejObjPaleta()" title="Color"><i style="background:' + col + '"></i></button>';
         if (uno.type === 'text') h += B('ed', 'ejEditarTexto()', 'Editar el texto');
         h += B('mas', 'ejObjMas()', 'Más opciones en el panel');
@@ -7147,6 +7145,7 @@ function ejDelete() {
 // la barrita del objeto y el borrado arrastrando a la franja inferior
 function ejSvgPointerDown(e) {
     ejP._objPaleta = false;
+    ejP._pulso = { x: e.clientX, y: e.clientY };
     var nJug = ejP.players.length;
     ejPunteroBajar(e);
     // Las fichas de tarea no llevan dorsal
@@ -7173,6 +7172,11 @@ function ejSvgPointerMove(e) {
 function ejSvgPointerUp(e) {
     var a = ejP._arr;
     ejP._arr = null;
+    // La barrita del objeto sale al tocarlo sin moverlo (o al acabar un recuadro de selección).
+    // Si se ha arrastrado algo, no sale: solo se quería mover.
+    var pu = ejP._pulso;
+    ejP._pulso = null;
+    ejP._objBarQuieta = !ejP._marquee && !!pu && (Math.abs(e.clientX - pu.x) + Math.abs(e.clientY - pu.y) > 8);
     if (a && a.movido && ejP.isDragging && ejObjZonaBorrar(e)) {
         // Se suelta en la franja: el objeto vuelve a donde estaba y se borra, así deshacer lo recupera en su sitio
         ejP.players = JSON.parse(a.copia.players); ejP.lines = JSON.parse(a.copia.lines); ejP.shapes = JSON.parse(a.copia.shapes);
