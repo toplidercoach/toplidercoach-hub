@@ -7577,12 +7577,40 @@ function ejIrEquipacion() {
 }
 // Barras que acompañan a la pizarra: jugadores arriba, hueco del panel y opciones del objeto
 function ejBarrasSync() {
-    ejRenderJugBar();
+    ejRenderJugBar(); ejFranjaAjustar();
     ejPanelHueco();
     ejObjBar();
     if (ejP._jugModalPend && ejP._plantilla && ejP._plantilla.length && !!ejP._plantillaEsRival === !!ejP._addingRival) { ejP._jugModalPend = false; ejJugModalAbrir(); }
 }
-window.addEventListener('resize', function () { ejPanelHueco(); ejObjBar(); });
+window.addEventListener('resize', function () { ejPanelHueco(); ejObjBar(); ejFranjaAjustar(); });
+// La franja superior se ajusta al ancho real disponible (menu del HUB abierto, plegado u oculto):
+// los botones de la derecha (Proyectos, Presentar, Nueva pizarra) nunca tapan la barra de jugadores.
+var EJ_FRANJA_NIVELES = 6;
+function ejFranjaAjustar() {
+    var mod = document.querySelector('.ej-module');
+    var nav = mod && mod.querySelector('.ej-nav');
+    if (!mod || !nav) return;
+    if (window.ResizeObserver && ejFranjaAjustar._nav !== nav) {
+        if (ejFranjaAjustar._ro) ejFranjaAjustar._ro.disconnect();
+        ejFranjaAjustar._ro = new ResizeObserver(function () { ejFranjaAjustar(); });
+        ejFranjaAjustar._ro.observe(nav);
+        ejFranjaAjustar._nav = nav;
+    }
+    var n;
+    for (n = 1; n <= EJ_FRANJA_NIVELES; n++) mod.classList.remove('ej-fr' + n);
+    var jb = document.getElementById('ej-jugbar');
+    var tb = document.getElementById('ej-pizarra-topbar');
+    if (!jb || !tb) return;
+    function tapa() {
+        var a = jb.getBoundingClientRect(), b = tb.getBoundingClientRect();
+        if (!a.width || !b.width) return false;
+        return a.right + 8 > b.left && a.bottom > b.top && a.top < b.bottom;
+    }
+    for (n = 1; n <= EJ_FRANJA_NIVELES && tapa(); n++) {
+        if (n === EJ_FRANJA_NIVELES) nav.style.setProperty('--ej-tbw', Math.ceil(tb.getBoundingClientRect().width + 14) + 'px');
+        mod.classList.add('ej-fr' + n);
+    }
+}
 
 // =====================================================================
 // PIZARRA · VÍDEO DE LA ANIMACIÓN

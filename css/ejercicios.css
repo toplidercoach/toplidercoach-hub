@@ -658,3 +658,37 @@
 .ej-field label.ej-multi-op.off { color: #6b7280; cursor: default; }
 .ej-field label.ej-multi-op.off:hover { background: none; }
 .ej-field label.ej-multi-op input { width: 15px; height: 15px; padding: 0; margin: 0; flex: none; accent-color: #3b82f6; }
+/* ===== Franja superior ajustada al ancho real disponible (lo calcula ejFranjaAjustar en ejercicios.js) =====
+   Cada nivel se suma al anterior y solo se aplica si los botones de la derecha llegarian a tapar la barra de jugadores. */
+/* 1 · sin el nombre de la pizarra */
+.ej-module.ej-fr1 #ej-pizarra-topbar > div:first-child { display: none !important; }
+/* 2 · Proyectos, Presentar y Nueva pizarra solo con icono */
+.ej-module.ej-fr2 #ej-pizarra-topbar .ej-tb-btn .ej-txt { display: none; }
+.ej-module.ej-fr2 #ej-pizarra-topbar .ej-tb-btn { padding: 0 9px; }
+/* 3 · barra de jugadores compacta */
+.ej-module.ej-fr3 #ej-jugbar { margin-left: 6px; padding-left: 8px; gap: 5px; }
+.ej-module.ej-fr3 .ej-jb-txt { display: none; }
+.ej-module.ej-fr3 .ej-jb-seg button { padding: 5px 7px; }
+.ej-module.ej-fr3 .ej-jb-btn, .ej-module.ej-fr3 .ej-jb-sel { padding: 0 7px; }
+.ej-module.ej-fr3 .ej-jb-sel { width: 86px; }
+.ej-module.ej-fr3 .ej-jb-dat { width: 90px; }
+.ej-module.ej-fr3 .ej-jb-dots { gap: 4px; padding: 0 2px 0 6px; }
+.ej-module.ej-fr3 .ej-jb-dot { width: 18px; height: 18px; }
+.ej-module.ej-fr3 .ej-nav .ej-nav-btn { padding-left: 10px; padding-right: 10px; }
+/* 4 · Pizarra, Ficha y Banco solo con icono */
+.ej-module.ej-fr4 .ej-nav .ej-nav-btn .ej-txt { display: none; }
+.ej-module.ej-fr4 #ej-jugbar { gap: 4px; }
+.ej-module.ej-fr4 .ej-jb-sel { width: 76px; }
+.ej-module.ej-fr4 .ej-jb-dat { width: 72px; }
+.ej-module.ej-fr4 .ej-jb-dots { gap: 3px; padding: 0 1px 0 5px; }
+.ej-module.ej-fr4 .ej-jb-dot { width: 16px; height: 16px; }
+.ej-module.ej-fr4 .ej-jb-seg button { padding: 5px 6px; }
+.ej-module.ej-fr4 .ej-jb-btn, .ej-module.ej-fr4 .ej-jb-sel { padding: 0 6px; }
+/* 5 · sin los puntos de color */
+.ej-module.ej-fr5 .ej-jb-dots { display: none; }
+.ej-module.ej-fr5 #ej-jugbar { margin-left: 2px; padding-left: 5px; }
+/* 6 · ultimo recurso: la barra de jugadores se desliza, pero nada queda debajo de otros botones */
+.ej-module.ej-fr6 .ej-nav { padding-right: var(--ej-tbw, 140px); }
+.ej-module.ej-fr6 #ej-jugbar { flex: 1 1 0; min-width: 0; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+.ej-module.ej-fr6 #ej-jugbar::-webkit-scrollbar { display: none; }
+.ej-module.ej-fr6 #ej-jugbar > * { flex: none; }
