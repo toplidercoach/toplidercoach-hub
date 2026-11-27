@@ -20,6 +20,30 @@ function asisFiltrarCelebradas(sesiones) {
 }
 // Asistencia por rango de fechas, filtro por temporada, bienestar, PDF individual y general
 
+// Lee TODOS los registros de asistencia de una lista de sesiones.
+// Supabase corta cada consulta a 1000 filas sin avisar: por eso se lee por paginas.
+async function asisCargarAsistencias(sesionIds) {
+    var todas = [];
+    var TAM = 1000;
+    for (var i = 0; i < sesionIds.length; i += 100) {
+        var trozo = sesionIds.slice(i, i + 100);
+        var desde = 0;
+        while (true) {
+            const { data, error } = await supabaseClient
+                .from('asistencia_sesiones')
+                .select('*')
+                .in('sesion_id', trozo)
+                .order('id', { ascending: true })
+                .range(desde, desde + TAM - 1);
+            if (error) throw error;
+            todas = todas.concat(data || []);
+            if (!data || data.length < TAM) break;
+            desde += TAM;
+        }
+    }
+    return todas;
+}
+
 (function() {
     if (document.getElementById('wreg-styles')) return;
     const st = document.createElement('style');
@@ -222,7 +246,7 @@ async function cargarAsistenciaRango() {
         
         const { data: sesiones, error: errSes } = await querySesiones;
         // Contar sesiones celebradas O con asistencia ya registrada (aunque no haya llegado su hora)
-        var idsRango = (sesiones || []).map(s => s.id);
+        var idsRango = (sesiones || []).filter(s => !asisSesionYaCelebrada(s)).map(s => s.id);
         var idsConRegistros = {};
         if (idsRango.length > 0) {
             const { data: regPrevios } = await supabaseClient
@@ -288,10 +312,7 @@ async function cargarAsistenciaRango() {
         
         // Asistencias del periodo
         const sesionIds = sesiones.map(s => s.id);
-        const { data: asistencias } = await supabaseClient
-            .from('asistencia_sesiones')
-            .select('*')
-            .in('sesion_id', sesionIds);
+        const asistencias = await asisCargarAsistencias(sesionIds);
         
         // Calcular stats por jugador
         let htmlRows = '';
@@ -1177,8 +1198,7 @@ async function generarPDFPlantillaGeneral() {
         
         // Asistencias
         const sesionIds = sesiones.map(s => s.id);
-        const { data: asistencias } = await supabaseClient
-            .from('asistencia_sesiones').select('*').in('sesion_id', sesionIds);
+        const asistencias = await asisCargarAsistencias(sesionIds);
         
         // Calcular stats por jugador
         const statsJugadores = jugadores.map(j => {
